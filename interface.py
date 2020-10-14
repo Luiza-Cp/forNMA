@@ -161,7 +161,7 @@ class GUI(QMainWindow):
 
     def load_data(self) -> None:
         """Opens a file dialog, prompting the user to select the data (Excel spreadsheet) to load."""
-        query = QFileDialog.getExistingDirectory(self, 'Select input folder', options=QFileDialog.DontUseNativeDialog)
+        query = QFileDialog.getExistingDirectory(self, 'Select input folder')
         if query:
             self.load_data_line.setText(query)
 
@@ -274,7 +274,7 @@ class GUI(QMainWindow):
                 target.addAction(action)
 
     def on_menu_save(self):
-        path, ext = QFileDialog.getSaveFileName(self, 'Save file', '', "*.png", options=QFileDialog.DontUseNativeDialog)
+        path, ext = QFileDialog.getSaveFileName(self, 'Save file', '', "*.png")
         if path:
             self.canvas.print_figure(path, dpi=100)
             self.statusBar().showMessage(f'Saved to {path}', 2000)
