@@ -27,6 +27,8 @@ import copy
 from scipy import stats
 import os
 
+
+
 class cell:
     def __init__(self, n, cnt, bbox, ring_size, rf):
         self.n = n
@@ -47,8 +49,8 @@ class cell:
         self.NII = self.calc_NII()
         self.nuc, self.mask = self.calc_nuc_mask()
         self.mean_intensity = self.calc_mean_intensity()
-        self.bbox2= self.bbox2()
-        self.expand_nuc = self.expand_nuc()
+        self.bbox2= self.calc_bbox2()
+        self.expand_nuc = self.calc_expand_nuc()
         self.ring, self.mean_ring = self.find_ring()
         self.NC_ratio = self.mean_intensity/ self.mean_ring[0]
         self.CN_ratio = self.mean_ring[0]/self.mean_intensity
@@ -101,7 +103,7 @@ class cell:
         mean_I= cv.mean(nuc,mask =mask)
         return mean_I[0]
     
-    def bbox2(self):
+    def calc_bbox2(self):
         factor = ring_size*2
         x2 = self.bbox[0] - factor
         y2 = self.bbox[1] - factor
@@ -117,7 +119,7 @@ class cell:
             h2 = img1.shape[0]
         return (x2,y2,w2,h2)
         
-    def expand_nuc(self):
+    def calc_expand_nuc(self):
         '''returns the integer mask (np.array) of the expanded nuc'''
         x2 = self.bbox2[0] 
         y2 = self.bbox2[1] 
@@ -217,6 +219,7 @@ class cell:
         return tot_area
 
 
+
 class foci:
     def __init__(self, n, cnt, orig_nuc, mask_foci):
         self.n = n
@@ -236,10 +239,6 @@ class foci:
         mask = mask.astype('uint8')
         mean = cv.mean(nuc, mask= mask)
         return mean
-        
-
-    
-
        
         
 '''------------------------------------------------------------'''       
@@ -255,7 +254,6 @@ def dot_count(cell_list):
     print ("More than 10 dots: ", z)
      
     
-
 def all_cnt(cell_list):
     '''cria uma lista com todos os contornos de todos os pontos'''
     all_cnt =  []   
@@ -267,8 +265,8 @@ def all_cnt(cell_list):
 def draw_all_cnt(cnt_foci, cnt_nuc):
     '''recebe a lista de todos os contornos + lista de contornos 
     do nucleo (contous)'''
-    cv.drawContours(eq_img1,cnt_foci, -1,  (255,0,0),2)
-    cv.drawContours(eq_img1,cnt_nuc,-1,  (255,0,0),2)
+    cv.drawContours(eq_img1,cnt_foci, -1,  (255,0,0),1)
+    cv.drawContours(eq_img1,cnt_nuc,-1,  (255,0,0),1)
     cv.namedWindow('finalImg', cv.WINDOW_NORMAL)
     cv.imshow("finalImg",eq_img1)
     cv.waitKey(0)
@@ -350,7 +348,7 @@ def watershed(imag, binary_im):
     img2 = color.label2rgb(markers, bg_label=0)
     markers1 = markers.astype(np.uint8)
     ret, imm2 = cv.threshold(markers1, 0, 255, cv.THRESH_BINARY|cv.THRESH_OTSU)
-    for i in range(22):
+    for i in range(round(rf*22)):
          imm2 = cv.blur(imm2,(3,3))
     imm2 =  cv.erode (imm2, kernel, iterations=round(6*rf))
     contours, hierarchy = cv.findContours(imm2, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
@@ -372,10 +370,10 @@ def adjust_cnt(contours_list,bin_img, img, rf):
         if arbox > 0.57:
             new_cnt_list.append(cnt)
         else:
-            x2 = x - round(30 *rf)
-            y2 = y - round(30 *rf)
-            w2 = w + round(60 *rf)
-            h2 = h + round(60 *rf)
+            x2 = x - round(50 *rf)
+            y2 = y - round(50 *rf)
+            w2 = w + round(100 *rf)
+            h2 = h + round(100 *rf)
             if x2 < 0:
                 x2 = 0
             if y2 < 0:
@@ -395,16 +393,19 @@ def adjust_cnt(contours_list,bin_img, img, rf):
             for i in range(len(cnt2)):
                 if hrc[0,i,2] == -1:
                     cnt_adjusted.append(np.array(cnt2[i]))
-                  
-            if len(cnt_adjusted) < 2:
+                    
+            if x2==0 or y2==0 or w2 == bin_img.shape[1] or h2 == bin_img.shape[0] and len(cnt_adjusted) < 2:
                 new_cnt_list.append(cnt)
-            else:
-                
-                for contour in cnt_adjusted:
-                    for pix in contour:
-                        pix[0][0] = pix[0][0] + x2
-                        pix[0][1] = pix[0][1] + y2
-                    new_cnt_list.append(contour)             
+            else:     
+            
+                if len(cnt_adjusted) < 2:
+                    new_cnt_list.append(cnt)
+                else:
+                    for contour in cnt_adjusted:
+                        for pix in contour:
+                            pix[0][0] = pix[0][0] + x2
+                            pix[0][1] = pix[0][1] + y2
+                        new_cnt_list.append(contour)             
                     
                         
     #cv.drawContours(img,new_cnt_list,-1,  (255,0,0),2)
@@ -435,9 +436,9 @@ def adjust_binary_img (binary_img):
     erode =  cv.erode (binary_img, kernel, iterations=1)
     opening = cv.morphologyEx(erode, cv.MORPH_OPEN, kernel, iterations=round(2*rf))
     dilate =  cv.dilate (opening, kernel, iterations=round(6*rf))
-    binary_img=  cv.erode (dilate, kernel, iterations=round(6*rf))
+    binary_img= cv.erode (dilate, kernel, iterations=round(6*rf))
     binary_img = binary_img.astype(np.uint8)
-    for i in range(12):
+    for i in range(round(12*rf)):
         binary_img = cv.blur(binary_img,(9,9))
     binary_img = binary_img <1 
     binary_img = clear_border(binary_img) 
@@ -447,6 +448,7 @@ def adjust_binary_img (binary_img):
 def find_binary_img (eq_im):
     thresh = threshold_triangle(eq_im)
     binary_img = eq_im <= thresh 
+    plt.imshow(binary_img)
     return binary_img
 
 
@@ -455,6 +457,18 @@ def find_binary_img_yen (eq_im):
     binary_img = eq_im <= thresh 
     return binary_img
 
+def plot_NMA_general (dictionary):
+    df_NMA_ellipse= pd.DataFrame(columns = ['Nucleus', 'Area',"NII" , "Foci Count", 
+                                            "c/n ratio", 'n/c ratio'])
+    for key,value in dict_NMA.items():
+        if key[1]==True:
+            df_NMA_ellipse= df_NMA_ellipse.append(value,ignore_index = True)
+    ellipse = thresh_NMA(df_NMA_ellipse)
+    plot_NMA(df_NMA_ellipse, ellipse)
+    for key,value in dict_NMA.items():
+        if key[1]==False:  
+            plt.figure()
+            plot_NMA(value, ellipse)
 
 '''--------------------------------------------------------------'''
 
@@ -466,10 +480,7 @@ im6 ='a.tif'
 im7 = 'b.tif'
 
 
-folders = [('C:\\Users\\Luiza Cherobini\\Desktop\\tesste\\Sem pontos', True),
-           ('C:\\Users\\Luiza Cherobini\\Desktop\\tesste\\1 ou 2 grandes', True),
-           ('C:\\Users\\Luiza Cherobini\\Desktop\\tesste\\muitos pequenos', False),
-           ('C:\\Users\\Luiza Cherobini\\Desktop\\tesste\\muitos definidos', False)]
+folders = [('C:\\Users\\Luiza Cherobini\\Documents\\Doutorado\\53BP1\\Outras img\\20x', True)]
 ###TRansformar todas as imagens em UINT 8?  
 
 
@@ -542,6 +553,11 @@ for folder in folders:
     
     
             dict_cells[filename] = cells
+            draw_all_cnt(all_cnt(cells), contours)
+            cv.namedWindow(filename, cv.WINDOW_NORMAL)
+            cv.imshow(filename,eq_img1)
+            cv.waitKey(0)
+            cv.destroyAllWindows()
 
 
     for key, value in dict_cells.items():
@@ -561,17 +577,8 @@ for folder in folders:
     dict_NMA[folder] = df_NMA
 
 
-df_NMA_ellipse= pd.DataFrame(columns = ['Nucleus', 'Area',"NII" , "Foci Count", 
-                                     "c/n ratio", 'n/c ratio'])
-for key,value in dict_NMA.items():
-    if key[1]==True:
-        df_NMA_ellipse= df_NMA_ellipse.append(value,ignore_index = True)
 
 
 
-ellipse = thresh_NMA(df_NMA_ellipse)
-plot_NMA(df_NMA_ellipse, ellipse)
-for key,value in dict_NMA.items():
-    if key[1]==False:  
-        plt.figure()
-        plot_NMA(value, ellipse)
+
+
