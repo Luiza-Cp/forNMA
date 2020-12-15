@@ -107,8 +107,8 @@ def foci_in_categories(dataFrame):
 #pensar em magnificação 5x para coisas como NMAe maybe ktr
 #aqui tem a main antes dessa
 
-def analyze_folder(folder_items, is_this_control, wants_foci, wants_NMA, wants_ktr,
-                    magnification, convert_to_micrometer = 1, folder2_items = None ):
+def generate_dfs(folder_items, wants_foci, wants_ktr, magnification, 
+                   convert_to_micrometer = 1, folder2_items = None ):
    
     df_nuc_features = pd.DataFrame(columns = ['Image','Nucleus', 'Nucleus Area', 'NII',
                                 'Foci Count', 'Total Foci Area', 'Foci Mean Intensity',
@@ -120,6 +120,7 @@ def analyze_folder(folder_items, is_this_control, wants_foci, wants_NMA, wants_k
                                                'Area','Mean Intensity'])
     
     df_foci_categories = foci_in_categories(df_nuc_features)
+    
     cells_dict =  {} 
     
     
@@ -150,5 +151,5 @@ def analyze_folder(folder_items, is_this_control, wants_foci, wants_NMA, wants_k
       
             
 
-fitems = ['muitos pontos pequenos.tif']
-#df_foci, df_nuc, df_cat, cells = analyze_folder(fitems, False, False, False, True, 60, folder2_items = fitems)
+#fitems = ['muitos pontos pequenos.tif']
+#df_foci, df_nuc, df_cat, cells = generate_dfs(fitems, True, False, False, 60)

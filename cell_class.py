@@ -13,9 +13,10 @@ from skimage.segmentation import clear_border
 from foci_class import foci
 
 class cell:
-    def __init__(self, n, cnt, ring_size, rf, image, binary_img, wants_foci):
+    def __init__(self, n, cnt, ring_size, rf, image, binary_img, wants_foci, mag):
         self.n = n
         self.rf = rf
+        self.mag = mag
         self.cnt = cnt
         self.image = image
         self.binary_img = binary_img
@@ -133,7 +134,7 @@ class cell:
         devolve uma msk com lbp'''
         nuc = self.nuc
         mask = self.mask
-        radius = 5
+        radius = 3
         n_points = 8 * radius
         METHOD = 'uniform'
         lbp = local_binary_pattern(nuc, n_points, radius, METHOD)
@@ -149,7 +150,7 @@ class cell:
         dots = cv.morphologyEx(dots, cv.MORPH_CLOSE, kernel, iterations=1)
         dots =  cv.dilate (dots, kernel, iterations=1)
         for i in range(6):
-            dots = cv.GaussianBlur(dots,(3,3),2)
+            dots = cv.GaussianBlur(dots_binary,(3,3),2)
         
         mask = self.mask
         dots = clear_border(dots)
@@ -159,6 +160,7 @@ class cell:
         
         contours_foci, hierarchy_foci = cv.findContours(dots, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         contours_foci  = [a for a in contours_foci if len(a)>4]
+       
         
         if len(contours_foci) >0:
             areas = []

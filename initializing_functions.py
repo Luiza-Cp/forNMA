@@ -242,7 +242,7 @@ def generate_cell_list(filename, magnification, wants_foci):
     position = 1
     for i in range (len(nuc_contours)):
         new_cell = cell(position, nuc_contours[i], ring_size, resolution_factor, 
-                        img, binary_img, wants_foci)
+                        img, binary_img, wants_foci, magnification)
         cells_list.append(new_cell)
         position = position + 1
         
