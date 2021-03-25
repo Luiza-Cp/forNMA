@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Oct 27 23:13:03 2020
+Created on Sun Jan 10 23:11:06 2021
 
 @author: Luiza
+nova versão do untitled_0 
 """
+
 from matplotlib import pyplot as plt
 from skimage import io, img_as_float, exposure,color
 from skimage.filters import  threshold_triangle, threshold_yen
@@ -11,10 +13,9 @@ from skimage.segmentation import clear_border
 import cv2 as cv
 import numpy as np
 import copy
-from cell_class import cell 
+from Cell_class_new import Cell 
 import os
 import math
-
 
 def set_thresh_triangle (equalized_image):
     thresh = threshold_triangle(equalized_image)
@@ -27,6 +28,7 @@ def set_thresh_yen (equalized_image):
     return binary_img
 
 def read_image(image):
+
     try:
         img1= img_as_float(io.imread(image,  plugin='pil'))
         equalized_img1 = exposure.equalize_adapthist(img1) 
@@ -45,7 +47,6 @@ def read_image(image):
 def adjust_low_res_binary_img(binary_image, kernel, px_s):
     erode =  cv.erode (binary_image, kernel, iterations=1)
     dilate =  cv.dilate (erode, kernel, iterations=round(0.65/px_s))
-    plt.imshow(dilate)
     return dilate
 
 def adjust_binary_img(binary_image, kernel, px_s):
@@ -61,7 +62,7 @@ def adjust_binary_image (binary_image, pixel_size, rf):
     
     if pixel_size > 0.3:
         bin_im = adjust_low_res_binary_img(binary_image, kernel, pixel_size)
-        plt.imshow(bin_im)
+       
         kernel_size = 9
     else: 
         bin_im = adjust_binary_img(binary_image, kernel, pixel_size)
@@ -84,7 +85,10 @@ def find_extent_convex_hull(contour):
     a = cv.contourArea(contour)
     hull = cv.convexHull(contour)
     hull_a = cv.contourArea(hull)
-    extent_hull = a/hull_a
+    if hull_a == 0:
+        extent_hull = 0
+    else:
+        extent_hull = a/hull_a
     return extent_hull, x, y, w, h
 
 def find_bigger_bbox(image, x, y, w, h, rf):
@@ -248,7 +252,7 @@ def divide_contours(contours_list,bin_img, img, rf, px_s):
                 new_contour_hull = hull_defects(contour, roi_binary, x2, y2)
                 if len(new_contour_hull) < 2:
                     new_cnt_list.append(contour)
-                else:
+                else: #colocar isso num for loop e ver como fica
                     new_contour_hull = adjust_contour_for_image(new_contour_hull, x2, y2)
                     for cnt_hull in new_contour_hull:
                         new_cnt_list.append(cnt_hull)
@@ -278,17 +282,22 @@ def divide_contours(contours_list,bin_img, img, rf, px_s):
                              new_cnt_list.append(cnt)                                              
     return(new_cnt_list)
 
-
+    
 def filter_contour_by_size(contours_list, magnification, pixel_size):
     areas = []
     for cnt in contours_list:
         areas.append(cv.contourArea(cnt))
     area2 = copy.deepcopy(areas)
-    i = round( len(areas)/2)
-    area2.sort()
-    median = area2[i]
-    max_a = 15*median
-    min1 = (sum(area2)/len(area2))/3
+    if len (area2) > 0:
+        i = round( len(areas)/2)
+        area2.sort()
+        median = area2[i]
+        max_a = 15*median
+        min1 = (sum(area2)/len(area2))/3
+    
+    else:
+        max_a=0
+        min1 = 0
     min2 = 15*magnification*pixel_size
     if min1>min2:
         min_a = min1
@@ -300,97 +309,126 @@ def filter_contour_by_size(contours_list, magnification, pixel_size):
     for cnt in contours_list2:
         ex,_,_,_,_ = find_extent_convex_hull(cnt)
         extent_hull.append(ex)
-    contours_list2 = [b for a, b in zip(extent_hull, contours_list2) if a > 0.88]    
+    contours_list2 = [b for a , b in zip(extent_hull, contours_list2) if a > 0.88]    
     return (contours_list2)  
 
 def find_nuc_contours(binary_image, image, rf, px_s, mag):
     contours, hierarchy = cv.findContours(binary_image, cv.RETR_TREE, 
                                                   cv.CHAIN_APPROX_NONE)
+    contours = select_right_contour(contours, hierarchy)
     contours = [a for a in contours if len(a)>4]
     contours = divide_contours(contours, binary_image, image, rf, px_s)
     contours = filter_contour_by_size(contours, mag, px_s)  
     return contours
+    
+def new_binary(image, pixel_size, resolution_factor):
+    '''this function will generate the new binary without strong fluorescence nuc'''
+    image = image.astype('uint8')
+    binary = set_thresh_triangle(image)
+    binary  =  adjust_binary_image(binary, pixel_size, resolution_factor)
+    binary = binary.astype('uint8')
+    return binary
+    
+def create_cells (contour_list, position, ring_size, resolution_factor, img, 
+                  binary_img, wants_foci, wants_ktr, magnification, pixel_size,
+                  foci_other_channel, image2 = None):
+     cells_list = []
+     for i in range (len(contour_list)):
+            new_cell = Cell(position, contour_list[i], ring_size, resolution_factor, 
+                        img, binary_img, wants_foci, wants_ktr, magnification, pixel_size,
+                        foci_other_channel, image2 )
+            cells_list.append(new_cell)
+            position = position + 1
+     return  cells_list
+            
+def filter_cell_list (cell_list, pixel_size, magnificarion):
+    areas = []
+    for cell_o in cell_list:
+        areas.append(cell_o.area)
+    area2 = copy.deepcopy(areas)
+    i = round( len(areas)/2)
+    area2.sort()
+    median = area2[i]
+    min_a = median/3
 
+    cell_list2 = [b for a, b in zip(areas, cell_list) if a > min_a]  
 
-
-#add msg sobre o pixel size, qie será considerado como 1 qdo não informado
+   
+    return (cell_list2)  
+        
+def find_new_contour(cell_object, ps, rf):
+    x = cell_object.bbox_x - (round ((20*cell_object.ps)/2))            
+    y = cell_object.bbox_y - (round ((20*cell_object.ps)/2))   
+    w = cell_object.bbox_w + (round (20*cell_object.ps))   
+    h = cell_object.bbox_h + (round (20*cell_object.ps))   
+    roi = cell_object.image[y:y+h, x:x+w]
+    binary =  set_thresh_triangle(roi)
+    binary = adjust_binary_image (binary, ps, rf)
+    contours, hierarchy = cv.findContours(binary, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+    contours = select_right_contour(contours, hierarchy)
+    contours = [a for a in contours if len(a)>4]
+    return contours
+    
+  
+    
+#add msg sobre o pixel size, que será considerado como .5 qdo não informado
 #colocar um help com direcionamento para site do lab de como achar isso nas fotos
-def generate_cell_list(filename, magnification, wants_foci, pixel_size = 0.5):
+
+
+def generate_cell_list(filename, magnification, wants_foci, wants_ktr, foci_other_channel, 
+                       pixel_size = 0.5, filename2= None):
     eq_img, img, binary_img = read_image(filename)
+    if filename2 != None:
+         __, img2, __ = read_image(filename2)
     ring_size = round(1.75/pixel_size) 
     '''ring of 1.75um'''
     resolution_factor = img.size/4194304
     '''RF == resolution factor'''
-    binary_img = adjust_binary_image(binary_img, pixel_size, resolution_factor)
-
-    if not binary_img.any() == True:
-        return []
-    else :
-        nuc_contours = find_nuc_contours(binary_img, img, resolution_factor, pixel_size, magnification)
-
-        cells_list = []
-        position = 1
-        for i in range (len(nuc_contours)):
-            new_cell = cell(position, nuc_contours[i], ring_size, resolution_factor, 
-                        img, binary_img, wants_foci, magnification, pixel_size)
-            cells_list.append(new_cell)
-            position = position + 1
-        
-        return cells_list
-
-
-
-
-
-'''
-folder = 'C:\\Users\\Luiza Cherobini\\Desktop\\Nova pasta'
-#folder = 'C://Users//Luiza Cherobini//Documents//Doutorado//53BP1//Outras img//20x'
-#folder = 'C://Users//Luiza Cherobini//Documents//Doutorado//53BP1//teste//muitos pequenos'
-image_to_analyze = 'E - 11(fld 038 wv Cy3 - Cy3).tif'
-path_to_save ='C:\\Users\\Luiza Cherobini\\Desktop\\'
-#pixel_size = 0.1038
-pixel_size = 0.3025
-magnification = 20
-wants_foci = False
-wants_ktr = False
-wants_NMA = False
-second_folder = False
-
-os.chdir(folder)
-cellss = generate_cell_list(image_to_analyze, magnification, wants_foci, pixel_size = pixel_size)
-image = cv.imread(image_to_analyze)
-import pandas as pd 
-df =  pd.DataFrame(columns = ['nuc', 'hul/nuc_area', 'max_hull', 'second_max_hull', 
-                   'third_max_hull', 'mean_max_hull' ])
-fs2 = cv.getFontScaleFromHeight(2,20,5)
-if cellss != None:
-    for c in cellss:
-        hull = cv.convexHull(c.cnt)
-        hull_area =   cv.contourArea(hull)
-        area = c.area/hull_area
-        hull2 = cv.convexHull(c.cnt,returnPoints=False)
-        defects = cv.convexityDefects(c.cnt, hull2)
-        dlist = []
-        for i in range(defects.shape[0]):
-            s,e,f,d = defects[i,0]
-            dlist.append(d)
-        max1 = max(dlist)
-        dlist.remove(max(dlist))
-        max2 = max(dlist)
-        dlist.remove(max(dlist))
-        max3 = max(dlist)
-        dlist.remove(max(dlist))
-        mean_max = (max1+max2+max3)/3
-        new_line =  [c.n, area, max1, max2, max3, mean_max]
-        df.loc[len(df)] = new_line
- 
-        cv.drawContours(image, c.cnt, -1, (255,255,255), 2)
-        cv.putText(image, str(c.n), (c.bbox_x, c.bbox_y), 2, fs2, (255,255,255), 1)
     
-    df.to_csv(path_to_save + 'hull.csv')   
-    cv.namedWindow('image', cv.WINDOW_NORMAL)
-    cv.imshow('image', image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-    cv.imwrite(path_to_save + 'im.tif', image)
-'''
+    binary_img = adjust_binary_image(binary_img, pixel_size, resolution_factor)
+    cells_list = []
+    position = 1
+    
+    if not binary_img.any() == False:
+        nuc_contours = find_nuc_contours(binary_img, img, resolution_factor, pixel_size, magnification)
+        if filename2 is None:
+            cells_l = create_cells (nuc_contours, position, ring_size, resolution_factor, 
+                        img, binary_img, wants_foci, wants_ktr, magnification, pixel_size,
+                        foci_other_channel)
+        else:
+            cells_l = create_cells (nuc_contours, position, ring_size, resolution_factor, 
+                        img, binary_img, wants_foci, wants_ktr, magnification, pixel_size,
+                        foci_other_channel, image2 = img2)
+            
+        while len(cells_l) > 0:
+            for item in cells_l:
+                cells_list.append(item)
+            position =  len(cells_list) +1 
+            for cnt in nuc_contours: 
+                x,y,w,h = cv.boundingRect(cnt)
+                x2 = x-5
+                y2 = y-5
+                w2 = w+10
+                h2=h+10
+                image_erased = cv.rectangle(img,(x2,y2),(x2+w2,y2+h2),(0,0,0),-1)
+            binary_img = new_binary(image_erased, pixel_size, resolution_factor)
+ 
+            if not binary_img.any() ==True:
+                cells_l = []
+            else:
+                nuc_contours = find_nuc_contours(binary_img, img, resolution_factor, pixel_size, magnification)
+                if  filename2 is None:
+                    cells_l = create_cells (nuc_contours, position, ring_size, resolution_factor, 
+                                            img, binary_img, wants_foci, wants_ktr, magnification, 
+                                            pixel_size,foci_other_channel)
+                else: 
+                    cells_l = create_cells (nuc_contours, position, ring_size, resolution_factor, 
+                                            img, binary_img, wants_foci, wants_ktr, magnification, 
+                                            pixel_size,foci_other_channel, image2 = img2)
+    
+    if len(cells_list)> 0:
+        cells_list = filter_cell_list(cells_list, pixel_size, magnification)
+        
+    
+    return cells_list
+

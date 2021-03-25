@@ -154,3 +154,4 @@ def generate_dfs(folder_items, wants_foci, wants_ktr, magnification,
     return df_foci_features, df_nuc_features, df_foci_categories, cells_dict     
 
 
+#cells dict é muito pesado, melhor retornar contornos, números 

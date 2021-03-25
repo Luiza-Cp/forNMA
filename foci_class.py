@@ -218,5 +218,3 @@ class foci:
         inertia = huMoments[0]
         return inertia
 
-#add filtro no NAN pro contorno, aí ja reovo aqueles q n ão tem intensidade la
-#ver a variancia da laplaciana dentro de uma coisa que ele considera ponto 

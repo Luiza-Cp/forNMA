@@ -18,7 +18,8 @@ from scipy import stats
 
 
 class cell:
-    def __init__(self, n, cnt, ring_size, rf, image, binary_img, wants_foci, mag, pixel_size):
+    def __init__(self, n, cnt, ring_size, rf, image, binary_img, wants_foci, mag, 
+                 pixel_size):
         self.n = n
         self.rf = rf
         self.mag = mag

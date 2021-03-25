@@ -10,7 +10,7 @@ import os
 
 import numpy as np
 import cv2 as cv
-from initializing_functions2 import generate_cell_list
+from untitled0 import generate_cell_list
 import re 
 import pandas as pd        
 from matplotlib import pyplot as plt 
@@ -24,15 +24,12 @@ import seaborn as sns
 from matplotlib.patches import Ellipse
 
 
-n = str(16)
-#os.chdir('C:\\Users\\Luiza Cherobini\\Desktop\\teste')
-os.chdir('C:\\Users\\Luiza Cherobini\\Desktop\\lu1')
-folder_nuc = 'C:\\Users\\Luiza Cherobini\\Desktop\\lu1'
-#folder_nuc ='C:\\Users\\Luiza Cherobini\\Desktop\\teste'
-folder_cyto = 'C:\\Users\\Luiza Cherobini\\Desktop\\lu2'
-#folder_cyto ='C:\\Users\\Luiza Cherobini\\Desktop\\teste'
-magnification = 40
-pixel_size = 0.2
+n = '7-8-9'
+os.chdir('D:\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Red')
+folder_nuc = 'D:\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Red'
+folder_cyto = 'D:\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Green'
+magnification = 20
+pixel_size = 0.3
 
 folder_nuc_items = os.listdir(folder_nuc)
 #folder_cyto_items = os.listdir(folder_cyto)
@@ -45,60 +42,19 @@ for key, values in cells_dict.items():
     im = cv.imread(folder_nuc+'\\'+key, cv.IMREAD_ANYDEPTH)
     fs2 = cv.getFontScaleFromHeight(2,20,5)
     for c in values:
-        cv.drawContours(im, c.cnt, -1, (255,255,0),1)
+        cv.drawContours(im, c.cnt, -1, (255,255,255),1)
         cv.putText(im, str(c.n), (c.centroid_x, c.centroid_y), 2, fs2, (255,255,255), 1)
     plt.imshow(im, cmap='gray')
-    path =  'D:\\Imagens incucyte lu\\c5_16_contoured\\cnt' + str(key) 
+    path = 'D:\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Contornadas vermelho' + str(key) 
     cv.imwrite( path , im)
     
 
 
-df_nuc.to_csv('D:\\Imagens incucyte lu\\dataframes\\c5_'+ n+ '.csv')
+df_nuc.to_csv('D:\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\results.csv')
 
 
 
 
-
-from matplotlib import pyplot as plt
-from skimage import io, img_as_float, exposure,color
-from skimage.filters import  threshold_triangle, threshold_yen
-from skimage.segmentation import clear_border
-import cv2 as cv
-import numpy as np
-import copy
-from cell_class import cell 
-import os
-import math
-img1 = cv.imread(folder_nuc_items[0], 0)
-equalized_img1 = exposure.equalize_adapthist(img1) 
-img2= cv.imread(folder_nuc_items[0], 0)
-
-thresh = threshold_yen(img2)
-binary = img2 <= thresh 
-binary = binary.astype('uint8')
-kernel=np.ones((3,3), np.uint8)
-erode =  cv.erode (binary, kernel, iterations=1)
-dilate =  cv.dilate (erode, kernel, iterations=round(0.65/0.5))
-
-plt.imshow(equalized_img1,cmap='gray')
-
-im = cv.imread('D:\\Imagens incucyte lu\\c4_1_RED\\VID20_C4_1_00d00h00m.tif', cv.IMREAD_ANYDEPTH )
-cv.namedWindow('image', cv.WINDOW_NORMAL)
-cv.imshow('image', im)
-cv.waitKey(0)
-cv.destroyAllWindows()
-plt.imshow(im)
-
-import skimage
-from skimage import io
-moon = io.imread('D:\\Imagens incucyte lu\\c4_1_RED\\VID20_C4_1_00d00h00m.tif')
-plt.imshow(moon)
-
-
-cv.namedWindow('image', cv.WINDOW_NORMAL)
-cv.imshow('image',moon)
-cv.waitKey(0)
-cv.destroyAllWindows()
 
 '''
 #cídigo tosco de rodar ktr
