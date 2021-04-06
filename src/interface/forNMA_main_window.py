@@ -24,7 +24,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
 
         # Application attributes
         self.setWindowTitle('forNMA Analysis')
-        self.setMinimumSize(600, 300)
+        self.setMinimumSize(800, 600)
         self.threadpool = qtc.QThreadPool(self)
 
         # Left DockWidget
@@ -35,7 +35,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.scroll_area = qtw.QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.left_dock_widget.setWidget(self.scroll_area)
-        self.left_dock_widget.setMinimumSize(200, 300)
+        self.left_dock_widget.setMinimumWidth(400)
 
         # Add Settings widget to ScrollArea
         self.settings_widget = SettingsWidget()

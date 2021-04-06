@@ -20,42 +20,56 @@ class SettingsWidget(qtw.QWidget):
         """Initializes a SettingsWidget instance."""
         super().__init__(parent=parent)
 
-        # Layout
+        # Main Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        # Top spinbox
-        self.top_label = qtw.QLabel('Load images')
+        # Top label
+        self.top_label = qtw.QLabel('Load images and select settings here')
         layout.addWidget(self.top_label)
+
+        # Settings frame
+        self.settings_frame = qtw.QFrame()
+        self.settings_frame.setFrameStyle(1)
+        layout.addWidget(self.settings_frame)
+
+        # Frame layout
+        frame_layout = qtw.QVBoxLayout()
+        self.settings_frame.setLayout(frame_layout)
 
         # Input selection
         self.input_selection_layout = InputSelectionLayout()
         self.input_selection_widget = CollapsibleWidget(self.input_selection_layout, title='Input Selection')
-        layout.addWidget(self.input_selection_widget)
+        frame_layout.addWidget(self.input_selection_widget)
 
         # Basic settings
         self.basic_settings_layout = BasicSettingsLayout()
         self.basic_settings_widget = CollapsibleWidget(self.basic_settings_layout, title='Basic Settings')
-        layout.addWidget(self.basic_settings_widget)
+        frame_layout.addWidget(self.basic_settings_widget)
 
         # Remove errors checkbox
         self.remove_errors_checkbox = qtw.QCheckBox('Remove errors')
-        layout.addWidget(self.remove_errors_checkbox)
+        frame_layout.addWidget(self.remove_errors_checkbox)
 
         # Fast detection checkbox
         self.fast_detection_checkbox = qtw.QCheckBox('Fast detection')
-        layout.addWidget(self.fast_detection_checkbox)
+        frame_layout.addWidget(self.fast_detection_checkbox)
 
         # Enable advanced settings checkbox
         self.enable_advanced_settings_checkbox = qtw.QCheckBox('Enable advanced settings')
-        layout.addWidget(self.enable_advanced_settings_checkbox)
+        frame_layout.addWidget(self.enable_advanced_settings_checkbox)
 
         # Advanced settings
         self.advanced_settings_layout = AdvancedSettingsLayout()
         self.advanced_settings_widget = CollapsibleWidget(self.advanced_settings_layout, title='Advanced Settings')
         self.advanced_settings_widget.setVisible(False)  # starts hidden
-        layout.addWidget(self.advanced_settings_widget)
+        frame_layout.addWidget(self.advanced_settings_widget)
 
+        # Connect enable advanced settings checkbox to advanced settings widget
+        self.enable_advanced_settings_checkbox.toggled.connect(self.advanced_settings_widget.setVisible)
+
+        # Add stretch before
+        layout.addStretch()
         # Preview/Run buttons
         button_layout = qtw.QHBoxLayout()
         self.preview_button = qtw.QPushButton('Preview', clicked=self.on_preview_button_clicked)  # noqa
@@ -63,12 +77,6 @@ class SettingsWidget(qtw.QWidget):
         self.run_button = qtw.QPushButton('Run', clicked=self.on_run_button_clicked)  # noqa
         button_layout.addWidget(self.run_button)
         layout.addLayout(button_layout)
-
-        # Connect enable advanced settings checkbox to advanced settings widget
-        self.enable_advanced_settings_checkbox.toggled.connect(self.advanced_settings_widget.setVisible)
-
-        # Add stretch below
-        layout.addStretch()
 
     # TODO: implement preview functionality!
     @qtc.pyqtSlot()
