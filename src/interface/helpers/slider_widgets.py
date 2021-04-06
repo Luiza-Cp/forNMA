@@ -36,22 +36,13 @@ class SliderWidgets:
         else:
             Slider = DoubleSlider
             SpinBox = qtw.QDoubleSpinBox
-        self.slider = Slider(
-            orientation=qtc.Qt.Horizontal,
-            objectName=slider_name,
-            enabled=False,
-            minimum=minimum,
-            maximum=maximum,
-            singleStep=singleStep,
-            value=value,
-        )
-        self.spinbox = SpinBox(  # noqa
-            enabled=False,
-            minimum=minimum,
-            maximum=maximum,
-            singleStep=singleStep,
-            value=value,
-        )
+        self.slider = Slider(objectName=slider_name, enabled=False, orientation=qtc.Qt.Horizontal)
+        self.spinbox = SpinBox(enabled=False)  # noqa
+        for widget in (self.slider, self.spinbox):  # setting constructor attributes for DoubleSlider is messy
+            widget.setMinimum(minimum)
+            widget.setMaximum(maximum)
+            widget.setSingleStep(singleStep)
+            widget.setValue(value)
         self.checkbox = qtw.QCheckBox(label, checked=False)  # noqa
 
         # Sets connections across the three widgets
