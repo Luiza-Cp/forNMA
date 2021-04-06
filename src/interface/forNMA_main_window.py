@@ -41,7 +41,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
 
         # MenuBar
         file_menu = self.menuBar().addMenu('File')
-        file_menu.addAction('Quit forNMA', self.closeEvent)
+        file_menu.addAction('Quit forNMA', self.close)  # noqa
         view_menu = self.menuBar().addMenu('View')
         view_menu.addAction('View settings', self.set_settings_widget_visible)
         help_menu = self.menuBar().addMenu('Help')
