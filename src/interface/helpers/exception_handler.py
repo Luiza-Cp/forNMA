@@ -49,9 +49,6 @@ class ExceptionHandler(qtc.QObject):
         Handles the exception by passing it to a message box or the default sys.__excepthook__,
         depending on whether a QApplication instance is available or not.
         """
-        print(exc_type)
-        print(exc_value)
-        print(exc_traceback)
         if qtw.QApplication.instance() is not None:
             self.show_error_message_box(exc_type, exc_value, exc_traceback)
         else:

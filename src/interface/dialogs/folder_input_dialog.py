@@ -132,5 +132,5 @@ class FolderInputDialog(qtw.QDialog):
 
     def check_channel_1(self) -> None:
         """Raises a ValueError if the Channel 1 folder path has not been chosen."""
-        if 'channel 1' not in self.row_dict or self.row_dict['channel 1'] == '':
+        if 'channel_1' not in self.row_dict or self.row_dict['channel_1'] == '':
             raise ValueError('Channel 1 path cannot be empty!')
