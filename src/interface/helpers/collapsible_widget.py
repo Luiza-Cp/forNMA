@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from PyQt5 import QtCore as qtc, QtWidgets as qtw  # noqa
 
@@ -53,6 +53,11 @@ class CollapsibleWidget(qtw.QWidget):
             self.setContentLayout(layout=content_layout)
 
     @qtc.pyqtSlot()
+    def click(self) -> None:
+        """Convenience method for clicking the CollapsibleWidget's toggle button."""
+        return self.toggle_button.click()
+
+    @qtc.pyqtSlot()
     def on_toggle_button_released(self) -> None:
         """Expands/shrinks the content under the button, whenever it is clicked and released."""
         if self.toggle_button.isChecked():
@@ -82,3 +87,13 @@ class CollapsibleWidget(qtw.QWidget):
         content_animation.setDuration(500)
         content_animation.setStartValue(0)
         content_animation.setEndValue(content_height)
+
+    def retrieve_settings(self) -> Dict[str, Any]:
+        """
+        Retrieve the settings contained inside the CollapsibleWidget's KeyGridLayout. Raises a TypeError
+        if the layout does not support key setting retrieval (i.e. it is not an instance of KeyGridLayout).
+        """
+        try:
+            return self.layout().retrieve_key_settings()
+        except AttributeError:
+            raise TypeError(f'Current layout of type {type(self.layout())} does not support key settings retrieval')

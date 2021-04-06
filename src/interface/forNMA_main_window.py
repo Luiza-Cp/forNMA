@@ -9,8 +9,6 @@ from src.interface.forNMA_tabbed_widget import ForNMATabbedWidget
 from src.interface.helpers.exception_handler import ExceptionHandler
 from src.interface.settings_widget import SettingsWidget
 
-# TODO: error handling through popups
-
 
 class ForNMAMainWindow(qtw.QMainWindow):
     """Class representing forNMA's main interface window."""
@@ -32,15 +30,10 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.left_dock_widget = qtw.QDockWidget('Settings')
         self.addDockWidget(qtc.Qt.LeftDockWidgetArea, self.left_dock_widget)
 
-        # ScrollArea placed inside left DockWidget
-        self.scroll_area = qtw.QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.left_dock_widget.setWidget(self.scroll_area)
-        self.left_dock_widget.setMinimumWidth(400)
-
-        # Add Settings widget to ScrollArea
+        # Add Settings widget to left DockWidget
         self.settings_widget = SettingsWidget()
-        self.scroll_area.setWidget(self.settings_widget)
+        self.left_dock_widget.setWidget(self.settings_widget)
+        self.left_dock_widget.setMinimumWidth(400)
 
         # ForNMATabbedWidget placed as the GUI's CentralWidget
         self.central_widget = ForNMATabbedWidget()
@@ -50,7 +43,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         file_menu = self.menuBar().addMenu('File')
         file_menu.addAction('Quit forNMA', self.closeEvent)
         view_menu = self.menuBar().addMenu('View')
-        view_menu.addAction('View settings', self.settings_widget.setVisible)
+        view_menu.addAction('View settings', self.set_settings_widget_visible)
         help_menu = self.menuBar().addMenu('Help')
         help_menu.addAction('Online documentation...', self.open_online_documentation)
 
@@ -65,7 +58,12 @@ class ForNMAMainWindow(qtw.QMainWindow):
 
         # Connect SettingsWidget's InputSelectionWidget to ForNMATabbedWidget's InputTableWidget
         # TODO: simplify/abstract this!
-        self.settings_widget.input_selection_layout.folderSelected.connect(self.central_widget.input_table_tab.add_row_from_dict)  # noqa
+        self.settings_widget.folderSelected.connect(self.central_widget.input_table_tab.add_row_from_dict)
+
+    @qtc.pyqtSlot()
+    def set_settings_widget_visible(self) -> None:
+        """Sets the settings widgets visible, useful if it has been closed."""
+        self.settings_widget.setVisible(True)
 
     @qtc.pyqtSlot(str)
     def set_status_message(

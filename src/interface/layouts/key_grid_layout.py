@@ -45,7 +45,7 @@ class KeyGridLayout(qtw.QGridLayout):
         if widget.objectName() != '':
             self.key_widgets.append(widget)
 
-    def retrieveSettings(self) -> Dict[str, Any]:  # noqa
+    def retrieve_key_settings(self) -> Dict[str, Any]:  # noqa
         """Retrieves the values from each key widget placed in the key widgets list."""
         settings = {}
         for widget in self.key_widgets:
