@@ -6,6 +6,7 @@ from typing import Optional
 from PyQt5 import QtCore as qtc, QtGui as qtg, QtWidgets as qtw  # noqa
 
 from src.interface.forNMA_tabbed_widget import ForNMATabbedWidget
+from src.interface.helpers.exception_handler import ExceptionHandler
 from src.interface.settings_widget import SettingsWidget
 
 # TODO: error handling through popups
@@ -24,7 +25,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
 
         # Application attributes
         self.setWindowTitle('forNMA Analysis')
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(960, 600)
         self.threadpool = qtc.QThreadPool(self)
 
         # Left DockWidget
@@ -81,19 +82,24 @@ class ForNMAMainWindow(qtw.QMainWindow):
         webbrowser.open('http://ufrgs.br/labsinal')
 
 
+# create a global instance of ExceptionHandler to register the exception hook
+# comment out this line for making exceptions display on the console again
+qt_exception_hook = ExceptionHandler()
+
 if __name__ == '__main__':
     # The lines below used to be in a main function, but it might be better if they are in the global scope.
     # See discussion at: https://stackoverflow.com/questions/51834981/pyside2-with-built-in-multiprocessing.
-    if __name__ == '__main__':
-        # Creates the QApplication
-        app = qtw.QApplication(sys.argv)
-        # TODO: create resource file, then load it here
-        # # Sets the global QApplication style by reading QSS from the resources file
-        # stream = qtc.QFile(":/style/style")
-        # stream.open(qtc.QIODevice.ReadOnly)
-        # app.setStyleSheet(qtc.QTextStream(stream).readAll())
 
-        # Displays GUI
-        fate_gui = ForNMAMainWindow()
-        fate_gui.show()
-        sys.exit(app.exec_())
+    # Creates the QApplication
+    app = qtw.QApplication(sys.argv)
+
+    # TODO: create resource file, then load it here
+    # # Sets the global QApplication style by reading QSS from the resources file
+    # stream = qtc.QFile(":/style/style")
+    # stream.open(qtc.QIODevice.ReadOnly)
+    # app.setStyleSheet(qtc.QTextStream(stream).readAll())
+
+    # Displays GUI
+    fornma_gui = ForNMAMainWindow()
+    fornma_gui.show()
+    sys.exit(app.exec_())
