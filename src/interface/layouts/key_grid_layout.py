@@ -19,6 +19,13 @@ class KeyGridLayout(qtw.QGridLayout):
         """Initializes a KeyGridLayout instance."""
         super().__init__(*args, **kwargs)
         self.key_widgets = []
+        self.current_row = -1
+
+    @property
+    def next_row(self) -> int:
+        """Moves one index further on the current row and returns it new value."""
+        self.current_row += 1
+        return self.current_row
 
     def addKeyWidget(  # noqa
             self,

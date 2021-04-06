@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets as qtw  # noqa
 
 from src.interface.helpers.int_combo_box import IntComboBox
-from src.interface.layouts.data_layout import KeyGridLayout
+from src.interface.layouts.key_grid_layout import KeyGridLayout
 
 
 class InputSelectionLayout(KeyGridLayout):
@@ -33,30 +33,30 @@ class InputSelectionLayout(KeyGridLayout):
 
         # Load data button
         self.load_button = qtw.QPushButton('Load data...', clicked=self.on_load_button_clicked)  # noqa
-        self.addWidget(self.load_button, 0, 0, 1, 2)
+        self.addWidget(self.load_button, self.next_row, 0, 1, 2)
 
         # Load data spinbox
         self.load_label = qtw.QLabel('')
-        self.addWidget(self.load_label, 1, 0, 1, 2)
+        self.addWidget(self.load_label, self.next_row, 0, 1, 2)
 
         # Nuclear detection combobox
-        self.addWidget(qtw.QLabel('Nuclear detection'), 2, 0, 1, 2)
+        self.addWidget(qtw.QLabel('Nuclear detection'), self.next_row, 0, 1, 2)
         self.nuclear_detection_combobox = qtw.QComboBox(objectName='nuclear detection')  # noqa
         for item in self.nuclear_detection_combobox_items:
             self.nuclear_detection_combobox.addItem(item)
-        self.addKeyWidget(self.nuclear_detection_combobox, 3, 1, 1, 1)
+        self.addKeyWidget(self.nuclear_detection_combobox, self.next_row, 1, 1, 1)
 
         # Magnification combobox
-        self.addWidget(qtw.QLabel('Magnification'), 4, 0, 1, 2)
+        self.addWidget(qtw.QLabel('Magnification'), self.next_row, 0, 1, 2)
         self.magnification_combobox = IntComboBox(objectName='magnification')  # noqa
         for item in self.magnification_combobox_items:
             self.magnification_combobox.addItem(item)
-        self.addKeyWidget(self.magnification_combobox, 5, 1, 1, 1)
+        self.addKeyWidget(self.magnification_combobox, self.next_row, 1, 1, 1)
 
         # Pixel size spinbox
-        self.addWidget(qtw.QLabel('Pixel size'), 6, 0, 1, 2)
+        self.addWidget(qtw.QLabel('Pixel size'), self.next_row, 0, 1, 2)
         self.pixel_size_spinbox = qtw.QDoubleSpinBox(objectName='pixel size', **self.pixel_size_spinbox_values)  # noqa
-        self.addKeyWidget(self.pixel_size_spinbox, 7, 1, 1, 1)
+        self.addKeyWidget(self.pixel_size_spinbox, self.next_row, 1, 1, 1)
 
     # TODO: implement proper input handling!
     def on_load_button_clicked(self) -> None:

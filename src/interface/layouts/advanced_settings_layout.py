@@ -1,6 +1,6 @@
 from PyQt5 import QtCore as qtc, QtWidgets as qtw  # noqa
 
-from src.interface.layouts.data_layout import KeyGridLayout
+from src.interface.layouts.key_grid_layout import KeyGridLayout
 from src.interface.helpers.slider_widgets import SliderWidgets
 
 
@@ -68,21 +68,21 @@ class AdvancedSettingsLayout(KeyGridLayout):
         super().__init__()
 
         # Threshold label
-        self.addWidget(qtw.QLabel('threshold'), 0, 0, 1, 1)
+        self.addWidget(qtw.QLabel('threshold'), self.next_row, 0, 1, 1)
 
         # Threshold combobox
         self.threshold_combobox = qtw.QComboBox(objectName='threshold')  # noqa
         for threshold_name in self.threshold_names:
             self.threshold_combobox.addItem(threshold_name)
-        self.addKeyWidget(self.threshold_combobox, 0, 1, 1, 1)
+        self.addKeyWidget(self.threshold_combobox, self.current_row, 1, 1, 1)
 
         # Offset label
         self.offset_label = qtw.QLabel('offset', enabled=False)  # noqa
-        self.addWidget(self.offset_label, 1, 0, 1, 1)
+        self.addWidget(self.offset_label, self.next_row, 0, 1, 1)
 
         # Offset spinbox
         self.offset_spinbox = qtw.QSpinBox(objectName='offset', enabled=False, **self.offset_spinbox_values)  # noqa
-        self.addKeyWidget(self.offset_spinbox, 1, 1, 1, 1)
+        self.addKeyWidget(self.offset_spinbox, self.current_row, 1, 1, 1)
 
         # Blur slider
         self.blur_slider, self.blur_checkbox, self.blur_spinbox = SliderWidgets(
@@ -91,9 +91,9 @@ class AdvancedSettingsLayout(KeyGridLayout):
             slider_name='blur',
             **self.blur_slider_values,
         ).items()
-        self.addWidget(self.blur_checkbox, 2, 0, 1, 1)
-        self.addWidget(self.blur_spinbox, 2, 1, 1, 1)
-        self.addKeyWidget(self.blur_slider, 3, 0, 1, 2)
+        self.addWidget(self.blur_checkbox, self.next_row, 0, 1, 1)
+        self.addWidget(self.blur_spinbox, self.current_row, 1, 1, 1)
+        self.addKeyWidget(self.blur_slider, self.next_row, 0, 1, 2)
 
         # Adjust size slider
         self.adjust_size_slider, self.adjust_size_checkbox, self.adjust_size_spinbox = SliderWidgets(
@@ -102,9 +102,9 @@ class AdvancedSettingsLayout(KeyGridLayout):
             slider_name='adjust_size',
             **self.adjust_size_slider_values,
         ).items()
-        self.addWidget(self.adjust_size_checkbox, 4, 0, 1, 1)
-        self.addWidget(self.adjust_size_spinbox, 4, 1, 1, 1)
-        self.addKeyWidget(self.adjust_size_slider, 5, 0, 1, 2)
+        self.addWidget(self.adjust_size_checkbox, self.next_row, 0, 1, 1)
+        self.addWidget(self.adjust_size_spinbox, self.current_row, 1, 1, 1)
+        self.addKeyWidget(self.adjust_size_slider, self.next_row, 0, 1, 2)
 
         # Cut edges slider
         self.cut_edges_slider, self.cut_edges_checkbox, self.cut_edges_spinbox = SliderWidgets(
@@ -113,9 +113,9 @@ class AdvancedSettingsLayout(KeyGridLayout):
             slider_name='cut_edges',
             **self.cut_edges_slider_values,
         ).items()
-        self.addWidget(self.cut_edges_checkbox, 6, 0, 1, 1)
-        self.addWidget(self.cut_edges_spinbox, 6, 1, 1, 1)
-        self.addKeyWidget(self.cut_edges_slider, 7, 0, 1, 2)
+        self.addWidget(self.cut_edges_checkbox, self.next_row, 0, 1, 1)
+        self.addWidget(self.cut_edges_spinbox, self.current_row, 1, 1, 1)
+        self.addKeyWidget(self.cut_edges_slider, self.next_row, 0, 1, 2)
 
         # Shape slider
         self.shape_slider, self.shape_checkbox, self.shape_spinbox = SliderWidgets(
@@ -124,9 +124,9 @@ class AdvancedSettingsLayout(KeyGridLayout):
             slider_name='shape',
             **self.shape_slider_values,
         ).items()
-        self.addWidget(self.shape_checkbox, 8, 0, 1, 1)
-        self.addWidget(self.shape_spinbox, 8, 1, 1, 1)
-        self.addKeyWidget(self.shape_slider, 9, 0, 1, 2)
+        self.addWidget(self.shape_checkbox, self.next_row, 0, 1, 1)
+        self.addWidget(self.shape_spinbox, self.current_row, 1, 1, 1)
+        self.addKeyWidget(self.shape_slider, self.next_row, 0, 1, 2)
 
         # Eccentricity slider
         self.eccentricity_slider, self.eccentricity_checkbox, self.eccentricity_spinbox = SliderWidgets(
@@ -135,9 +135,9 @@ class AdvancedSettingsLayout(KeyGridLayout):
             slider_name='eccentricity',
             **self.eccentricity_slider_values,
         ).items()
-        self.addWidget(self.eccentricity_checkbox, 10, 0, 1, 1)
-        self.addWidget(self.eccentricity_spinbox, 10, 1, 1, 1)
-        self.addKeyWidget(self.eccentricity_slider, 11, 0, 1, 2)
+        self.addWidget(self.eccentricity_checkbox, self.next_row, 0, 1, 1)
+        self.addWidget(self.eccentricity_spinbox, self.current_row, 1, 1, 1)
+        self.addKeyWidget(self.eccentricity_slider, self.next_row, 0, 1, 2)
 
         # TODO: add these parameters below to the interface!
         # # Size min/max

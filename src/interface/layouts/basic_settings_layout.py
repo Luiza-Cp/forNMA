@@ -1,6 +1,6 @@
 from PyQt5 import QtWidgets as qtw  # noqa
 
-from src.interface.layouts.data_layout import KeyGridLayout
+from src.interface.layouts.key_grid_layout import KeyGridLayout
 
 
 class BasicSettingsLayout(KeyGridLayout):
@@ -14,11 +14,11 @@ class BasicSettingsLayout(KeyGridLayout):
 
         # Wants foci checkbox
         self.wants_foci_checkbox = qtw.QCheckBox('Foci', objectName='wants_foci')  # noqa
-        self.addKeyWidget(self.wants_foci_checkbox, 0, 0, 1, 2)
+        self.addKeyWidget(self.wants_foci_checkbox, self.next_row, 0, 1, 2)
 
         # Foci channel layout
         foci_buttons_layout = qtw.QHBoxLayout()
-        self.addLayout(foci_buttons_layout, 1, 0, 1, 2)
+        self.addLayout(foci_buttons_layout, self.next_row, 0, 1, 2)
 
         # Foci channel buttons
         self.foci_channel_1_button = qtw.QRadioButton('Channel 1', enabled=False)  # noqa
@@ -34,11 +34,11 @@ class BasicSettingsLayout(KeyGridLayout):
 
         # Wants cytoplasmic ring checkbox
         self.wants_cyto_ring_checkbox = qtw.QCheckBox('Cytoplasmic Ring', objectName='wants_ktr')  # noqa
-        self.addKeyWidget(self.wants_cyto_ring_checkbox, 2, 0, 1, 2)
+        self.addKeyWidget(self.wants_cyto_ring_checkbox, self.next_row, 0, 1, 2)
 
         # Cytoplasmic ring channel layout
         cyto_ring_buttons_layout = qtw.QHBoxLayout()
-        self.addLayout(cyto_ring_buttons_layout, 3, 0, 1, 2)
+        self.addLayout(cyto_ring_buttons_layout, self.next_row, 0, 1, 2)
 
         # Cytoplasmic ring channel buttons
         self.cyto_ring_channel_1_button = qtw.QRadioButton('Channel 1', enabled=False)  # noqa
