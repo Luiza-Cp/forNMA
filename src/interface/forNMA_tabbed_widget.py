@@ -2,6 +2,8 @@ from typing import Optional
 
 from PyQt5 import QtWidgets as qtw  # noqa
 
+from src.interface.input_table_widget import InputTableWidget
+
 
 class ForNMATabbedWidget(qtw.QTabWidget):
     """Class representing tabbed widget placed in the center of forNMA's interface."""
@@ -12,16 +14,21 @@ class ForNMATabbedWidget(qtw.QTabWidget):
         """Initializes an ForNMATabbedWidget instance."""
         super().__init__(parent=parent)
 
-        # Main tab
-        self.main_tab = qtw.QWidget()
-        self.addTab(self.main_tab, 'Main')
+        # Input data tab
+        self.main_tab = InputTableWidget()
+        self.addTab(self.main_tab, 'Input data')
+
+        # Images tab
+        self.images_tab = qtw.QWidget()
+        self.addTab(self.main_tab, 'Images')
+        self.setTabEnabled(1, False)
 
         # Errors tab
         self.errors_tab = qtw.QWidget()
         self.addTab(self.errors_tab, 'Errors')
-        self.setTabEnabled(1, False)
+        self.setTabEnabled(2, False)
 
         # Analysis tab
         self.analysis_tab = qtw.QWidget()
         self.addTab(self.analysis_tab, 'Analysis')
-        self.setTabEnabled(2, False)
+        self.setTabEnabled(3, False)
