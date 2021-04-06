@@ -14,13 +14,13 @@ class ForNMATabbedWidget(qtw.QTabWidget):
         """Initializes an ForNMATabbedWidget instance."""
         super().__init__(parent=parent)
 
-        # Input data tab
-        self.main_tab = InputTableWidget()
-        self.addTab(self.main_tab, 'Input data')
+        # Input table tab
+        self.input_table_tab = InputTableWidget()
+        self.addTab(self.input_table_tab, 'Input data')
 
         # Images tab
         self.images_tab = qtw.QWidget()
-        self.addTab(self.main_tab, 'Images')
+        self.addTab(self.images_tab, 'Images')
         self.setTabEnabled(1, False)
 
         # Errors tab

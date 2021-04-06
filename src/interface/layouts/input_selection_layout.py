@@ -1,5 +1,6 @@
-from PyQt5 import QtWidgets as qtw  # noqa
+from PyQt5 import QtCore as qtc, QtWidgets as qtw  # noqa
 
+from src.interface.dialogs.folder_input_dialog import FolderInputDialog
 from src.interface.helpers.int_combo_box import IntComboBox
 from src.interface.layouts.key_grid_layout import KeyGridLayout
 
@@ -26,18 +27,15 @@ class InputSelectionLayout(KeyGridLayout):
         'singleStep': 0.010,
         'value':      0.500,
     }
+    folderSelected = qtc.pyqtSignal(dict)
 
     def __init__(self):
-        """Initializes a InputSelectionLayout instance."""
+        """Initializes an InputSelectionLayout instance."""
         super().__init__()
 
         # Load data button
         self.load_button = qtw.QPushButton('Load data...', clicked=self.on_load_button_clicked)  # noqa
         self.addWidget(self.load_button, self.next_row, 0, 1, 2)
-
-        # Load data spinbox
-        self.load_label = qtw.QLabel('')
-        self.addWidget(self.load_label, self.next_row, 0, 1, 2)
 
         # Nuclear detection combobox
         self.addWidget(qtw.QLabel('Nuclear detection'), self.next_row, 0, 1, 2)
@@ -61,6 +59,6 @@ class InputSelectionLayout(KeyGridLayout):
     # TODO: implement proper input handling!
     def on_load_button_clicked(self) -> None:
         """Prompts the user to select a folder for the forNMA analysis"""
-        query = qtw.QFileDialog.getExistingDirectory(None, 'Select folder', options=qtw.QFileDialog.DontUseNativeDialog)
-        if query:
-            self.load_label.setText(query)
+        dialog = FolderInputDialog()
+        if (result := dialog.exec_()) is not None:
+            self.folderSelected.emit(result)

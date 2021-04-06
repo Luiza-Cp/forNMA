@@ -62,6 +62,10 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.status_message_widget = qtw.QLabel(self.default_statusbar_text)  # starts with an empty string
         self.statusBar().addWidget(self.status_message_widget)
 
+        # Connect SettingsWidget's InputSelectionWidget to ForNMATabbedWidget's InputTableWidget
+        # TODO: simplify/abstract this!
+        self.settings_widget.input_selection_layout.folderSelected.connect(self.central_widget.input_table_tab.add_row_from_dict)  # noqa
+
     @qtc.pyqtSlot(str)
     def set_status_message(
             self,
