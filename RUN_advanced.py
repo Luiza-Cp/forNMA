@@ -45,10 +45,10 @@ no caso do exemplo, ela vai listar as pastas 1, 2, N ...
 *Se você possui imagens somente em um canal de fluorescência, deixe a segunda pasta com o
 valor None. Caso contrário, adicione a pasta do canal 2'''
 
-#main_dir1 = 'D:\\Doutorado\\Imagens incucyte\\julieti'  #Troque essa info pela sua pasta
+main_dir1 = 'D:\\Doutorado\\53BP1\\Outras img'  #Troque essa info pela sua pasta
 main_dir2 = None # ou substitua por None
 
-main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\r'
+#main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\r'
 #main_dir2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\g'
 
 

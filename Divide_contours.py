@@ -3,14 +3,17 @@
 Created on Sat Mar 13 21:12:53 2021
 
 @author: Luiza
+
+This class performs watershed segmentation and/or forces a division of a cell in 
+two according to user input
 """
 import cv2 as cv
 import numpy as np
 from skimage import color, img_as_ubyte
 import math
-from matplotlib import pyplot as plt
 
 def select_right_contour(contour_list, hierarchy):
+     """ It uses hierarchy from cv.findContours to get the most external contour. """
      cnt_adjusted = [] 
      for i in range(len(contour_list)):
          if hierarchy[0,i,2] == -1:
@@ -53,10 +56,12 @@ def find_smallest_distance(coordinate_list):
 
 
 class Segmenting:
+       
+
+    
     def __init__(self, contour, image, resolution_factor, pixel_size,
-                 extent, x, y, w, h, cut_edges): #passar argumento de forçar corte
-    #se a pessoa não quer forçar corte, nem plica o force_cut e sem o hull lá
-    #sse não cortar no fim a lista final fica igual ao ws ou ao raw
+                 extent, x, y, w, h, cut_edges): 
+        
     
         self.raw_contour = contour
         self.img = image
@@ -178,6 +183,7 @@ class Segmenting:
     
     def hull_defects(self, contour, binary, x, y):
         hull = cv.convexHull(contour,returnPoints=False)
+        hull[::-1].sort(axis=0)
         defects = cv.convexityDefects(contour, hull)
         if np.all(defects) != None:
             coordinate_far_list = main_defects(defects, contour) 
