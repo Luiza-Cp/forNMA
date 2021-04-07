@@ -171,13 +171,13 @@ class Segmenting:
             if radius[0]*self.cut_edges > dist:
                 a = (coordinate_list[0][0]- x, coordinate_list[0][1]-y)
                 b = (coordinate_list[1][0]- x, coordinate_list[1][1]-y)
-                cv.line(binary_image,a, b,[0,0,0], 3)   #round(2 * self.rf))    
+                cv.line(binary_image,a, b,[0,0,0], 2)   #round(2 * self.rf))    
         if len(coordinate_list)>2:
            new_line, dist2 = find_smallest_distance(coordinate_list)
            if radius[0]*self.cut_edges > dist2:
                a = (new_line[0][0]- x, new_line[0][1]-y)
                b =  (new_line[1][0]- x, new_line[1][1]-y)
-               cv.line(binary_image, a,b ,[0,0,0],3)     
+               cv.line(binary_image, a,b ,[0,0,0],2)     
         return binary_image    
 
     

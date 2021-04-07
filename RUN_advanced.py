@@ -10,8 +10,8 @@ from analyze_folder_advanced import generate_dfs
 
 '''IMPORTANTE:
     1. Todas as instruções estarão nessa cor;
-    2. Sempre que for colocar o caminho de uma psta, coloque entre aspas e com duas barras 
-    separando. Exemplo " D:\\Doutorado\\imagens incucyte kaka\\Meki\\Red"  
+    2. PARA WINDOWS: Sempre que for colocar o caminho de uma psta, coloque entre aspas 
+    e com duas barras separando. Exemplo " D:\\Doutorado\\imagens incucyte kaka\\Meki\\Red"  
     3. Você não precisa ter dois canais de fluorescência.
     4. TODAS as pastas devem estar organizadas em subpastas onde a pasta mãe 
     corresponde a um canal de flurescência diferente. Por exemplo:
@@ -45,21 +45,26 @@ no caso do exemplo, ela vai listar as pastas 1, 2, N ...
 *Se você possui imagens somente em um canal de fluorescência, deixe a segunda pasta com o
 valor None. Caso contrário, adicione a pasta do canal 2'''
 
-main_dir1 = 'D:\\Doutorado\\53BP1\\Outras img'  #Troque essa info pela sua pasta
-main_dir2 = None # ou substitua por None
+main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\ju\\r'  #Troque essa info pela sua pasta
+main_dir2 = None#'C:\\Users\\Luiza Cherobini\\Desktop\\ju\\g'
 
 #main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\r'
 #main_dir2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\g'
 
 
 folder_nuc_list = []
-for i in os.listdir(main_dir1):
+if os.path.exists(main_dir1) == False:
+    raise ValueError ('This file do not exists: '+ main_dir1)
+for i in [f for f in os.listdir(main_dir1) if not f.startswith('.')]:
     full_path = os.path.join(main_dir1, i)
     folder_nuc_list.append(full_path)
+
         
-if main_dir2 is not None:    
+if main_dir2 is not None: 
+    if os.path.exists(main_dir2) == False:
+        raise ValueError ('This file do not exists: ' +  main_dir1)
     folder_2_list = []
-    for i in os.listdir(main_dir2):
+    for i in [f for f in os.listdir(main_dir2) if not f.startswith('.')]:
         full_path = os.path.join(main_dir2, i)
         folder_2_list.append(full_path)
 else:
@@ -68,7 +73,7 @@ else:
     '''`Passo 2: 
     Escolha uma pasta para salvar os resultados. Pode ser qualquer pasta
     '''   
-path_to_save = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka' #isso é só um exemplo 
+path_to_save = 'C:\\Users\\Luiza Cherobini\\Desktop\\ju' #isso é só um exemplo 
 
 
 
@@ -153,12 +158,17 @@ Ex>: fast_detection = True'''
 
 ###################################################################
 
+if os.path.exists(path_to_save) == False:
+    raise ValueError ('This file do not exists: '+ path_to_save)
+
 total_dict = {}
 df_list = []
 
 for n in range(len(folder_nuc_list)):
-    folder_nuc_items = [os.path.abspath(os.path.join(folder_nuc_list[n],i)) for i in os.listdir(folder_nuc_list[n])]
-    foldername = str(os.path.basename(folder_nuc_list[n]))  
+    folder_nuc_items = sorted([os.path.abspath(os.path.join(folder_nuc_list[n],i)) for i in 
+                      [f for f in os.listdir(folder_nuc_list[n]) if not f.startswith('.')]])
+    foldername = str(os.path.basename(folder_nuc_list[n]))
+
     #criar aqui a pasta
     folder_save_1 = None
     folder_save_2 = None
@@ -166,22 +176,21 @@ for n in range(len(folder_nuc_list)):
         pixel_size = 0.5
     
     if save_image == True:
-        os.mkdir(path_to_save + '\\' + foldername + ' Contours')
-        folder_save_1 = path_to_save + '\\' + foldername + ' Contours\\'
-    
-    
+        folder_save_1  = os.path.join(path_to_save, foldername + " Contours")
+        os.mkdir(folder_save_1)
+       
     if len(folder_2_list) == 0:
         folder_save_2 = None
         folder2_items = None  
     else: 
         foldername2 = str(os.path.basename(folder_2_list[n]))
-        folder2_items = [os.path.abspath(os.path.join(folder_2_list[n],i)) for i in os.listdir(folder_2_list[n])]
+        folder2_items = sorted([os.path.abspath(os.path.join(folder_2_list[n],i)) for i in 
+                         [f for f in os.listdir(folder_2_list[n]) if not f.startswith('.')]])
         if len(folder2_items) != len(folder_nuc_items):
             raise IndexError ("The folders must contain the same number of files")
         if save_image == True:
-            os.mkdir(path_to_save + '\\' + foldername2 + ' Contours')    
-            folder_save_2 = path_to_save + '\\' + foldername2 + ' Contours\\'
-
+            folder_save_2  = os.path.join(path_to_save, foldername2 + " Contours")
+            os.mkdir(folder_save_2)
         
         ''' Aqui é o local onde vocês ativam aquelas coisas. Elas devem ser adicionadas 
 dentro do parênteses, após o foder_save2, entre vírgulas. vou colocar um exemplo aqui, 
@@ -194,13 +203,13 @@ df_foci, df_nuc, df_categories, cells_dict = generate_dfs(folder_nuc_items, path
 
      '''    
     
-
+    
     df_foci, df_nuc, df_categories, cells_dict = generate_dfs(folder_nuc_items, path_to_save,
                 save_image, folder_save_1, magnification, folder2_items = folder2_items, 
-                folder_save_2 = folder_save_2, wants_ktr =wants_ktr, wants_foci =wants_foci,
-                cut_edges = 1)
+                folder_save_2 = folder_save_2, wants_ktr =wants_ktr, wants_foci =wants_foci)
     
     
-    df_nuc.to_csv(path_to_save+ '\\' + foldername + '.csv', sep='\t')    #mudei isso pro tab
+    saving = os.path.join(path_to_save, foldername + '.csv')
+    df_nuc.to_csv(saving, sep='\t', index=False)    #mudei isso pro tab
     df_list.append(df_nuc)     
-    print ("FEITO")
+    print ("Pasta", folder_nuc_list[n] + ":", "FEITO")

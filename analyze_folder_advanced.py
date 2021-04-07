@@ -11,8 +11,8 @@ from initializing_functions_advanced import run_image
 import cv2 as cv
 import os
 
-def find_df_nuc_features_image (cell_list, image_name, wants_foci, pixel_size, image2_name):
-    df_total = pd.DataFrame(columns = ['Image','Nucleus','Centroid x', 'Centroid y',
+def find_df_nuc_features_image (cell_list, image_name, wants_foci, pixel_size, image2_name, image_number):
+    df_total = pd.DataFrame(columns = ['Image Number', 'Image','Nucleus','Centroid x', 'Centroid y',
                 'Nucleus Area',  "Nucleus mean intensity",'NII', 'Radius Ratio', 'Aspect',
                 'Rotation Angle','Foci Count', 'Total Foci Area',  'Foci Mean Intensity',
                 ' Foci/Nucleus Area', 'Image 2','Image 2 Minimum Intensity',
@@ -30,7 +30,7 @@ def find_df_nuc_features_image (cell_list, image_name, wants_foci, pixel_size, i
         else: 
             fociNuc_area = None
         
-        new_line = [image_name, cell_o.n, cell_o.centroid_x, cell_o.centroid_y, cell_o.area, 
+        new_line = [image_number, image_name, cell_o.n, cell_o.centroid_x, cell_o.centroid_y, cell_o.area, 
                     cell_o.mean_intensity, cell_o.NII, cell_o.radius_ratio, cell_o.aspect,
                     cell_o.fellipse[2], cell_o.foci, cell_o.tot_foci_area, 
                     cell_o.tot_foci_mean, fociNuc_area, image2_name, cell_o.image2_min, 
@@ -80,7 +80,8 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
                  magnification, pixel_size = 0.5, threshold = 'triangle', 
                  offset = 0, blur = 12, adjust_size = 0, cut_edges = 0.7,
                  shape = 0.88, eccentricity = None, min_size = None, max_size = None, 
-                 min_radius = None, max_radius= None, fast_detection = False,
+                 min_radius = None, max_radius= None, rescale_intensity= False, 
+                 fast_detection = False, 
                  error= None, wants_ktr = False, ring_size = 1.75, use_ellipse = False, 
                  wants_foci = None, foci_channel2 = False, foci_min_size = None, 
                  foci_max_size = None, foci_min_int = None, foci_max_int = None,
@@ -88,7 +89,7 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
                  folder_save_2 = None, folder2_items = None):
 
     
-    df_nuc_features = pd.DataFrame(columns = ['Image','Nucleus','Centroid x', 'Centroid y',
+    df_nuc_features = pd.DataFrame(columns = ['Image Number', 'Image','Nucleus','Centroid x', 'Centroid y',
                 'Nucleus Area',  "Nucleus mean intensity",'NII', 'Radius Ratio', 'Aspect',
                 'Rotation Angle','Foci Count', 'Total Foci Area',  'Foci Mean Intensity',
                 ' Foci/Nucleus Area', 'Image 2','Image 2 Minimum Intensity',
@@ -112,7 +113,7 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
             cells = run_image(folder_items[i], magnification, pixel_size, None,
                     threshold, offset, blur, adjust_size, cut_edges, shape,
                     eccentricity, min_size, max_size, min_radius, max_radius, 
-                    fast_detection, error, wants_ktr, ring_size, use_ellipse, 
+                    fast_detection,rescale_intensity,  error, wants_ktr, ring_size, use_ellipse, 
                     wants_foci, foci_channel2, foci_min_size,foci_max_size, foci_min_int, 
                     foci_max_int, foci_min_rel_int, foci_max_rel_int, foci_eccentricity)
             
@@ -126,12 +127,12 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
             cells = run_image(folder_items[i], magnification, pixel_size, image_folder2,
                     threshold, offset, blur, adjust_size, cut_edges, shape,
                     eccentricity, min_size, max_size, min_radius, max_radius, 
-                    fast_detection, error, wants_ktr, ring_size, use_ellipse, 
+                    fast_detection,rescale_intensity,  error, wants_ktr, ring_size, use_ellipse, 
                     wants_foci, foci_channel2, foci_min_size,foci_max_size, foci_min_int, 
                     foci_max_int, foci_min_rel_int, foci_max_rel_int, foci_eccentricity)
             
         df_nuc_features_image= find_df_nuc_features_image (cells, image_name, wants_foci, 
-                                                           pixel_size, image_folder2)
+                                                           pixel_size, image_folder2, i)
         df_nuc_features = pd.concat([df_nuc_features, df_nuc_features_image], sort=False)
         
         if wants_foci == True:
@@ -157,7 +158,7 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
                 if wants_foci == True and foci_channel2 == False:
                     cv.drawContours(image_draw, Cell_o.foci_cnt_im, -1, (255,255,255),1)
             #cv.imwrite(folder_save_1 + image_name + '.jpeg', image_draw)
-            cv.imwrite(folder_save_1 + image_name, image_draw)
+            cv.imwrite(os.path.join(folder_save_1, image_name), image_draw)
             
         if image2_to_draw is not None:
             fs = cv.getFontScaleFromHeight(2,15,3)
@@ -176,9 +177,8 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
                     cv.drawContours(image2_draw, Cell_o.foci_cnt_im, -1, (122,97,246),1)
             
            
-            cv.imwrite(folder_save_2 + image2_name , image2_draw)
-            
-                        
+            cv.imwrite(os.path.join(folder_save_2, image2_name) , image2_draw)
+        
     return df_foci_features, df_nuc_features, df_foci_categories, cells_dict     
 
     

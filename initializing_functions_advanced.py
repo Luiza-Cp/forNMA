@@ -11,7 +11,7 @@ You can look at my code
 """
 
 from matplotlib import pyplot as run_image
-from skimage import  img_as_ubyte
+from skimage import  img_as_ubyte, exposure
 from skimage.segmentation import clear_border
 import cv2 as cv
 import numpy as np
@@ -27,9 +27,11 @@ def read_image(file: str
     """ Opens the imgae speciefied by the path or raise a ValueError. """
     img = cv.imread(file,cv.IMREAD_ANYDEPTH)
     if  img is None or img.size ==0:
-        raise ValueError ("This file can not be opened")
-    
-    return (img)
+        raise ValueError ("The file, "+ file+ " can not be opened")
+        #print ("the file", file, "can not be opened")
+        #continue
+    else:
+        return (img)
 
 
 def adjust_low_res_binary_img(
@@ -342,7 +344,7 @@ def filter_debree(
     Elimiates small objects based on the magnification (mag) and pixel size (ps). 
     This will prevent the code from analyzing spurious contours.
     """
-    min_val = 15*mag*ps*rf      # trhis is an arbitrary small value
+    min_val = 15*mag*ps*rf      # this is an arbitrary small value
     areas = []
     for cnt in contour_list:
         areas.append(cv.contourArea(cnt))
@@ -352,7 +354,7 @@ def filter_debree(
 
 
 def size_filter(
-        contours: np.ndarry, 
+        contours: np.ndarray, 
         area_list: List[float], 
         min_size: int, 
         max_size: int
@@ -475,7 +477,7 @@ def find_nuc_contours(
 ) -> List[np.ndarray]:
     """ 
     Given an image, its binary and a set of parameters, aplies a series of
-    funtions to find nuclei contours and filter them.
+    functions to find nuclei contours and filter them.
     It returns the contours list of the image.
     """
     contours, hierarchy = cv.findContours(binary_img, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
@@ -492,18 +494,24 @@ def find_nuc_contours(
     return contours
 
 
-def erase_image(contour_list, image, rf):
+def erase_image(
+        contour_list: np.ndarray, 
+        image: np.ndarray, 
+        rf: float
+)-> np.ndarray:
     """
-    Creates a black box at image covring the object. Returns the image 
-    with erased objects
+    Creates a box at image covring the object. The box color will be given by
+    the intensity of pixel corresponding to 0.1 quantile of the image.
+    Returns the image with erased objects.
     """
+    f = np.quantile(image, 0.1)
     for cnt in contour_list:
         x,y,w,h = cv.boundingRect(cnt)
         x2 = x - round(7*rf)
         y2 = y - round(7*rf)
         w2 = w + round(14*rf)
         h2 = h + round(14*rf)
-        image_erased = cv.rectangle(image,(x2,y2),(x2+w2,y2+h2),(0,0,0),-1)
+        image_erased = cv.rectangle(image,(x2,y2),(x2+w2,y2+h2),(f,f,f),-1)
    
     return image_erased  
 
@@ -524,6 +532,7 @@ def run_image(
         max_size: Optional[int] = None, 
         min_radius: Optional[int] = None, 
         max_radius: Optional[int] = None, 
+        rescale_intensity: bool = False, 
         fast_detection: bool = False,
         error: Optional[int] = None, 
         wants_ktr: bool = False, 
@@ -541,23 +550,27 @@ def run_image(
 ) -> List[Cell]:
     """
     Performs all the operations in one image to generate a cell list.
-    First, it applies a threshold and make the necessary adjustments.
+    First, it applies a threshold and makes the necessary adjustments.
     From the binary image, the contours are obtained and, if there is any,
     the Cell list is created. 
     If user do not enable fast_mode, all objects within a image will be 
     erased with a black box and the image will be analyzed again, in a maximum
     range of 6 times, allowing for low fluorescence nuclei to be detected.
-    
-    If nothing is detetected in the binary image, it will try to convert
-    images to uint-8 without scaling, in order to get objects with low fluorescence
-    detection. If nothing is detected, the image will be considered empty, 
+    If nothing is detected, the image will be considered empty, 
     untill thresholding settings are changed by user.
     """
+    
     if magnification<10:
         pixel_size = 0.5        # standard for small objects
         
     ring_size = round(ring_size/pixel_size)
-    raw_image= read_image(filename)     
+    raw_image= read_image(filename) 
+    if rescale_intensity == True:
+        raw_image = exposure.rescale_intensity(raw_image, in_range='image', out_range='dtype')
+    elif raw_image.dtype.kind == 'f' and (np.any(raw_image>1) or np.any(raw_image<-1)):
+        raw_image = exposure.rescale_intensity(raw_image, in_range='image', out_range='dtype')
+        print ('adjusted exposure anyway - luiza has to create the message')
+        
     img = img_as_ubyte(raw_image)       # will be used in analysis
     resolution_factor = img.size/4194304        # used to compensate some iterations
     binary = threshold_dict[threshold](img, offset)
@@ -567,6 +580,9 @@ def run_image(
         img2 = None
     else:
         img2 = read_image(filename2)
+        img2 = exposure.rescale_intensity(img2, in_range='image', out_range='dtype')
+        img2 = img_as_ubyte(img2)  
+        
   
     cell_list = []
     if not binary.any() == False:   #if binary image is not empty, it searches for nuclei 
@@ -582,25 +598,10 @@ def run_image(
                 cell_list.append(cell_object)
 
     else:
-        #it tries again without scaling the values when transforming to uint8
-        img = raw_image.astype('uint8')
-        binary = threshold_dict[threshold](img, offset)
-        binary= adjust_binary_image(binary, pixel_size, resolution_factor, blur, magnification,adjust_size)
-        if not binary.any() == False: #if binary image is not empty, it searches for nuclei 
-            nuc_contours = find_nuc_contours(binary, img, resolution_factor, pixel_size,
-                                         magnification, cut_edges, adjust_size,
-                                         shape, eccentricity, min_size, max_size,
-                                         min_radius, max_radius, fast_detection)
-            if len(nuc_contours) > 0: #if it finds nuclear contours, it create a Cell object for each contour
-                for i in range(len(nuc_contours)):
-                    cell_object = Cell(i, nuc_contours[i], ring_size,  resolution_factor, img,
-                           binary, wants_foci, wants_ktr, magnification, pixel_size, 
-                           foci_channel2, img2)
-                    cell_list.append(cell_object)
-        else:
-            nuc_contours = [] 
+        nuc_contours = [] 
         
     img_to_fill =img.copy()
+
     if fast_detection == False:
         #it tries to find nuclei with less ifluorescence intensity by covering 
         #the already detected ones. If after 6 rounds of covering nuclei it still 
@@ -634,36 +635,29 @@ def run_image(
     return cell_list 
 
 
-  
-
-
-
-
-
 
 um = 'D:\\Doutorado\\Imagens incucyte\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Cyto\\Green\\VID53_D6_7_2020y12m18d_23h00m.tif'
 dois= 'D:\\Doutorado\\53BP1\\Outras img\\40x\\a.tif'
 tres = 'D:\\Doutorado\\53BP1\\Outras img\\20x\\a.tif'
 quatro = 'C:\\Users\\Luiza Cherobini\\Desktop\\Nucear detection validation\\40x\\Slide 1_RPE WT PDS 4uM 4hrs_FOV 00285_DAPI.tif'
 cinco= 'D:\\Doutorado\\Imagens incucyte\\imagens jeph 4x\\Analise\\teste 4x\\red_A2_42_2021y01m25d_13h06m.tif'
-seis = 'D:\\Doutorado\\Imagens incucyte\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Nuc\\Red\\VID53_D6_7_2020y12m21d_00h30m.tif'
+seis = 'D:\\Doutorado\\Imagens incucyte\kaka\\clonogenico 2 kaka\\Pre TMZ\\Nuc\\Red\\VID53_D6_7_2020y12m21d_00h30m.tif'
+sete = 'C:\\Users\\Luiza Cherobini\\Desktop\\Red_C6_4_2020y12m19d_18h00m.tif'
+oito ='C:\\Users\\Luiza Cherobini\\Desktop\\ju\\Red_C7_13_2020y12m18d_16h30m.tif'
 
-xx = cinco
 
-b = run_image(xx, 5, pixel_size = 0.1 )
+xx = dois
+
+b = run_image(xx, 40, pixel_size = 0.1, threshold='yen', shape = 0.2)
 #c = run_image(tres, 20, pixel_size = 0.6)
 img = read_image(xx)
-img2 = img_as_ubyte(img)
-img3 = img.astype('uint8')
-
-bright_count = np.sum(np.array(img) >= 255)
-
-
+img = exposure.rescale_intensity(img, in_range='image', out_range='dtype')
+img = img_as_ubyte(img)
+print(img.min())
 for cell_o in b:
-    img = cv.drawContours(img,cell_o.cnt, -1, (255,255,255), 3)
+    img = cv.drawContours(img,cell_o.cnt, -1, (255,255,255), 1)
  
 cv.namedWindow('resultado', cv.WINDOW_NORMAL)
 cv.imshow('resultado', img)
 cv.waitKey(0)
-    
-
+cv.imwrite('C:\\Users\\Luiza Cherobini\\Desktop\\ex.png', img)
