@@ -94,6 +94,6 @@ class CollapsibleWidget(qtw.QWidget):
         if the layout does not support key setting retrieval (i.e. it is not an instance of KeyGridLayout).
         """
         try:
-            return self.layout().retrieve_key_settings()
+            return self.content_area.layout().retrieve_key_settings()
         except AttributeError:
             raise TypeError(f'Current layout of type {type(self.layout())} does not support key settings retrieval')

@@ -41,8 +41,11 @@ class SettingsWidget(qtw.QWidget):
 
         # Basic settings
         self.basic_settings_widget = CollapsibleWidget(BasicSettingsLayout(), title='Basic Settings')
-        self.basic_settings_widget.click()  # starts open
         self.frame.layout.addWidget(self.basic_settings_widget)
+        # self.basic_settings_widget.click()  # starts open
+
+        # Add some spacing between basic settings and checkboxes
+        self.frame.layout.addStretch()
 
         # Remove errors checkbox
         self.remove_errors_checkbox = qtw.QCheckBox('Remove errors')
@@ -88,22 +91,22 @@ class SettingsWidget(qtw.QWidget):
     def on_preview_button_clicked(self) -> None:
         """Previews the analysis to be performed by forNMA."""
         print('Basic settings selected:')
-        print(self.basic_settings_widget.retrieve_key_settings())
+        print(self.basic_settings_widget.retrieve_settings())
         print(f'Remove errors: {self.remove_errors_checkbox.isChecked()}')
         print(f'Fast detection: {self.fast_detection_checkbox.isChecked()}')
         advanced_settings_enabled = self.enable_advanced_settings_checkbox.isChecked()
         print(f'Enable advanced settings: {advanced_settings_enabled}')
         print('Advanced settings selected:')
-        advanced_settings = self.advanced_settings_widget.retrieve_key_settings() if advanced_settings_enabled else {}
+        advanced_settings = self.advanced_settings_widget.retrieve_settings() if advanced_settings_enabled else {}
         print(advanced_settings)
 
     # TODO: implement run functionality!
     @qtc.pyqtSlot()
     def on_run_button_clicked(self) -> Tuple[Dict, Dict, bool, bool]:
         """Runs the analysis to be performed by forNMA."""
-        basic_settings = self.basic_settings_widget.retrieve_key_settings()
+        basic_settings = self.basic_settings_widget.retrieve_settings()
         advanced_settings_enabled = self.enable_advanced_settings_checkbox.isChecked()
-        advanced_settings = self.advanced_settings_widget.retrieve_key_settings() if advanced_settings_enabled else {}
+        advanced_settings = self.advanced_settings_widget.retrieve_settings() if advanced_settings_enabled else {}
         remove_errors = self.remove_errors_checkbox.isChecked()
         fast_detection = self.fast_detection_checkbox.isChecked()
         return basic_settings, advanced_settings, remove_errors, fast_detection
