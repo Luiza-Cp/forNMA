@@ -112,8 +112,8 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
         if folder2_items is None:
             cells = run_image(folder_items[i], magnification, pixel_size, None,
                     threshold, offset, blur, adjust_size, cut_edges, shape,
-                    eccentricity, min_size, max_size, min_radius, max_radius, 
-                    fast_detection,rescale_intensity,  error, wants_ktr, ring_size, use_ellipse, 
+                    eccentricity, min_size, max_size, min_radius, max_radius, rescale_intensity,
+                    fast_detection,  error, wants_ktr, ring_size, use_ellipse, 
                     wants_foci, foci_channel2, foci_min_size,foci_max_size, foci_min_int, 
                     foci_max_int, foci_min_rel_int, foci_max_rel_int, foci_eccentricity)
             
@@ -126,8 +126,8 @@ def generate_dfs(folder_items, path_to_save, save_image, folder_save_1,
             image_folder2= folder2_items[i]
             cells = run_image(folder_items[i], magnification, pixel_size, image_folder2,
                     threshold, offset, blur, adjust_size, cut_edges, shape,
-                    eccentricity, min_size, max_size, min_radius, max_radius, 
-                    fast_detection,rescale_intensity,  error, wants_ktr, ring_size, use_ellipse, 
+                    eccentricity, min_size, max_size, min_radius, max_radius, rescale_intensity, 
+                    fast_detection, error, wants_ktr, ring_size, use_ellipse, 
                     wants_foci, foci_channel2, foci_min_size,foci_max_size, foci_min_int, 
                     foci_max_int, foci_min_rel_int, foci_max_rel_int, foci_eccentricity)
             

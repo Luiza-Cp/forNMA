@@ -569,9 +569,10 @@ def run_image(
         raw_image = exposure.rescale_intensity(raw_image, in_range='image', out_range='dtype')
     elif raw_image.dtype.kind == 'f' and (np.any(raw_image>1) or np.any(raw_image<-1)):
         raw_image = exposure.rescale_intensity(raw_image, in_range='image', out_range='dtype')
-        print ('adjusted exposure anyway - luiza has to create the message')
+        print ('adjusted exposure anyway')
         
     img = img_as_ubyte(raw_image)       # will be used in analysis
+    #img = raw_image.astype('uint8')
     resolution_factor = img.size/4194304        # used to compensate some iterations
     binary = threshold_dict[threshold](img, offset)
     binary= adjust_binary_image(binary, pixel_size, resolution_factor, blur, magnification,
@@ -580,13 +581,21 @@ def run_image(
         img2 = None
     else:
         img2 = read_image(filename2)
-        img2 = exposure.rescale_intensity(img2, in_range='image', out_range='dtype')
+        if rescale_intensity == True:
+            img2 = exposure.rescale_intensity(img2, in_range='image', out_range='dtype')
+        elif img2.dtype.kind == 'f' and (np.any(img2>1) or np.any(img2<-1)):
+           img2 = exposure.rescale_intensity(img2, in_range='image', out_range='dtype')
+           print ('adjusted exposure anyway')
         img2 = img_as_ubyte(img2)  
         
-  
+        
     cell_list = []
     if not binary.any() == False:   #if binary image is not empty, it searches for nuclei 
         nuc_contours = find_nuc_contours(binary, img, resolution_factor, pixel_size,
+                                         magnification, cut_edges, adjust_size,
+                                         shape, eccentricity, min_size, max_size,
+                                         min_radius, max_radius, fast_detection)
+        print(resolution_factor, pixel_size,
                                          magnification, cut_edges, adjust_size,
                                          shape, eccentricity, min_size, max_size,
                                          min_radius, max_radius, fast_detection)
@@ -599,7 +608,6 @@ def run_image(
 
     else:
         nuc_contours = [] 
-        
     img_to_fill =img.copy()
 
     if fast_detection == False:
@@ -634,8 +642,6 @@ def run_image(
  
     return cell_list 
 
-
-
 um = 'D:\\Doutorado\\Imagens incucyte\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Cyto\\Green\\VID53_D6_7_2020y12m18d_23h00m.tif'
 dois= 'D:\\Doutorado\\53BP1\\Outras img\\40x\\a.tif'
 tres = 'D:\\Doutorado\\53BP1\\Outras img\\20x\\a.tif'
@@ -643,13 +649,12 @@ quatro = 'C:\\Users\\Luiza Cherobini\\Desktop\\Nucear detection validation\\40x\
 cinco= 'D:\\Doutorado\\Imagens incucyte\\imagens jeph 4x\\Analise\\teste 4x\\red_A2_42_2021y01m25d_13h06m.tif'
 seis = 'D:\\Doutorado\\Imagens incucyte\kaka\\clonogenico 2 kaka\\Pre TMZ\\Nuc\\Red\\VID53_D6_7_2020y12m21d_00h30m.tif'
 sete = 'C:\\Users\\Luiza Cherobini\\Desktop\\Red_C6_4_2020y12m19d_18h00m.tif'
-oito ='C:\\Users\\Luiza Cherobini\\Desktop\\ju\\Red_C7_13_2020y12m18d_16h30m.tif'
+oito = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\r\\red\\VID429-karine-red-erk53bp1-30min_B5_19_2021y02m28d_15h05m.tif'
 
 
-xx = dois
-
-b = run_image(xx, 40, pixel_size = 0.1, threshold='yen', shape = 0.2)
-#c = run_image(tres, 20, pixel_size = 0.6)
+xx = oito
+#b = run_image(dois, 40, pixel_size = 0.1, threshold='yen', shape = 0.2)
+b = run_image(xx, 20, pixel_size = 0.6, rescale_intensity = True)
 img = read_image(xx)
 img = exposure.rescale_intensity(img, in_range='image', out_range='dtype')
 img = img_as_ubyte(img)
@@ -660,4 +665,4 @@ for cell_o in b:
 cv.namedWindow('resultado', cv.WINDOW_NORMAL)
 cv.imshow('resultado', img)
 cv.waitKey(0)
-cv.imwrite('C:\\Users\\Luiza Cherobini\\Desktop\\ex.png', img)
+#cv.imwrite('C:\\Users\\Luiza Cherobini\\Desktop\\ex.png', img)

@@ -62,7 +62,6 @@ class Segmenting:
     def __init__(self, contour, image, resolution_factor, pixel_size,
                  extent, x, y, w, h, cut_edges): 
         
-    
         self.raw_contour = contour
         self.img = image
         self.rf = resolution_factor

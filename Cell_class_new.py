@@ -89,10 +89,6 @@ class Cell:
                          self.bbox_x:self.bbox_x+self.bbox_w]
             self.min_nuc2, self.max_nuc2, __, __ = cv.minMaxLoc(self.nuc2, mask = self.mask)
             self.mean_intensity2  = cv.mean(self.nuc2,mask = self.mask)[0]
-            from matplotlib import pyplot as plt
-            plt.figure()
-            plt.imshow(self.nuc2)
-            plt.imshow(self.mask)
             self.image2_min, self.image2_max, __, __ = cv.minMaxLoc(self.image2)#min max from all img
         if wants_ktr == True:
             #bbox2 ao redor do nuc2

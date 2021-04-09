@@ -45,11 +45,11 @@ no caso do exemplo, ela vai listar as pastas 1, 2, N ...
 *Se você possui imagens somente em um canal de fluorescência, deixe a segunda pasta com o
 valor None. Caso contrário, adicione a pasta do canal 2'''
 
-main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\ju\\r'  #Troque essa info pela sua pasta
-main_dir2 = None#'C:\\Users\\Luiza Cherobini\\Desktop\\ju\\g'
+#main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\ju\\r'  #Troque essa info pela sua pasta
+#main_dir2 = None#'C:\\Users\\Luiza Cherobini\\Desktop\\ju\\g'
 
-#main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\r'
-#main_dir2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\g'
+main_dir1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\r'
+main_dir2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\g'
 
 
 folder_nuc_list = []
@@ -73,7 +73,7 @@ else:
     '''`Passo 2: 
     Escolha uma pasta para salvar os resultados. Pode ser qualquer pasta
     '''   
-path_to_save = 'C:\\Users\\Luiza Cherobini\\Desktop\\ju' #isso é só um exemplo 
+path_to_save = 'C:\\Users\\Luiza Cherobini\\Desktop' #isso é só um exemplo 
 
 
 
@@ -206,7 +206,8 @@ df_foci, df_nuc, df_categories, cells_dict = generate_dfs(folder_nuc_items, path
     
     df_foci, df_nuc, df_categories, cells_dict = generate_dfs(folder_nuc_items, path_to_save,
                 save_image, folder_save_1, magnification, folder2_items = folder2_items, 
-                folder_save_2 = folder_save_2, wants_ktr =wants_ktr, wants_foci =wants_foci)
+                folder_save_2 = folder_save_2, wants_ktr =wants_ktr, wants_foci =wants_foci, 
+                rescale_intensity = True)
     
     
     saving = os.path.join(path_to_save, foldername + '.csv')
