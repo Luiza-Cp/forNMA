@@ -9,8 +9,17 @@ import numpy as np
 from scipy.stats import kurtosis
 from skimage.measure import profile_line
 
+
+# A: essa classe ta toda meio perdida, vou mexer nela com mais calma quando der  husahsuah
+# vou deixar pra comentar els quando estiver pronta, aí tu mexe nela depois
+
+
+
 class foci:
     def __init__(self, n, cnt, orig_nuc, orig_nuc_tophat, mask_foci):
+        
+        #Quando refizer essa, preciso normalizar as intensidades, pq o valor de 
+        #intensidade do foci ta dando super alto e distoane do resto
         self.n = n
         self.cnt = cnt
         self.orig_nuc = orig_nuc
@@ -27,18 +36,19 @@ class foci:
         self.cent_int_tophat = (self.orig_nuc_tophat[self.centroid_y, self.centroid_x])
         self.img, self.bright, self.bright_th, self.px_list, self.px_list_th = self.find_mean_bright_px()
         self.mean_cnt, self.mean_cnt_tophat = self.find_mean_contour_points()
-        self.ext, self.ext4, self.ext_th, self.ext4_th = self.calc_mean_exrtreme_points()
-        self.kurtosis = kurtosis((self.px_list)**2)
-        self.kurtosis_th = kurtosis(self.px_list_th)
-        self.lv, self.lv_th= self.laplacian_var()
-        self.sec_deriv, self.sec_deriv_th = self.second_derivative()
-        self.inertia = self.find_inertia_moment()[0]
-        self.bright_cnt_ratio = self.bright/self.mean_cnt
+        #self.ext, self.ext4, self.ext_th, self.ext4_th = self.calc_mean_exrtreme_points()
+        #self.kurtosis = kurtosis((self.px_list)**2)
+        #self.kurtosis_th = kurtosis(self.px_list_th)
+        #self.lv, self.lv_th= self.laplacian_var()
+        #self.sec_deriv, self.sec_deriv_th = self.second_derivative()
+        #self.inertia = self.find_inertia_moment()[0]
+        #self.bright_cnt_ratio = self.bright/self.mean_cnt
         
 #se o cnt ta com as coordenadas do núcleo, o que eu acabei de fazer n se aplica 
     def calc_intensity(self):
         mask = self.mask_foci[self.by:self.by+self.bh, 
                               self.bx:self.bx+self.bw]
+        mask = cv.bitwise_not(mask)
         nuc = self.orig_nuc[self.by:self.by+self.bh, 
                             self.bx:self.bx+self.bw]
         nuc_th = self.orig_nuc_tophat[self.by:self.by+self.bh, 

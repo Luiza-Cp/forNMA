@@ -645,7 +645,7 @@ def run_image(
 um = 'D:\\Doutorado\\Imagens incucyte\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Cyto\\Green\\VID53_D6_7_2020y12m18d_23h00m.tif'
 dois= 'D:\\Doutorado\\53BP1\\Outras img\\40x\\a.tif'
 tres = 'D:\\Doutorado\\53BP1\\Outras img\\20x\\a.tif'
-quatro = 'C:\\Users\\Luiza Cherobini\\Desktop\\Nucear detection validation\\40x\\Slide 1_RPE WT PDS 4uM 4hrs_FOV 00285_DAPI.tif'
+quatro = 'D:\Doutorado\\53bp1 py some info\\validações forNMA 2020\\Nucear detection validation\\40x\\Slide 1_RPE WT PDS 4uM 4hrs_FOV 00285_DAPI.tif'
 cinco= 'D:\\Doutorado\\Imagens incucyte\\imagens jeph 4x\\Analise\\teste 4x\\red_A2_42_2021y01m25d_13h06m.tif'
 seis = 'D:\\Doutorado\\Imagens incucyte\kaka\\clonogenico 2 kaka\\Pre TMZ\\Nuc\\Red\\VID53_D6_7_2020y12m21d_00h30m.tif'
 sete = 'C:\\Users\\Luiza Cherobini\\Desktop\\Red_C6_4_2020y12m19d_18h00m.tif'
@@ -653,7 +653,7 @@ oito = 'C:\\Users\\Luiza Cherobini\\Desktop\\video kaka\\r\\red\\VID429-karine-r
 
 
 xx = oito
-#b = run_image(dois, 40, pixel_size = 0.1, threshold='yen', shape = 0.2)
+b = run_image(quatro, 40, pixel_size = 0.1, threshold='yen', shape = 0.2)
 b = run_image(xx, 20, pixel_size = 0.6, rescale_intensity = True)
 img = read_image(xx)
 img = exposure.rescale_intensity(img, in_range='image', out_range='dtype')

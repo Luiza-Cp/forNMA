@@ -44,9 +44,9 @@ control_df = pd.concat([df_NMA_list[0]],  ignore_index=True)
 
 def thresh_NMA(df):
     mean_NII = df['NII'].mean()
-    mean_a = df["Nucleus Area"].mean()
+    mean_a = df["Area"].mean()
     std_NII = df['NII'].std()
-    std_a = df["Nucleus Area"].std() 
+    std_a = df["Area"].std() 
     t = np.linspace(0, 2*pi, 100) 
     return mean_NII, mean_a, std_NII, std_a, t
 

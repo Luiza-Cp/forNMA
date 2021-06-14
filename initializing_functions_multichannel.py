@@ -1,17 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Mar 13 23:41:15 2021
+Created on Sun May 16 15:09:48 2021
 
-@author: Luiza Cherobini Pereira
-
-Hi stranger! It's been a while. 
-I've missed you.
-It's ok...
-You can look at my code
+@author: Luiza
+Contain all the necessary functions for processing the image for segmentation
 """
 
-from matplotlib import pyplot as run_image
-from skimage import  img_as_ubyte, exposure
+from skimage import  img_as_ubyte, exposure, restoration
+from skimage.exposure import match_histograms
 from skimage.segmentation import clear_border
 import cv2 as cv
 import numpy as np
@@ -19,9 +15,48 @@ import copy
 import math
 from Divide_contours import Segmenting, select_right_contour
 from thresholding import threshold_dict
-from Cell_class_new import Cell
 from typing import Optional, List, Tuple
-      
+
+#   A: esse lista serve pra guardar imagens que eventiualmente ele não consiga abrir
+#e vão ser exibidas em forma de aviso na interface
+
+not_processed = []
+#remover Nones dessa lista no fim -> [x for x in L if x is not None]
+def load_image(
+        filename: str, 
+        rescale_intensity: bool = False,
+        remove_bg: bool = False,
+        radius_bg: int = 30,
+        ref: Optional[np.ndarray] = None
+) -> Optional[np.array]:
+    """ 
+    It opens the image, performs intensity adjustments, if required, and
+    converts image to ubyte. If file can not be opened, adds the file
+    to not_procesed list.
+    """
+    print ('file: ',filename)
+    img = cv.imread(filename,cv.IMREAD_ANYDEPTH)
+    if  img is None or img.size == 0:
+        not_processed.append(filename)
+        return None
+    
+    if ref is not None:
+        img = match_histograms(img, ref)
+        img =img.astype('ubyte')
+
+    if rescale_intensity == True:
+        img = exposure.rescale_intensity(img, in_range='image', out_range='dtype')
+    elif img.dtype.kind == 'f' and (np.any(img>1) or np.any(img<-1)):
+        img = exposure.rescale_intensity(img, in_range='image', out_range='dtype')
+        
+    img = img_as_ubyte(img) 
+
+    if remove_bg == True:
+        background = restoration.rolling_ball(img, radius = radius_bg )
+        img = img-background
+     
+    return img
+   
 
 def adjust_low_res_binary_img(
         binary_image: np.ndarray, 
@@ -182,7 +217,6 @@ def find_rings(
     return nuc_mask, inner_ring_mask, outter_ring_mask, inner_nuc_mask
    
     
-   
 def find_bigger_bbox(
         x: int,
         y: int,
@@ -320,7 +354,7 @@ def fluorescence_of_rings(
             else:       # right contour
                 new_cnt_list.append(cnt)
     
-    return new_cnt_list
+    return contour_list
   
 
 def filter_debree(
@@ -502,136 +536,3 @@ def erase_image(
         image_erased = cv.rectangle(image,(x2,y2),(x2+w2,y2+h2),(f,f,f),-1)
    
     return image_erased  
-
-     
-def run_image(
-        image1: np.array,
-        magnification: int, 
-        image2: Optional[np.array] = None,
-        pixel_size: Optional[float] = 0.5, 
-        threshold: Optional[str] = 'triangle', 
-        offset: Optional[int] = 0, 
-        blur: Optional[int] = 12, 
-        adjust_size: Optional[int] = 0, 
-        cut_edges: Optional[float] = 0.7, 
-        shape: Optional[float] = 0.88, 
-        eccentricity: Optional[float] = None, 
-        min_size: Optional[int] = None, 
-        max_size: Optional[int] = None, 
-        min_radius: Optional[int] = None, 
-        max_radius: Optional[int] = None, 
-        fast_detection: bool = False,
-        error: Optional[int] = None, 
-        wants_ktr: bool = False, 
-        ring_size: Optional[float] = 1.75, #talvez pedir valor em pixel
-        use_ellipse: bool = False, 
-        wants_foci: bool = False, 
-        foci_channel2: bool = False, 
-        foci_min_size: Optional[int] = None, 
-        foci_max_size: Optional[int] = None, 
-        foci_min_int: Optional[int] = None, 
-        foci_max_int: Optional[int] = None,
-        foci_min_rel_int: Optional[int] = None, 
-        foci_max_rel_int: Optional[int] = None, 
-        foci_eccentricity: Optional[int] = None
-) -> List[Cell]:
-    """
-    Performs all the operations in one image to generate a cell list.
-    First, it applies a threshold and makes the necessary adjustments.
-    From the binary image, the contours are obtained and, if there is any,
-    the Cell list is created. 
-    If user do not enable fast_mode, all objects within a image will be 
-    erased with a black box and the image will be analyzed again, in a maximum
-    range of 6 times, allowing for low fluorescence nuclei to be detected.
-    If nothing is detected, the image will be considered empty, 
-    untill thresholding settings are changed by user.
-    """
-    if magnification<10:
-        pixel_size = 0.5        # standard for small objects   
-    ring_size = round(ring_size/pixel_size)
-    resolution_factor = image1.size/4194304        # used to compensate some iterations
-    binary = threshold_dict[threshold](image1, offset)
-    from matplotlib import pyplot as plt
-    plt.figure()
-    
-    binary= adjust_binary_image(binary, pixel_size, resolution_factor, blur, magnification,
-                                adjust_size)
-    cell_list = []
-    if not binary.any() == False:   #if binary image is not empty, it searches for nuclei 
-        nuc_contours = find_nuc_contours(binary, image1, resolution_factor, pixel_size,
-                                         magnification, cut_edges, adjust_size,
-                                         shape, eccentricity, min_size, max_size,
-                                         min_radius, max_radius, fast_detection)
-        
-        if len(nuc_contours) > 0:   #if it finds nuclear contours, it create a Cell object for each contour
-            for i in range(len(nuc_contours)):
-                cell_object = Cell(i, nuc_contours[i], ring_size,  resolution_factor, image1,
-                           binary, wants_foci, wants_ktr, magnification, pixel_size, 
-                           foci_channel2, image2)
-                cell_list.append(cell_object)
-
-    else:
-        nuc_contours = [] 
-        
-    img_to_fill =image1.copy()
-
-    if fast_detection == False:
-        #it tries to find nuclei with less ifluorescence intensity by covering 
-        #the already detected ones. If after 6 rounds of covering nuclei it still 
-        #finds objects, forNMA will ignore them
-        n = 0
-        while len(nuc_contours) > 0 and n < 6:
-            n = n + 1
-            image_erased = erase_image(nuc_contours, img_to_fill, resolution_factor)
-            new_binary = threshold_dict[threshold](image_erased, offset)
-            new_binary = adjust_binary_image(new_binary, pixel_size, resolution_factor, blur, 
-                                              magnification, adjust_size)
-            if not new_binary.any() ==True:
-                nuc_contours = []
-            else:
-                nuc_contours = find_nuc_contours(new_binary, image1, resolution_factor, pixel_size,
-                                             magnification, cut_edges, adjust_size,
-                                             shape, eccentricity, min_size, max_size,
-                                             min_radius, max_radius, fast_detection)
-                for i in range(len(nuc_contours)):
-                    cell_object = Cell(i, nuc_contours[i], ring_size,  resolution_factor, image1,
-                           new_binary, wants_foci, wants_ktr, magnification, pixel_size, 
-                           foci_channel2, image2)
-                    cell_list.append(cell_object)
-
-
-    pos = 1     # corrects the number of each cell in the image
-    for cell_o in cell_list:
-        cell_o.n = pos
-        pos=pos+1
-    
-    return cell_list 
-
-'''
-
-um = 'D:\\Doutorado\\Imagens incucyte\\imagens incucyte kaka\\clonogenico 2 kaka\\Pre TMZ\\Cyto\\Green\\VID53_D6_7_2020y12m18d_23h00m.tif'
-dois= 'D:\\Doutorado\\53BP1\\Outras img\\40x\\a.tif'
-tres = 'D:\\Doutorado\\53BP1\\Outras img\\20x\\a.tif'
-quatro = 'C:\\Users\\Luiza Cherobini\\Desktop\\Nucear detection validation\\40x\\Slide 1_RPE WT PDS 4uM 4hrs_FOV 00285_DAPI.tif'
-cinco= 'D:\\Doutorado\\Imagens incucyte\\imagens jeph 4x\\Analise\\teste 4x\\red_A2_42_2021y01m25d_13h06m.tif'
-seis = 'D:\\Doutorado\\Imagens incucyte\kaka\\clonogenico 2 kaka\\Pre TMZ\\Nuc\\Red\\VID53_D6_7_2020y12m21d_00h30m.tif'
-sete = 'C:\\Users\\Luiza Cherobini\\Desktop\\Red_C6_4_2020y12m19d_18h00m.tif'
-oito ='C:\\Users\\Luiza Cherobini\\Desktop\\ju\\Red_C7_13_2020y12m18d_16h30m.tif'
-
-
-xx = dois
-
-b = run_image(xx, 40, pixel_size = 0.1, threshold='yen', shape = 0.2)
-#c = run_image(tres, 20, pixel_size = 0.6)
-img = read_image(xx)
-img = exposure.rescale_intensity(img, in_range='image', out_range='dtype')
-img = img_as_ubyte(img)
-print(img.min())
-for cell_o in b:
-    img = cv.drawContours(img,cell_o.cnt, -1, (255,255,255), 1)
- 
-cv.namedWindow('resultado', cv.WINDOW_NORMAL)
-cv.imshow('resultado', img)
-cv.waitKey(0)
-cv.imwrite('C:\\Users\\Luiza Cherobini\\Desktop\\ex.png', img)
-'''
