@@ -16,7 +16,7 @@ from pystackreg.util import to_uint16
 
 #Add here the path to folders crerated in the previous step
 
-folder_save = 'D:\\Triagem\\'
+folder_save = 'D:\\Triagem 2\\'
 folder_save2 =  os.path.join(folder_save, "Red_Registered")
 folder_save3 =  os.path.join(folder_save, "Green_registered")
 #os.mkdir(folder_save2)

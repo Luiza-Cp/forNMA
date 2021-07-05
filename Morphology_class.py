@@ -53,7 +53,7 @@ class Morphology:
         self.centroid_x = int(self.moments['m10']/self.moments['m00'])
         self.centroid_y = int(self.moments['m01']/self.moments['m00'])
         self.radius_ratio = self.calc_radius_ratio()
-        self.NII = self.aspect-self.extent + self.radius_ratio + self.roundness
+        self.NII = 0.9*self.aspect- 0.87*self.extent + 0.96*self.radius_ratio + 0.92*self.roundness
         self.df = self.create_df()
         
     def calc_aspect (self) -> float: 

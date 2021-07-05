@@ -15,7 +15,7 @@ import seaborn as sns
 import numpy as np  
 from math import pi
 
-path = 'D:\\Doutorado\\Imagens incucyte\\dinamica 53bp1\\A172\\Resultados\\TMZ 50'
+path = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\results\\A'
 #path = 'D:\\Doutorado\\Imagens eduardo\\Results'
 
 df_list = []
@@ -25,18 +25,23 @@ for file in os.listdir(path):
     if file.endswith(".csv"):
         print(file)
         table = pd.read_csv(path+ '\\' + file) 
+        table = table[table['Area'] > 1000]
         df_dict[file] = table
         df_list.append(table)
-        
+  
+  
+  
 # dia 1 e 2 são controle   
 df_NMA_dict = {} 
 df_NMA_list = [] 
 for key, value in df_dict.items():
-    df_NMA = value[['Nucleus', 'Nucleus Area',"NII"]]
+    df_NMA = value[['Cell', 'Area',"NII"]]
     df_NMA_list.append(df_NMA)
     df_NMA_dict[key] = df_NMA
    
 control_df = pd.concat([df_NMA_list[0]],  ignore_index=True)
+
+
 #control_df = pd.concat([df_NMA_list[0], df_NMA_list[1]],  ignore_index=True)
 #for i in df_NMA_list[2:]:
 #    control_df = pd.concat([control_df, i],  ignore_index=True)
@@ -68,8 +73,8 @@ def find_yx_lim(df_dict):
     max_NII = []
     min_NII = []
     for key, value in df_dict.items():
-        max_a.append(value['Nucleus Area'].max())
-        min_a.append(value['Nucleus Area'].min())
+        max_a.append(value['Area'].max())
+        min_a.append(value['Area'].min())
         max_NII.append(value['NII'].max())
         min_NII.append(value['NII'].min())
     return min(min_a),max(max_a), min(min_NII), max(max_NII)  
@@ -77,24 +82,24 @@ def find_yx_lim(df_dict):
 def find_yx_lim2(df_dict):
     #remove outlier
     max_a = []
-    min_a = []
+    min_a = 3000
     max_NII = []
-    min_NII = []
+    min_NII = 2
     for key, value in df_NMA_dict.items():
         df = value[(np.abs(stats.zscore(value)) < 3).all(axis=1)]
-        max_a.append(df['Nucleus Area'].max())
-        min_a.append(df['Nucleus Area'].min())
+        max_a.append(df['Area'].max())
+        #min_a.append(df['Area'].min())
         max_NII.append(df['NII'].max())
-        min_NII.append(df['NII'].min())
-    return min(min_a),max(max_a), min(min_NII), max(max_NII)  
+        #min_NII.append(df['NII'].min())
+    return min_a,max(max_a), min_NII, max(max_NII)  
 
 
 def get_sample(df):
     df_sample = df.sample(n = 200)
     p_NII_var = f_test(df['NII'].values, df_sample['NII'].values)
-    p_a_var = f_test( df['Nucleus Area'].values,df_sample['Nucleus Area'].values)
+    p_a_var = f_test( df['Area'].values,df_sample['Area'].values)
     p_NII_mean = stats.ttest_ind(df['NII'].values, df_sample['NII'].values)[1]
-    p_a_mean = stats.ttest_ind( df['Nucleus Area'].values,df_sample['Nucleus Area'].values)[1]
+    p_a_mean = stats.ttest_ind( df['Area'].values,df_sample['Area'].values)[1]
         
     if p_NII_var > 0.05 and p_a_var > 0.05 and p_NII_mean > 0.05 and p_a_mean >0.05:
         boolean = True         
@@ -114,22 +119,26 @@ def f_test(x, y):
 
 #antes de plotar isso tem que perguntar se tem mais de 200
 #usar xy lim
-def plot_NMA_200(name, df, xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a, t):
+def plot_NMA_200(name, df, xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a, t, lims):
     df_sample, boolean = get_sample(df)
     while boolean == False:
         df_sample, boolean = get_sample(df)
     plt.rcParams['axes.facecolor'] = 'white'
     fig,ax = plt.subplots(1)
-    sns.scatterplot(data=df_sample, x="NII", y="Nucleus Area", color='#A02F7E', ax=ax, s=40) 
+    sns.scatterplot(data=df_sample, x="NII", y="Area", size ='Total_foci_53BP1', 
+                    hue = 'Total_foci_gamaH2AX', hue_norm =(0.0,40.0),
+                    size_norm =(0.0,20.0), ax=ax, s=40) 
     plt.plot( mean_NII+(2*std_NII)*np.cos(t) , mean_a+(2*std_a)*np.sin(t), color= 'black' )
     plt.plot (xh, yh1, xh, yh2, xv, yv, color='black')
+    plt.ylim(lims[0], lims[1])
+    plt.xlim(lims[2], lims[3])
     plt.title(name)
 
 def plot_NMA_heatmap(name, df, xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a, t, lims):
     plt.rcParams['axes.facecolor'] = '#03051A'
     plt.figure()
     #fig,ax = plt.subplots(1)
-    sns.displot(df, x="NII", y="Nucleus Area", cmap= 'rocket', kind='kde', 
+    sns.displot(df, x="NII", y="Area", cmap= 'rocket', kind='kde', 
                     fill=True, thresh= None, levels = 60)
     #plt.plot( mean_NII+(2*std_NII)*np.cos(t) , mean_a+(2*std_a)*np.sin(t), color= 'white', linewidth = 0.75 )
     plt.plot (xh, yh1, xh, yh2, xv, yv, color='white', linewidth = 0.75)
@@ -140,7 +149,7 @@ def plot_NMA_heatmap(name, df, xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, 
 def plot_NMA_heatmap_dot(name, df, xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a, t, lims):
     plt.rcParams['axes.facecolor'] = 'white'
     plt.figure()
-    sns.displot(df,x="NII", y="Nucleus Area", cmap= 'rocket')
+    sns.displot(df,x="NII", y="Area", cmap= 'rocket')
     plt.plot( mean_NII+(2*std_NII)*np.cos(t) , mean_a+(2*std_a)*np.sin(t), color= 'red', linewidth = 0.75 )
     plt.plot (xh, yh1, xh, yh2, xv, yv, color='red', linewidth = 0.75)
     plt.title(name)
@@ -165,19 +174,22 @@ def  pop_doubling(df_list, time_list):
 
         
 
-df2 =  control_df[['Nucleus Area', 'NII']]
+df2 =  control_df[['Area', 'NII']]
 df3 = df2[(np.abs(stats.zscore(df2)) < 2).all(axis=1)]
 mean_NII, mean_a, std_NII, std_a, t = thresh_NMA(df3)
 xh, yh1, yh2, xv, yv = lines(mean_NII, mean_a, std_NII, std_a)
 lims = find_yx_lim2(df_dict)
 
 for key, value in df_dict.items():
-    #plot_NMA_200(key, value ,xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a,t )
-    plot_NMA_heatmap(key, value, xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a, t, lims )
+    plot_NMA_200(key, value ,xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a,t , lims)
+    #plot_NMA_heatmap(key, value, xh, yh1, yh2, xv, yv, mean_NII, mean_a, std_NII, std_a, t, lims )
 
+    plt.savefig(path +'\\ sample ' + key +'.svg', dpi=200)
 
-
-l = [5,6,7,8,9,11,12,13]
-pop_doubling(df_list, l)
+#l = [5,6,7,8,9,11,12,13]
+#pop_doubling(df_list, l)
 
 # DESCOBRIR COMO CALCLAR OS LEVELS AUTOMATICAMENTEEEE
+for key, value in df_dict.items():
+    print (key + '53bp1', value['Total_foci_53BP1'].mean())
+    print (key + 'gH2AX', value['Total_foci_gamaH2AX'].mean())
