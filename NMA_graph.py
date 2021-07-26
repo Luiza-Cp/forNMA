@@ -17,6 +17,7 @@ import seaborn as sns
 import numpy as np  
 from math import pi
 from typing import Optional, List, Tuple
+from matplotlib.patches import Ellipse
 
 
 # função de calcular as porcentagens por quadrante e anotar
@@ -65,7 +66,7 @@ def find_area_NII_lims(df_dict: dict):
     max_NII = []
     min_NII = []
     for key, value in df_dict.items():
-        df = value[0]
+        df = value
         min_NII.append(df['NII'].min())
         min_a.append(df['Area'].min())
         df = df[(np.abs(stats.zscore(df["Area"])) < 3)]
@@ -73,9 +74,9 @@ def find_area_NII_lims(df_dict: dict):
         max_a.append(df['Area'].max())
         max_NII.append(df['NII'].max())
 
-    min_a = min(min_a) - ((sum(min_a)/len(min_a))*0.3) #ver se isso faz sentido 
+    min_a = min(min_a) - ((sum(min_a)/len(min_a))*5) #ver se isso faz sentido 
     min_NII = min(min_NII) - 0.5
-    
+
     return min_a,max(max_a), min_NII, max(max_NII)
 
 def find_3d_lim(
@@ -92,8 +93,8 @@ def find_3d_lim(
     max_3d = []
     min_3d = []
     for key, value in df_dict.items():
-        min_3d.append(value[0][col].min())
-        df = value[(np.abs(stats.zscore(value[0][col])) < 3).all(axis=1)]
+        min_3d.append(value[col].min())
+        df = value[(np.abs(stats.zscore(value[col])) < 3).all(axis=1)]
         max_3d.append(df[col].max())
     min_3d = min(min_3d) - (sum(min_3d)/len(min_3d))*0.3 #ver se isso faz sentido 
     
@@ -113,7 +114,7 @@ def find_norms(
        min_val = []
        max_val = []
        for key, value in df_dict.items():
-           df= value[0]
+           df= value
            df = df[(np.abs(stats.zscore(df[col])) < 3)]
            min_val.append(df[col].min())
            max_val.append(df[col].max())
@@ -162,6 +163,8 @@ def plot_NMA_heatmap(
     plt.ylim(lims[0], lims[1])
     plt.xlim(lims[2], lims[3])
     plt.title(name)
+   # path_to_save = 'D:\\Triagem\\Results\\NEW\\Graphs\\NMA'
+   # plt.savefig(os.path.join(path_to_save, 'Heatmap ' + name+ '.png'), dpi = 200)
 
  
     
@@ -262,7 +265,8 @@ def plot_NMA_200(
     plt.ylim(lims[0], lims[1])
     plt.xlim(lims[2], lims[3])
     plt.title(name)
-    
+   # path_to_save = 'D:\\Triagem\\Results\\NEW\\Graphs\\NMA'
+   # plt.savefig(os.path.join(path_to_save, 'Sample ' +  name+ '.png'), dpi = 200)
  
 def plot_NMA_dot(
         name: str, 
@@ -298,12 +302,15 @@ def plot_NMA_dot(
     fig,ax = plt.subplots(1)
     sns.scatterplot(data=df, x="NII", y="Area", size = size, hue = hue,
                     hue_norm = hue_norm, size_norm = size_norm, ax=ax) 
-    plt.plot( mean_NII+(2*std_NII)*np.cos(c) , mean_a+(2*std_a)*np.sin(c), color= 'black' )
+    plt.plot(mean_NII+(2*std_NII)*np.cos(c) , mean_a+(2*std_a)*np.sin(c), color= 'black' )
+    #el = Ellipse((mean_NII, mean_a), 4*std_NII, 4*std_a, angle=0, color="black", fill=False)
+    #ax.add_patch(el)
     plt.plot (xh, yh1, xh, yh2, xv, yv, color='black')
     plt.ylim(lims[0], lims[1])
     plt.xlim(lims[2], lims[3])
     plt.title(name)
-    
+   # path_to_save = 'D:\\Triagem\\Results\\NEW\\Graphs\\NMA'
+   # plt.savefig(os.path.join(path_to_save,'Scatter ' +  name+ '.png'), dpi = 200)
     
     
     
@@ -315,10 +322,13 @@ NMA_plots_dict = {'heatmap': plot_NMA_heatmap,
         
 
 def NMA(df_dict: dict,
+        ref: str, 
         type_of_plot: str,
         col1: Optional[str] = None,
         col2: Optional[str] = None,
-        col3: Optional[str] = None
+        col3: Optional[str] = None,
+        overtime: bool = False, 
+        timelist: Optional[List[int]]= None,
 ):
     #esse df tem que ter o nome da pasta ou do csv como key e uma list [df, bool] como value
     # o bool é se é ou não controle
@@ -328,19 +338,44 @@ def NMA(df_dict: dict,
    the user can assign two columns for hue and size of the dot.
    """
     
-   for key, value in df_dict.items():
-       if value[1] == True:
-            mean_NII, mean_a, std_NII, std_a, circle = thresh_NMA(value[0])
-            hx, hy1,hy2, vx, vy = lines(mean_NII, mean_a, std_NII, std_a)
-            lims = find_area_NII_lims(df_dict)
-   
-#normalização das cols1 (hue_norm), 2 (size_norm) e 3 (limite do 3d)
+   # normalização das cols1 (hue_norm), 2 (size_norm) e 3 (limite do 3d)
    hue_norm = find_norms(df_dict, col1)
    size_norm = find_norms(df_dict, col2)
-   print (hue_norm, size_norm)
    lim3d = find_3d_lim(df_dict, col3)
+   lims = find_area_NII_lims(df_dict)
+   
+   if overtime == True and ref == 't0':
+       print('aa')
+       for key, value in df_dict.items():
+           t0 = value[value["Frame"] == 0]
+           mean_NII, mean_a, std_NII, std_a, circle = thresh_NMA(t0)
+           hx, hy1,hy2, vx, vy = lines(mean_NII, mean_a, std_NII, std_a)
+           
+           for time in timelist:
+               df_plot = value[value["Frame"] == time]
+               graph_name = str(key[:-8]) + ' Time '+ str(time)
+               NMA_plots_dict[type_of_plot](graph_name, df_plot, hx, hy1, hy2, vx, vy, mean_NII, 
+                                    mean_a, std_NII, std_a, circle, lims, col1, 
+                                    col2, hue_norm,size_norm,col3, lim3d)
+   
+    
    for key, value in df_dict.items():
-        NMA_plots_dict[type_of_plot](key[:-8], value[0], hx, hy1, hy2, vx, vy, mean_NII, 
+       if key == ref:
+            mean_NII, mean_a, std_NII, std_a, circle = thresh_NMA(value)
+            hx, hy1,hy2, vx, vy = lines(mean_NII, mean_a, std_NII, std_a)
+           
+  
+   for key, value in df_dict.items():
+       if overtime == True:
+           for time in timelist:
+               df_plot = value[value["Frame"] == time]
+               graph_name = str(key[:-8]) + ' Time '+ str(time)
+               NMA_plots_dict[type_of_plot](graph_name, df_plot, hx, hy1, hy2, vx, vy, mean_NII, 
+                                    mean_a, std_NII, std_a, circle, lims, col1, 
+                                    col2, hue_norm,size_norm,col3, lim3d)
+           
+       else:
+           NMA_plots_dict[type_of_plot](key[:-8], value, hx, hy1, hy2, vx, vy, mean_NII, 
                                     mean_a, std_NII, std_a, circle, lims, col1, 
                                     col2, hue_norm,size_norm,col3, lim3d)
           
@@ -350,7 +385,7 @@ def NMA(df_dict: dict,
 ## Não esquecer das duas funções que faltam!
 
 
-#esse dicionário vem da interface também
+# esse dicionário vem da interface também
 # se for overtime, o controle é o primeiro tempo e o usuário escolhe
 #qual ou quais tempos plotar. E nesse dic só entram os dfs a plotar
 
@@ -358,7 +393,7 @@ def NMA(df_dict: dict,
 #e o dicionário vem com todos  
 
 
-path = 'D:\\Triagem 2'
+path = 'D:\\Triagem\\Results\\NEW'
 
 df_dic= {}
 
@@ -370,12 +405,33 @@ for file in os.listdir(path):
         for col in table.columns:
             if isinstance(table.iloc[0][col],str):
                  table = table.drop(columns =col)
-            
-        #table = table[table['Area'] > 1000]
-        if str(file) == 'C Results.csv':
-            df_dic[file[:-4]] = (table, True)
-        else:
-             df_dic[file[:-4]] = (table, False)
+        df_dic[file[:-4]] = table
        
-        
-NMA(df_dic, 'sample', 'Total_foci_red', 'Mean_ellipse_green')       
+#Types of plot: dot, sample, heatmap      
+#Types of control: 
+    # str representing the name of one specific group. If overtime will put all 
+    # time values together to generate the control 
+    # t0 -> initial time for each group
+
+l = list(table["Frame"])
+l= list(set(l))
+l = [int(i) for i in l]
+l.sort()
+timelist = [int(l[0]), int(l[54]), int(l[101]), int(l[149]), int(l[176]), int(l[152]), int(l[188])]
+
+NMA(df_dic, 'C_1000 Results', 'dot', 'Total_foci_red', 'Mean_ellipse_green', overtime = True, 
+    timelist = timelist)
+
+aa = list(df_dic.values())[0]
+bb= aa[aa.Area > aa.Area.quantile(.75) ]
+cc = aa[aa.Area < aa.Area.quantile(.25) ]
+dd= aa[aa.NII > aa.NII.quantile(.75)]
+ee = aa[aa.NII <aa.NII.quantile(.25)]
+
+idx = []
+idx.extend(bb.index.to_list())
+idx.extend(cc.index.to_list())
+idx.extend(dd.index.to_list())
+idx.extend(ee.index.to_list())
+to_drop = list(set(idx))
+aa = aa.drop(aa.index[to_drop])
