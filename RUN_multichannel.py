@@ -9,11 +9,10 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save=  'D:\\Triagem\\Results\\NEW'
+path_to_save=  'C:\\Users\\Luiza Cherobini\\Desktop\\kk'
 
-
-ch1 = 'D:\\Triagem\\Red\\RUN'     #pasta contendo as pastas de imagens de um canal 
-ch2 = 'D:\\Triagem\\Green\\RUN'   #pasta contendo as pastas de imagens de um canal 
+ch1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\kk\\r'     #pasta contendo as pastas de imagens de um canal 
+ch2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\kk\\r'   #pasta contendo as pastas de imagens de um canal 
 #ch3 = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\Run\\gH2AX'
 
 #como você nomeia o canal
@@ -111,7 +110,7 @@ parameter_list = [param_ch1, param_ch2]
 
 # para cada subpasta dentro da pasta mãe, adicionar uma lista de condições
 # se deixar vazia ou com numero diferente do tamanho de subpastas vai colcoar none
-conditions = []
+conditions = ['controle']
 
 #Vai checar se dados são sequencia temporal
 #se for sequencia temporal, favor colocar 1 campo por pasta!

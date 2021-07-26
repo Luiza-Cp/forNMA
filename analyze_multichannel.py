@@ -129,10 +129,13 @@ def analyze_dict(
             
             df_ch = pd.concat(df_ch_list)
             image_df = pd.merge(image_df, df_ch, on = 'Cell')
+            image_df["Frame"] = img_n
            
         all_df_list.append(image_df)
     
     all_df = pd.concat(all_df_list)
+    all_df["Condition"] = condition
+    all_df["Overtime"] =  is_overtime
     all_df = all_df.reset_index(drop= True)
     
     return all_df   # esse df vai pra parte de remover outliers 
