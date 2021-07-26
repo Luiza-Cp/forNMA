@@ -171,7 +171,7 @@ for i in range(n_sub):
         raise("The folders contain different image number")
     else:
     
-        total_df = analyze_dict(general_dict, segment_dict) # ju usa esse pra remover outliers
+        total_df = analyze_dict(general_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
         df_results, df_cnt = split_dfs(total_df, general_dict)
         draw_and_save(df_cnt, df_results, path_to_save, os.path.basename((value[0][i])),
               general_dict, save_images)       

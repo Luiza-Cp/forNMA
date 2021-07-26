@@ -11,7 +11,7 @@ from Morphology_class import Morphology
 from Cell_class_multichannel import Cell
 from Foci_class import foci
 import numpy as np
-from typing import List
+from typing import List, Optional
 import os
 import cv2 as cv
 
@@ -74,7 +74,10 @@ def measure_image(
 
 def analyze_dict(
         ch_dict: dict,      # dic of every channel 
-        seg_param: dict     # dic of global parameters
+        seg_param: dict,     # dic of global parameters
+        is_overtime: bool,
+        condition: Optional[str]
+        
 )-> pd.DataFrame:
     
     """
@@ -120,8 +123,6 @@ def analyze_dict(
           
         
         for key, value in ch_dict.items():
-            #aqui poderia retornar tbm um dict de imagens (os arrays) pra n ter 
-            #que carregar tudo de novo 
             df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
                             ref_dict[key], contours, seg_param['magnification'], 
                             seg_param['pixel_size'], key)
