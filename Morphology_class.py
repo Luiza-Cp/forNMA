@@ -16,12 +16,14 @@ class Morphology:
     """
     Stores and measures morphological properties of a object contour.
     """
-    def __init__(self, n, cnt):
+    def __init__(self, n, cnt, int_in, int_out):
         """
         Atributes
         
         self.n = number of the cell at a given image
         self.cnt = contour of the object(the nucleus) at image
+        self.int_in = mean intensity of a inner ring and the nucleus
+        self.int_out = mean intensity of a outter ring and the nucleus
         self.bbox_x1 = bounding rectangle x coordinate
         self.bbox_y1 = bounding rectangle y coordinate
         self.bbox_w1 = bounding rectangle width
@@ -37,11 +39,14 @@ class Morphology:
         self.centroid_y = y position of self.cnt  centroid
         self.radius_ratio = radius ratio of self.cnt
         self.NII = Nuclear Irregularity Index of self.cnt
+        self.convex_area = area of convex hull divided by contour area
         self.df = DataFrame with all information
         """
         
         self.n = n
         self.cnt = cnt
+        self.int_in = int_in
+        self.int_out = int_out
         self.bbox_x1, self.bbox_y1, self.bbox_w1, self.bbox_h1 = cv.boundingRect(self.cnt)
         self.area = cv.contourArea(cnt) 
         self.fellipse = cv.fitEllipse(cnt)   #fitting ellipse
@@ -54,6 +59,8 @@ class Morphology:
         self.centroid_y = int(self.moments['m01']/self.moments['m00'])
         self.radius_ratio = self.calc_radius_ratio()
         self.NII = 0.9*self.aspect- 0.87*self.extent + 0.96*self.radius_ratio + 0.92*self.roundness
+       
+        self.convex_area = cv.contourArea(cv.convexHull(self.cnt))/self.area
         self.df = self.create_df()
         
     def calc_aspect (self) -> float: 
@@ -111,6 +118,9 @@ class Morphology:
                      "Roundness": [self.roundness],
                      "Radius_ratio": [self.radius_ratio],
                      "NII" : [self.NII],
+                     "Error_int_in" : [self.int_in],
+                     "Error_int_out" : [self.int_out],
+                     "Error_convex_area" : [self.convex_area]
                        }
         df_morpho = pd.DataFrame(morpho_info) 
         

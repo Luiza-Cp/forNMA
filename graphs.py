@@ -318,6 +318,8 @@ def cpd (df: pd.DataFrame,
     """ Measures the Cumulative Population Doubling of a cell population, given
     a dataframe and a list of timepoints"""
     
+    timelist = timelist_cpd
+    
     dict_of_pd_lists = {}
     conditions = set(list(df["Condition"])) 
     
@@ -427,7 +429,7 @@ def moving_average(df: pd. DataFrame,
 
    
 #vou criar um dataset pra testar se ta tufo orolando certo se não vou enlouqucer aqui 
-group = "222"
+group = "DBS16"
 
 t1= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_0.001_1000 Results.csv')
 t2= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_0.01_1000 Results.csv')
@@ -437,7 +439,7 @@ t5= pd.read_csv('D:\\Triagem\\Results\\NEW\\C_1000 Results.csv')
 #t6 =  pd.read_csv('D:\\Triagem\\Results\\NEW\\MEKi_0.17_1000 Results.csv')
 #t7 =  pd.read_csv('D:\\Triagem\\Results\\NEW\\MEKi_0.017_1000 Results.csv')
 
-tl =[t5]#,t2,t3,t4, t5]
+tl =[t1 ,t2,t3,t4, t5]
 
 
 df = pd.DataFrame( )
@@ -457,27 +459,14 @@ timelist = [int(l[0]), int(l[54]), int(l[101]), int(l[149]), int(l[176]), int(l[
 
 timelist_cpd = [0,54,101,149,176,182, 188]
 
-l2 = [583,598,613,628,643,658,673,688,718,748,778,808,838,868,898,
- 928,958, 988, 1018, 1048, 1078, 1108, 1138, 1168, 1198, 1228, 1258, 1288, 
- 1318, 1348,
- 1378,
- 1408,
- 1438,
- 1468,
- 1498,
- 1528,
- 1558,
- 1588,
- 1618 ]
 
 
 df_plot = pd.DataFrame()
 
-for i in l2:
-    dp= t5[t5["Frame"] == i] 
-    df_plot = df_plot.append(dp)
-    
-lineplot('Frame', "Mean_Ellipse/Nucleus_green", df_plot,  ci=95)
+
+#cpd(df, timelist_cpd, abc= False)
+
+moving_average(df, "Total_foci_red", 20, ref= 'C_1000', path_save = ps3)
 
 #categorical_plots('strip', "Area" , "Area", df, overtime = True )
 

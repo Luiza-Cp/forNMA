@@ -99,8 +99,9 @@ def analyze_dict(
     all_df_list =  []    
     for img_n in range(len((list(ch_dict.values())[0][0]))):      
         img_to_segment = ch_dict[ch_segment][0][img_n]
-      
-        contours = find_contours(img_to_segment, magnification = seg_param['magnification'],
+      #retornar nessa função o int_in, int_out, detection_round
+        contours, int_in, int_out, detection_round = find_contours(img_to_segment, 
+               magnification = seg_param['magnification'],
                pixel_size = seg_param['pixel_size'], rescale_intensity = seg_param['rescale_intensity'],
                remove_bg = seg_param['remove_bg'],radius_bg = seg_param['radius_bg'],
                threshold = seg_param['threshold'], offset = seg_param['offset'], 
@@ -117,7 +118,7 @@ def analyze_dict(
             continue
         df_morpho_list  = []
         for n in range(len(contours)):
-            morpho= Morphology(n+1, contours[n])
+            morpho = Morphology(n+1, contours[n], int_in[n], int_out[n])
             df_morpho_list.append(morpho.df)
         image_df = pd.concat(df_morpho_list)
           
@@ -130,7 +131,8 @@ def analyze_dict(
             df_ch = pd.concat(df_ch_list)
             image_df = pd.merge(image_df, df_ch, on = 'Cell')
             image_df["Frame"] = img_n
-           
+            image_df["Error_detection_round"] = detection_round
+            
         all_df_list.append(image_df)
     
     all_df = pd.concat(all_df_list)

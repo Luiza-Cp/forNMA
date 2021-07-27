@@ -212,8 +212,8 @@ def find_rings(
         dilate_nuc = cv.dilate(nuc_mask.copy(), kernel, iterations=round(7*rf))
     outter_ring_mask = cv.bitwise_and(dilate_nuc, object_img.copy())
     inner_nuc_mask = erode_nuc
-    inner_ring_mask = cv.bitwise_and(inner_nuc_mask, nuc_mask.copy())
-    
+    inner_ring_mask = cv.bitwise_xor(inner_nuc_mask, nuc_mask.copy())
+
     return nuc_mask, inner_ring_mask, outter_ring_mask, inner_nuc_mask
    
     
@@ -333,6 +333,9 @@ def fluorescence_of_rings(
     
     """
     new_cnt_list = []
+    int_in_list = [] 
+    int_out_list= []
+
     for cnt in contour_list:
         nuc, inner_ring, outter_ring, inner_nuc = find_rings(img, cnt, rf, mag)
         mean_inner_ring = cv.mean(img, mask = inner_ring)[0]
@@ -342,19 +345,20 @@ def fluorescence_of_rings(
         if mean_nuc == 0 or mean_inner_nuc == 0:
             continue
         else:
-            a = mean_outter_ring/mean_nuc 
-            b = mean_inner_ring/mean_inner_nuc 
-            if a > 0.5:     # contour smaller the the nucleus
+            int_out = mean_outter_ring/mean_nuc 
+            int_in = mean_inner_ring/mean_inner_nuc 
+            int_in_list.append(int_in) 
+            int_out_list.append(int_out)
+            if int_out > 0.5:     # contour smaller the the nucleus
                new_cnt = adjust_small_contour(cnt, img, rf, px_s, mag)
                new_cnt_list.append(new_cnt)
-            elif b < 0.7:      # contour bigger than the nucleus
-               print ('Avisa a luiza que caiu aqui')
+            elif int_in < 0.7:      # contour bigger than the nucleus
                new_cnt = adjust_large_contour(cnt, img, rf, px_s, mag)
                new_cnt_list.append(new_cnt)
             else:       # right contour
                 new_cnt_list.append(cnt)
-    
-    return contour_list
+               
+    return contour_list, int_in_list, int_out_list
   
 
 def filter_debree(
@@ -509,11 +513,12 @@ def find_nuc_contours(
     contours = divide_contours(contours, binary_img, image, rf, px_s, cut_edges)
     contours = filter_debree(contours, mag, px_s, rf)
     if mag >= 10 or fast == False:
-        contours = fluorescence_of_rings(contours, image, rf, px_s, mag)
+        contours, in_list, out_list= fluorescence_of_rings(contours, 
+                                                            image, rf, px_s, mag)
     if len(contours)> 0:
         contours = filter_contours(contours, mag, px_s, shape, eccentricity, min_size,
                                max_size, min_radius, max_radius)
-    return contours
+    return contours, in_list, out_list
 
 
 def erase_image(

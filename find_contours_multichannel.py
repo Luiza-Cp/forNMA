@@ -70,8 +70,12 @@ def find_contours(
                                 magnification, adjust_size)
    
     all_contours = [] 
+    all_int_in = []
+    all_int_out = []
+
     if not binary.any() == False:   #if binary image is not empty, it searches for nuclei 
-        nuc_contours = find_nuc_contours(binary, img, resolution_factor, pixel_size,
+        nuc_contours, in_l, out_l = find_nuc_contours(binary, img, 
+                                        resolution_factor, pixel_size,
                                          magnification, cut_edges, adjust_size,
                                          shape, eccentricity, min_size, max_size,
                                          min_radius, max_radius, fast_detection)
@@ -79,6 +83,9 @@ def find_contours(
         if len(nuc_contours) > 0:   #if it finds nuclear contours, it create a Cell object for each contour
             for i in range(len(nuc_contours)):
                 all_contours.append(nuc_contours[i])
+                all_int_in.append(in_l[i])
+                all_int_out.append(out_l[i])
+              
             
     else:
         nuc_contours = [] 
@@ -99,17 +106,23 @@ def find_contours(
                 if not new_binary.any() ==True:
                     nuc_contours = []
                 else:
-                    nuc_contours = find_nuc_contours(new_binary, img, resolution_factor, pixel_size,
+                    nuc_contours, in_l, out_l= find_nuc_contours(new_binary, 
+                                             img, resolution_factor, pixel_size,
                                              magnification, cut_edges, adjust_size,
                                              shape, eccentricity, min_size, max_size,
                                              min_radius, max_radius, fast_detection)
                     if len(nuc_contours) > 0:
                         for i in range(len(nuc_contours)):
                             all_contours.append(nuc_contours[i])
-                          
+                            all_int_in.append(in_l[i])
+                            all_int_out.append(out_l[i])
+                            
 
-    return all_contours
+    return all_contours, all_int_in, all_int_out, n
  
+    
+ 
+    
 #im = 'C:\\Users\\Luiza Cherobini\\Desktop\\R\\RED\\red dap.tif'
 #cnt = find_contours(im, 20)
 

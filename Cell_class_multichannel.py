@@ -69,8 +69,10 @@ class Cell:
         
         self.min_int = minimum intensity of self.image1
         self.max_int = maximum intensity of self.image1
+        self.image_mean = mean intensity of self.image1
         self.mean_int = normalized mean intensity of the nucleus (given by self.nuc1)
         self.median_int = meadian intensity of the nucleus
+        self.error_mean = nucleus mean divided by image mean
         
         self.ring_mask = is the mask of cytoplasmatic ring, or None if cytoplasm analysis is not required
         self.ring_cnt = contour of cytoplasmatic ring
@@ -138,9 +140,11 @@ class Cell:
                               self.bbox_x2:self.bbox_x2+self.bbox_w2]
         self.nuc_mask,self.nuc_mask_ex, self.expand_nuc = self.calc_expand_nuc()
         
-        self.min_int,self.max_int,  __, __  = cv.minMaxLoc(self.image) 
+        self.min_int,self.max_int,  __, __  = cv.minMaxLoc(self.image)
+        self.image_mean = cv.mean(self.image)[0]
         self.mean_int = (cv.mean(self.nuc,mask =self.nuc_mask)[0] - self.min_int)/(self.max_int-self.min_int)
         self.median_int =  self.calc_median(self.nuc,self.nuc_mask)
+        self.error_mean = self.mean_int/self.image_mean 
         
         #add 1 caso para não dar float division by 0
         self.ring_mask = None
@@ -503,7 +507,8 @@ class Cell:
                      "Ring_cnt_" + self.ch_name: [self.ring_cnt],
                      "Ellipse_cnt_" + self.ch_name: [self.ellipse_cnt],
                      "Foci_cnt_" + self.ch_name: [self.foci_cnt_im],
-                     "Y_draw_" + self.ch_name: [self.bbox_y1]}
+                     "Y_draw_" + self.ch_name: [self.bbox_y1],
+                     "Error_mean_" + self.ch_name : [self.error_mean]}
         df_cell = pd.DataFrame(cell_info) 
         
         return df_cell

@@ -54,7 +54,7 @@ segment_dict = {'magnification': 20,
 #modificações a serem feitas nas imagens do canal 1. Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch1 = {'rescale_intensity': True,
-           'remove_bg' : True,
+           'remove_bg' : False,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : False,
@@ -71,7 +71,7 @@ param_ch1 = {'rescale_intensity': True,
 #modificações a serem feitas nas imagens do canal 2.  Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch2 = {'rescale_intensity': True,
-           'remove_bg' :True,
+           'remove_bg' :False,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : True,
