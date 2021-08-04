@@ -111,13 +111,14 @@ def find_contours(
                                              magnification, cut_edges, adjust_size,
                                              shape, eccentricity, min_size, max_size,
                                              min_radius, max_radius, fast_detection)
+                   
                     if len(nuc_contours) > 0:
                         for i in range(len(nuc_contours)):
                             all_contours.append(nuc_contours[i])
                             all_int_in.append(in_l[i])
                             all_int_out.append(out_l[i])
                             
-
+            
     return all_contours, all_int_in, all_int_out, n
  
     

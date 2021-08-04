@@ -11,7 +11,7 @@ from Morphology_class import Morphology
 from Cell_class_multichannel import Cell
 from Foci_class import foci
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import os
 import cv2 as cv
 
@@ -68,6 +68,34 @@ def measure_image(
        
     return cell_df_list, img_to_measure, name
     
+
+
+def drop_cols(
+        complete_df: pd.DataFrame,
+        ch_dict: dict
+)-> pd.DataFrame:
+    """ Drops columns tht store values not required by user."""
+    
+    for key, value in ch_dict.items():
+        if value[1]['wants_foci'] == False:
+            drop_foci = ["Total_foci_" + key,"Total_foci_area_" + key,
+                         "Total_foci_mean_" + key, "Foci_area_fraction_" + key,
+                         "Foci_cnt_" + key]
+            complete_df.drop(columns = (drop_foci), inplace=True)
+       
+        if value[1]['wants_ktr'] == False:
+             drop_ktr = [ "Mean_ring_" + key,"Median_ring_" + key, "Mean_ellipse_" + key,
+                     "Median_ellipse_" + key,"Mean_Ring/Nucleus_" + key, "Median_Ring/Nucleus_" + key,
+                     "Mean_Nucleus/Ring_" + key, "Median_Nucleus/Ring_" + key,
+                     "Mean_Ellipse/Nucleus_" + key,"Median_Ellipse/Nucleus_" + key,
+                     "Mean_Nucleus/Ellipse_" + key,  "Median_Nucleus/Ellipse_" + key,
+                     "Ring_cnt_" + key, 'Ellipse_cnt_' + key]
+                    
+             complete_df.drop(columns = (drop_ktr), inplace=True)
+
+    return complete_df
+
+
 
 
 #ELE nÂo salva imagens que estão sem contornos, tenho que corrigir isso 
@@ -138,13 +166,134 @@ def analyze_dict(
     all_df = pd.concat(all_df_list)
     all_df["Condition"] = condition
     all_df["Overtime"] =  is_overtime
+    #add error here
+    all_df["Error"] = (-0.93 * all_df.Roundness - 0.8 * all_df.Error_convex_area ) *-1
+    all_df.drop(columns = (["Error_convex_area"]), inplace=True)
     all_df = all_df.reset_index(drop= True)
+    
+    #drop columns here 
+    all_df = drop_cols(all_df, ch_dict)
     
     return all_df   # esse df vai pra parte de remover outliers 
           
-     
-        
+   
 def split_dfs(
+        complete_df: pd.DataFrame,
+        ch_name_list: List[str]
+)-> Tuple[pd.DataFrame, pd.DataFrame]:
+    """ 
+    Gets a complete DataFrame and separates it in the user output and the 
+    dataframe with information to draw images.
+    """
+    col_list_cnt =['Cell', 'X', 'origin_folder']
+    col_to_remove = []
+    for key in ch_name_list:
+        cols = ['Image_'+ key,'Image_name_'+ key, "Nuc_cnt_" + key,"Ring_cnt_" + key, 
+                "Ellipse_cnt_" + key, "Foci_cnt_" + key, "Y_draw_" + key]
+        col_list_cnt.extend(cols)
+        cols_remove = ["Nuc_cnt_" + key,"Ring_cnt_" + key, "Ellipse_cnt_" + key,
+                "Foci_cnt_" + key, "Y_draw_" + key, "Unnamed: 0", "Error", "Image_" + key ]
+        col_to_remove.extend(cols_remove)
+    
+    all_col = list(complete_df)
+    col_results = [i for i in all_col if i not in col_to_remove]
+    df_results = complete_df[col_results]
+    col_draw = [i for i in col_list_cnt if i in all_col]
+    df_draw = complete_df[col_draw]
+    
+    return df_results, df_draw
+    
+   
+def save_dfs(df_results: pd.DataFrame,
+             path_save: str):
+    tables = list(set(df_results['origin_folder']))
+    for t in tables:
+        df_save =  df_results[df_results["origin_folder"]== t]
+        df_save = df_save.reindex(columns=(['Frame'] + list([a for a in df_save.columns if a != 'Frame']) ))
+        df_save.drop(columns= (["origin_folder"]), inplace=True)
+        df_save.to_csv(os.path.join(path_save, t))
+    
+    return print("files saved")
+ 
+
+
+def draw_and_save(df: pd.DataFrame,
+                ch: str,
+                saving_dir: str
+):
+    """ 
+    Loop though a dataframe based on its channels and draws contours at the
+    specified images and then saves them.
+    """
+     
+    cols_to_draw = [ f for f in list(df.columns) if ch in f 
+                    and 'Y_draw' not in f and 'Image_' not in f]
+    
+    df = df.filter(regex = ch+"|Cell|X")
+    cnt_groupped = df.groupby(['Image_name_' + ch])
+    fs = cv.getFontScaleFromHeight(2,15,2)   
+    for name, group in  cnt_groupped:
+        img = group['Image_'+ ch].iloc[0]
+        img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
+        cnt_nuc = list(group['Nuc_cnt_' + ch])
+        print(name)
+        img = cv.drawContours(img, cnt_nuc, -1, (98,59,132), 1)
+        for i in range(len(group['Cell'])):
+            img = cv.putText(img, str(int(group['Cell'].iloc[i])), 
+                            ((group['X']+5).iloc[i], group['Y_draw_' + ch].iloc[i]), 
+                            2, fs, (122, 144,248), 1)
+         
+        for col in cols_to_draw:
+            if 'Foci' in col:
+                 foci_cnt = list(group['Foci_cnt_' + ch])
+                 foci_cnt = [i for f in foci_cnt for i in f if len(f)> 0]
+                 img = cv.drawContours(img, foci_cnt, -1, (122, 144,248), 1)
+                 
+            else:                           
+                 cnt = list(group[col])
+                 cnt = [f[0] for f in cnt if len(f)> 0]
+                 img = cv.drawContours(img, cnt, -1, (122, 144,248), 1)
+                                    
+    
+        cv.imwrite(os.path.join(saving_dir, name), img)
+    
+    
+
+def saving_images(df_draw: pd.DataFrame,
+                path_to_save: str,
+                ch_name_list: List[str]
+):  
+   """ 
+   Splits dataframaccording to their folders, creates directories
+   for saving and pass values to draw_and_save, that draws contours and saves
+   images.
+   """
+   dirs = list(set(df_draw.origin_folder.values))
+   #    itera por cada pasta nesse df
+   for d in dirs:
+       df_dir = df_draw[df_draw["origin_folder"]==d]
+       saving_dir = os.path.join(path_to_save, d[:-4])
+       os.mkdir(saving_dir)
+       #    vai iterar sobre cada canal dessa pasta
+       for ch in ch_name_list:
+           saving_dir_ch = os.path.join(saving_dir, ch)
+           os.mkdir(saving_dir_ch)           
+           draw_and_save(df_dir, ch, saving_dir_ch)
+         
+    
+           
+   
+
+        
+    
+   
+####funções abaixo não são masi utilizadas mas eu não quis apagar ainda 
+## pra caso eu precise editar as de cima heahha
+    
+   
+    
+   
+def split_dfs_old(
         complete_df: pd.DataFrame,
         ch_dict: dict
 )-> pd.DataFrame:
@@ -161,7 +310,7 @@ def split_dfs(
                 "Ellipse_cnt_" + key, "Foci_cnt_" + key, "Y_draw_" + key]
         col_list_cnt.extend(cols)
         cols_remove = ["Nuc_cnt_" + key,"Ring_cnt_" + key, "Ellipse_cnt_" + key,
-                "Foci_cnt_" + key, "Y_draw_" + key]
+                "Foci_cnt_" + key, "Y_draw_" + key,]
         col_to_remove.extend(cols_remove)
     df_cnt = complete_df[col_list_cnt]
     
@@ -190,7 +339,7 @@ def split_dfs(
         
      
 #se ficar mto pesado eu exlcuo aquele loaded dict e recarrego todas as fotos aqui 
-def draw_and_save(
+def draw_and_save_old(
         df_cnt: pd.DataFrame,
         df_results: pd.DataFrame, 
         path_to_save: str,
