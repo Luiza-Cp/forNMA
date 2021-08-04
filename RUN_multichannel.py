@@ -9,10 +9,10 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save=  'C:\\Users\\Luiza Cherobini\\Desktop\\kk'
+path_to_save= 'C:\\Users\\Luiza Cherobini\\Desktop\\kk'
 
 ch1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\kk\\r'     #pasta contendo as pastas de imagens de um canal 
-ch2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\kk\\r'   #pasta contendo as pastas de imagens de um canal 
+ch2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\kk\\g'   #pasta contendo as pastas de imagens de um canal 
 #ch3 = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\Run\\gH2AX'
 
 #como você nomeia o canal
@@ -46,7 +46,7 @@ segment_dict = {'magnification': 20,
                 'min_radius': None, 
                 'max_radius': None, 
                 'fast_detection': False,
-                'error': None                   #  não mudar esse
+                'error': 7                   #  não mudar esse
   }
 
 
@@ -60,7 +60,7 @@ param_ch1 = {'rescale_intensity': True,
            'wants_ktr' : False,
            'ring_size': 3,                      # raio do citoplasma 
            'use_ellipse': False,                # deixar True se quer usar elipse
-           'wants_foci': True,
+           'wants_foci': False,
            'foci_min_size' : 5,
            'foci_max_size': None,
            'foci_min_int' : None,               # int = intensidade 
@@ -105,75 +105,24 @@ param_ch3 = {'rescale_intensity': False,
 #se existirem menos canais, parâmetros devem ser removidos
 
 ch_list = [ch1, ch2]
-ch_name_list = [ch1_name, ch2_name]
+ch_name_list = [ch1_name,ch2_name]
 parameter_list = [param_ch1, param_ch2]
 
 # para cada subpasta dentro da pasta mãe, adicionar uma lista de condições
 # se deixar vazia ou com numero diferente do tamanho de subpastas vai colcoar none
-conditions = ['controle']
+conditions = ['A', "B"]
 
 #Vai checar se dados são sequencia temporal
 #se for sequencia temporal, favor colocar 1 campo por pasta!
 overtime = False
 
-##### That's it #####
 
 
-import os
-from analyze_multichannel import check_size, analyze_dict, split_dfs, draw_and_save
 import time 
+from main import run
 ts = time.time()
 
-# cria um dicionário da pasta
-# key: nome de cada canal
-#values: possui 3 valores
-    # 0: uam lista com o caminho de todas as pastas nesse canal
-    # 1: o param_dict desse canal
-    # 2: bool (informa se o canal é o de segmentação ou não)
-
-subfolder_dict = {}
-for i in range(len(ch_name_list)):
-    if ch_with_nuc == ch_list[i]:
-        seg = True 
-    else:
-        seg = False
-    subfolders = sorted((os.listdir(ch_list[i])))
-    subfolder_dict[ch_name_list[i]] = [[os.path.join(ch_list[i], f) for f in subfolders],
-                                       parameter_list[i],seg]
-
-n_sub = len(subfolders)    
- 
-
-#testa se as condições estão corretas (isso sai do codigo depois)
-if len(conditions) == n_sub:
-    conditions = conditions
-else:
-    conditions = [None] * n_sub
-
-
-# Cria um dicionário geral de cada subpasta e roda o código nele
-# key: é o canal (nome do canal)
-# items: 
-    # 0: lista dos itens da pasta
-    # 1: param_dict
-    # 2: booleano para saber se é de segmentação
-
-for i in range(n_sub):
-    general_dict ={}   
-    for key, value in subfolder_dict.items():
-        files = sorted(os.listdir(value[0][i]))
-        files = [os.path.join(value[0][i], f) for f in files ]
-        general_dict[key] = [files, value[1], value[2]]
-    
-    size = check_size(general_dict)
-    if size == False:
-        raise("The folders contain different image number")
-    else:
-    
-        total_df = analyze_dict(general_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
-        df_results, df_cnt = split_dfs(total_df, general_dict)
-        draw_and_save(df_cnt, df_results, path_to_save, os.path.basename((value[0][i])),
-              general_dict, save_images)       
-
+run (path_to_save, ch_name_list, ch_list, ch_with_nuc, overtime, parameter_list,
+     conditions, segment_dict, save_images)
 te = time.time()
 print ('Time: ', te-ts)
