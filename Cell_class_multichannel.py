@@ -18,8 +18,8 @@ from skimage.segmentation import clear_border
 from Foci_class import foci
 import pandas as pd
 import scipy
-from typing import Optional, List, Tuple
-from matplotlib import pyplot as plt
+from typing import Optional, List
+
 
 #talvez eu não precise a binária -> excluir
 class Cell:
@@ -29,7 +29,7 @@ class Cell:
     """
     def __init__(self, n, cnt, mag, ps, image, image_name, ch_name,
                  wants_ktr, ring_size,  wants_foci, foci_min_size, foci_max_size,
-                 foci_min_int,foci_max_int,foci_proeminence):
+                 foci_min_int,foci_max_int,foci_proeminence, use_el):
         """
         Atributes
         
@@ -42,6 +42,7 @@ class Cell:
         self.image = image with the nucleus represented by this specific Object
         self.image_name = str representing the name of the image at this channel
         self.wants_ktr = boolean user-defined  #A: esse KTR é aquela medida do aro no citoplasma
+        self.use_el = boolean defined by user to choose between a ring or ellipse for translocation measurments
         
         self.wants_foci = boolean user-defined
         self.foci_min_size = user-input minimun foci size
@@ -104,7 +105,7 @@ class Cell:
         self.tot_foci_area = sum of foci area
         self.tot_foci_mean = mean of all foci together
         
-        self.df = datafram with all main information of this cell
+        self.df = dataframe with all main information of this cell
         
         
         * All mean intensities are normalized by the minimun e maximum image value
@@ -122,6 +123,7 @@ class Cell:
         self.image_name = image_name
         self.ch_name = ch_name
         self.wants_ktr = wants_ktr
+        self.use_el = use_el
      
         self.wants_foci = wants_foci
         self.foci_min_size = foci_min_size
@@ -144,7 +146,7 @@ class Cell:
         self.image_mean = cv.mean(self.image)[0]
         self.mean_int = (cv.mean(self.nuc,mask =self.nuc_mask)[0] - self.min_int)/(self.max_int-self.min_int)
         self.median_int =  self.calc_median(self.nuc,self.nuc_mask)
-        self.error_mean = self.mean_int/self.image_mean 
+    
         
         #add 1 caso para não dar float division by 0
         self.ring_mask = None
@@ -157,6 +159,7 @@ class Cell:
         self.nc_ring = None
         self.cn_ellipse = None
         self.nc_ellipse = None
+        self.cyto_ring_cnt = None
        
         self.ring_median = None
         self.ellipse_median = None
@@ -183,7 +186,7 @@ class Cell:
              self.ellipse_mask, self.ellipse_cnt = self.find_ring_from_ellipse()
              self.ring_mean =  (cv.mean(self.nuc2, mask = self.ring_mask)[0] - self.min_int)/(self.max_int- self.min_int)
              self.ellipse_mean = (cv.mean(self.nuc2, mask = self.ellipse_mask)[0] - self.min_int)/(self.max_int - self.min_int)
-             
+             self.cyto_ring_cnt = self.ellipse_cnt if self.use_el==True else self.ring_cnt 
              if self.mean_int == 0:
                  self.cn_ring = None
                  self.cn_ellipse = None
@@ -207,7 +210,8 @@ class Cell:
              self.nc_ring_med = self.median_int/self.ring_median
              self.cn_ellipse_med = self.ellipse_median/self.median_int
              self.nc_ellipse_med = self.median_int/self.ellipse_median
-            
+             
+             
         if wants_foci == True:
             self.GaussianKernel = self.calc_GaussianKernel()
             self.tophat = cv.morphologyEx(self.nuc, cv.MORPH_TOPHAT, self.GaussianKernel)
@@ -220,6 +224,7 @@ class Cell:
             self.foci_cnt_im = self.find_cnt_at_image()
             self.tot_foci_area = self.calc_tot_foc_area()
             self.tot_foci_mean = self.calc_foci_mean_int()
+           
         self.df = self.create_df() 
      
         
@@ -504,11 +509,10 @@ class Cell:
                      "Total_foci_mean_" + self.ch_name: [self.tot_foci_mean],
                      "Foci_area_fraction_" + self.ch_name: [foci_area_fraction],
                      "Nuc_cnt_" + self.ch_name: [self.cnt],
-                     "Ring_cnt_" + self.ch_name: [self.ring_cnt],
-                     "Ellipse_cnt_" + self.ch_name: [self.ellipse_cnt],
+                     "Cyto_ring_cnt_" + self.ch_name: [self.cyto_ring_cnt],
                      "Foci_cnt_" + self.ch_name: [self.foci_cnt_im],
                      "Y_draw_" + self.ch_name: [self.bbox_y1],
-                     "Error_mean_" + self.ch_name : [self.error_mean]}
+                     }
         df_cell = pd.DataFrame(cell_info) 
         
         return df_cell

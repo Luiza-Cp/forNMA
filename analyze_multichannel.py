@@ -60,10 +60,11 @@ def measure_image(
     cell_df_list = []
     for i in range(len(contour_list)):
         cell_obj = Cell(i+1, contour_list[i], mag, ps, img_to_measure, name, 
-                        channel_name, dp['wants_ktr'], dp['ring_size'],
+                        channel_name, dp['wants_ktr'], dp['ring_size'], 
                         dp['wants_foci'], dp['foci_min_size'], 
                         dp['foci_max_size'], dp['foci_min_int'], 
-                        dp['foci_max_int'], dp['foci_proeminence'])
+                        dp['foci_max_int'], dp['foci_proeminence'], 
+                        dp['use_ellipse'])
         cell_df_list.append(cell_obj.df)
        
     return cell_df_list, img_to_measure, name
@@ -89,7 +90,7 @@ def drop_cols(
                      "Mean_Nucleus/Ring_" + key, "Median_Nucleus/Ring_" + key,
                      "Mean_Ellipse/Nucleus_" + key,"Median_Ellipse/Nucleus_" + key,
                      "Mean_Nucleus/Ellipse_" + key,  "Median_Nucleus/Ellipse_" + key,
-                     "Ring_cnt_" + key, 'Ellipse_cnt_' + key]
+                     "Cyto_ring_cnt_" + key]
                     
              complete_df.drop(columns = (drop_ktr), inplace=True)
 
@@ -188,10 +189,10 @@ def split_dfs(
     col_list_cnt =['Cell', 'X', 'origin_folder']
     col_to_remove = []
     for key in ch_name_list:
-        cols = ['Image_'+ key,'Image_name_'+ key, "Nuc_cnt_" + key,"Ring_cnt_" + key, 
-                "Ellipse_cnt_" + key, "Foci_cnt_" + key, "Y_draw_" + key]
+        cols = ['Image_'+ key,'Image_name_'+ key, "Nuc_cnt_" + key, "Cyto_ring_cnt_" + key,
+                "Foci_cnt_" + key, "Y_draw_" + key]
         col_list_cnt.extend(cols)
-        cols_remove = ["Nuc_cnt_" + key,"Ring_cnt_" + key, "Ellipse_cnt_" + key,
+        cols_remove = ["Nuc_cnt_" + key,"Cyto_ring_cnt_" + key,
                 "Foci_cnt_" + key, "Y_draw_" + key, "Unnamed: 0", "Error", "Image_" + key ]
         col_to_remove.extend(cols_remove)
     
