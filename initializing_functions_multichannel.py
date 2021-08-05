@@ -52,6 +52,7 @@ def load_image(
     img = img_as_ubyte(img) 
 
     if remove_bg == True:
+        img = cv.GaussianBlur(img,(5,5),0)
         background = restoration.rolling_ball(img, radius = radius_bg )
         img = img-background
      
