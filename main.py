@@ -13,6 +13,7 @@ from typing import List, Optional
 from analyze_multichannel import check_size, analyze_dict, saving_images,split_dfs, save_dfs
 import tempfile
 import pandas as pd 
+pd.options.mode.chained_assignment = None  # default='warn'
 import numpy as np
 
 

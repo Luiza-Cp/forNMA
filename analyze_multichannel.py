@@ -5,6 +5,7 @@ Created on Sun May 16 20:11:52 2021
 @author: Luiza
 """
 import pandas as pd
+pd.options.mode.chained_assignment = None  # default='warn'
 from initializing_functions_multichannel import load_image
 from find_contours_multichannel import find_contours
 from Morphology_class import Morphology 
@@ -212,8 +213,8 @@ def save_dfs(df_results: pd.DataFrame,
         df_save =  df_results[df_results["origin_folder"]== t]
         df_save = df_save.reindex(columns=(['Frame'] + list([a for a in df_save.columns if a != 'Frame']) ))
         df_save.drop(columns= (["origin_folder"]), inplace=True)
-        df_save.to_csv(os.path.join(path_save, t))
-    
+        df_save.to_csv(os.path.join(path_save, t[:-4]) + 'Results .csv')
+        print (os.path.join(path_save, t[:-4]))
     return print("files saved")
  
 

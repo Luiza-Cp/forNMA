@@ -22,9 +22,8 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
     
     h_down = df.Area.quantile(0.05)
     h_up= df.Area.quantile(0.95)
-    v_left = df.Error.quantile(0.05)
+    v_left = df.Error.min()
     v_right = df.Error.quantile(0.95)
-    print (h_down, h_up, v_left, v_right)
     fig= plt.figure()
     ax = fig.add_subplot(sns.scatterplot(data=df, x="Error", y="Area")) 
     horizontal_up = draggable_lines(ax, "h",h_up)
@@ -61,9 +60,9 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
         
     for item in coord_tuples:
         if item[0] == "_line3":
-            v_ringt = item[1]
+            v_right = item[1]
             break 
-    print (h_down, h_up, v_left, v_right)
+    
     return h_down, h_up, v_left, v_right
     
 

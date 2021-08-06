@@ -9,10 +9,10 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save= 'C:\\Users\\Luiza Cherobini\\Desktop\\kk'
+path_to_save= 'C:\\Users\\Luiza Cherobini\\Desktop\\figura'
 
-ch1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\kk\\r'     #pasta contendo as pastas de imagens de um canal 
-ch2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\kk\\g'   #pasta contendo as pastas de imagens de um canal 
+ch1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\r'     #pasta contendo as pastas de imagens de um canal 
+ch2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\g'   #pasta contendo as pastas de imagens de um canal 
 #ch3 = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\Run\\gH2AX'
 
 #como você nomeia o canal
@@ -54,28 +54,28 @@ segment_dict = {'magnification': 20,
 #modificações a serem feitas nas imagens do canal 1. Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch1 = {'rescale_intensity': True,
-           'remove_bg' : False,
+           'remove_bg' : True,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : False,
            'ring_size': 3,                      # raio do citoplasma 
            'use_ellipse': False,                # deixar True se quer usar elipse
-           'wants_foci': False,
+           'wants_foci': True,
            'foci_min_size' : 5,
            'foci_max_size': None,
            'foci_min_int' : None,               # int = intensidade 
            'foci_max_int' : None,       
-           'foci_proeminence' : 600           # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
+           'foci_proeminence' : 300           # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
            }
 
 #modificações a serem feitas nas imagens do canal 2.  Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch2 = {'rescale_intensity': True,
-           'remove_bg' :False,
+           'remove_bg' : True,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : True,
-           'ring_size': 3,
+           'ring_size': 6,
            'use_ellipse': True,
            'wants_foci': False,
            'foci_min_size' : 5,
@@ -120,6 +120,7 @@ overtime = False
 
 import time 
 from main import run
+%matplotlib 
 ts = time.time()
 
 run (path_to_save, ch_name_list, ch_list, ch_with_nuc, overtime, parameter_list,

@@ -5,7 +5,6 @@ Created on Sun Aug  1 19:29:16 2021
 @author: Luiza
 """
 
-import matplotlib.pyplot as plt
 import matplotlib.lines as lines
 
 line_coord_list = [] 
@@ -32,7 +31,6 @@ class draggable_lines:
 
     def clickonline(self, event):
         if event.artist == self.line:
-            print("line selected ", event.artist)
             line_coord_list.append(event.artist._label)
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
             self.releaser = self.c.mpl_connect("button_press_event", self.releaseonclick)
@@ -50,7 +48,7 @@ class draggable_lines:
         else:
             self.XorY = self.line.get_xdata()[0]
 
-        print (self.XorY)
+    
         line_coord_list.append(self.XorY)
         self.c.mpl_disconnect(self.releaser)
         self.c.mpl_disconnect(self.follower)
