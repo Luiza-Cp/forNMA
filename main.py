@@ -22,7 +22,7 @@ import numpy as np
 
 def run(path_to_save: str,
         ch_name_list: List[str],
-        ch_list: List[str],
+        ch_path_list: List[str],
         ch_with_nuc: str,
         overtime: bool,
         parameter_list: List[str],
@@ -39,21 +39,16 @@ def run(path_to_save: str,
     
     subfolder_dict = {}
     for i in range(len(ch_name_list)):
-        if ch_with_nuc == ch_list[i]:
-            seg = True 
-        else:
-            seg = False
-        subfolders = sorted((os.listdir(ch_list[i])))
-        subfolder_dict[ch_name_list[i]] = [[os.path.join(ch_list[i], f) for f in subfolders],
+        seg = ch_with_nuc == ch_path_list[i]
+        subfolders = sorted((os.listdir(ch_path_list[i])))
+        subfolder_dict[ch_name_list[i]] = [[os.path.join(ch_path_list[i], f) for f in subfolders],
                                            parameter_list[i],seg]
     
     n_sub = len(subfolders)    
      
     
     #testa se as condições estão corretas (isso sai do codigo depois)
-    if len(conditions) == n_sub:
-        conditions = conditions
-    else:
+    if len(conditions) != n_sub:
         conditions = [None] * n_sub
     
     
@@ -79,16 +74,15 @@ def run(path_to_save: str,
             files = sorted(os.listdir(value[0][i]))
             files = [os.path.join(value[0][i], f) for f in files ]
             general_dict[key] = [files, value[1], value[2]]
-        
-        size = check_size(general_dict)
-        if size == False:
+
+        if not check_size(general_dict):
             raise("The folders contain different image number")
-        else:
-            total_df = analyze_dict(general_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
-            filename = os.path.basename(subfolders[i]) + '.zip'
-            total_df.to_pickle(os.path.join(temp_dir.name, filename))
-    
-            # files foram jogados na temp
+
+        total_df = analyze_dict(general_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
+        filename = os.path.basename(subfolders[i]) + '.zip'
+        total_df.to_pickle(os.path.join(temp_dir.name, filename))
+
+        # files foram jogados na temp
     
     
     #abrir todos na temp e juntar num dfzão

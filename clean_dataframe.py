@@ -13,11 +13,6 @@ import seaborn as sns
 import numpy as np
 
 
-df = pd.read_csv("C:\\Users\\Luiza Cherobini\\Desktop\\teste nucleos forNMA\\Eduardo\\40x Results.csv", sep = ";")
-
-
-
-
 def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:   
     
     h_down = df.Area.quantile(0.05)

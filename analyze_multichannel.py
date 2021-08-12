@@ -10,7 +10,7 @@ from initializing_functions_multichannel import load_image
 from find_contours_multichannel import find_contours
 from Morphology_class import Morphology 
 from Cell_class_multichannel import Cell
-from Foci_class import foci
+from foci_class import foci
 import numpy as np
 from typing import List, Optional, Tuple
 import os
@@ -121,10 +121,7 @@ def analyze_dict(
     for key, value in ch_dict.items():
         if value[2] == True:
             ch_segment = key
-        if value[1]['match_hist'] == True:
-            ref_dict[key] = load_image(value[0][0])
-        else:
-            ref_dict[key] = None
+        ref_dict[key] = load_image(value[0][0]) if value[1]['match_hist'] else None
 
     all_df_list =  []    
     for img_n in range(len((list(ch_dict.values())[0][0]))):      
@@ -213,7 +210,7 @@ def save_dfs(df_results: pd.DataFrame,
         df_save =  df_results[df_results["origin_folder"]== t]
         df_save = df_save.reindex(columns=(['Frame'] + list([a for a in df_save.columns if a != 'Frame']) ))
         df_save.drop(columns= (["origin_folder"]), inplace=True)
-        df_save.to_csv(os.path.join(path_save, t[:-4]) + 'Results .csv')
+        df_save.to_csv(os.path.join(path_save, t[:-4]) + 'Results.csv')
         print (os.path.join(path_save, t[:-4]))
     return print("files saved")
  

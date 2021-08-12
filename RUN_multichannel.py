@@ -11,9 +11,9 @@ Created on Sun May 30 09:36:15 2021
 
 path_to_save= 'C:\\Users\\Luiza Cherobini\\Desktop\\figura'
 
-ch1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\r'     #pasta contendo as pastas de imagens de um canal 
-ch2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\g'   #pasta contendo as pastas de imagens de um canal 
-#ch3 = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\Run\\gH2AX'
+ch1_path = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\r'   #pasta contendo as pastas de imagens de um canal 
+ch2_path = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\g'   #pasta contendo as pastas de imagens de um canal 
+#ch3_path = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\Run\\gH2AX'
 
 #como você nomeia o canal
 ch1_name = "red"
@@ -21,7 +21,7 @@ ch2_name = 'green'
 ch3_name ='gH2AX'
 #add mais ch conforme demanda. Se usar só um, remover o restante.
 
-ch_with_nuc = ch1  #canal que possui imagens do núcleo
+ch_with_nuc = ch1_path  #canal que possui imagens do núcleo
 
 save_images = True #recomendo deixar True
 
@@ -104,8 +104,8 @@ param_ch3 = {'rescale_intensity': False,
 #se existirem mais canais, mais params devem ser adicionados.
 #se existirem menos canais, parâmetros devem ser removidos
 
-ch_list = [ch1, ch2]
-ch_name_list = [ch1_name,ch2_name]
+ch_path_list = [ch1_path, ch2_path]
+ch_name_list = [ch1_name, ch2_name]
 parameter_list = [param_ch1, param_ch2]
 
 # para cada subpasta dentro da pasta mãe, adicionar uma lista de condições
@@ -123,7 +123,7 @@ from main import run
 %matplotlib 
 ts = time.time()
 
-run (path_to_save, ch_name_list, ch_list, ch_with_nuc, overtime, parameter_list,
+run (path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list,
      conditions, segment_dict, save_images)
 te = time.time()
 print ('Time: ', te-ts)

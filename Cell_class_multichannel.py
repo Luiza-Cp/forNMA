@@ -15,7 +15,7 @@ import numpy as np
 from scipy import signal
 from skimage.feature import local_binary_pattern
 from skimage.segmentation import clear_border
-from Foci_class import foci
+from foci_class import foci
 import pandas as pd
 import scipy
 from typing import Optional, List
