@@ -94,7 +94,10 @@ def blur_binary(
     """ It applyes a series of blur to image in order to smooth contours. """   
     if mag < 20: 
         blur = blur/4   #Too much blur can make small objects disapear, so we reduce the user input value in these cases
-    for i in range(round(blur*rf)):     #the amount of blur deppends on the input and the resolution factor
+    range_to_use = round(blur*rf)
+    if range_to_use == 0:
+        range_to_use =1
+    for i in range(round(range_to_use)):     #the amount of blur deppends on the input and the resolution factor
         binary = cv.blur(binary_img,(kernel_size,kernel_size))
     binary = clear_border(cv.bitwise_not(binary)) 
     

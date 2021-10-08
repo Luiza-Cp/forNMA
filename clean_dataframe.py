@@ -28,7 +28,7 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
     plt.show(block=True)
    
     from Draggable_line import line_coord_list
-    plt.close()
+    plt.close('all')
     
     coord_tuples = []
     for i in range (len(line_coord_list[:-1])):
@@ -81,9 +81,6 @@ def erase_df (df, h_down, h_up, v_left, v_right):
             
     return df
 
-    #fig = plt.figure()  
-    #ax = fig.add_subplot(111)
-    
     
     
     
