@@ -19,7 +19,7 @@ from shapely.geometry import Polygon, LineString, box
 
 def open_images(path: str)-> Tuple[np.ndarray, List[str]]:
     """ Loads images and creates a stack """
-    image_names = sorted(os.listdir(path))
+    image_names = sorted(os.listdir(path)) # removi sorted aqui
     image_paths = [os.path.join(path, i) for i in image_names]
     images = [cv.imread(i,cv.IMREAD_ANYDEPTH) for i in image_paths]
     stack = np.stack(images) 
@@ -48,16 +48,19 @@ def find_new_coordinates(x: int,
     
     polygon_list = []
     for mat in tmats:
-        coordinate1 = np.matmul(mat, [0, 0, 1])         #   x, y, z 
+        coordinate1 = np.array([mat[0,2], y - mat[1,2], 1])      #   x, y, z 
         coordinate2 = np.matmul(mat, [0, y, 1])
+        coordinate2 = np.array([coordinate2[0],y-coordinate2[1], coordinate2[2]])
         coordinate3 = np.matmul(mat, [x, 0, 1])
+        coordinate3 = np.array([coordinate3[0],y-coordinate3[1], coordinate3[2]])
         coordinate4 = np.matmul(mat, [x, y, 1])
+        coordinate4 = np.array([coordinate4[0],y-coordinate4[1], coordinate4[2]])
         registered_rectangle = Polygon([(coordinate1[0], coordinate1[1]), 
                                         (coordinate2[0], coordinate2[1]),
                                         (coordinate4[0], coordinate4[1]), 
                                         (coordinate3[0],coordinate3[1])])
         polygon_list.append(registered_rectangle)
-    
+   
     return polygon_list
 
 
@@ -67,7 +70,7 @@ def find_bbox(polygon: shapely.geometry.polygon.Polygon) -> shapely.geometry.pol
     x_list = sorted(x_list)
     y_list = sorted(y_list)
     bbox = box(x_list[0], y_list[0], x_list[-1], y_list[-1])
-    
+   
     return bbox
 
 
@@ -105,6 +108,7 @@ def intersect_lines(bbox: shapely.geometry.polygon.Polygon,
     """
     
     x_list, y_list = bbox.exterior.coords.xy
+    
     left_line = LineString([(min(x_list), min(y_list)), (min(x_list), max(y_list))]) 
     right_line = LineString([(max(x_list), min(y_list)), (max(x_list), max(y_list))]) 
     upper_line = LineString([(min(x_list), max(y_list)), (max(x_list), max(y_list))]) 
@@ -131,9 +135,9 @@ def adjust_box(bbox: shapely.geometry.polygon.Polygon,
         bool_tuple = intersect_lines(bbox, polygon)
 
     x_list, y_list = bbox.exterior.coords.xy        # bbox is a inner box now
-    ycrop = round(max(y_list) - min(y_list))
-
-    return 0, ycrop, int(min(x_list)), int(max(x_list))
+   
+   
+    return int(min(y_list)), int(max(y_list)), int(min(x_list)), int(max(x_list))
     
 
 def coord_to_crop(stack_shape: np.ndarray,
@@ -143,10 +147,10 @@ def coord_to_crop(stack_shape: np.ndarray,
     Calculates the new image xy coordinates.
     Returns a tuple with minimun y, maximun y, minimum x and maximun x.
     """  
-    polygons = find_new_coordinates(stack_shape[2, stack_shape[1], tmats])
+    polygons = find_new_coordinates(stack_shape[2], stack_shape[1], tmats)
     polygons_intersection = polygons[0].intersection(polygons[1])
     for i in polygons [2:]:
-        polygons_intersection.intersection(i) 
+        polygons_intersection = polygons_intersection.intersection(i) 
     bbox = find_bbox(polygons_intersection)
     miny, maxy, minx, maxx = adjust_box(bbox, polygons_intersection)
     
@@ -185,13 +189,13 @@ def registration (folders_to_register: List[str],
     """
     stack, names = open_images(folders_to_register[0])
     new_stack, sr, tmat = registrate_stack(stack)   
-    crop_coordinates = coord_to_crop(stack, tmat) if crop == True else None
-    save(new_stack, names, path_to_save, folders_to_register[0], crop)
+    crop_coordinates = coord_to_crop(stack.shape, tmat) if crop == True else None
+    save(new_stack, names, path_to_save, folders_to_register[0], crop_coordinates)
     if len(folders_to_register) > 1:
         for i in range(1, len(folders_to_register)):
             stack2, names2 = open_images(folders_to_register[i])
             stack2_from_stack = sr.transform_stack(stack2)
-            save(stack2_from_stack, names2, path_to_save, folders_to_register[i])
+            save(stack2_from_stack, names2, path_to_save, folders_to_register[i], crop_coordinates)
             
 
 registration([ '/home/luiza/Área de Trabalho/red' ,  '/home/luiza/Área de Trabalho/green'],
