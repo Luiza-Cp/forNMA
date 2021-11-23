@@ -127,7 +127,7 @@ def analyze_dict(
     for img_n in range(len((list(ch_dict.values())[0][0]))):      
         img_to_segment = ch_dict[ch_segment][0][img_n]
       #retornar nessa função o int_in, int_out, detection_round
-        contours, int_in, int_out, detection_round = find_contours(img_to_segment, 
+        contours = find_contours(img_to_segment, 
                magnification = seg_param['magnification'],
                pixel_size = seg_param['pixel_size'], rescale_intensity = seg_param['rescale_intensity'],
                remove_bg = seg_param['remove_bg'],radius_bg = seg_param['radius_bg'],
@@ -137,7 +137,7 @@ def analyze_dict(
                eccentricity = seg_param['eccentricity'],min_size= seg_param['min_size'], 
                max_size= seg_param['max_size'],min_radius= seg_param['min_radius'], 
                max_radius= seg_param['max_radius'],fast_detection = seg_param['fast_detection'],
-               error = seg_param['error'])
+               )
         
         #aqui vem o morphology e gero um df e todos os proximos vem ao lado 
         if len(contours) == 0:
@@ -145,7 +145,7 @@ def analyze_dict(
             continue
         df_morpho_list  = []
         for n in range(len(contours)):
-            morpho = Morphology(n+1, contours[n], int_in[n], int_out[n])
+            morpho = Morphology(n+1, contours[n])
             df_morpho_list.append(morpho.df)
         image_df = pd.concat(df_morpho_list)
           
@@ -158,7 +158,7 @@ def analyze_dict(
             df_ch = pd.concat(df_ch_list)
             image_df = pd.merge(image_df, df_ch, on = 'Cell')
             image_df["Frame"] = img_n
-            image_df["Error_detection_round"] = detection_round
+           
             
         all_df_list.append(image_df)
     
@@ -166,8 +166,8 @@ def analyze_dict(
     all_df["Condition"] = condition
     all_df["Overtime"] =  is_overtime
     #add error here
-    all_df["Error"] = (-0.93 * all_df.Roundness - 0.8 * all_df.Error_convex_area ) *-1
-    all_df.drop(columns = (["Error_convex_area"]), inplace=True)
+   # all_df["Error"] = (-0.93 * all_df.Roundness - 0.8 * all_df.Error_convex_area ) *-1
+  #  all_df.drop(columns = (["Error_convex_area"]), inplace=True)
     all_df = all_df.reset_index(drop= True)
     
     #drop columns here 
@@ -283,138 +283,15 @@ def saving_images(df_draw: pd.DataFrame,
            
    
 
-        
     
-   
-####funções abaixo não são masi utilizadas mas eu não quis apagar ainda 
-## pra caso eu precise editar as de cima heahha
-    
-   
-    
-   
-def split_dfs_old(
-        complete_df: pd.DataFrame,
-        ch_dict: dict
-)-> pd.DataFrame:
-    """ 
-    Gets a complete DataFrame and separates it in the user output and the 
-    dataframe with information to draw images.
-    """
-    
-    keys = ch_dict.keys()
-    col_list_cnt =['Cell', 'X']
-    col_to_remove = []
-    for key in keys:
-        cols = ['Image_'+ key,'Image_name_'+ key, "Nuc_cnt_" + key,"Ring_cnt_" + key, 
-                "Ellipse_cnt_" + key, "Foci_cnt_" + key, "Y_draw_" + key]
-        col_list_cnt.extend(cols)
-        cols_remove = ["Nuc_cnt_" + key,"Ring_cnt_" + key, "Ellipse_cnt_" + key,
-                "Foci_cnt_" + key, "Y_draw_" + key,]
-        col_to_remove.extend(cols_remove)
-    df_cnt = complete_df[col_list_cnt]
-    
-    all_col = list(complete_df)
-    col_results = [i for i in all_col if i not in col_to_remove]
-    df_results = complete_df[col_results]
-    
-    for key, value in ch_dict.items():
-        if value[1]['wants_foci'] == False:
-            drop_foci = ["Total_foci_" + key,"Total_foci_area_" + key,
-                         "Total_foci_mean_" + key, "Foci_area_fraction_" + key,]
-            df_cnt = df_cnt.drop (columns=(["Foci_cnt_" + key]))
-            df_results = df_results.drop(columns = (drop_foci))
-        if value[1]['wants_ktr'] == False:
-             drop_ktr = [ "Mean_ring_" + key,"Median_ring_" + key, "Mean_ellipse_" + key,
-                     "Median_ellipse_" + key,"Mean_Ring/Nucleus_" + key, "Median_Ring/Nucleus_" + key,
-                     "Mean_Nucleus/Ring_" + key, "Median_Nucleus/Ring_" + key,
-                     "Mean_Ellipse/Nucleus_" + key,"Median_Ellipse/Nucleus_" + key,
-                     "Mean_Nucleus/Ellipse_" + key,  "Median_Nucleus/Ellipse_" + key]
-                    
-             df_cnt = df_cnt.drop (columns=(["Ring_cnt_" + key, 'Ellipse_cnt_' + key]))
-             df_results = df_results.drop(columns = (drop_ktr))
-        df_results =  df_results.drop(columns = ('Image_' + key))
-    
-    return df_results, df_cnt
-        
-     
-#se ficar mto pesado eu exlcuo aquele loaded dict e recarrego todas as fotos aqui 
-def draw_and_save_old(
-        df_cnt: pd.DataFrame,
-        df_results: pd.DataFrame, 
-        path_to_save: str,
-        foldername,         #name of folder containing images
-        ch_dict: dict,
-        save_img: bool = True
-)-> True:
-  """ 
-   INCOMPLETE FUNCTION
-   According to user input, draws images stored in the df_cnt with contours also 
-   belongin to it and saves the images and a csv with complete results at 
-   path_to_save.
-  """
-    
-  if save_img == True:
-     df_results.to_csv(os.path.join(path_to_save, foldername + " Results.csv"))
-     fs = cv.getFontScaleFromHeight(2,15,2)
-     
-     for key, value in ch_dict.items():
-         save_ch = os.path.join(path_to_save, foldername, key + " Contours")
-         os.makedirs(save_ch)    
-        
-         df = df_cnt.filter(regex = key+"|Cell|X")
-         cnt_groupped = df.groupby(['Image_name_' + key])
-         
-
-         for name, group in  cnt_groupped:
-             img = group['Image_'+ key].iloc[0]
-             img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
-             cnt_nuc = list(group['Nuc_cnt_' + key])
-             print(name)
-             img = cv.drawContours(img, cnt_nuc, -1, (98,59,132), 1)
-             for i in range(len(group['Cell'])):
-                 img = cv.putText(img, str(group['Cell'].iloc[i]), 
-                                  ((group['X']+5).iloc[i], group['Y_draw_' + key].iloc[i]), 
-                                  2, fs, (122, 144,248), 1)
-         
-             if  value[1]['wants_foci'] == True:
-                 foci_cnt = list(group['Foci_cnt_' + key])
-                 foci_cnt = [i for f in foci_cnt for i in f if len(f)> 0]
-                 img = cv.drawContours(img, foci_cnt, -1, (122, 144,248), 1)
-                 
-             elif value[1]['wants_ktr'] and value[1]['use_ellipse']  == True:
-                 el_cnt = list(group['Ellipse_cnt_' + key])
-                 el_cnt = [f[0] for f in el_cnt if len(f)> 0]
-                 img = cv.drawContours(img, el_cnt, -1, (122, 144,248), 1)
-           
-             elif value[1]['wants_ktr'] == True:
-                 ring_cnt = list(group['Ring_cnt_' + key])
-                 ring_cnt = [f[0] for f in ring_cnt if len(f)> 0]
-                 img = cv.drawContours(img, ring_cnt, -1, (122, 144,248), 1)
-                
-         
-    
-             cv.imwrite(os.path.join(save_ch, name), img)
-         
-  return True
-             
-             
-             
-
-        
-     
-        
-     
-        
-
 
 # o foldername deve ser o nome da pasta mãe dessa análise (função draw_and_save)
 # depois que eu selecionar o que faz sentido pra mim, rodar uma pasta separando 
 # campos e poços e ploto so dotplots das médias de areqa e ativação de erk      
-     
 '''    
-
-p1 = 'C:\\Users\\Luiza Cherobini\\Desktop\\teste r\\r - reg'
-p2 = 'C:\\Users\\Luiza Cherobini\\Desktop\\teste g\\g - reg'
+       
+p1 = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/r/red'
+p2 = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/g/green'
 r = os.listdir (p1) 
 r = [os.path.join(p1, i) for i in r]
 g = os.listdir (p2 ) 
@@ -476,11 +353,11 @@ segment_dict = {'magnification': 20,
 
      
 check_size(teste_dict)
-c = analyze_dict(teste_dict, segment_dict)
+c = analyze_dict(teste_dict, segment_dict, True, 'c')
 d = split_dfs(c, teste_dict)
 
 e = split_dfs(c, teste_dict)
-h =draw_and_save( e[1], e[0], 'C:\\Users\\Luiza Cherobini\\Desktop\\', 'a',
-              teste_dict, True)       
+#h =draw_and_save( e[1], e[0], 'C:\\Users\\Luiza Cherobini\\Desktop\\', 'a',
+#              teste_dict, True)       
 
-'''                
+'''               

@@ -337,8 +337,7 @@ def fluorescence_of_rings(
     
     """
     new_cnt_list = []
-    int_in_list = [] 
-    int_out_list= []
+   
     for cnt in contour_list:
         nuc, inner_ring, outter_ring, inner_nuc = find_rings(img, cnt, rf, mag)
         mean_inner_ring = cv.mean(img, mask = inner_ring)[0]
@@ -350,8 +349,7 @@ def fluorescence_of_rings(
         else:
             int_out = mean_outter_ring/mean_nuc 
             int_in = mean_inner_ring/mean_inner_nuc 
-            int_in_list.append(int_in) 
-            int_out_list.append(int_out)
+            
             if int_out > 0.5:     # contour smaller the the nucleus
                new_cnt = adjust_small_contour(cnt, img, rf, px_s, mag)
                new_cnt_list.append(new_cnt)
@@ -361,7 +359,7 @@ def fluorescence_of_rings(
             else:       # right contour
                 new_cnt_list.append(cnt)
    
-    return new_cnt_list, int_in_list, int_out_list
+    return new_cnt_list
   
 
 def filter_debree(
@@ -388,8 +386,7 @@ def size_filter(
         area_list: List[float], 
         min_size: int, 
         max_size: int,
-        in_l: List[float],
-        out_l: List[float]
+        
 )-> Tuple[List[np.ndarray], List[float], List[float]]:
     """ Filter objects according to the input values or sets 1/3 of the mean
     area as minimum value and 10 times the median as maximun value.
@@ -403,10 +400,9 @@ def size_filter(
         median = area_list[i]
         max_size = 10*median
     filtered_contours = [b for a, b in zip(area_list, contours) if  min_size < a < max_size]  
-    filtered_in_l = [b for a, b in zip(area_list, in_l) if  min_size < a < max_size] 
-    filtered_out_l = [b for a, b in zip(area_list, out_l) if  min_size < a < max_size] 
+   
     
-    return filtered_contours, filtered_in_l, filtered_out_l
+    return filtered_contours
 
 
 def radius_and_eccentricity_filter(
@@ -414,8 +410,6 @@ def radius_and_eccentricity_filter(
         eccentricity: float, 
         min_radius: int, 
         max_radius: int,
-        in_l: List[float],
-        out_l: List[float]
 ) -> Tuple[List[np.ndarray], List[float], List[float]]:
     """
     Filters objects according to the given values of eccentricity, min radius 
@@ -425,8 +419,6 @@ def radius_and_eccentricity_filter(
         sqrt((major ellipse axis**2)-(minor ellipse axis** 2))/major ellipse axis'''
     """
     new_cnt_list = []
-    new_in_l = []
-    new_out_l = []
     if min_radius == None:
         min_radius = 0
     if eccentricity ==None:
@@ -439,18 +431,14 @@ def radius_and_eccentricity_filter(
         if max_radius == None or  h < max_radius:
             if w > min_radius and e < eccentricity:
                 new_cnt_list.append(contours[i])
-                new_in_l.append(in_l[i])
-                new_out_l.append(out_l[i])
         else:
             continue
         
-    return new_cnt_list, new_in_l, new_out_l
+    return new_cnt_list
             
 def hull_filter(
         contours: np.ndarray, 
         shape: float,
-        in_l: List[float],
-        out_l: List[float]
 ) -> Tuple[List[np.ndarray], List[float], List[float]]:
     """
     This function divides the area of the convex hull of a contour by its area 
@@ -467,9 +455,8 @@ def hull_filter(
             ex = a/hull_a
             extent_hull.append(ex)
     contours_list = [b for a, b in zip(extent_hull, contours) if a > shape]    
-    filtered_in_l = [b for a, b in zip(extent_hull, in_l) if a > shape]
-    filtered_out_l = [b for a, b in zip(extent_hull, out_l) if a > shape]
-    return contours_list, filtered_in_l, filtered_out_l
+    
+    return contours_list
 
 
 def filter_contours(
@@ -482,8 +469,7 @@ def filter_contours(
         max_size: int, 
         min_radius: int, 
         max_radius: int,
-        in_l: List[float],
-        out_l: List[float]
+        
 ) -> Tuple[List[np.ndarray], List[float], List[float]]:
     """
     Given a set of standard and user-defined parameters, it filters the contours 
@@ -492,19 +478,19 @@ def filter_contours(
     areas = []
     for cnt in contour_list:
         areas.append(cv.contourArea(cnt))
-    contours, in_l, out_l = size_filter(contour_list, areas, min_size, max_size, in_l, out_l)
+    contours = size_filter(contour_list, areas, min_size, max_size)
 
     if len(contours) == 0:
-        return  [], [], []
-    contours, in_l, out_l = hull_filter(contours, shape,  in_l, out_l)
+        return  []
+    contours = hull_filter(contours, shape)
     
     if len(contours) == 0:
-        return [], [], []
+        return []
     if eccentricity != None or min_radius != None or max_radius !=None:
-        contours, in_l, out_l = radius_and_eccentricity_filter(contours, eccentricity, 
-                                            min_radius, max_radius, in_l, out_l)
+        contours = radius_and_eccentricity_filter(contours, eccentricity, 
+                                            min_radius, max_radius)
     
-    return contours, in_l, out_l
+    return contours
    
 
 def find_nuc_contours(
@@ -534,12 +520,12 @@ def find_nuc_contours(
     contours = divide_contours(contours, binary_img, image, rf, px_s, cut_edges)
     contours = filter_debree(contours, mag, px_s, rf)
     if mag >= 10 or fast == False:
-        contours, in_l, out_l= fluorescence_of_rings(contours, image, rf, px_s, mag)
+        contours = fluorescence_of_rings(contours, image, rf, px_s, mag)
     if len(contours)> 0:
-        contours, in_l, out_l = filter_contours(contours, mag, px_s, shape, eccentricity, min_size,
-                               max_size, min_radius, max_radius, in_l, out_l)
+        contours = filter_contours(contours, mag, px_s, shape, eccentricity, min_size,
+                               max_size, min_radius, max_radius)
     
-    return contours, in_l, out_l
+    return contours
 
 
 def erase_image(

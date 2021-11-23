@@ -9,10 +9,10 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save= 'C:\\Users\\Luiza Cherobini\\Desktop\\figura'
+path_to_save= '/media/luiza/DATA/àrea de trabalho/video kaka/analise'
 
-ch1_path = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\r'   #pasta contendo as pastas de imagens de um canal 
-ch2_path = 'C:\\Users\\Luiza Cherobini\\Desktop\\figura\\g'   #pasta contendo as pastas de imagens de um canal 
+ch1_path = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/r'   #pasta contendo as pastas de imagens de um canal 
+ch2_path = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/g'   #pasta contendo as pastas de imagens de um canal 
 #ch3_path = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\Run\\gH2AX'
 
 #como você nomeia o canal
@@ -54,7 +54,7 @@ segment_dict = {'magnification': 20,
 #modificações a serem feitas nas imagens do canal 1. Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch1 = {'rescale_intensity': True,
-           'remove_bg' : True,
+           'remove_bg' : False,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : False,
@@ -71,7 +71,7 @@ param_ch1 = {'rescale_intensity': True,
 #modificações a serem feitas nas imagens do canal 2.  Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch2 = {'rescale_intensity': True,
-           'remove_bg' : True,
+           'remove_bg' : False,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : True,

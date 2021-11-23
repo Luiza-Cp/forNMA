@@ -17,18 +17,19 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
     
     h_down = df.Area.quantile(0.05)
     h_up= df.Area.quantile(0.95)
-    v_left = df.Error.min()
-    v_right = df.Error.quantile(0.95)
+    v_left = df.NII.min()
+    v_right = df.NII.quantile(0.95)
     fig= plt.figure()
-    ax = fig.add_subplot(sns.scatterplot(data=df, x="Error", y="Area")) 
+    ax = fig.add_subplot(sns.scatterplot(data=df, x="NII", y="Area")) 
     horizontal_up = draggable_lines(ax, "h",h_up)
     horizontal_down = draggable_lines(ax, "h", h_down)
     vertical_left = draggable_lines(ax, "v", v_left)
     vertical_right = draggable_lines(ax, "v", v_right)
     plt.show(block=True)
    
-    from Draggable_line import line_coord_list
     plt.close('all')
+    from Draggable_line import line_coord_list
+    
     
     coord_tuples = []
     for i in range (len(line_coord_list[:-1])):
@@ -64,8 +65,8 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
 def erase_df (df, h_down, h_up, v_left, v_right):
     df = df[df["Area"] < h_up]
     df = df[df["Area"] > h_down]
-    df = df[df["Error"] > v_left]
-    df = df[df["Error"] < v_right]
+    df = df[df["NII"] > v_left]
+    df = df[df["NII"] < v_right]
     
     frames = list(set(df.Frame.values))
     origin_folders = list(set(df.origin_folder.values))

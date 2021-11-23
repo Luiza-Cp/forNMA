@@ -16,14 +16,12 @@ class Morphology:
     """
     Stores and measures morphological properties of a object contour.
     """
-    def __init__(self, n, cnt, int_in, int_out):
+    def __init__(self, n, cnt):
         """
         Atributes
         
         self.n = number of the cell at a given image
         self.cnt = contour of the object(the nucleus) at image
-        self.int_in = mean intensity of a inner ring and the nucleus
-        self.int_out = mean intensity of a outter ring and the nucleus
         self.bbox_x1 = bounding rectangle x coordinate
         self.bbox_y1 = bounding rectangle y coordinate
         self.bbox_w1 = bounding rectangle width
@@ -45,8 +43,6 @@ class Morphology:
         
         self.n = n
         self.cnt = cnt
-        self.int_in = int_in
-        self.int_out = int_out
         self.bbox_x1, self.bbox_y1, self.bbox_w1, self.bbox_h1 = cv.boundingRect(self.cnt)
         self.area = cv.contourArea(cnt) 
         self.fellipse = cv.fitEllipse(cnt)   #fitting ellipse
@@ -118,9 +114,6 @@ class Morphology:
                      "Roundness": [self.roundness],
                      "Radius_ratio": [self.radius_ratio],
                      "NII" : [self.NII],
-                     "Error_int_in" : [self.int_in],
-                     "Error_int_out" : [self.int_out],
-                     "Error_convex_area" : [self.convex_area]
                        }
         df_morpho = pd.DataFrame(morpho_info) 
         

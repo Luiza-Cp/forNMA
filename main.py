@@ -94,7 +94,7 @@ def run(path_to_save: str,
         df["origin_folder"]= file
         complete_df = complete_df.append(df)
     
-    complete_df = complete_df[complete_df["Error"] < segment_dict["error"] ]
+
     #o colplete df vai pra interface para remover outliers, 
     # substituindo as funções que colocarei abaixo
     from clean_dataframe import plot_and_clean, erase_df
