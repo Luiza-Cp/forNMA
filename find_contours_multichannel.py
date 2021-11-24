@@ -10,18 +10,12 @@ Busca os contornos somente (no load não vai remover bg ou match histog.)
 Análoga à RUN_IMAGE
 
 """
+from matplotlib import pyplot as plt
 
-
-from skimage import  img_as_ubyte, exposure
-from skimage.segmentation import clear_border
-import cv2 as cv
 import numpy as np
-import copy
-import math
 from initializing_functions_multichannel import load_image, adjust_binary_image, find_nuc_contours, erase_image
-from Divide_contours import Segmenting, select_right_contour
 from thresholding import threshold_dict
-from typing import Optional, List, Tuple
+from typing import Optional, List
       
 
      
@@ -44,6 +38,7 @@ def find_contours(
         min_radius: Optional[int] = None, 
         max_radius: Optional[int] = None, 
         fast_detection: bool = False,
+        weakly_labeled: bool = False
 ) -> List[np.ndarray]:
     """
     Performs all the operations in one image to generate a contour list.
@@ -76,7 +71,8 @@ def find_contours(
                                         resolution_factor, pixel_size,
                                          magnification, cut_edges, adjust_size,
                                          shape, eccentricity, min_size, max_size,
-                                         min_radius, max_radius, fast_detection)
+                                         min_radius, max_radius, fast_detection,
+                                         weakly_labeled)
         
         if len(nuc_contours) > 0:   #if it finds nuclear contours, it create a Cell object for each contour
             for i in range(len(nuc_contours)):
@@ -85,7 +81,7 @@ def find_contours(
             
     else:
         nuc_contours = [] 
-    img_to_fill =img.copy()
+    image_erased =img.copy()
     if fast_detection == False:
         #it tries to find nuclei with less ifluorescence intensity by covering 
         #the already detected ones. If after 6 rounds of covering nuclei it still 
@@ -93,7 +89,7 @@ def find_contours(
         n = 0
         while len(nuc_contours) > 0 and n < 6:
             n = n + 1
-            image_erased = erase_image(nuc_contours, img_to_fill, resolution_factor)
+            image_erased = erase_image(nuc_contours,image_erased, resolution_factor)
             if not image_erased.any() == False:
                 new_binary = threshold_dict[threshold](image_erased, offset)
                 new_binary = adjust_binary_image(new_binary, pixel_size, resolution_factor, blur, 
@@ -106,13 +102,14 @@ def find_contours(
                                              img, resolution_factor, pixel_size,
                                              magnification, cut_edges, adjust_size,
                                              shape, eccentricity, min_size, max_size,
-                                             min_radius, max_radius, fast_detection)
+                                             min_radius, max_radius, fast_detection,
+                                             weakly_labeled)
                    
                     if len(nuc_contours) > 0:
                         for i in range(len(nuc_contours)):
                             all_contours.append(nuc_contours[i])
-                            
-                            
+   # print ('a', len(contours))
+
             
     return all_contours 
  
@@ -122,5 +119,30 @@ def find_contours(
 #im = 'C:\\Users\\Luiza Cherobini\\Desktop\\R\\RED\\red dap.tif'
 #cnt = find_contours(im, 20)
 
-#im = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/r/red/VID429-karine-red-erk53bp1-30min_B5_19_2021y02m28d_16h35m.tif'
-#cnt = find_contours(im, 20, rescale_intensity= True)
+im = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/teste nucleos forNMA/InCell 20x/20x/A - 01(fld 01 wv Cy3 - Cy3 time 05 - 2400000ms).tif'
+cnt = find_contours(im, 20, rescale_intensity= True, pixel_size = 0.10)
+
+
+
+#im = 'C:\\Users\\Luiza Cherobini\\Desktop\\R\\RED\\red dap.tif'
+import cv2 as cv
+img = cv.imread(im, cv.IMREAD_ANYDEPTH)
+img =cv.drawContours(img, cnt, -1, (65000, 65000, 65000), 3)
+
+for n in range(len(cnt)):
+    x,y,w,h = cv.boundingRect(cnt[n])
+    cv.putText(img,str(n), (x+w, y+h), cv.FONT_HERSHEY_SIMPLEX, 3,  (65000, 65000, 65000))
+
+
+
+
+
+
+#cv.namedWindow("im", cv.WINDOW_NORMAL)   
+
+#cv.imshow('im', img)
+#cv.waitKey(-1)
+#cv.destroyAllWindows()
+imga = img
+from matplotlib import pyplot as plt
+plt.imshow(img)

@@ -137,6 +137,7 @@ def analyze_dict(
                eccentricity = seg_param['eccentricity'],min_size= seg_param['min_size'], 
                max_size= seg_param['max_size'],min_radius= seg_param['min_radius'], 
                max_radius= seg_param['max_radius'],fast_detection = seg_param['fast_detection'],
+               weakly_labeled = seg_param['weakly_labeled']
                )
         
         #aqui vem o morphology e gero um df e todos os proximos vem ao lado 
@@ -191,7 +192,7 @@ def split_dfs(
                 "Foci_cnt_" + key, "Y_draw_" + key]
         col_list_cnt.extend(cols)
         cols_remove = ["Nuc_cnt_" + key,"Cyto_ring_cnt_" + key,
-                "Foci_cnt_" + key, "Y_draw_" + key, "Unnamed: 0", "Error", "Image_" + key ]
+                "Foci_cnt_" + key, "Y_draw_" + key, "Unnamed: 0", "Image_" + key ]
         col_to_remove.extend(cols_remove)
     
     all_col = list(complete_df)

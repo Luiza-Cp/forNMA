@@ -5,6 +5,7 @@ Created on Sun May 16 15:09:48 2021
 @author: Luiza
 Contain all the necessary functions for processing the image for segmentation
 """
+from matplotlib import pyplot as plt
 
 from skimage import  img_as_ubyte, exposure, restoration
 from skimage.exposure import match_histograms
@@ -193,7 +194,8 @@ def divide_contours(
                    new_cnt_list.append(cnt)
                 else: #If it returns the list, we just have to append the contour inside it
                     new_cnt_list.append(cnt[0])           
-    
+     
+   
     return new_cnt_list
 
 
@@ -358,6 +360,8 @@ def fluorescence_of_rings(
                new_cnt_list.append(new_cnt)
             else:       # right contour
                 new_cnt_list.append(cnt)
+                
+     
    
     return new_cnt_list
   
@@ -478,7 +482,7 @@ def filter_contours(
     areas = []
     for cnt in contour_list:
         areas.append(cv.contourArea(cnt))
-    contours = size_filter(contour_list, areas, min_size, max_size)
+    contours = size_filter(contour_list, areas, min_size, max_size)         
 
     if len(contours) == 0:
         return  []
@@ -507,7 +511,8 @@ def find_nuc_contours(
         max_size: int, 
         min_radius: int, 
         max_radius: int, 
-        fast: bool
+        fast: bool,
+        weakly_labeled: bool
 ) -> List[np.ndarray]:
     """ 
     Given an image, its binary and a set of parameters, aplies a series of
@@ -519,8 +524,9 @@ def find_nuc_contours(
     contours = [a for a in contours if len(a)>4]
     contours = divide_contours(contours, binary_img, image, rf, px_s, cut_edges)
     contours = filter_debree(contours, mag, px_s, rf)
-    if mag >= 10 or fast == False:
+    if weakly_labeled == True:
         contours = fluorescence_of_rings(contours, image, rf, px_s, mag)
+        
     if len(contours)> 0:
         contours = filter_contours(contours, mag, px_s, shape, eccentricity, min_size,
                                max_size, min_radius, max_radius)

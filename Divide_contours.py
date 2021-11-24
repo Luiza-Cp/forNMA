@@ -6,6 +6,8 @@ Created on Sat Mar 13 21:12:53 2021
 
 
 """
+from matplotlib import pyplot as plt
+
 import cv2 as cv
 import numpy as np
 from skimage import color, img_as_ubyte
@@ -109,8 +111,9 @@ class Segmenting:
         self.ws_contour = self.watershed() # aqui tem a lista dos contornos 
         self.cut_contour = self.force_cut()
         self.true_contour = self.select_contour()
-
-  
+              
+        
+        
     def find_bigger_bbox(self) -> int:
         """ Gets the x,y,w and h to expand the bounding box of the contour. """
         x2 = self.x - round(60 *self.rf)

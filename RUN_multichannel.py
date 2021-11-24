@@ -46,7 +46,7 @@ segment_dict = {'magnification': 20,
                 'min_radius': None, 
                 'max_radius': None, 
                 'fast_detection': False,
-                'error': 7                   #  não mudar esse
+                'weakly_labeled': True          # setar como true se tiverem marcações fracas e baixa densidade de cell
   }
 
 
