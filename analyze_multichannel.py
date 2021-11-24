@@ -10,7 +10,6 @@ from initializing_functions_multichannel import load_image
 from find_contours_multichannel import find_contours
 from Morphology_class import Morphology 
 from Cell_class_multichannel import Cell
-from foci_class import foci
 import numpy as np
 from typing import List, Optional, Tuple
 import os

@@ -119,30 +119,7 @@ def find_contours(
 #im = 'C:\\Users\\Luiza Cherobini\\Desktop\\R\\RED\\red dap.tif'
 #cnt = find_contours(im, 20)
 
-im = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/teste nucleos forNMA/InCell 20x/20x/A - 01(fld 01 wv Cy3 - Cy3 time 05 - 2400000ms).tif'
-cnt = find_contours(im, 20, rescale_intensity= True, pixel_size = 0.10)
+#im = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/teste nucleos forNMA/InCell 20x/20x/A - 01(fld 01 wv Cy3 - Cy3 time 05 - 2400000ms).tif'
+#cnt = find_contours(im, 20, rescale_intensity= True, pixel_size = 0.10)
 
 
-
-#im = 'C:\\Users\\Luiza Cherobini\\Desktop\\R\\RED\\red dap.tif'
-import cv2 as cv
-img = cv.imread(im, cv.IMREAD_ANYDEPTH)
-img =cv.drawContours(img, cnt, -1, (65000, 65000, 65000), 3)
-
-for n in range(len(cnt)):
-    x,y,w,h = cv.boundingRect(cnt[n])
-    cv.putText(img,str(n), (x+w, y+h), cv.FONT_HERSHEY_SIMPLEX, 3,  (65000, 65000, 65000))
-
-
-
-
-
-
-#cv.namedWindow("im", cv.WINDOW_NORMAL)   
-
-#cv.imshow('im', img)
-#cv.waitKey(-1)
-#cv.destroyAllWindows()
-imga = img
-from matplotlib import pyplot as plt
-plt.imshow(img)

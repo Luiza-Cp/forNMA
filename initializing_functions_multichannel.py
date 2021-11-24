@@ -5,7 +5,6 @@ Created on Sun May 16 15:09:48 2021
 @author: Luiza
 Contain all the necessary functions for processing the image for segmentation
 """
-from matplotlib import pyplot as plt
 
 from skimage import  img_as_ubyte, exposure, restoration
 from skimage.exposure import match_histograms
