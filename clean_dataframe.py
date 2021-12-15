@@ -29,7 +29,7 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
    
     plt.close('all')
     from Draggable_line import line_coord_list
-    
+    plt.close('all')
     
     coord_tuples = []
     for i in range (len(line_coord_list[:-1])):

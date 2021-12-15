@@ -9,15 +9,15 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save= '/media/luiza/DATA/àrea de trabalho/video kaka/analise'
+path_to_save= '/media/luiza/DATA/Doutorado/elipses angelo/results'
 
-ch1_path = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/r'   #pasta contendo as pastas de imagens de um canal 
-ch2_path = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/g'   #pasta contendo as pastas de imagens de um canal 
+ch1_path = '/media/luiza/DATA/Doutorado/elipses angelo/run' #pasta contendo as pastas de imagens de um canal 
+ch2_path = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ct/reg/g'  #pasta contendo as pastas de imagens de um canal 
 #ch3_path = 'C:\\Users\\Luiza Cherobini\\Documents\\Nicolas\\Run\\gH2AX'
 
 #como você nomeia o canal
-ch1_name = "red"
-ch2_name = 'green'
+ch1_name = "53bp1"
+ch2_name = 'erk'
 ch3_name ='gH2AX'
 #add mais ch conforme demanda. Se usar só um, remover o restante.
 
@@ -38,8 +38,8 @@ segment_dict = {'magnification': 20,
                 'offset': 0,                    # Deve ser usado para os thresholds locais 
                 'blur': 12,                     # o quanto deve suavizar o contorno do núcleo
                 'adjust_size': 0,               # Expandir ou diminuir o contorno (número negativo para diminuir)
-                'cut_edges':  0.7,              # o quanto deve forçar o corte entre os núcleos 
-                'shape':  0.88,                 # remove células com formatos muito loucos
+                'cut_edges':  False,              # o quanto deve forçar o corte entre os núcleos, pode ser False 
+                'shape':  0.75,                 # remove células com formatos muito loucos
                 'eccentricity': None,           # Vai de 0 a 1. Valores mais próximos de 0 represenntam mais circular, mais perto de 1 é mais oval
                 'min_size': None, 
                 'max_size': None, 
@@ -54,24 +54,24 @@ segment_dict = {'magnification': 20,
 #modificações a serem feitas nas imagens do canal 1. Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch1 = {'rescale_intensity': True,
-           'remove_bg' : False,
+           'remove_bg' : True,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : False,
            'ring_size': 3,                      # raio do citoplasma 
            'use_ellipse': False,                # deixar True se quer usar elipse
-           'wants_foci': True,
-           'foci_min_size' : 5,
+           'wants_foci': False,
+           'foci_min_size' : 7,
            'foci_max_size': None,
            'foci_min_int' : None,               # int = intensidade 
            'foci_max_int' : None,       
-           'foci_proeminence' : 300           # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
+           'foci_proeminence' : 350           # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
            }
 
 #modificações a serem feitas nas imagens do canal 2.  Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch2 = {'rescale_intensity': True,
-           'remove_bg' : False,
+           'remove_bg' : True,
            'radius_bg': 50,
            'match_hist' : False,
            'wants_ktr' : True,
@@ -104,13 +104,13 @@ param_ch3 = {'rescale_intensity': False,
 #se existirem mais canais, mais params devem ser adicionados.
 #se existirem menos canais, parâmetros devem ser removidos
 
-ch_path_list = [ch1_path, ch2_path]
-ch_name_list = [ch1_name, ch2_name]
-parameter_list = [param_ch1, param_ch2]
+ch_path_list = [ch1_path]#, ch2_path]
+ch_name_list = [ch1_name]#, ch2_name]
+parameter_list = [param_ch1]#, param_ch2]
 
 # para cada subpasta dentro da pasta mãe, adicionar uma lista de condições
 # se deixar vazia ou com numero diferente do tamanho de subpastas vai colcoar none
-conditions = ['A', "B"]
+conditions = [''] #'ETO', 'GEM', 'TAXOL', 'TAXOL+CARBO']#, "B"]
 
 #Vai checar se dados são sequencia temporal
 #se for sequencia temporal, favor colocar 1 campo por pasta!

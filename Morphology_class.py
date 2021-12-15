@@ -114,6 +114,11 @@ class Morphology:
                      "Roundness": [self.roundness],
                      "Radius_ratio": [self.radius_ratio],
                      "NII" : [self.NII],
+                     "FitEllipse_X": [self.fellipse[0][0]],
+                     "FitEllipse_Y": [self.fellipse[0][1]],
+                     "FitEllipse_a": [self.fellipse[1][1]],
+                     "FitEllipse_b": [self.fellipse[1][0]],
+                     "FitEllipse_angle": [self.fellipse[2]],
                        }
         df_morpho = pd.DataFrame(morpho_info) 
         

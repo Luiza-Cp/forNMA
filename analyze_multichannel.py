@@ -145,8 +145,10 @@ def analyze_dict(
             continue
         df_morpho_list  = []
         for n in range(len(contours)):
-            morpho = Morphology(n+1, contours[n])
-            df_morpho_list.append(morpho.df)
+            #checar len(n) tem que ter ao menos 5 ptos no contorno para fitar uma elipse
+            if len(contours[n]>5):
+                morpho = Morphology(n+1, contours[n])
+                df_morpho_list.append(morpho.df)
         image_df = pd.concat(df_morpho_list)
           
         
@@ -165,9 +167,6 @@ def analyze_dict(
     all_df = pd.concat(all_df_list)
     all_df["Condition"] = condition
     all_df["Overtime"] =  is_overtime
-    #add error here
-   # all_df["Error"] = (-0.93 * all_df.Roundness - 0.8 * all_df.Error_convex_area ) *-1
-  #  all_df.drop(columns = (["Error_convex_area"]), inplace=True)
     all_df = all_df.reset_index(drop= True)
     
     #drop columns here 
@@ -287,7 +286,9 @@ def saving_images(df_draw: pd.DataFrame,
 
 # o foldername deve ser o nome da pasta mãe dessa análise (função draw_and_save)
 # depois que eu selecionar o que faz sentido pra mim, rodar uma pasta separando 
-# campos e poços e ploto so dotplots das médias de areqa e ativação de erk      
+# campos e poços e ploto so dotplots das médias de areqa e ativação de erk   
+
+#abaixo exemplo de como chamar para eventuais testes (sem ter que roar tudo a partir do run)   
 '''    
        
 p1 = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/r/red'

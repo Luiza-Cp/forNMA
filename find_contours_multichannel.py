@@ -86,6 +86,10 @@ def find_contours(
         #it tries to find nuclei with less ifluorescence intensity by covering 
         #the already detected ones. If after 6 rounds of covering nuclei it still 
         #finds objects, forNMA will ignore them
+        
+        # Artur, aqui é uma parte que eu joguei pro user. Fica dentro do 'Fast Detection"
+        # essa é a parte que vai tapando os nucleos e mednindo de novo e acaba gerando 
+        # marcações quadradas sem querer. 
         n = 0
         while len(nuc_contours) > 0 and n < 6:
             n = n + 1

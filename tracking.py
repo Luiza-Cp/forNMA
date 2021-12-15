@@ -115,7 +115,8 @@ def tracking(path_to_table: str,
              max_distance: int = 30,
              time_window: int = 5,
              max_split_distance: int = 30,
-             max_gap_closing_distance: int = 30
+             max_gap_closing_distance: int = 30,
+             allow_merging = True
 )-> pd.DataFrame :
     """ Gets a dataframe and user parameters and applies LapTracker for cell tracking."""
     
@@ -175,9 +176,12 @@ def draw_tracking_at_iamges(img: np.ndarray,
                 x_list = tree['X'].values
                 y_list = tree['Y'].values
                 for i in range(len(x_list)-1):
-                   cv. line(img, (int(x_list[i]), int(y_list[i])),
+                   cv.line(img, (int(x_list[i]), int(y_list[i])),
                                  (int(x_list[i+1]), int(y_list[i+1])), 
                             value, linewidth)
+                #cv.putText(img, key, (int(x_list[i]+ 10), int(y_list[i])+ 5),
+                #              cv.FONT_HERSHEY_SIMPLEX, 1, value)
+                   
                
     return img 
 
@@ -192,7 +196,7 @@ def save_images(image_list: List[np.ndarray],
     
         return True
 
-
+#from skimage import img_as_ubyte, exposure
 def generate_tracked_images(path: str,
                             df_track: pd.DataFrame,                   
 ) -> np.ndarray:
@@ -211,7 +215,8 @@ def generate_tracked_images(path: str,
     images = []
     print(frames)
     for frame in frames:
-         img = cv.imread(os.path.join(path,image_names[frame]), cv.IMREAD_COLOR )
+         img = cv.imread(os.path.join(path,image_names[frame]), cv.IMREAD_COLOR)
+         #img = exposure.rescale_intensity(img, in_range='image', out_range='dtype')
          circle_radius = 5 if img.shape[0]*img.shape[1] < 4000000 else 10
          linewidth = 2 if img.shape[0]*img.shape[1] < 4000000 else 5
          img = draw_tracking_at_iamges(img, frame, df_track,track_color_dict,
@@ -224,20 +229,24 @@ def generate_tracked_images(path: str,
     
 #exemplo de como chamar 
 # fazer testes com imagens da kaka
-bb = tracking ('/media/luiza/DATA/àrea de trabalho/video kaka/analise/greenResults.csv',
-              max_distance = 100,
-               time_window= 30,
-               max_split_distance = 1,
-               max_gap_closing_distance = 1)
+md = 50
+t = 10 
+ms = 5
+mg = 5
+bb = tracking ('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/d5_2_gResults.csv',
+              max_distance = md,
+               time_window= t,
+               max_split_distance = ms,
+               max_gap_closing_distance = mg)
 
-ims, im_names = generate_tracked_images('/media/luiza/DATA/àrea de trabalho/video kaka/analise/green/red', bb)
+ims, im_names = generate_tracked_images('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/d5_2_g/53bp1', bb)
 
 import random, string
 
 
 letters = string.ascii_lowercase
-name =''.join(random.choice(letters) for i in range(6))
-path = os.path.join('/media/luiza/DATA/àrea de trabalho/video kaka/analise/', name)
+name = ('md_' + str(md) + ' t_' + str(t)+ ' ms_' + str(ms) + ' mg_'+ str(mg) +  ' linking=true')
+path = os.path.join('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/teste tracking ptx', name)
 os.makedirs(path)
 save_images(ims, im_names,path )
-
+bb.to_csv(os.path.join (path, 'table'))

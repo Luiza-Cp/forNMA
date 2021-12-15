@@ -523,6 +523,10 @@ def find_nuc_contours(
     contours = [a for a in contours if len(a)>4]
     contours = divide_contours(contours, binary_img, image, rf, px_s, cut_edges)
     contours = filter_debree(contours, mag, px_s, rf)
+    
+    # essa foi a segunda coisa que joguei pro user. a "fluorescence_of_rings" faz com que
+    # alguns nucleos sejam decetados um sobre o outro (como se não descartasse o contorno antigo
+    # quando esta ajustandio o novo) 
     if weakly_labeled == True:
         contours = fluorescence_of_rings(contours, image, rf, px_s, mag)
         

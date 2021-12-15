@@ -109,16 +109,17 @@ def find_norms(
 )-> Tuple[int, int]:
     
     """ Given a dictionary of dataFrames, establishes hue, size and 3d plot limits"""
-   
+    print(col)
     if col != None:
        min_val = []
        max_val = []
        for key, value in df_dict.items():
+           print (key)
            df= value
            df = df[(np.abs(stats.zscore(df[col])) < 3)]
            min_val.append(df[col].min())
            max_val.append(df[col].max())
-     
+       print(min_val, max_val)
        min_val = round(min(min_val), 0)
        max_val = round(max(max_val), 1)
        
@@ -309,8 +310,8 @@ def plot_NMA_dot(
     plt.ylim(lims[0], lims[1])
     plt.xlim(lims[2], lims[3])
     plt.title(name)
-   # path_to_save = 'D:\\Triagem\\Results\\NEW\\Graphs\\NMA'
-   # plt.savefig(os.path.join(path_to_save,'Scatter ' +  name+ '.png'), dpi = 200)
+    path_to_save = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/graphs'
+    plt.savefig(os.path.join(path_to_save,'Scatter ' +  name+ '.svg'), dpi = 200)
     
     
     
@@ -419,8 +420,15 @@ l = [int(i) for i in l]
 l.sort()
 timelist = [int(l[0]), int(l[54]), int(l[101]), int(l[149]), int(l[176]), int(l[152]), int(l[188])]
 
-NMA(df_dic, 'C_1000 Results', 'dot', 'Total_foci_red', 'Mean_ellipse_green', overtime = True, 
-    timelist = timelist)
+
+
+t1= pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ct/c3_1_gResults.csv')
+t2= pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/d5_2_gResults.csv')
+
+df_dict = {'Control': t1, 'Paclitaxel': t2}
+
+
+NMA(df_dict, 'Control', 'dot', 'Total_foci_53bp1', 'Mean_Nucleus/Ellipse_erk', overtime = True, timelist = [0,21])
 
 aa = list(df_dic.values())[0]
 bb= aa[aa.Area > aa.Area.quantile(.75) ]

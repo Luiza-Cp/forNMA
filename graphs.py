@@ -14,7 +14,7 @@ import numpy as np
 import similaritymeasures
 import os
 import itertools
-from statannot import add_stat_annotation
+#from statannot import add_stat_annotation
 
 def violinplot(x: str, 
                y: str, 
@@ -50,7 +50,7 @@ def stripplot(x: str,
      if overtime == True:
          hue = None
          dodge = False
-     ax = sns.stripplot(x=x, y=y, hue=hue, data=df, palette="rocket_r", dodge=dodge)
+     ax = sns.stripplot(x=x, y=y, hue=hue, data=df, palette="Accent", dodge=dodge)
      return ax    
 
 def barplot(x: str, 
@@ -114,8 +114,8 @@ def categorical_plots(plot_type: str,
         conditions = set(list(df["Condition"]))
         for c in conditions:
             df_plot = df[df["Condition"]== c]
-            plt.figure(figsize = ((len(set(list(df['Time'])))+1)/3 ,6))
-            ax = categorical_dict[plot_type]('Time',y, df_plot, hue, dodge, overtime)
+            plt.figure(figsize = ((len(set(list(df['Frame'])))+1)/3 ,6))
+            ax = categorical_dict[plot_type]('Frame',y, df_plot, hue, dodge, overtime)
             plt.xticks(rotation=70)
             plt.tight_layout()
             plt.title(str(c))
@@ -127,7 +127,7 @@ def categorical_plots(plot_type: str,
         plt.tight_layout()
         plt.title(plot_type)
     if path_save != None:
-        plt.savefig(os.path.join(path_save, plot_type + '.png'), dpi=200)
+        plt.savefig(os.path.join(path_save, plot_type + '.svg'), dpi=200)
         
 
 def area_between_curves(x: List[float],
@@ -268,7 +268,7 @@ def lineplot(x: str,
                z = y.replace('/', '_')
            else:
                 z= y
-           plt.savefig(os.path.join(path_save, z + '.png'), dpi=200)
+           plt.savefig(os.path.join(path_save, z + '.svg'), dpi=200)
         
 
           
@@ -381,8 +381,9 @@ def moving_average(df: pd. DataFrame,
     """
     
     conditions = list(set(list(df["Condition"])))
-    conditions.remove(ref)
-    conditions.insert(0, ref)
+    if ref != None:
+        conditions.remove(ref)
+        conditions.insert(0, ref)
     
     framelist = set(list(df["Frame"]))
     sns.set_theme()
@@ -431,23 +432,24 @@ def moving_average(df: pd. DataFrame,
 #vou criar um dataset pra testar se ta tufo orolando certo se não vou enlouqucer aqui 
 group = "DBS16"
 
-t1= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_0.001_1000 Results.csv')
-t2= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_0.01_1000 Results.csv')
-t3= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_0.1_1000 Results.csv')
-t4= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_1_1000 Results.csv')
-t5= pd.read_csv('D:\\Triagem\\Results\\NEW\\C_1000 Results.csv')
+t1= pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ct/c3_1_gResults.csv')
+t2= pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/d5_2_gResults.csv')
+#t3= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_0.1_1000 Results.csv')
+#t4= pd.read_csv('D:\\Triagem\\Results\\NEW\\'+ group +'_1_1000 Results.csv')
+#t5= pd.read_csv('D:\\Triagem\\Results\\NEW\\C_1000 Results.csv')
 #t6 =  pd.read_csv('D:\\Triagem\\Results\\NEW\\MEKi_0.17_1000 Results.csv')
 #t7 =  pd.read_csv('D:\\Triagem\\Results\\NEW\\MEKi_0.017_1000 Results.csv')
 
-tl =[t1 ,t2,t3,t4, t5]
+tl =[t1 ,t2,]#t3,t4, t5]
 
 
 df = pd.DataFrame( )
 
 for t in tl:
     df = pd.concat([df, t])
+df.reset_index(inplace=True)
 
-ps = 'D:\\Triagem\\Results\\NEW\\Graphs\\erk\\'+ group
+ps = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/graphs'
 ps2 = 'D:\\Triagem\\Results\\NEW\\Graphs\\cpd\\'+group
 ps3 = 'D:\\Triagem\\Results\\NEW\\Graphs\\53bp1\\'+group
 
@@ -466,13 +468,13 @@ df_plot = pd.DataFrame()
 
 #cpd(df, timelist_cpd, abc= False)
 
-moving_average(df, "Total_foci_red", 20, ref= 'C_1000', path_save = ps3)
+moving_average(df, "Total_foci_53bp1", 20, ref= None, path_save = ps)
 
-#categorical_plots('strip', "Area" , "Area", df, overtime = True )
+categorical_plots('strip', "Mean_Ellipse/Nucleus_erk" , "Frame", df, overtime = True )
 
-#lineplot('Frame', "Mean_Ellipse/Nucleus_green", df,  ci=95, path_save =ps)
-#lineplot('Frame', "Total_foci_red", df, split = False, ci=95, path_save =ps3)
-#scatterplots('NII', 'Area', df, hue= 'Condition', overtime= True, timelist = [0,30,60,90])
+lineplot('Frame', "Mean_Ellipse/Nucleus_erk", df,  ci=95, path_save =ps)
+lineplot('Frame', "Total_foci_53bp1", df, split = False, ci=95, path_save =ps3)
+scatterplots('NII', 'Area', df, hue= 'Condition', overtime= True, timelist = [0,30,60,90])
 #cpd(df, timelist_cpd, abc=True, path_save=ps2)
 #moving_average(df, "Mean_Ellipse/Nucleus_green", 20,  abc=True, ref = 'C_1000', path_save = ps)
 #moving_average(df, "Total_foci_red", 20,  abc=True, ref = 'C_1000', path_save = ps3)
@@ -484,3 +486,6 @@ moving_average(df, "Total_foci_red", 20, ref= 'C_1000', path_save = ps3)
 #sns.lineplot(data=df,x="Frame", y="Mean_Ellipse/Nucleus_green", hue='Condition', style =None,
 #            size=None,  ci=95, legend="full" ,units=None, 
  #                                sort= False) 
+
+sns.stripplot(x="Frame", y="Mean_Nucleus/Ellipse_erk", data=t1, palette="rocket_r",)
+plt.savefig('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/graphs/strip.svg')
