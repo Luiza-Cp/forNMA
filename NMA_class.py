@@ -17,22 +17,28 @@ import numpy as np
 from math import pi
 from typing import Optional, List, Tuple
 from matplotlib.patches import Ellipse
-
+from NMA_draggable_line import draggable_lines
 # devo fazer NMA 3d???
 # porcentagens de pixels que colocalizma faz sentido pro edu???
 
 
 
+# na interface: usar um código que fornece uma caixinha pra digitar o sd ouu opções d elinhagens celulares
+# em ordem alfabética. Essa lista de linhagens pode ser atualizada pelo user
+# os valores devem ser puxados de um csv (que abre em forma de dataFrame). c
+#ALÉM DE CADA USUÁRIO PODER ADD SUAS LINHAGENS, A GENTE PODE DISPONIBILIZAR TABELAS ATUALIZADAS NO SITE
+
 
 class NMA:
     """ Class for NMA graph plotting"""
     
-    def __init__(self, df, controls): # control: Tuple[group_name, frame] - um deles pode ser None
+    def __init__(self, df, controls, sd): # control: Tuple[group_name, frame] - um deles pode ser None
         """ 
         Atributes:
         
         self.df: pandas DataFrame with all value information
         self.coontrols: tuple containing gorup name and frmae. One of them can be none
+        self.sd: float representing the standard deviation from mean to use for NMA threshold
         self.control_df: dataframe only with control group rows
         self.mean_NII: mean NII value of control gorup
         self.mean_a: mean area value of control gorup
@@ -42,27 +48,37 @@ class NMA:
         self.h_x: horizontal line x value
         self.h_y_up: horixontal upper line y value
         self.h_y_down: horixontal lower line y value
-        self.v_x: vertical line x value
-        self.v_y: vertical line y value
+        self.v_upx:
+        self.v_upy:
+        self.v_midx:
+        self.v_midy:
+        self.v_downx:
+        self.v_downy:
+        self.v_downx2:
         self.graph_limits: tuple with min and maximum area and NII values within 3 standard deviations
         """
         self.df = df
         self.controls = controls
+        self.sd = sd
         self.control_df = self.subset_df(self.controls)
         self.mean_NII, self.mean_a, self.std_NII, self.std_a, self.circle = self.calc_threshold_NMA()
-        self.h_x, self.h_y_up,self.h_y_down, self.v_x, self.v_y = self.calc_lines()
+        self.h_x, self.h_y_up,self.h_y_down = self.calc_lines()
+        self.graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7,  ec="#bdbbbb", lw=1)
+        self.v_upx, self.v_upy, self.v_midx, self.v_midy, self.v_downx, self.v_downy, self.v_downx2 = self.calc_vertical_lines()
         self.graph_limits = self.calc_area_NII_lims()
+        self.percentages = self.calc_all_percentages()
         #self.df_percentages = self.calc_percentages()
         #self.dot_plots = []
         #self.heatmap_plots: {}
         #self.sample_plost: []
-       
+
         
     def subset_df(self, condition_time_tuple):
         
        """ Subsets the self dataframe based in a condition or time frame or both.""" 
-       
-       if condition_time_tuple[1] is None:
+       if all(item is None for item in condition_time_tuple):
+           df= self.df
+       elif condition_time_tuple[1] is None:
             df = self.df.loc[self.df['Condition'] == condition_time_tuple[0]]
        elif condition_time_tuple[0] is None:
             df = self.df.loc[self.df['Frame'] == condition_time_tuple[1]]
@@ -75,38 +91,37 @@ class NMA:
         
        
     def calc_threshold_NMA(self):
-        
+       
         """ 
+        sd: number of standard deviations from mean tht user has to provide for thresholding.
         Gets the control group from self.dataframe and returns the values for NMA 
         threshold- area mean and standard deviation and NII mean and standard 
         deviation removig 2 z-score outliers- and the thcreshold ellipse.
         """
         df = self.control_df
-        df = df.loc[(np.abs(stats.zscore(df["Area"])) < 1.5)]
-        df = df.loc[(np.abs(stats.zscore(df["NII"])) < 1.5)]
+        df = df.loc[(np.abs(stats.zscore(df["Area"])) < self.sd)] # user mexe -> fazer algum esquema de dict com parametros para linhnagens 
+        df = df.loc[(np.abs(stats.zscore(df["NII"])) < self.sd)]
         mean_NII = df['NII'].mean()
         mean_a = df["Area"].mean()
         std_NII = df['NII'].std() 
         std_a = df["Area"].std() 
 
-        print( std_NII, mean_NII, std_a, mean_a)
-        
         circle = np.linspace(0, 2*pi, 100) 
         
         return mean_NII, mean_a, std_NII, std_a, circle
     
+    
     def calc_lines(self):
          """ Given mean and standard deviation values, it returns lines coordinates"""
             
-         rx= 2* self.std_NII
-         ry = 2* self.std_a
+         rx= self.sd* self.std_NII
+         ry = self.sd* self.std_a
          horizontal_x =  [self.mean_NII -rx,  self.mean_NII + 3*rx]
          horizontal_y_up = [self.mean_a +ry, self.mean_a +ry]
          horizontal_y_down= [self.mean_a-ry, self.mean_a-ry]
-         vertical_x =  [self.mean_NII +rx,  self.mean_NII +rx]
-         vertical_y=  [self.mean_a -ry,  self.mean_a + 3*ry]
-         return horizontal_x, horizontal_y_up,horizontal_y_down, vertical_x, vertical_y
         
+         return horizontal_x, horizontal_y_up,horizontal_y_down
+     
         
     def calc_area_NII_lims(self):
         
@@ -122,16 +137,130 @@ class NMA:
         return min_a,max_a, min_NII, max_NII
     
     
-    
-   # def calc_percentages(self):
-        
-    
-    
-    
-    
-    
-    ##BAH EU N SEI SE ISSO TA CERTO
+    def calc_vertical_lines(self):
+       """
+       Plots the control df with ellipse and horizontal lines for user to adjust
+       the NMA threshold. Returns the new values.
+       """
+      # %matplotlib qt
+       upper_line_x = self.mean_NII + self.sd*self.std_NII
+       upper_line_ys = [int(self.mean_a + self.sd * self.std_a), int(self.mean_a + (2+self.sd) * self.std_a)] 
+       
+       middle_line_x = upper_line_x +0.3 
+       middle_line_ys = [int(self.mean_a - self.sd * self.std_a), upper_line_ys[0]]
+       
+       bottom_line_x = self.mean_NII
+       bottom_line_ys =  [ int(self.mean_a -(1+ self.sd)* self.std_a) ,middle_line_ys[0]]
+       
+       bottom_line_x2 = self.mean_NII + 2.5*self.std_NII
+       
+       fig= plt.figure()
+       ax = fig.add_subplot(sns.scatterplot(data=self.control_df, x="NII", y="Area", color = '#d8b8b8')) 
+       ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, color='black')
+       ax.plot(self.mean_NII+(self.sd*self.std_NII)*np.cos(self.circle) , 
+               self.mean_a+(self.sd*self.std_a)*np.sin(self.circle), color= 'black' )
+       ax.set_title('Click to move the blue lines. Click again to release.')
+       
 
+       # ax.text(x, y, text, size, bbox)
+       ax.text(upper_line_x-1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 'LR', 
+               size=10, bbox=self.graph_box)
+       ax.text(upper_line_x+1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 'LI', 
+               size=10, bbox=self.graph_box)
+       ax.text(self.mean_NII, self.mean_a, 'N', size=10, bbox=self.graph_box)
+       ax.text(middle_line_x+1, self.mean_a, 'I', size=10, bbox=self.graph_box)
+       ax.text(bottom_line_x-0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a,
+               'SR', size=10, bbox=self.graph_box)
+       ax.text(bottom_line_x+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a, 'S', 
+               size=10, bbox=self.graph_box)
+       ax.text(bottom_line_x2+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a, 
+               'SI', size=10, bbox=self.graph_box)
+       
+       upper_line =  draggable_lines(ax, 'v', upper_line_x, upper_line_ys)
+       middle_line =  draggable_lines(ax, 'v', middle_line_x, middle_line_ys)
+       bottom_line =  draggable_lines(ax, 'v', bottom_line_x, bottom_line_ys)
+       bottom_line2 = draggable_lines(ax, 'v', bottom_line_x2, bottom_line_ys)
+        
+       plt.show(block=True)
+       
+       upper = upper_line.x
+       middle = middle_line.x
+       bottom = bottom_line.x
+       bottom2 = bottom_line2.x
+      
+       plt.close('all')
+  
+       return [upper, upper], upper_line_ys, [middle, middle],middle_line_ys, [bottom, bottom], bottom_line_ys, [bottom2, bottom2]
+  
+    
+    def get_NMA_classification_from_df(self, df):
+        """Gets a dataframe and measures the percentage of nuclei in each NMA category."""
+        
+        total = df.shape[0]
+        t= 100/total
+        lr = df.loc[(df['Area'] >= self.h_y_up[0])& (df['NII'] < self.v_upx[0])].shape[0]
+        li = df[(df['Area'] > self.h_y_up[0]) & (df['NII'] >= self.v_upx[0])].shape[0]
+        n = df[(df['Area'] < self.h_y_up[0]) & (df['Area'] >= self.h_y_down[0]) & 
+                   (df['NII'] < self.v_midx[0])].shape[0]
+        i = df[(df['Area'] < self.h_y_up[0]) & (df['Area'] >= self.h_y_down[0]) & 
+                   (df['NII'] > self.v_midx[0])].shape[0]
+        sr = df[(df['Area'] < self.h_y_down[0]) & (df['NII'] < self.v_downx[0])].shape[0]
+        s = df[(df['Area'] < self.h_y_down[0]) & (df['NII'] >= self.v_downx[0])
+                  & (df['NII'] < self.v_downx2[0])].shape[0]
+        si = df[(df['Area'] < self.h_y_down[0]) & (df['NII'] >= self.v_downx2[0])].shape[0]
+        
+        return  lr*t, li*t, n*t, i*t, sr*t, s*t, si*t
+  
+    
+  
+    def calc_all_percentages(self):
+        """ Generates a dataframe containig the percentage relation of all NMA gorups. """
+        
+        has_controls = self.df['Condition'].iloc[0] != False and len(set(list(self.df['Condition']))) != 1 
+        #não é falso (logo, tem valores ali) e tiver mais d 1 condição have_controls ==True
+        
+        df_percent_rows = []
+        
+        if has_controls ==True and self.df['Overtime'].loc[0] == True:
+            # tem controles E tempo
+            conditions = self.df.groupby('Condition')
+            for name, group in conditions:
+                frames = self.df.groupby("Frame")
+                for frame_name, frame in frames:
+                    lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(frame)
+                    new_row = [name, frame_name, frame.shape[0], lr, li, n, i, sr, s, si ]
+                    df_percent_rows.append(new_row)
+       
+        elif has_controls == True:
+            #tem só controles?
+            conditions = self.df.groupby('Condition')
+            for name, group in conditions:
+                lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(group)
+                new_row = [name, False,group.shape[0], lr, li, n, i, sr, s, si ]
+                df_percent_rows.append(new_row)
+       
+        elif self.df['Overtime'].loc[0] == True:
+            # tem sṕ tempos?
+            frames = self.df.groupby('Frame')
+            for name, group in frames:
+                lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(group)
+                new_row = [False, name,group.shape[0], lr, li, n, i, sr, s, si ]
+                df_percent_rows.append(new_row)
+        
+        else:
+            #nada destacado
+            lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(self.df)
+            new_row = [False, False, self.df.shape[0], lr, li, n, i, sr, s, si ]
+            df_percent_rows.append(new_row)
+            
+      
+        percent_df = pd.DataFrame(df_percent_rows,
+                    columns = ["Condition", "Frame", 'Total Cells', 'LR', 'LI', 'N', 'I', 'SR', 'S', 'SI'])
+        
+        return percent_df
+      
+        
+      
     def plot_NMA_heatmap(self, 
                          subset_of_df: pd.DataFrame, 
                          title: str): 
@@ -140,17 +269,22 @@ class NMA:
      
         """  Plots a heatmap NMA with ignoring values passed as hue and size."""
         
-       
+        #%matplotlib inline
         plt.rcParams['axes.facecolor'] = '#7e03ff'#'#03051A'
         fig, ax = plt.subplots()
         sns.kdeplot(data = subset_of_df, x="NII", y="Area", cmap= 'rainbow',  
                         fill=True, thresh= None, levels = 60, ax= ax)
-        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, self.v_x, self.v_y, color='white', linewidth = 0.75)
+        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, 
+                 self.v_upx, self.v_upy, self.v_midx, self.v_midy,
+                 self.v_downx, self.v_downy, self.v_downx2, self.v_downy,
+                 color='white', linewidth = 0.75)
+        
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
         ax.set_title(title)
+        
        
-        return ax 
+        return fig 
     
        
     # na interface tem que aparecer as olções de grupos e/ou tempos pro user plotar
@@ -158,8 +292,8 @@ class NMA:
     
     
     def plot_NMA_dot(self, 
+                     condition_time_tuple: Tuple[Optional[str], Optional[int]],
                      subset_of_df: pd.DataFrame, 
-                     title: str,
                      hue: Optional[str] = None,
                      size: Optional[str] = None,
                      hue_norm: Optional[tuple] = None,
@@ -167,10 +301,26 @@ class NMA:
                      ):
         """ 
         Plots the NMA graph(scatterplot) with hue and size chosen by user. Same graph
-        as the one define by plot_NMA_200, but without performing sampling.
+        as the one defined by plot_NMA_200, but without performing sampling.
         """
-        #make the values out of graph limits group at the limit (cytometry-like)
+        #CONFERIR ESSAS COISAS DOS PERCENTS 
+        if all(item is None for item in condition_time_tuple):
+            print ('q')
+            title = ' '
+            percentages = None
+        elif condition_time_tuple[0] == None:
+            title = 'Frame ' + str(condition_time_tuple[1])
+            percentages = self.percentages.loc[self.percentages['Frame'] == condition_time_tuple[1]]
+        elif condition_time_tuple[1] == None:
+            title =  str(condition_time_tuple[0])
+            percentages = self.percentages.loc[self.percentages['Condition'] == condition_time_tuple[0]]
+        else:
+            title = condition_time_tuple[0] + ' Frame ' +  str(condition_time_tuple[0])
+            percentages = self.percentages.loc[(self.percentages['Condition'] == condition_time_tuple[0])
+                        & self.percentages['Frame'] == condition_time_tuple[1]]
+            
         
+        #make the values out of graph limits group at the limit (cytometry-like)
         subset_of_df.loc[subset_of_df['NII'] == self.graph_limits[3], 'NII'] = self.graph_limits[3] - 0.1
         subset_of_df.loc[subset_of_df['Area'] == self.graph_limits[1], 'Area'] = self.graph_limits[1] - 10
         plt.rcParams['axes.facecolor'] = 'white'
@@ -179,17 +329,43 @@ class NMA:
         
         sns.scatterplot(data=subset_of_df, x="NII", y="Area", size = size, hue = hue,
                         hue_norm = hue_norm, size_norm = size_norm, ax=ax, palette = 'rainbow') 
-        ax.plot(self.mean_NII+(2*self.std_NII)*np.cos(self.circle) , 
-                self.mean_a+(2*self.std_a)*np.sin(self.circle), color= 'black' )
+        ax.plot(self.mean_NII+(self.sd*self.std_NII)*np.cos(self.circle) , 
+                self.mean_a+(self.sd*self.std_a)*np.sin(self.circle), color= 'black' )
         #el = Ellipse((mean_NII, mean_a), 4*std_NII, 4*std_a, angle=0, color="black", fill=False)
         #ax.add_patch(el)
-        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, self.v_x, self.v_y, color='black')
+        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, 
+                 self.v_upx, self.v_upy, self.v_midx, self.v_midy,
+                 self.v_downx, self.v_downy,
+                 self.v_downx2, self.v_downy, color='black')
+        
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
         ax.set_title(title)
-        
-        
-        return ax                  
+        if isinstance(percentages, pd.DataFrame):
+            if percentages.shape[0]>1:
+                percentages = percentages.drop(columns = ['Condition', 'Frame', 'Total Cells'])
+                n = percentages.shape[0]
+                percentages = (percentages.sum()/n).to_frame()
+                percentages = percentages.transpose()
+            print (percentages)
+           
+            ax.text(self.v_upx[0]-1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 
+                    str(round(percentages['LR'].iloc[0],2)),size=10, bbox=self.graph_box)
+            ax.text(self.v_upx[0]+1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 
+                    str(round(percentages['LI'].iloc[0],2)), size=10, bbox=self.graph_box)
+            ax.text(self.mean_NII, self.mean_a, str(round(percentages['N'].iloc[0],2)), 
+                    size=10, bbox=self.graph_box)
+            ax.text(self.v_midx[0]+1, self.mean_a, str(round(percentages['I'].iloc[0],2)),
+                    size=10, bbox=self.graph_box)
+            ax.text(self.v_downx[0]-0.7, self.h_y_down[0]-0.1*self.sd*self.mean_a,
+                    str(round(percentages['SR'].iloc[0],2)), size=10, bbox=self.graph_box)
+            ax.text(self.v_downx[0]+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a,
+                    str(round(percentages['S'].iloc[0],2)), size=10, bbox=self.graph_box)
+            ax.text(self.v_downx2[0]+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a, 
+                    str(round(percentages['SI'].iloc[0],2)), size=10, bbox=self.graph_box)
+            
+                
+        return fig                 
         
         
   # adicionar as porcentagems (escritas no gráfico)
@@ -200,16 +376,23 @@ class NMA:
 nma_df_ignacio = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/NMA_organizado.csv')
 nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results.csv') 
 
-ig= NMA(nma_df_ignacio, ('Control', None))
-fornma= NMA(nma_df_fornma, ('Control', None))
 
-c_ig = ig.plot_NMA_dot(ig.subset_df(('Control', None)), 'Control', hue = 'Aspect')
-c_ig_htm = ig.plot_NMA_heatmap(ig.subset_df(('Control', None)), 'Control')
-t_ig = ig.plot_NMA_dot(ig.subset_df(('Taxol', None)), 'Taxol', hue = 'Aspect')
-t_ig_htm =  ig.plot_NMA_heatmap(ig.subset_df(('Taxol', None)), 'Taxol')
 
-c_for = fornma.plot_NMA_dot(fornma.subset_df(('Control', None)), 'Control fornma', hue = 'Aspect')
-c_for_htm =  fornma.plot_NMA_heatmap(fornma.subset_df(('Control', None)), 'Control fornma')
-t_for = fornma.plot_NMA_dot(fornma.subset_df(('Taxol', None)), 'Taxol fornma', hue = 'Aspect')
-t_fpr_htm = fornma.plot_NMA_heatmap(fornma.subset_df(('Taxol', None)), 'Taxolfornma')
+
+#ig= NMA(nma_df_ignacio, ('Control', None), 1.8)
+fornma= NMA(nma_df_fornma, ('Control', None),1.8)
+
+t_for = fornma.plot_NMA_dot(('Taxol', None),fornma.subset_df(('Taxol', None)), hue = 'Aspect')
+# =============================================================================
+#c_ig = ig.plot_NMA_dot(ig.subset_df(('Control', None)), 'Control', hue = 'Aspect')
+# c_ig_htm = ig.plot_NMA_heatmap(ig.subset_df(('Control', None)), 'Control')
+# t_ig = ig.plot_NMA_dot(ig.subset_df(('Taxol', None)), 'Taxol', hue = 'Aspect')
+# t_ig_htm =  ig.plot_NMA_heatmap(ig.subset_df(('Taxol', None)), 'Taxol')
+# 
+# c_for = fornma.plot_NMA_dot(fornma.subset_df(('Control', None)), 'Control fornma', hue = 'Aspect')
+# c_for_htm =  fornma.plot_NMA_heatmap(fornma.subset_df(('Control', None)), 'Control fornma')
+# t_for = fornma.plot_NMA_dot(fornma.subset_df(('Taxol', None)), 'Taxol fornma', hue = 'Aspect')
+# t_fpr_htm = fornma.plot_NMA_heatmap(fornma.subset_df(('Taxol', None)), 'Taxolfornma')
+# 
+# =============================================================================
 
