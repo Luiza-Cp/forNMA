@@ -65,7 +65,7 @@ def graph_init(
     nan_l = [] 
     for df in df_list:
         conditions.append(df['Condition'].iloc[0])
-        nan = True if math.isnan(df['Condition'].iloc[0]) else False
+        nan = True if df['Condition'].iloc[0] == False else False # aqui n
         nan_l.append(nan)
  
     df_list = rename_conditions(conditions, csv_list, nan_l, df_list)
