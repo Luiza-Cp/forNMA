@@ -18,12 +18,11 @@ from math import pi
 from typing import Optional, List, Tuple
 from matplotlib.patches import Ellipse
 from NMA_draggable_line import draggable_lines
-# devo fazer NMA 3d???
-# porcentagens de pixels que colocalizma faz sentido pro edu???
 
 
 
-# na interface: usar um código que fornece uma caixinha pra digitar o sd ouu opções d elinhagens celulares
+
+# na interface: usar um código que fornece uma caixinha pra digitar o sd ouu opções de linhagens celulares
 # em ordem alfabética. Essa lista de linhagens pode ser atualizada pelo user
 # os valores devem ser puxados de um csv (que abre em forma de dataFrame). c
 #ALÉM DE CADA USUÁRIO PODER ADD SUAS LINHAGENS, A GENTE PODE DISPONIBILIZAR TABELAS ATUALIZADAS NO SITE
@@ -31,9 +30,9 @@ from NMA_draggable_line import draggable_lines
 
 class NMA:
     """ Class for NMA graph plotting"""
-    
-    def __init__(self, df, controls, sd): # control: Tuple[group_name, frame] - um deles pode ser None
-        """ 
+                                                                # other_control: user-input dataframe with control group from another experiment
+    def __init__(self, df, controls, sd, other_control = None): # control: Tuple[group_name, frame] - um deles pode ser None
+        """                                     
         Atributes:
         
         self.df: pandas DataFrame with all value information
@@ -46,31 +45,28 @@ class NMA:
         self.std_a: distance from mean area of the max or min value (the smallest is chosen)
         self.circle: numpy linespace for ellipse 
         self.h_x: horizontal line x value
-        self.h_y_up: horixontal upper line y value
-        self.h_y_down: horixontal lower line y value
-        self.v_upx:
-        self.v_upy:
-        self.v_midx:
-        self.v_midy:
-        self.v_downx:
-        self.v_downy:
-        self.v_downx2:
+        self.h_y_up: horixontal upper line y coordinates
+        self.h_y_down: horixontal lower line y coordinates
+        self.v_upx: vertical upper line X coordinates
+        self.v_upy: vertical upper line y coordinates
+        self.v_midx: vertical middle line x coordinates
+        self.v_midy: vertical middle line y coordinates
+        self.v_downx: vertical bottom left line x coordinates
+        self.v_downy: vertical bottom lines y coordinates
+        self.v_downx2: vertical bottom right line x coordinates
         self.graph_limits: tuple with min and maximum area and NII values within 3 standard deviations
+        self.percentages: 
         """
         self.df = df
         self.controls = controls
         self.sd = sd
-        self.control_df = self.subset_df(self.controls)
+        self.control_df = self.subset_df(self.controls) if other_control != None else other_control
         self.mean_NII, self.mean_a, self.std_NII, self.std_a, self.circle = self.calc_threshold_NMA()
         self.h_x, self.h_y_up,self.h_y_down = self.calc_lines()
         self.graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7,  ec="#bdbbbb", lw=1)
         self.v_upx, self.v_upy, self.v_midx, self.v_midy, self.v_downx, self.v_downy, self.v_downx2 = self.calc_vertical_lines()
         self.graph_limits = self.calc_area_NII_lims()
         self.percentages = self.calc_all_percentages()
-        #self.df_percentages = self.calc_percentages()
-        #self.dot_plots = []
-        #self.heatmap_plots: {}
-        #self.sample_plost: []
 
         
     def subset_df(self, condition_time_tuple):
@@ -89,7 +85,6 @@ class NMA:
        return df
        
         
-       
     def calc_threshold_NMA(self):
        
         """ 
@@ -211,7 +206,6 @@ class NMA:
         
         return  lr*t, li*t, n*t, i*t, sr*t, s*t, si*t
   
-    
   
     def calc_all_percentages(self):
         """ Generates a dataframe containig the percentage relation of all NMA gorups. """
@@ -258,9 +252,63 @@ class NMA:
                     columns = ["Condition", "Frame", 'Total Cells', 'LR', 'LI', 'N', 'I', 'SR', 'S', 'SI'])
         
         return percent_df
-      
+          
         
-      
+    def f_test(self,
+               x: List[float],
+               y: List[float]):
+        """ Given two lists, performs the f statistic teste and returns the p value. """
+        x = np.array(x)
+        y = np.array(y)
+        f = np.var(x, ddof=1)/np.var(y, ddof=1)     # calculate F test statistic 
+        dfn = x.size-1                              # define degrees of freedom numerator 
+        dfd = y.size-1                              # define degrees of freedom denominator 
+        p = 1- stats.f.cdf(f, dfn, dfd)             # find p-value of F test statistic 
+        
+        return p     
+    
+    def get_sample(self,
+                   df: pd.DataFrame,
+                   hue: Optional[str],
+                   size: Optional[str]
+    )-> Tuple[pd.DataFrame, bool]:
+        """ 
+        Finds statistcally significant samples from a population based on Area,
+        NII and other specified column values.
+        """
+        df_sample = df.sample(n = 200)
+        p_NII_var = self.f_test(df['NII'].values, df_sample['NII'].values)
+        p_a_var = self.f_test( df['Area'].values,df_sample['Area'].values)
+        
+        p_NII_mean = stats.ttest_ind(df['NII'].values, df_sample['NII'].values)[1]
+        p_a_mean = stats.ttest_ind( df['Area'].values,df_sample['Area'].values)[1]
+        
+        
+        if hue != None:
+            p_hue_var = self.f_test(df[hue].values, df_sample[hue].values)
+            p_hue_mean = stats.ttest_ind(df[hue].values, df_sample[hue].values)[1]
+        if size != None:
+            p_size_var = self.f_test(df[size].values, df_sample[size].values)
+            p_size_mean = stats.ttest_ind(df[size].values, df_sample[size].values)[1]
+        if hue == None and size==None:
+            p_hue_var = None
+            p_hue_mean = None
+            p_size_var = None
+            p_size_mean = None
+        
+        p_values = [p_NII_var, p_NII_mean, p_a_var, p_a_mean, p_hue_var, p_hue_mean, 
+                    p_size_var, p_size_mean]  
+        
+        for p in p_values:
+            if p != None and p > 0.05:
+                boolean = False
+        else: 
+            boolean = True
+        
+        return df_sample, boolean
+     
+        
+    
     def plot_NMA_heatmap(self, 
                          subset_of_df: pd.DataFrame, 
                          title: str): 
@@ -288,7 +336,7 @@ class NMA:
     
        
     # na interface tem que aparecer as olções de grupos e/ou tempos pro user plotar
-    # aí chama essa função com um de cada vez (um tempo e condição) - acho que iss?
+    # aí chama essa função com um de cada vez (um tempo e condição) 
     
     
     def plot_NMA_dot(self, 
@@ -298,12 +346,25 @@ class NMA:
                      size: Optional[str] = None,
                      hue_norm: Optional[tuple] = None,
                      size_norm: Optional[tuple] = None,
+                     sample: bool = False
                      ):
         """ 
         Plots the NMA graph(scatterplot) with hue and size chosen by user. Same graph
         as the one defined by plot_NMA_200, but without performing sampling.
+        When sample is enabled, it performs t test statistics to get representative
+        means of the population and f test for variances, for each measure to be plotted.
+        It also doe not plot the percentages in each graph group.
         """
-        #CONFERIR ESSAS COISAS DOS PERCENTS 
+       
+    #checar se ta tudo certo com esse iníco dos samples         
+        if sample == True:
+            df_sample, boolean = self.get_sample(subset_of_df , hue, size)
+            while boolean == False:
+                df_sample, boolean = self.get_sample(subset_of_df, hue, size)
+       
+        subset_of_df = df_sample
+        
+       #CONFERIR ESSAS COISAS DOS PERCENTS 
         if all(item is None for item in condition_time_tuple):
             print ('q')
             title = ' '
@@ -341,7 +402,7 @@ class NMA:
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
         ax.set_title(title)
-        if isinstance(percentages, pd.DataFrame):
+        if isinstance(percentages, pd.DataFrame) and sample== True:
             if percentages.shape[0]>1:
                 percentages = percentages.drop(columns = ['Condition', 'Frame', 'Total Cells'])
                 n = percentages.shape[0]
@@ -366,12 +427,10 @@ class NMA:
             
                 
         return fig                 
+    
         
-        
-  # adicionar as porcentagems (escritas no gráfico)
-# pensar se retorno elas na tabea tbm
-     
-       
+
+## COMO CHAMAR
        
 nma_df_ignacio = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/NMA_organizado.csv')
 nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results.csv') 
