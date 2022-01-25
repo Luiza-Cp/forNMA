@@ -48,7 +48,7 @@ def run(path_to_save: str,
     
     #testa se as condições estão corretas (isso sai do codigo depois)
     if len(conditions) != n_sub:
-        conditions = [None] * n_sub
+        conditions = [False] * n_sub
     
     
     # cria uma tempfile onde vão entrar os total_df, para que seja feita e remoção
