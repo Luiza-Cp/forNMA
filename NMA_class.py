@@ -28,6 +28,15 @@ from NMA_draggable_line import draggable_lines
 #ALÉM DE CADA USUÁRIO PODER ADD SUAS LINHAGENS, A GENTE PODE DISPONIBILIZAR TABELAS ATUALIZADAS NO SITE
 
 
+
+
+
+
+# Na funcçao graph init eu já tenho a infp de quem é controle. E é lá que a pesoa passa uma tabela de controle,
+#logo, não preciso essa other_control e o controle eu tenho que fazer o subset de acordo com o is_control 
+# se nenhuma do is control for true, ele avisa que é necessário ter uma condição controle (caixa de erro mesmo)
+
+
 class NMA:
     """ Class for NMA graph plotting"""
                                                                 # other_control: user-input dataframe with control group from another experiment
@@ -60,7 +69,7 @@ class NMA:
         self.df = df
         self.controls = controls
         self.sd = sd
-        self.control_df = self.subset_df(self.controls) if other_control != None else other_control
+        self.control_df = self.subset_df(self.controls) #if other_control != None else other_control
         self.mean_NII, self.mean_a, self.std_NII, self.std_a, self.circle = self.calc_threshold_NMA()
         self.h_x, self.h_y_up,self.h_y_down = self.calc_lines()
         self.graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7,  ec="#bdbbbb", lw=1)
@@ -137,7 +146,7 @@ class NMA:
        Plots the control df with ellipse and horizontal lines for user to adjust
        the NMA threshold. Returns the new values.
        """
-      # %matplotlib qt
+       %matplotlib qt
        upper_line_x = self.mean_NII + self.sd*self.std_NII
        upper_line_ys = [int(self.mean_a + self.sd * self.std_a), int(self.mean_a + (2+self.sd) * self.std_a)] 
        
@@ -362,7 +371,7 @@ class NMA:
             while boolean == False:
                 df_sample, boolean = self.get_sample(subset_of_df, hue, size)
        
-        subset_of_df = df_sample
+            subset_of_df = df_sample
         
        #CONFERIR ESSAS COISAS DOS PERCENTS 
         if all(item is None for item in condition_time_tuple):
@@ -392,8 +401,7 @@ class NMA:
                         hue_norm = hue_norm, size_norm = size_norm, ax=ax, palette = 'rainbow') 
         ax.plot(self.mean_NII+(self.sd*self.std_NII)*np.cos(self.circle) , 
                 self.mean_a+(self.sd*self.std_a)*np.sin(self.circle), color= 'black' )
-        #el = Ellipse((mean_NII, mean_a), 4*std_NII, 4*std_a, angle=0, color="black", fill=False)
-        #ax.add_patch(el)
+        
         ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, 
                  self.v_upx, self.v_upy, self.v_midx, self.v_midy,
                  self.v_downx, self.v_downy,
@@ -401,8 +409,9 @@ class NMA:
         
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
-        ax.set_title(title)
-        if isinstance(percentages, pd.DataFrame) and sample== True:
+        #ax.set_title(title)
+        
+        if isinstance(percentages, pd.DataFrame) or isinstance(percentages, pd.DataFrame) and sample== True:
             if percentages.shape[0]>1:
                 percentages = percentages.drop(columns = ['Condition', 'Frame', 'Total Cells'])
                 n = percentages.shape[0]
@@ -424,7 +433,7 @@ class NMA:
                     str(round(percentages['S'].iloc[0],2)), size=10, bbox=self.graph_box)
             ax.text(self.v_downx2[0]+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a, 
                     str(round(percentages['SI'].iloc[0],2)), size=10, bbox=self.graph_box)
-            
+        ax.set_title(title)   
                 
         return fig                 
     
@@ -439,9 +448,9 @@ nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forN
 
 
 #ig= NMA(nma_df_ignacio, ('Control', None), 1.8)
-fornma= NMA(nma_df_fornma, ('Control', None),1.8)
+fornma= NMA(nma_df_fornma, ('Control', None),1.8,)
 
-t_for = fornma.plot_NMA_dot(('Taxol', None),fornma.subset_df(('Taxol', None)), hue = 'Aspect')
+t_for = fornma.plot_NMA_dot(('Taxol', None),fornma.subset_df(('Taxol', None)), hue = 'Total_foci_Dapi')
 # =============================================================================
 #c_ig = ig.plot_NMA_dot(ig.subset_df(('Control', None)), 'Control', hue = 'Aspect')
 # c_ig_htm = ig.plot_NMA_heatmap(ig.subset_df(('Control', None)), 'Control')
