@@ -418,7 +418,7 @@ class NMA:
                 percentages = (percentages.sum()/n).to_frame()
                 percentages = percentages.transpose()
             print (percentages)
-           
+            
             ax.text(self.v_upx[0]-1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 
                     str(round(percentages['LR'].iloc[0],2)),size=10, bbox=self.graph_box)
             ax.text(self.v_upx[0]+1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 
@@ -433,8 +433,9 @@ class NMA:
                     str(round(percentages['S'].iloc[0],2)), size=10, bbox=self.graph_box)
             ax.text(self.v_downx2[0]+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a, 
                     str(round(percentages['SI'].iloc[0],2)), size=10, bbox=self.graph_box)
+            
         ax.set_title(title)   
-                
+        
         return fig                 
     
         
@@ -450,7 +451,7 @@ nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forN
 #ig= NMA(nma_df_ignacio, ('Control', None), 1.8)
 fornma= NMA(nma_df_fornma, ('Control', None),1.8,)
 
-t_for = fornma.plot_NMA_dot(('Taxol', None),fornma.subset_df(('Taxol', None)), hue = 'Total_foci_Dapi')
+t_for = fornma.plot_NMA_dot(('Etoposide', None),fornma.subset_df(('Etoposide', None)), hue = 'Total_foci_Dapi')
 # =============================================================================
 #c_ig = ig.plot_NMA_dot(ig.subset_df(('Control', None)), 'Control', hue = 'Aspect')
 # c_ig_htm = ig.plot_NMA_heatmap(ig.subset_df(('Control', None)), 'Control')
