@@ -15,7 +15,7 @@ import numpy as np
 from scipy import signal
 from skimage.feature import local_binary_pattern
 from skimage.segmentation import clear_border
-from foci_class import foci
+from foci_class import Foci
 import pandas as pd
 import scipy
 from typing import Optional, List
@@ -104,6 +104,7 @@ class Cell:
         self.foci_cnt_im = contors of all foci wit xy positions adjusted for image
         self.tot_foci_area = sum of foci area
         self.tot_foci_mean = mean of all foci together
+        self.df_all_foci = dataframe of cell foci 
         
         self.df = dataframe with all main information of this cell
         
@@ -179,6 +180,7 @@ class Cell:
         self.foci_cnt_im = None
         self.tot_foci_area = None
         self.tot_foci_mean = None
+        self.df_all_foci = None
         
         
         if wants_ktr == True:
@@ -224,9 +226,10 @@ class Cell:
             self.foci_cnt_im = self.find_cnt_at_image()
             self.tot_foci_area = self.calc_tot_foc_area()
             self.tot_foci_mean = self.calc_foci_mean_int()
+            self.df_all_foci = self.get_foci_dfs()
            
         self.df = self.create_df() 
-     
+       
         
     
     def calc_bbox2(self) -> int:
@@ -381,7 +384,7 @@ class Cell:
         return contours_foci, dots
     
     
-    def calc_nuc_foci(self) -> List[foci]:
+    def calc_nuc_foci(self) -> List[Foci]:
         """ 
         Gets the nucleus image, masks it and use self.foci_cnt to create Foci 
         objcts. Returns a list of Foci or an empty list, if none are found.
@@ -395,7 +398,8 @@ class Cell:
               foci_list = []           
         else:
             for i in range(len(self.foci_cnt)):
-                new_foci = foci(i, self.foci_cnt[i], nuc_masked, self.tophat, self.mask_foci)
+                new_foci = Foci(i, self.foci_cnt[i], nuc_masked, self.tophat, 
+                                self.mask_foci, self.min_int, self.max_int)
                 foci_list.append (new_foci)
         foci_list2 = []  
         for foc in foci_list:
@@ -518,7 +522,18 @@ class Cell:
         return df_cell
                      
                      
-                     
+    def get_foci_dfs(self):
+        if len(self.foci_list) ==0:
+            df = None
+        else:
+            foci_dfs = [f.df for f in self.foci_list] 
+            df = pd.concat(foci_dfs)
+            df.insert(0, "Origin_nucleus", self.n)
+            df.insert(0, "Image_name", self.image_name)
+            df.insert(0, "Channel", self.ch_name)
+
+        return df
+        
                      
                      
             
