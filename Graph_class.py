@@ -33,7 +33,7 @@ class Graphs:
         self.conditions = groups
         self.times = times
         self.fig_width=  self.calc_fig_width()
-        self.subset =self.subset_df(self.df)
+        self.subset =self.subset_df()
         
     def subset_df(self): 
         
@@ -47,7 +47,7 @@ class Graphs:
        else:
            df = self.df[self.df['Frame'].isin(self.times)]
            if len(self.conditions) > 1:
-               df = df[df['Frame'].isin(self.conditions)]
+               df = df[df['Condition'].isin(self.conditions)]
       
          
        return df
@@ -76,24 +76,24 @@ class Graphs:
     
     def violinplot(self, 
                    y: str, 
-                   hue: Optional[str]):
+                   hue: Optional[str] = None):
          """  Plots a violin plot with all groups in a frame or all frames in a group"""
          
         
          x= "Condition" if self.s_o =='s' else 'Frame'
-         fig= plt.figure(figsize=(self.width, 6) ) 
+         fig= plt.figure(figsize=(self.fig_width, 6)) 
          sns.set_theme()
-         ax = sns.violinplot(x=x, y=y, data=self.subset, inner=None, palette = "raindow")
+         ax = sns.violinplot(x=x, hue=hue, y=y, data=self.subset, inner=None, palette = "rainbow")
         
          return fig
      
         
     def boxplot(self, 
                 y: str, 
-                hue: Optional[str]): 
-        
+                hue: Optional[str] = None): 
+         
          x= "Condition" if self.s_o =='s' else 'Frame'
-         fig= plt.figure(figsize=(self.width, 6) ) 
+         fig= plt.figure(figsize=(self.fig_width, 6) ) 
          sns.set_theme()
          ax = sns.boxplot(x=x, y=y, hue=hue, data=self.subset, palette= "rainbow")
          
@@ -102,10 +102,10 @@ class Graphs:
 
     def stripplot(self, 
                   y: str, 
-                  hue: Optional[str] ): 
+                  hue: Optional[str]= None): 
         
          x= "Condition" if self.s_o =='s' else 'Frame'
-         fig= plt.figure(figsize=(self.width, 6) ) 
+         fig= plt.figure(figsize=(self.fig_width, 6) ) 
          sns.set_theme()
          ax = sns.stripplot(x=x, y=y, hue=hue, data=self.subset, palette="rainbow")
          
@@ -113,10 +113,10 @@ class Graphs:
 
     def barplot(self, 
                  y: str, 
-                 hue: Optional[str] ): 
+                 hue: Optional[str] = None ): 
         
          x= "Condition" if self.s_o =='s' else 'Frame'
-         fig= plt.figure(figsize=(self.width, 6) ) 
+         fig= plt.figure(figsize=(self.fig_width, 6) ) 
          sns.set_theme()
          ax = sns.barplot(x=x, y=y, hue=hue, data=self.subset, palette="rainbow")
          
@@ -125,10 +125,10 @@ class Graphs:
 
     def box_dot(self, 
                 y: str, 
-                hue: Optional[str]):
+                hue: Optional[str] = None):
          
         x= "Condition" if self.s_o =='s' else 'Frame'
-        fig= plt.figure(figsize=(self.width, 6) ) 
+        fig= plt.figure(figsize=(self.fig_width, 6) ) 
         sns.set_theme()
         ax = sns.boxplot(x=x, y=y, hue=hue, data=self.subset, palette= "rainbow")   
         ax = sns.swarmplot(x=x, y=y, data=self.subset, color="gray", edgecolor="gray", size = 3)
@@ -138,22 +138,22 @@ class Graphs:
 
     def violin_dot(self, 
                    y: str, 
-                   hue: Optional[str]):                   
+                   hue: Optional[str] = None):                   
          
         x= "Condition" if self.s_o =='s' else 'Frame'
-        fig= plt.figure(figsize=(self.width, 6) ) 
+        fig= plt.figure(figsize=(self.fig_width, 6) ) 
         sns.set_theme()
-        ax = sns.violinplot(x=x, y=y, data=self.subset, inner=None, palette = "raindow")
+        ax = sns.violinplot(x=x, y=y, data=self.subset, inner=None, palette = "rainbow")
         ax = sns.swarmplot(x=x, y=y, data=self.subset, color="gray", edgecolor="gray", size = 3)
         
         return fig 
 
 
-    def get_scatterplots(self,
-                         x: str,        #add hue_norm and size_norm? e xy limits?
-                         y: str,
-                         hue: Optional[str] = None,
-                         size: Optional[str] = None):
+    def scatterplot(self,
+                   x: str,        #add hue_norm and size_norm? e xy limits?
+                   y: str,
+                   hue: Optional[str] = None,
+                   size: Optional[str] = None):
         
 
         """ 
@@ -168,32 +168,32 @@ class Graphs:
                 df_time = cond_group.groupby('Frame')
                 for frame_name, frame_group in df_time:
                     txt = 'Scatterplot ' + str(cond_name) + ' frame ' + str(frame_name)
-                    fig = self.scatterplot(txt, df_time, x, y, hue, size)
+                    fig = self.plot_scatterplot(txt, df_time, x, y, hue, size)
                     fig_list.append(fig)
         
         elif len(self.conditions) >1:
             df_cond = self.subset.groupby('Condition')
             for cond_name, cond_group in df_cond:
                 txt = 'Scatterplot ' + str(cond_name)
-                fig = self.scatterplot(txt, df_cond, x, y, hue, size)
+                fig = self.plot_scatterplot(txt, df_cond, x, y, hue, size)
                 fig_list.append(fig)
                 
         elif len(self.times)>1:
             df_time = self.subset.groupby('Frame')
             for frame_name, frame_group in df_time:
                 txt = 'Scatterplot Frame ' + str(frame_name)
-                fig = self.scatterplot(txt, df_time, x, y, hue, size)
+                fig = self.plot_scatterplot(txt, df_time, x, y, hue, size)
                 fig_list.append(fig)
        
         else:
-            fig = self.scatterplot("Scatterplot", x, y, hue, size)
+            fig = self.plot_scatterplot("Scatterplot", x, y, hue, size)
             fig_list.append(fig)
         
         return fig_list
         
     # esse gráfico deve ser chaamdo n vezes de acordo com condições ou grupo ou ambos.
     # posso fazer uma função que já faz isso pra esse que tem que chamar vários, e armazenar eles em self.something
-    def scatterplot(self,
+    def plot_scatterplot(self,
                     name: str,
                     group: pd.DataFrame,
                     x: str,      
@@ -202,12 +202,13 @@ class Graphs:
                     size: Optional[str]):
     
         """ Plots scatterlots and returns a figure containing the plot """
-        fig= plt.figure(figsize=(self.width, 6)) 
+        fig= plt.figure(figsize=(self.fig_width, 6)) 
         sns.set_theme()
-       
+        group= group.apply(lambda x: x) 
+               
         ax = sns.scatterplot(data=group, x=x, y=y, size = size, hue = hue) 
         sns.regplot(data=group, x=x, y=y,scatter = False, color ='gray')
-        
+        ax.set_title(name)
         plt.xticks(rotation=70)
         
         return fig
@@ -225,7 +226,7 @@ class Graphs:
          
          x= 'Frame'
          units = "segment_ID" if individual ==True else None
-         fig= plt.figure(figsize=(self.width, 6) ) 
+         fig= plt.figure(figsize=(self.fig_width, 6) ) 
          sns.set_theme()
          ax = sns.lineplot(data=self.subset, x=x, y=y, hue= hue, style =style, 
                            size=size, ci=ci, legend="full", units=units, 
@@ -239,7 +240,7 @@ class Graphs:
                         y: str,
                         n: str):          # number to group for moving average
       
-         fig= plt.figure(figsize=(self.width, 6) ) 
+         fig= plt.figure(figsize=(self.fig_width, 6) ) 
          conditions = list(set(list(self.subset["Condition"])))
          sns.set_theme()
      
@@ -289,7 +290,7 @@ class Graphs:
         
             dict_of_pd_lists[c] = pd_list 
         
-        fig= plt.figure(figsize=(self.width, 6) ) 
+        fig= plt.figure(figsize=(self.fig_width, 6) ) 
         sns.set_theme()
         abc_list = []
         x= frames
@@ -297,7 +298,13 @@ class Graphs:
         x = [int(x[i]) for i in frames]
         for key, value in dict_of_pd_lists.items():
             ax = sns.lineplot(y =value, x = x, marker='s', sort= False)
-        ax.set_legend(dict_of_pd_lists.keys())
+        plt.legend(dict_of_pd_lists.keys())
         ax.set_title("Cumulative Population Doubling")  
         
         return fig
+    
+
+# como chamar!!!    
+# devo testar também com tabelas maiores    
+df = pd.read_csv('/home/luiza/Área de Trabalho/teste.csv')
+g= Graphs(df, 'o', ['A', 'B'], [0, 1, 2, 3])
