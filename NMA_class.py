@@ -329,7 +329,7 @@ class NMA:
         #%matplotlib inline
         plt.rcParams['axes.facecolor'] = '#7e03ff'#'#03051A'
         fig, ax = plt.subplots()
-        sns.kdeplot(data = subset_of_df, x="NII", y="Area", cmap= 'rainbow',  
+        sns.kdeplot(data = subset_of_df, x="Total_foci_Dapi", y="Area", cmap= 'rainbow',  
                         fill=True, thresh= None, levels = 60, ax= ax)
         ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, 
                  self.v_upx, self.v_upy, self.v_midx, self.v_midy,
@@ -451,7 +451,8 @@ nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forN
 #ig= NMA(nma_df_ignacio, ('Control', None), 1.8)
 fornma= NMA(nma_df_fornma, ('Control', None),1.8,)
 
-t_for = fornma.plot_NMA_dot(('Etoposide', None),fornma.subset_df(('Etoposide', None)), hue = 'Total_foci_Dapi')
+t_for = fornma.plot_NMA_dot(('Control', None),fornma.subset_df(('Control', None)), hue = 'Total_foci_Dapi')
+t_ig_htm =  fornma.plot_NMA_heatmap(fornma.subset_df(('Etoposide', None)), 'Etoposide')
 # =============================================================================
 #c_ig = ig.plot_NMA_dot(ig.subset_df(('Control', None)), 'Control', hue = 'Aspect')
 # c_ig_htm = ig.plot_NMA_heatmap(ig.subset_df(('Control', None)), 'Control')
