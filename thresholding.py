@@ -107,7 +107,7 @@ def local_gaussian(image: np.ndarray, offset: int) -> np.ndarray:
     return binary
 
    
-threshold_dict = {'isodata': isodata,'li': li,  'mean': mean, 'minimun': minimum,
+threshold_dict = {'isodata': isodata,'li': li,  'mean': mean, 'minimum': minimum,
                   'otsu': otsu, 'triangle': triangle, 'yen': yen, 'median': median,
                   'multiotsu': multiotsu, 'local_mean': local_mean, 
                   'local_gaussian': local_gaussian}
