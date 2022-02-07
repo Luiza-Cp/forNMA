@@ -28,7 +28,9 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
     plt.show(block=True)
    
     plt.close('all')
+    
     from Draggable_line import line_coord_list
+    
     plt.close('all')
     
     coord_tuples = []
