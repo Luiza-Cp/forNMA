@@ -516,6 +516,7 @@ class Cell:
                      "Cyto_ring_cnt_" + self.ch_name: [self.cyto_ring_cnt],
                      "Foci_cnt_" + self.ch_name: [self.foci_cnt_im],
                      "Y_draw_" + self.ch_name: [self.bbox_y1],
+                     "foci_df_"+ self.ch_name: [self.df_all_foci]
                      }
         df_cell = pd.DataFrame(cell_info) 
         
