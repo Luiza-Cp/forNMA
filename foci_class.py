@@ -96,7 +96,7 @@ class Foci:
                      "Focus_mean_intensity": [self.mean_int],
                      "Focus_Area": [self.area],
                      "Focus_perimeter": [self.perimeter],
-                     "Focus_centroid_x:":  [self.centroid_x],
+                     "Focus_centroid_x":  [self.centroid_x],
                      "Focus_centroid_y" : [self.centroid_y]}
         df_foci = pd.DataFrame(foci_info) 
         
