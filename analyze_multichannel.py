@@ -200,16 +200,75 @@ def split_dfs(
     df_draw = complete_df[col_draw]
     
     return df_results, df_draw
+
+
+def organize_df_foci(frames: List[int],
+                      overtime: List[bool],
+                      condition: List[str],
+                      image_names: List[str],
+                      foci_dfs: List[Optional[pd.DataFrame]]
+)-> List[pd.DataFrame]:
+    
+    assert len(frames) == len(overtime) == len(condition) == len(image_names) == len(foci_dfs)
+    foci_df_list = []
+    for i in range(len(foci_dfs)):
+        if isinstance(foci_dfs[i], pd.DataFrame): 
+            foci_dfs[i]['Frame'] = frames[i]
+            foci_dfs[i]['Is_overtime'] = overtime[i]
+            foci_dfs[i]['Condition'] = condition[i]
+            foci_dfs[i]['Image_name'] = image_names[i]
+            foci_df_list.append(foci_dfs[i])
+    
+    return foci_df_list
+
+
+
+def get_foci_df(df_results: pd.DataFrame,
+                ): # o pkl vem denttro do draw images la que eu salvo isso 
+   
+     df_results_cols = list(df_results.columns)
+     cols_channel = [f for f in df_results_cols if "Total_foci" in f]
+     print(cols_channel)
+     channels_with_foci = [f.replace('Total_foci_', '') for f in cols_channel]
+     channels_with_foci = [f for f in channels_with_foci if "area" not in f]
+     channels_with_foci = [f for f in channels_with_foci if "mean" not in f]
+     print(channels_with_foci)
+     
+    
+     frames = list(df_results['Frame'])
+     overtime = list(df_results['Overtime'])
+     condition = list(df_results['Condition'])
+     
+     dfs_foci_to_append = []
+     for ch in channels_with_foci:
+         image_names = list(df_results['Image_name_' + ch])
+         foci_dfs = list(df_results['foci_df_' + ch])
+         df_foci_list = organize_df_foci(frames, overtime, condition,
+                                         image_names, foci_dfs)
+         dfs_foci_to_append.extend(df_foci_list)
+         #df_results.drop(columns= (["foci_df_"+ ch]), inplace=True)
+    
+     df_foci = pd.concat(dfs_foci_to_append)
+     df_foci = df_foci[['Channel', 'Image_name', 'Frame', 'Focus_number',
+                        'Focus_mean_intensity',	'Focus_Area', 'Focus_perimeter', 
+                        'Focus_centroid_x', 'Focus_centroid_y', 'Condition', 
+                        'Is_overtime']] 
+     
+     return df_foci, df_results
     
    
 def save_dfs(df_results: pd.DataFrame,
              path_save: str):
     tables = list(set(df_results['origin_folder']))
     for t in tables:
+        df_foci, df_results = get_foci_df(df_results)
         df_save =  df_results[df_results["origin_folder"]== t]
         df_save = df_save.reindex(columns=(['Frame'] + list([a for a in df_save.columns if a != 'Frame']) ))
         df_save.drop(columns= (["origin_folder"]), inplace=True)
-        df_save.to_csv(os.path.join(path_save, t[:-4]) + 'Results.csv')
+        cols = [f for f in df_save.columns if 'foci_df' not in f]
+        df_save = df_save[cols]        
+        df_save.to_csv(os.path.join(path_save, t[:-4]) + ' Results.csv')
+        df_foci.to_csv(os.path.join(path_save, t[:-4]) + ' Foci Results.csv')
         print (os.path.join(path_save, t[:-4]))
     return print("files saved")
  
@@ -270,8 +329,8 @@ def saving_images(df_draw: pd.DataFrame,
    #    itera por cada pasta nesse df
    for d in dirs:
        df_dir = df_draw[df_draw["origin_folder"]==d]
-       saving_dir = os.path.join(path_to_save, d[:-4])
-       os.mkdir(saving_dir)
+       saving_dir = os.path.join(path_to_save, d[:-4] + '-') if os.path.isdir(os.path.join(path_to_save, d[:-4])) else os.path.join(path_to_save, d[:-4])
+       os.mkdir(saving_dir) 
        #    vai iterar sobre cada canal dessa pasta
        for ch in ch_name_list:
            saving_dir_ch = os.path.join(saving_dir, ch)
