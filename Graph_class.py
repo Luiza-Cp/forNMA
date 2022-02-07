@@ -168,14 +168,14 @@ class Graphs:
                 df_time = cond_group.groupby('Frame')
                 for frame_name, frame_group in df_time:
                     txt = 'Scatterplot ' + str(cond_name) + ' frame ' + str(frame_name)
-                    fig = self.plot_scatterplot(txt, df_time, x, y, hue, size)
+                    fig = self.plot_scatterplot(txt, frame_name, x, y, hue, size)
                     fig_list.append(fig)
         
         elif len(self.conditions) >1:
             df_cond = self.subset.groupby('Condition')
             for cond_name, cond_group in df_cond:
                 txt = 'Scatterplot ' + str(cond_name)
-                fig = self.plot_scatterplot(txt, df_cond, x, y, hue, size)
+                fig = self.plot_scatterplot(txt, cond_group, x, y, hue, size)
                 fig_list.append(fig)
                 
         elif len(self.times)>1:
@@ -206,7 +206,7 @@ class Graphs:
         sns.set_theme()
         group= group.apply(lambda x: x) 
                
-        ax = sns.scatterplot(data=group, x=x, y=y, size = size, hue = hue) 
+        ax = sns.scatterplot(data=group, x=x, y=y, size = size, hue = hue, palette= 'rainbow') 
         sns.regplot(data=group, x=x, y=y,scatter = False, color ='gray')
         ax.set_title(name)
         plt.xticks(rotation=70)
@@ -308,3 +308,6 @@ class Graphs:
 # devo testar também com tabelas maiores    
 df = pd.read_csv('/home/luiza/Área de Trabalho/teste.csv')
 g= Graphs(df, 'o', ['A', 'B'], [0, 1, 2, 3])
+
+df2 = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results.csv')
+g= Graphs(df2, 's', ['Control', 'Gemcitabine', 'Etoposide', 'Taxol+carbo', 'Taxol'], [])
