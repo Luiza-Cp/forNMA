@@ -79,9 +79,10 @@ def erase_df (df, h_down, h_up, v_left, v_right):
             df2 = df[(df["origin_folder"]== o) & (df["Frame"]== f)]
             df2["Cell"] = list(range(1, df2.shape[0]+1))
             df_adjusted_list.append(df2)
-    
-    df = pd.concat(df_adjusted_list)   
-            
+    if len(df_adjusted_list)>1:
+        df = pd.concat(df_adjusted_list)   
+    else:
+        df = None
     return df
 
     

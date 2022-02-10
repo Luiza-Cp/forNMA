@@ -183,7 +183,7 @@ def split_dfs(
     Gets a complete DataFrame and separates it in the user output and the 
     dataframe with information to draw images.
     """
-    col_list_cnt =['Cell', 'X', 'origin_folder']
+    col_list_cnt =['Frame', 'Cell', 'X', 'origin_folder']
     col_to_remove = []
     for key in ch_name_list:
         cols = ['Image_'+ key,'Image_name_'+ key, "Nuc_cnt_" + key, "Cyto_ring_cnt_" + key,
@@ -209,6 +209,11 @@ def organize_df_foci(frames: List[int],
                       foci_dfs: List[Optional[pd.DataFrame]]
 )-> List[pd.DataFrame]:
     
+    """ 
+    Gets a dataframe list and other information lists and create new 
+    dataframe columns. Stores all dataframes in a list trat is returned.
+    """
+    
     assert len(frames) == len(overtime) == len(condition) == len(image_names) == len(foci_dfs)
     foci_df_list = []
     for i in range(len(foci_dfs)):
@@ -223,8 +228,8 @@ def organize_df_foci(frames: List[int],
 
 
 
-def get_foci_df(df_results: pd.DataFrame,
-                ): # o pkl vem denttro do draw images la que eu salvo isso 
+def get_foci_df(df_results: pd.DataFrame): 
+     """ Generates foci df from dataframes stored inside df_results. """
    
      df_results_cols = list(df_results.columns)
      cols_channel = [f for f in df_results_cols if "Total_foci" in f]
@@ -249,16 +254,18 @@ def get_foci_df(df_results: pd.DataFrame,
          #df_results.drop(columns= (["foci_df_"+ ch]), inplace=True)
     
      df_foci = pd.concat(dfs_foci_to_append)
-     df_foci = df_foci[['Channel', 'Image_name', 'Frame', 'Focus_number',
-                        'Focus_mean_intensity',	'Focus_Area', 'Focus_perimeter', 
-                        'Focus_centroid_x', 'Focus_centroid_y', 'Condition', 
-                        'Is_overtime']] 
+     df_foci = df_foci[['Channel', 'Image_name', 'Frame', "Origin_nucleus", 
+                        'Focus_number', 'Focus_mean_intensity',	'Focus_Area', 
+                        'Focus_perimeter', 'Focus_centroid_x', 'Focus_centroid_y', 
+                        'Condition', 'Is_overtime']] 
      
      return df_foci, df_results
     
    
 def save_dfs(df_results: pd.DataFrame,
              path_save: str):
+    
+    """ Saves dataframes"""
     tables = list(set(df_results['origin_folder']))
     for t in tables:
         df_foci, df_results = get_foci_df(df_results)
@@ -275,8 +282,8 @@ def save_dfs(df_results: pd.DataFrame,
 
 
 def draw_and_save(df: pd.DataFrame,
-                ch: str,
-                saving_dir: str
+                 ch: str,
+                 saving_dir: str
 ):
     """ 
     Loop though a dataframe based on its channels and draws contours at the
@@ -326,6 +333,7 @@ def saving_images(df_draw: pd.DataFrame,
    images.
    """
    dirs = list(set(df_draw.origin_folder.values))
+   df_draw.to_pickle(os.path.join(path_to_save, 'Results.pkl'))
    #    itera por cada pasta nesse df
    for d in dirs:
        df_dir = df_draw[df_draw["origin_folder"]==d]

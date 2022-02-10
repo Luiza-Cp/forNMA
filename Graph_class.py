@@ -15,6 +15,8 @@ import similaritymeasures
 import os
 import itertools
 
+
+# essa classe pode ser usada para plotar foci individual
 class Graphs:
     """ Class containing graph plotting funcrions. """
     
@@ -311,3 +313,6 @@ g= Graphs(df, 'o', ['A', 'B'], [0, 1, 2, 3])
 
 df2 = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results.csv')
 g= Graphs(df2, 's', ['Control', 'Gemcitabine', 'Etoposide', 'Taxol+carbo', 'Taxol'], [])
+
+df = pd.read_csv('/media/luiza/DATA/àrea de trabalho/kk/b Foci Results.csv')
+g= Graphs(df, 's', [False], [])

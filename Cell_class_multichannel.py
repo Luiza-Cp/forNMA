@@ -483,6 +483,19 @@ class Cell:
     
         return mean
     
+                      
+    def get_foci_dfs(self):
+        if len(self.foci_list) ==0:
+            df = None
+        else:
+            foci_dfs = [f.df for f in self.foci_list] 
+            df = pd.concat(foci_dfs)
+            df.insert(0, "Origin_nucleus", self.n)
+            df.insert(0, "Image_name", self.image_name)
+            df.insert(0, "Channel", self.ch_name)
+
+        return df
+        
     
     def create_df(self):
         if self.wants_foci == False:
@@ -522,19 +535,7 @@ class Cell:
         
         return df_cell
                      
-                     
-    def get_foci_dfs(self):
-        if len(self.foci_list) ==0:
-            df = None
-        else:
-            foci_dfs = [f.df for f in self.foci_list] 
-            df = pd.concat(foci_dfs)
-            df.insert(0, "Origin_nucleus", self.n)
-            df.insert(0, "Image_name", self.image_name)
-            df.insert(0, "Channel", self.ch_name)
-
-        return df
-        
+   
                      
                      
             
