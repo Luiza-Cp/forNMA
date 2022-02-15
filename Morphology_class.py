@@ -16,12 +16,13 @@ class Morphology:
     """
     Stores and measures morphological properties of a object contour.
     """
-    def __init__(self, n, cnt):
+    def __init__(self, n, cnt, cellpose):
         """
         Atributes
         
         self.n = number of the cell at a given image
         self.cnt = contour of the object(the nucleus) at image
+        self.cellpose = boolean. True if contours were obtained with cellpose
         self.bbox_x1 = bounding rectangle x coordinate
         self.bbox_y1 = bounding rectangle y coordinate
         self.bbox_w1 = bounding rectangle width
@@ -43,6 +44,7 @@ class Morphology:
         
         self.n = n
         self.cnt = cnt
+        self.cellpose = cellpose
         self.bbox_x1, self.bbox_y1, self.bbox_w1, self.bbox_h1 = cv.boundingRect(self.cnt)
         self.area = cv.contourArea(cnt) 
         self.fellipse = cv.fitEllipse(cnt)   #fitting ellipse
@@ -89,11 +91,19 @@ class Morphology:
         radius = []
         cx =self.centroid_x
         cy = self.centroid_y
-        for i in range(len(self.cnt)):
-            a = cx- self.cnt[i,0,0]
-            b = cy - self.cnt[i,0,1]
-            hipot = math.sqrt(a**2 + b **2)
-            radius.append(hipot)
+        if self.cellpose == False:
+            for i in range(len(self.cnt)):
+                a = cx- self.cnt[i,0,0]
+                b = cy - self.cnt[i,0,1]
+                hipot = math.sqrt(a**2 + b **2)
+                radius.append(hipot)
+        else:
+            for i in range(len(self.cnt)):
+                a = cx- self.cnt[i][0]
+                b = cy - self.cnt[i][1]
+                hipot = math.sqrt(a**2 + b **2)
+                radius.append(hipot)
+                
         if min(radius)==0:
             rr = 1
         else:

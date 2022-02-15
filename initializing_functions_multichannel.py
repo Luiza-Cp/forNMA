@@ -401,7 +401,7 @@ def size_filter(
         i = round( len(area_list2)/2)
         area_list2.sort()
         median = area_list[i]
-        max_size = 10*median
+        max_size = 30*median
     filtered_contours = [b for a, b in zip(area_list, contours) if  min_size < a < max_size]  
    
     

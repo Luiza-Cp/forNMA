@@ -25,41 +25,18 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
     horizontal_down = draggable_lines(ax, "h", h_down)
     vertical_left = draggable_lines(ax, "v", v_left)
     vertical_right = draggable_lines(ax, "v", v_right)
+    
     plt.show(block=True)
    
-    plt.close('all')
-    
-    from Draggable_line import line_coord_list
     
     plt.close('all')
+   
     
-    coord_tuples = []
-    for i in range (len(line_coord_list[:-1])):
-        if isinstance(line_coord_list[i], str) and isinstance(line_coord_list[i+1], float):
-            coord_tuples.append((line_coord_list[i], line_coord_list[i+1]))
+    h_up =horizontal_up.XorY
+    h_down =horizontal_down.XorY
+    v_left = vertical_left.XorY
+    v_right = vertical_right.XorY
     
-    coord_tuples = list(reversed(coord_tuples))
-    
-        
-    for item in coord_tuples:
-        if item[0] == "_line0":
-            h_up  = item[1]
-            break 
-        
-    for item in coord_tuples:
-        if item[0] == "_line1":
-            h_down = item[1]
-            break 
-    
-    for item in coord_tuples:
-        if item[0] == "_line2":
-            v_left = item[1]
-            break 
-        
-    for item in coord_tuples:
-        if item[0] == "_line3":
-            v_right = item[1]
-            break 
     
     return h_down, h_up, v_left, v_right
     

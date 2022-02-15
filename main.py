@@ -97,16 +97,18 @@ def run(path_to_save: str,
     #o colplete df vai pra interface para remover outliers, 
     # substituindo as funções que colocarei abaixo
     from clean_dataframe import plot_and_clean, erase_df
+    
     h_down, h_up, v_left, v_right = plot_and_clean(complete_df)
-    print('ok')
+    
+    print('ok', h_down, h_up, v_left, v_right)
     complete_df = erase_df(complete_df, h_down, h_up, v_left, v_right)       
-    print('ok2')
+    
         
     #agora isso precisa passar pelo split e pelo draw and save
     df_results, df_draw = split_dfs(complete_df, ch_name_list) # aqui dentro eu crio o df foci
     save_dfs(df_results, path_to_save)
     if wants_to_save == True:
-        saving_images(df_draw, path_to_save, ch_name_list) # aqui dentro eu crio os pkl dos foci
+        saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) # aqui dentro eu crio os pkl dos foci
     
     # elimina os temp dirs
     

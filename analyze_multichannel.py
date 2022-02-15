@@ -14,7 +14,7 @@ import numpy as np
 from typing import List, Optional, Tuple
 import os
 import cv2 as cv
-
+from cellpose_integration import run_cellpose
 
 
 #channel dict: key = channel (1, 2 3, 4 ..)
@@ -96,6 +96,35 @@ def drop_cols(
 
     return complete_df
 
+def perform_measure(contours: np.ndarray,
+                    img_n: int,
+                    ch_dict: dict,
+                    ref_dict: dict,
+                    seg_param: dict
+                    ):
+    """ 
+        Applies functions needed for cell morphometry and intesity measures
+    Returns a dataframe with all image information.
+    """
+    df_morpho_list  = []
+    for n in range(len(contours)):
+        #checar len(n) tem que ter ao menos 5 ptos no contorno para fitar uma elipse
+        if len(contours[n]>5):
+            morpho = Morphology(n+1, contours[n], seg_param['use_cellpose'])
+            df_morpho_list.append(morpho.df)
+    image_df = pd.concat(df_morpho_list)
+      
+    
+    for key, value in ch_dict.items():
+        df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
+                        ref_dict[key], contours, seg_param['magnification'], 
+                        seg_param['pixel_size'], key)
+        
+        df_ch = pd.concat(df_ch_list)
+        image_df = pd.merge(image_df, df_ch, on = 'Cell')
+        image_df["Frame"] = img_n
+    
+    return image_df
 
 
 
@@ -125,8 +154,26 @@ def analyze_dict(
     all_df_list =  []    
     for img_n in range(len((list(ch_dict.values())[0][0]))):      
         img_to_segment = ch_dict[ch_segment][0][img_n]
-      #retornar nessa função o int_in, int_out, detection_round
-        contours = find_contours(img_to_segment, 
+        
+        cellpose =  seg_param['use_cellpose']
+        
+        if cellpose == True:
+            #aqui chamo a função que vai pegar essa img já aberta e rodar... 
+            #não sei se fazer ssim não deixa mais lento
+            image_cp =load_image(img_to_segment)
+            contours = run_cellpose(image_cp, seg_param['use_gpu'], 
+                            seg_param['diameter'], seg_param['magnification'],
+                            seg_param['pixel_size'], seg_param['shape'], 
+                            seg_param['eccentricity'],seg_param['min_size'], 
+                            seg_param['max_size'],seg_param['min_radius'], 
+                            seg_param['max_radius'], seg_param['invert'], 
+                            seg_param['normalize'], seg_param['net_avg'],
+                            seg_param['resample'], seg_param['flow_threshold'],
+                            seg_param['mask_threshold'])
+           
+            print(len(contours))
+        else: 
+            contours = find_contours(img_to_segment, 
                magnification = seg_param['magnification'],
                pixel_size = seg_param['pixel_size'], rescale_intensity = seg_param['rescale_intensity'],
                remove_bg = seg_param['remove_bg'],radius_bg = seg_param['radius_bg'],
@@ -143,23 +190,7 @@ def analyze_dict(
         if len(contours) == 0:
             #ele ta dando continue, nem todas imagens vão estar no final pra serem salvas
             continue
-        df_morpho_list  = []
-        for n in range(len(contours)):
-            #checar len(n) tem que ter ao menos 5 ptos no contorno para fitar uma elipse
-            if len(contours[n]>5):
-                morpho = Morphology(n+1, contours[n])
-                df_morpho_list.append(morpho.df)
-        image_df = pd.concat(df_morpho_list)
-          
-        
-        for key, value in ch_dict.items():
-            df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
-                            ref_dict[key], contours, seg_param['magnification'], 
-                            seg_param['pixel_size'], key)
-            
-            df_ch = pd.concat(df_ch_list)
-            image_df = pd.merge(image_df, df_ch, on = 'Cell')
-            image_df["Frame"] = img_n
+        image_df = perform_measure(contours, img_n, ch_dict, ref_dict, seg_param)
            
             
         all_df_list.append(image_df)
@@ -283,7 +314,8 @@ def save_dfs(df_results: pd.DataFrame,
 
 def draw_and_save(df: pd.DataFrame,
                  ch: str,
-                 saving_dir: str
+                 saving_dir: str,
+                 use_cellpose: bool
 ):
     """ 
     Loop though a dataframe based on its channels and draws contours at the
@@ -315,7 +347,7 @@ def draw_and_save(df: pd.DataFrame,
                  
             else:                           
                  cnt = list(group[col])
-                 cnt = [f[0] for f in cnt if len(f)> 0]
+                 cnt = [f[0] for f in cnt if len(f)> 0] if use_cellpose == False else cnt
                  img = cv.drawContours(img, cnt, -1, (122, 144,248), 1)
                                     
     
@@ -325,7 +357,8 @@ def draw_and_save(df: pd.DataFrame,
 
 def saving_images(df_draw: pd.DataFrame,
                 path_to_save: str,
-                ch_name_list: List[str]
+                ch_name_list: List[str],
+                use_cellpose: bool
 ):  
    """ 
    Splits dataframaccording to their folders, creates directories
@@ -334,6 +367,7 @@ def saving_images(df_draw: pd.DataFrame,
    """
    dirs = list(set(df_draw.origin_folder.values))
    df_draw.to_pickle(os.path.join(path_to_save, 'Results.pkl'))
+   
    #    itera por cada pasta nesse df
    for d in dirs:
        df_dir = df_draw[df_draw["origin_folder"]==d]
@@ -343,7 +377,7 @@ def saving_images(df_draw: pd.DataFrame,
        for ch in ch_name_list:
            saving_dir_ch = os.path.join(saving_dir, ch)
            os.mkdir(saving_dir_ch)           
-           draw_and_save(df_dir, ch, saving_dir_ch)
+           draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
          
     
            
