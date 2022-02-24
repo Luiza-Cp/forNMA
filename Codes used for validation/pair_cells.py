@@ -12,7 +12,7 @@ from scipy.optimize import linear_sum_assignment
 
 pcp20 = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Measurements_Nuclei.csv'
 pij20 = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/NMA_organizado.csv'
-pfornma20 = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results.csv'
+pfornma20 = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results_blur3.csv'
 
 
 cp = pd.read_csv(pcp20,  encoding='latin-1')
@@ -27,16 +27,18 @@ cp = cp[['Image', 'ObjectNumber',  'AreaShape_Center_X',
          'AreaShape_Center_Y' , 'AreaShape_Area', 'Aspect',
          'AreaShape_Extent', 'Condition']]
 
-ij = ij[['Image', 'Cell', 'X', 'Y', 'Area', 'Aspect', 'Ar_box', 'Condition']]
+ij = ij[['Image', 'Cell', 'X', 'Y', 'Area', 'Aspect', 'Ar_box', 'Condition',
+         'Radius_ratio', 'Roundness', 'NII']]
 fornma = fornma[["Image_name_Dapi", 'Cell', "X", "Y", 'Area', 'Aspect', 'Extent', 
-                'Condition' ]]
+                'Condition' ,  'Radius_ratio', 'Roundness', 'NII']]
 
 
 fornma.dropna(inplace=True)
 #normalizar intensidade média 
 # divido a int máxima da imagem pela intensidade média do núcleo 
 
-col_names =['Image', 'Cell', 'X', 'Y', 'Area', 'Aspect', 'Extent','Condition'] 
+col_names =['Image', 'Cell', 'X', 'Y', 'Area', 'Aspect', 'Extent','Condition', 
+            'Radius_ratio', 'Roundness', 'NII'] 
 cp.columns =col_names
 ij.columns= col_names
 fornma.columns = col_names
@@ -205,10 +207,10 @@ ij_fornma, fornma_ij = pair_df(ij,fornma, 'IPP', 'FORNMA')
 cp_fornma, fornma_cp = pair_df(cp, fornma, 'CP', 'FORNMA') 
 
 
-ij_cp.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/ImageJ (organized against Cellprofiler).csv')
-#ij_fornma.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/IPP (organized against forNMA).csv')
-cp_ij.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/Cellprofiler (organized against ImageJ).csv')
-cp_fornma.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/Cellprofiler (organized against forNMA).csv')
-fornma_cp.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/forNMA (organized against Cellprofiler).csv')
-#fornma_ij.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/forNMA (organized against IPP).csv')
+ij_cp.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/ImageJ (organized against Cellprofiler).csv')
+ij_fornma.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/IPP (organized against forNMA).csv')
+cp_ij.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/Cellprofiler (organized against ImageJ).csv')
+cp_fornma.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/Cellprofiler (organized against forNMA).csv')
+fornma_cp.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/forNMA (organized against Cellprofiler).csv')
+fornma_ij.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/forNMA (organized against IPP).csv')
 ###############

@@ -6,7 +6,7 @@ Created on Fri Nov 12 15:43:42 2021
 @author: luiza
 """
 
-from LapTracker.LapTracker import *
+from LapTracker.LapTracker import LapTracker
 import numpy as np
 import pandas as pd
 import os
@@ -48,7 +48,7 @@ def find_parent(tracking_df: pd.DataFrame,
     return segment_parent_dict
 
 
-
+# ISSO TA TUDO ERRADO TIPO 100%
 def adjust_tracking(single_track: pd.DataFrame) -> pd.DataFrame:
     """ Finds mother-daugther relationships from single trcaking branches. """
      
@@ -206,7 +206,8 @@ def generate_tracked_images(path: str,
     """
     image_names = sorted(os.listdir(path))
     frames = sorted(list(set(df_track['Frame'].values)))
- 
+    
+    print (len(frames), len(image_names))
     track_color_dict = {}
     tracks = sorted(list(set(df_track['track_id'])))
     for t in tracks:
@@ -229,24 +230,35 @@ def generate_tracked_images(path: str,
     
 #exemplo de como chamar 
 # fazer testes com imagens da kaka
-md = 50
-t = 10 
-ms = 5
-mg = 5
-bb = tracking ('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/d5_2_gResults.csv',
+#md = 50
+#t = 10 
+#ms = 5
+#mg = 5
+md = 100
+t = 5
+ms = 20
+mg = 0
+
+bb = tracking ('/media/luiza/DATA/Doutorado/Teste tracking/teste arvore mentira.csv',
               max_distance = md,
                time_window= t,
                max_split_distance = ms,
                max_gap_closing_distance = mg)
 
-ims, im_names = generate_tracked_images('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/d5_2_g/53bp1', bb)
+ims, im_names = generate_tracked_images('/media/luiza/DATA/Doutorado/Teste tracking/imagens', bb)
 
 import random, string
 
 
 letters = string.ascii_lowercase
 name = ('md_' + str(md) + ' t_' + str(t)+ ' ms_' + str(ms) + ' mg_'+ str(mg) +  ' linking=true')
-path = os.path.join('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ptx 1/teste tracking ptx', name)
+path = os.path.join('/media/luiza/DATA/Doutorado/Teste tracking', name)
 os.makedirs(path)
 save_images(ims, im_names,path )
 bb.to_csv(os.path.join (path, 'table'))
+
+
+
+bb_fram = bb.loc[bb['is_start'] == 1]
+
+bb_fram = bb_fram.sort_values(by = 'Frame')

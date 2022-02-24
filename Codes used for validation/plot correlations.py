@@ -44,7 +44,6 @@ def plot_correlations(df1_path, df2_path, folder_save, hue):
     then plots the correlations and calculates correlation statistics.'''
     
     
-    
     df1 = pd.read_csv(df1_path)
     df2 = pd.read_csv(df2_path)
     
@@ -61,7 +60,7 @@ def plot_correlations(df1_path, df2_path, folder_save, hue):
     #mag = df1.iloc[:,0]
     #mag.name = 'Magnification'
     hue_series = df1[hue]
-    statistics = []
+    statistics = {}
     for col in cols:
         c1 = df1[df1.columns[pd.Series(df1.columns).str.startswith(col)]]
         c2 = df2[df2.columns[pd.Series(df2.columns).str.startswith(col)]]
@@ -88,17 +87,27 @@ def plot_correlations(df1_path, df2_path, folder_save, hue):
         
         aaa = lmplot_stats(to_plot, hue)
         
-        statistics.append(aaa)
-        statistics.append (col)
+        statistics[col] = aaa
+        
         g = sns.lmplot(x=to_plot.columns[0], y= to_plot.columns[1], col=hue,
                        hue=hue, data=to_plot, col_wrap=2, height=3)
     
+        plt.savefig(os.path.join(folder_save, col + ' Individual' + '.svg'))
+        plt.savefig(os.path.join(folder_save, col + ' Individual' + '.png'), dpi=300)
+        
+       
+    with open(os.path.join(folder_save,"statistics.txt"), 'w') as f: 
+       for key, value in statistics.items():  
+           f.write(key)
+           for i in value:
+               f.write('\n'+ i)
+                        
     return statistics
 
 
 aaa =plot_correlations(
-    '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/forNMA (organized against IPP).csv',
-    '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/IPP (organized against forNMA).csv',         
-    '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Gráficos2',
+    '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/forNMA (organized against IPP).csv',
+    '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/paired_df/blur 3/IPP (organized against forNMA).csv',         
+    '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Gráficos/Gráficos blur 3',
     'Condition_FORNMA')
 
