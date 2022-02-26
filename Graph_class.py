@@ -8,12 +8,9 @@ Created on Thu Jan 27 09:04:52 2022
 import seaborn as sns
 from matplotlib import pyplot as plt
 import pandas as pd
-from typing import Optional, List, Dict
+from typing import Optional, List
 import math
-import numpy as np
-import similaritymeasures
-import os
-import itertools
+
 
 
 # essa classe pode ser usada para plotar foci individual

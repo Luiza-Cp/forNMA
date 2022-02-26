@@ -9,8 +9,11 @@ Prepairs dataframes for graph plotting
 """
 import pandas as pd
 from typing import List, Optional
-import numpy as np
-import math
+from matplotlib import pyplot as plt
+import seaborn as sns
+from NMA_draggable_line import draggable_lines
+# o df que sai do graph init que vai para o graph class
+
 
 
 def rename_conditions(
@@ -55,6 +58,7 @@ def rename_conditions(
 def graph_init(
         csv_list: List[pd.DataFrame],
         control: Optional[int],
+        
 )-> pd.DataFrame:
     
     """
@@ -81,6 +85,38 @@ def graph_init(
         
     return final_df
 
+def gating(df: pd.DataFrame,
+           conditions: List[str],
+           x: int,
+           y: int,
+           frames: Optional[List[int]] = None
+)-> pd.DataFrame:
+   
+    """
+    Gets a dataframe with all conditions and frames (if present) and plots
+    a scatterplot for region selection by user.
+    Returns a dataframe with user-defined subset.
+    """
+    
+    if len(conditions) > 0:
+        df = df[df['Condition'].isin(conditions)]
+    if len(frames) > 0:
+        df = df[df['Frame'].isin(frames)]
+    
+    fig= plt.figure() 
+    sns.set_theme()
 
+    ax = sns.scatterplot(data=df, x=x, y=y, palette= 'rainbow') 
+    ax.set_title('Click once to move the lines. Click again to release')
+    plt.xticks(rotation=70)
+    
+    
+    upper_line =  draggable_lines(ax, 'v', upper_line_x, upper_line_ys)
+    middle_line =  draggable_lines(ax, 'v', middle_line_x, middle_line_ys)
+    bottom_line =  draggable_lines(ax, 'v', bottom_line_x, bottom_line_ys)
+    bottom_line2 = draggable_lines(ax, 'v', bottom_line_x2, bottom_line_ys)
+    
+    
+    
 # como chamar
 df = graph_init(['/media/luiza/DATA/Doutorado/Imagens incucyte/img 4x/teste 12.csv' ,'/media/luiza/DATA/Doutorado/Imagens incucyte/img 4x/teste 11.csv'], 1)
