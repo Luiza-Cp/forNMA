@@ -24,10 +24,10 @@ class draggable_lines:
 
         if kind == "h":
             x = ys
-            y = [x, x]
+            y = [self.x, self.x]
 
         elif kind == "v":
-            x = [x, x]
+            x = [self.x, self.x]
             y = ys
         self.line = lines.Line2D(x, y, picker=5, color ="#12c7e5", linewidth= 3)
         self.ax.add_line(self.line)

@@ -40,7 +40,7 @@ from NMA_draggable_line import draggable_lines
 class NMA:
     """ Class for NMA graph plotting"""
                                                                 # other_control: user-input dataframe with control group from another experiment
-    def __init__(self, df, controls, sd, other_control = None): # control: Tuple[group_name, frame] - um deles pode ser None
+    def __init__(self, df, controls, sd, other_control = None): # controls: Tuple[group_name, frame] - um deles pode ser None
         """                                     
         Atributes:
         
@@ -64,7 +64,7 @@ class NMA:
         self.v_downy: vertical bottom lines y coordinates
         self.v_downx2: vertical bottom right line x coordinates
         self.graph_limits: tuple with min and maximum area and NII values within 3 standard deviations
-        self.percentages: 
+        self.percentages: dataframe with cell percentages at each NMA group
         """
         self.df = df
         self.controls = controls
@@ -76,7 +76,7 @@ class NMA:
         self.v_upx, self.v_upy, self.v_midx, self.v_midy, self.v_downx, self.v_downy, self.v_downx2 = self.calc_vertical_lines()
         self.graph_limits = self.calc_area_NII_lims()
         self.percentages = self.calc_all_percentages()
-
+       
         
     def subset_df(self, condition_time_tuple):
         
@@ -158,6 +158,7 @@ class NMA:
        
        bottom_line_x2 = self.mean_NII + 2.5*self.std_NII
        
+       sns.set_theme()
        fig= plt.figure()
        ax = fig.add_subplot(sns.scatterplot(data=self.control_df, x="NII", y="Area", color = '#d8b8b8')) 
        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, color='black')
@@ -436,14 +437,66 @@ class NMA:
             
         ax.set_title(title)   
         
-        return fig                 
-    
+        return fig    
+
+
+    def calc_gates(self):
+        """
+        Plots the Control NMA graph and lets the user gate its data over it.
+        Returns a dataframe with selected values
+        """
+        x0 = self.control_df['NII'].quantile(.05)
+        xf = self.control_df['NII'].quantile(.95)
+        y0 = self.control_df["Area"].quantile(.05)
+        yf = self.control_df["Area"].quantile(.95)
         
+        x_quantile = self.control_df['NII'].quantile(.2)
+        y_quantile = self.control_df['Area'].quantile(.2)
+        
+        sns.set_theme()
+        fig= plt.figure()
+        ax = fig.add_subplot(sns.scatterplot(data=self.control_df, x="NII", y="Area", color = '#d8b8b8')) 
+        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, color='black')
+        ax.plot(self.mean_NII+(self.sd*self.std_NII)*np.cos(self.circle) , 
+                self.mean_a+(self.sd*self.std_a)*np.sin(self.circle), color= 'black' )
+       
+        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, 
+                 self.v_upx, self.v_upy, self.v_midx, self.v_midy,
+                 self.v_downx, self.v_downy,
+                 self.v_downx2, self.v_downy, color='black')
+        
+        ax.set_title('Click to move the blue lines. Click again to release.')
+        
+       
+        ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
+        ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
+        
+        df=self.control_df
+        x = 'NII'
+        y = 'Area'
+        upper_line =  draggable_lines(ax, 'h', int(yf), [int(df[x].min()- x_quantile), int(df[x].max()+ x_quantile)])
+        bottom_line = draggable_lines(ax, 'h',y0,  [int(df[x].min()-x_quantile), int(df[x].max()+ x_quantile)])
+        left_line = draggable_lines(ax, 'v', x0, [int(df[y].min()-y_quantile), int(df[y].max()+ y_quantile)])
+        right_line = draggable_lines(ax, 'v',xf, [int(df[y].min()-y_quantile), int(df[y].max()+y_quantile)])
+        
+        plt.show(block = True)
+         
+        upper = upper_line.x
+        bottom = bottom_line.x
+        left = left_line.x
+        right =  right_line.x
+        
+        plt.close('all') 
+        
+        df2 = df.loc[(df[y] < upper) & (df[y] > bottom)]
+        df2 = df2.loc[(df2[x] < right) & (df2[x] > left)]
+        
+        return df2
 
 ## COMO CHAMAR
        
 nma_df_ignacio = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/NMA_organizado.csv')
-nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results.csv') 
+nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results_blur12.csv') 
 
 
 
@@ -453,6 +506,12 @@ fornma= NMA(nma_df_fornma, ('Control', None),1.8,)
 
 t_for = fornma.plot_NMA_dot(('Control', None),fornma.subset_df(('Control', None)), hue = 'Total_foci_Dapi')
 t_ig_htm =  fornma.plot_NMA_heatmap(fornma.subset_df(('Etoposide', None)), 'Etoposide')
+
+
+# se o usuário quiser fazer gate baseado nesse gráfico ele pode tbm, chama assim
+
+df_gated = fornma.calc_gates()
+
 # =============================================================================
 #c_ig = ig.plot_NMA_dot(ig.subset_df(('Control', None)), 'Control', hue = 'Aspect')
 # c_ig_htm = ig.plot_NMA_heatmap(ig.subset_df(('Control', None)), 'Control')
