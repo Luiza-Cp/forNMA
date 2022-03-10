@@ -243,6 +243,6 @@ def registration (folders_to_register: List[str],
   
 ##### ASSIM SE CHAMA
 
-registration([ '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ct/images/c3_1_r' , 
-            '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ct/images/c3_1_g'],
-             '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Aplicação poster/ct/reg')
+registration([ '/media/luiza/DATA/paper/Red/C5_9' , 
+            '/media/luiza/DATA/paper/Green/C5_9g'],
+            '/media/luiza/DATA/paper/Registradas')

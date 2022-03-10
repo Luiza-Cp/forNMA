@@ -283,13 +283,15 @@ def get_foci_df(df_results: pd.DataFrame):
                                          image_names, foci_dfs)
          dfs_foci_to_append.extend(df_foci_list)
          #df_results.drop(columns= (["foci_df_"+ ch]), inplace=True)
-    
-     df_foci = pd.concat(dfs_foci_to_append)
-     df_foci = df_foci[['Channel', 'Image_name', 'Frame', "Origin_nucleus", 
-                        'Focus_number', 'Focus_mean_intensity',	'Focus_Area', 
-                        'Focus_perimeter', 'Focus_centroid_x', 'Focus_centroid_y', 
-                        'Condition', 'Is_overtime']] 
-     
+     if len (dfs_foci_to_append) > 0:
+         df_foci = pd.concat(dfs_foci_to_append)
+         df_foci = df_foci[['Channel', 'Image_name', 'Frame', "Origin_nucleus", 
+                            'Focus_number', 'Focus_mean_intensity',	'Focus_Area', 
+                            'Focus_perimeter', 'Focus_centroid_x', 'Focus_centroid_y', 
+                            'Condition', 'Is_overtime']] 
+     else:
+         df_foci= None
+         
      return df_foci, df_results
     
    
@@ -306,7 +308,8 @@ def save_dfs(df_results: pd.DataFrame,
         cols = [f for f in df_save.columns if 'foci_df' not in f]
         df_save = df_save[cols]        
         df_save.to_csv(os.path.join(path_save, t[:-4]) + ' Results.csv')
-        df_foci.to_csv(os.path.join(path_save, t[:-4]) + ' Foci Results.csv')
+        if df_foci != None:
+            df_foci.to_csv(os.path.join(path_save, t[:-4]) + ' Foci Results.csv')
         print (os.path.join(path_save, t[:-4]))
     return print("files saved")
  
