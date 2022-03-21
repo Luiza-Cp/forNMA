@@ -13,18 +13,25 @@ import seaborn as sns
 import numpy as np
 
 
-def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:   
+def plot_and_clean(df: pd.DataFrame,
+                   is_cyto: bool,
+) -> pd.DataFrame:   
     
-    h_down = df.Area.quantile(0.05)
-    h_up= df.Area.quantile(0.95)
-    v_left = df.NII.min()
-    v_right = df.NII.quantile(0.95)
+    n_or_c = "Nuc_" if is_cyto==False else "Cyto_"
+    title = 'Nuclei' if is_cyto==False else "Cells"
+    
+    h_down = df[n_or_c + 'Area'].quantile(0.05)
+    h_up= df[n_or_c + 'Area'].quantile(0.95)
+    v_left = df[n_or_c + 'Roundness'].min()
+    v_right = df[n_or_c + 'Roundness'].quantile(0.95)
     fig= plt.figure()
-    ax = fig.add_subplot(sns.scatterplot(data=df, x="NII", y="Area")) 
+    ax = fig.add_subplot(sns.scatterplot(data=df, x=n_or_c + 'Roundness', y=n_or_c + 'Area')) 
     horizontal_up = draggable_lines(ax, "h",h_up)
     horizontal_down = draggable_lines(ax, "h", h_down)
     vertical_left = draggable_lines(ax, "v", v_left)
     vertical_right = draggable_lines(ax, "v", v_right)
+    
+    plt.title(title +" outlier removal. Click and move to adjust the gate. Cliick again to relaese")
     
     plt.show(block=True)
    
@@ -41,11 +48,12 @@ def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:
     return h_down, h_up, v_left, v_right
     
 
-def erase_df (df, h_down, h_up, v_left, v_right):
-    df = df[df["Area"] < h_up]
-    df = df[df["Area"] > h_down]
-    df = df[df["NII"] > v_left]
-    df = df[df["NII"] < v_right]
+def erase_df (df, h_down, h_up, v_left, v_right, is_cyto):
+    n_or_c = "Nuc_" if is_cyto==False else "Cyto_"
+    df = df[df[n_or_c + 'Area'] < h_up]
+    df = df[df[n_or_c + 'Area'] > h_down]
+    df = df[df[n_or_c + 'Roundness'] > v_left]
+    df = df[df[n_or_c + 'Roundness'] < v_right]
     
     frames = list(set(df.Frame.values))
     origin_folders = list(set(df.origin_folder.values))

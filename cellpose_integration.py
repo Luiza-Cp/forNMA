@@ -25,7 +25,7 @@ def remove_edge_cnt(outlines_cnt, shape):
     return cnts_not_border 
 
 
-def run_cellpose (image: np.ndarray, 
+def run_cellpose_nuc(image: np.ndarray, 
                   use_gpu: bool, 
                   diameter: Optional[int],
                   mag: int, 
@@ -52,19 +52,43 @@ def run_cellpose (image: np.ndarray,
     model = models.Cellpose(model_type='nuclei', gpu= use_gpu)
     channels = [[0,0]]
     masks, flows, styles, diams = model.eval([image], diameter=diameter, channels=channels,
-                                             invert=invert, normalize=normalize,
-                                             net_avg = net_avg, resample= resample,
                                              flow_threshold = flow_threshold,
                                              mask_threshold = mask_threshold,
                                              min_size = min_size, )
     outlines_cnt =  utils.outlines_list(masks[0])
     outlines_cnt = remove_edge_cnt(outlines_cnt, image.shape)
+    outlines_cnt = [f for f in outlines_cnt if len(f)>4]
     if len(outlines_cnt) >0 :
         outlines_cnt = filter_contours(outlines_cnt, mag, px_s, shape, eccentricity, 
                                        min_size, max_size, min_radius, max_radius)
     
     return outlines_cnt
-        
+
+def run_cellpose_cyto(image: np.ndarray, 
+                  use_gpu: bool, 
+                  diameter: Optional[int],
+                  flow_threshold: float = 0.4,
+                  mask_threshold : float = 0.0,
+                  model_type: str = 'cyto2'
+) -> List[np.ndarray]:
+    
+    """ 
+    Runs cellpose nuclear model in a specified image and returns a
+    list of nuclei contours.
+    """
+    
+    model = models.Cellpose(model_type= model_type, gpu= use_gpu)
+    channels = [[0,0]]
+    masks, flows, styles, diams = model.eval([image], diameter=diameter, channels=channels,
+                                             flow_threshold = flow_threshold,
+                                             mask_threshold = mask_threshold,
+                                             )
+    outlines_cnt =  utils.outlines_list(masks[0])
+    outlines_cnt = [f for f in outlines_cnt if len(f)>4]
+    
+    return outlines_cnt
+
+
 #######        
 #files = ['/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Azul/DAPI/WT_RPE WT ETOPOSIDE 0,2uM 2h_FOV 00301_DAPI.tif',
 #         '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Azul/DAPI/WT_RPE WT ETOPOSIDE 0,2uM 2h_FOV 00302_DAPI.tif' ,

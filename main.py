@@ -34,14 +34,16 @@ def run(path_to_save: str,
     #values: possui 3 valores
         # 0: uam lista com o caminho de todas as pastas nesse canal
         # 1: o param_dict desse canal
-        # 2: bool (informa se o canal é o de segmentação ou não)
+        # 2: bool (informa se o canal é o de segmentação nuclear)
+        # 3: bool (informa se o canal é o de segmentação citoplasmatica)
     
     subfolder_dict = {}
     for i in range(len(ch_name_list)):
-        seg = ch_with_nuc == ch_path_list[i]
+        seg_nuc = ch_with_nuc == ch_path_list[i]
+        seg_cyto = parameter_list[i]['cytoplasm']
         subfolders = sorted((os.listdir(ch_path_list[i])))
         subfolder_dict[ch_name_list[i]] = [[os.path.join(ch_path_list[i], f) for f in subfolders],
-                                           parameter_list[i],seg]
+                                           parameter_list[i],seg_nuc, seg_cyto]
     
     n_sub = len(subfolders)    
      
@@ -65,52 +67,74 @@ def run(path_to_save: str,
     # items: 
         # 0: lista dos itens da pasta
         # 1: param_dict
-        # 2: booleano para saber se é o canal de segmentação
+        # 2: booleano para saber se é o canal de segmentaçãode núcleo
+        # 3: booleano para saber se é canal de segmentação do citoplasma
     
     for i in range(n_sub):
         general_dict ={}   
         for key, value in subfolder_dict.items():
             files = sorted(os.listdir(value[0][i]))
             files = [os.path.join(value[0][i], f) for f in files ]
-            general_dict[key] = [files, value[1], value[2]]
+            general_dict[key] = [files, value[1], value[2], value[3]]
 
         if not check_size(general_dict):
             raise("The folders contain different image number")
 
-        total_df = analyze_dict(general_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
-        filename = os.path.basename(subfolders[i]) + '.zip'
-        total_df.to_pickle(os.path.join(temp_dir.name, filename))
+        total_df_nuc, total_df_cyto = analyze_dict(general_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
+        filename = os.path.basename(subfolders[i]) 
+        
+        if total_df_nuc is not None:
+            total_df_nuc.to_pickle(os.path.join(temp_dir.name, filename + ' Nucleus-fornma.zip'))
+        if total_df_cyto is not None:
+            total_df_cyto.to_pickle(os.path.join(temp_dir.name, filename + ' Cytoplasm-fornma.zip'))
 
         # files foram jogados na temp
     
     
     #abrir todos na temp e juntar num dfzão
     #add a cada df uma coluna com nome da pasta de origem e removo erros
-    complete_df = pd.DataFrame()
+    complete_df_nuc = pd.DataFrame()
+    complete_df_cyto = pd.DataFrame()
     for file in os.listdir(temp_dir.name):
         path_to_temp_csv = os.path.join(temp_dir.name, file) 
         df = pd.read_pickle(path_to_temp_csv)
         df["origin_folder"]= file
-        complete_df = complete_df.append(df)
+        if 'Nucleus-fornma' in file:
+            complete_df_nuc = complete_df_nuc.append(df)
+        if 'Cytoplasm-fornma' in file:
+            complete_df_cyto = complete_df_cyto.append(df)
     
 
-    #o colplete df vai pra interface para remover outliers, 
+    #o complete df vai pra interface para remover outliers, 
     # substituindo as funções que colocarei abaixo
     from clean_dataframe import plot_and_clean, erase_df
     
-    h_down, h_up, v_left, v_right = plot_and_clean(complete_df)
-    
-    print('ok', h_down, h_up, v_left, v_right)
-    complete_df = erase_df(complete_df, h_down, h_up, v_left, v_right)       
-    
+  
+    if complete_df_nuc.empty == False:
+        h_down, h_up, v_left, v_right = plot_and_clean(complete_df_nuc, False)
+        complete_df_nuc = erase_df(complete_df_nuc, h_down, h_up, v_left, v_right, False)  
+        df_results_nuc, df_draw_nuc = split_dfs(complete_df_nuc, general_dict) # aqui dentro eu crio o df foci
+        save_dfs(df_results_nuc, path_to_save, False)
+    else: 
+        df_results_nuc = None
+        df_draw_nuc = None 
         
-    #agora isso precisa passar pelo split e pelo draw and save
-    df_results, df_draw = split_dfs(complete_df, ch_name_list) # aqui dentro eu crio o df foci
-    save_dfs(df_results, path_to_save)
-    if wants_to_save == True:
-        saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) # aqui dentro eu crio os pkl dos foci
+        
+    if complete_df_cyto.empty == False:
+        h_down, h_up, v_left, v_right = plot_and_clean(complete_df_cyto, True)
+        complete_df_cyto = erase_df(complete_df_cyto, h_down, h_up, v_left, v_right, True) 
+        df_results_cyto, df_draw_cyto = split_dfs(complete_df_cyto, general_dict)
+        save_dfs(df_results_cyto, path_to_save, True)
+    else: 
+        df_results_cyto = None
+        df_draw_cyto = None 
+   
+    return  df_draw_nuc, df_draw_cyto, path_to_save, ch_name_list
+    
+   # if wants_to_save == True:
+   #     saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) # aqui dentro eu crio os pkl dos foci
     
     # elimina os temp dirs
     
-    temp_dir.cleanup()
+   # temp_dir.cleanup()
     

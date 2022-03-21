@@ -9,10 +9,10 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save= '/media/luiza/DATA/paper/Registradas'
+path_to_save= '/media/luiza/DATA/àrea de trabalho/teste (del)'
 
-ch1_path = '/media/luiza/DATA/paper/Registradas/Red' #pasta contendo as pastas de imagens de um canal 
-ch2_path = '/media/luiza/DATA/paper/Registradas/Green'  #pasta contendo as pastas de imagens de um canal 
+ch1_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/r' #pasta contendo as pastas de imagens de um canal 
+ch2_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/g'  #pasta contendo as pastas de imagens de um canal 
 ch3_path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Verde'
 
 #como você nomeia o canal
@@ -32,7 +32,7 @@ save_images = True #recomendo deixar True
 segment_dict = {'magnification': 20,   
                 'pixel_size': 0.6,     
                 'rescale_intensity': True,      # seta o valor mínimo para 0 e máximo para 255
-                'remove_bg': True,     
+                'remove_bg': False,     
                 'radius_bg': 40,                # raio da rolling-balll (igual ao imageJ)
                 'threshold':'triangle',        # Descrição das opções vem abaixo 
                 'offset': 5,                    # Deve ser usado para os thresholds locais 
@@ -55,7 +55,11 @@ segment_dict = {'magnification': 20,
                 'resample': True,               # run dynamics at original image size (will be slower but create more accurate boundaries)
                 'flow_threshold': 0.4,          # flow error threshold (all cells with errors below threshold are kept)
                 'mask_threshold': 0.0 ,         # all pixels with value above threshold kept for masks, decrease to find more and larger masks
-                'use_gpu': True
+                'use_gpu': True,
+                'model_for_cyto': 'cyto2',     #cellpose model for cytoplasmatic measures
+                'cyto_diameter': 60 ,               # if set to None, then diameter is automatically estimated if size model is loaded
+                'cyto_flow_threshold': 0.6,          # flow error threshold (all cells with errors below threshold are kept)
+                'cyto_mask_threshold': 0.0 ,   
     }
 
 
@@ -63,24 +67,25 @@ segment_dict = {'magnification': 20,
 #modificações a serem feitas nas imagens do canal 1. Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch1 = {'rescale_intensity': True,
-           'remove_bg' : True,
+           'remove_bg' : False,
            'radius_bg': 40,
            'match_hist' : False,
            'wants_ktr' : False,
            'ring_size': 3,                      # raio do citoplasma 
            'use_ellipse': False,                # deixar True se quer usar elipse
-           'wants_foci': False,
+           'wants_foci': True,
            'foci_min_size' : 7,
            'foci_max_size': None,
            'foci_min_int' : None,               # int = intensidade 
            'foci_max_int' : None,       
-           'foci_proeminence' : 1.2           # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
+           'foci_proeminence' : 1.2,            # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
+           'cytoplasm' : False
            }
 
 #modificações a serem feitas nas imagens do canal 2.  Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch2 = {'rescale_intensity': True,
-           'remove_bg' : True,
+           'remove_bg' : False,
            'radius_bg': 40,
            'match_hist' : False,
            'wants_ktr' : True,
@@ -91,7 +96,8 @@ param_ch2 = {'rescale_intensity': True,
            'foci_max_size': None,
            'foci_min_int' : None,
            'foci_max_int' : None,
-           'foci_proeminence' : 1.3
+           'foci_proeminence' : 1.3,
+           'cytoplasm' : True
            }  
 
 param_ch3 = {'rescale_intensity': False,
@@ -106,7 +112,8 @@ param_ch3 = {'rescale_intensity': False,
            'foci_max_size': None,
            'foci_min_int' : None,
            'foci_max_int' : None,
-           'foci_proeminence' : 1.3
+           'foci_proeminence' : 1.3,
+           'cytoplasm' : False
            }  
 
 
@@ -132,7 +139,7 @@ from main import run
 %matplotlib 
 ts = time.time()
 
-run (path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list,
+a =run (path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list,
      conditions, segment_dict, save_images)
 te = time.time()
 
