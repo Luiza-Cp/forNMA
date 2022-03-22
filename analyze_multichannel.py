@@ -174,7 +174,7 @@ def perform_measure(nuc_contours: List[np.ndarray],
         # checks if for that specific channel it wants to measure cytoplasm
         # utilising the segment_parameters (value[1])
         if value[1]['cytoplasm'] == True:
-            print(key, 'cytoooooo')
+            
             contours = cyto_contours        # pass the cytoplasm contours
             df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
                         ref_dict[key], contours, seg_param['magnification'], 
@@ -185,7 +185,7 @@ def perform_measure(nuc_contours: List[np.ndarray],
         
         # else is considered it wants to measure nuclei
         else:
-            print(key, 'nuc')
+           
             contours = nuc_contours         # pass the nuclei contours
             df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
                         ref_dict[key], contours, seg_param['magnification'], 
@@ -220,7 +220,6 @@ def segment_nuc_and_cyto(img_n: int,
     ch_nuc = ch_nuc[0] if len(ch_nuc)> 0 else None
     ch_cyto = ch_cyto[0] if len(ch_cyto)> 0 else None
     
-    print (ch_nuc, ch_cyto) # printa aqui
     
     #se algum canal tem núcleo:
     if ch_nuc != None:  
@@ -268,8 +267,7 @@ def segment_nuc_and_cyto(img_n: int,
     else:
         cyto_contours = [] # se não tem detecção de  citoplasma devolve a lista vazia
     
-    print('nuc_cnt:', len(nuc_contours),'cyto_cnt', len(cyto_contours))
-         
+   
     return nuc_contours, cyto_contours
     
 
@@ -293,7 +291,6 @@ def match_nuc_cyto(image_nuc_df: pd.DataFrame,
     image_nuc_df['Origin_cell_image'] = image_cyto_df[col].iloc[0]
     
     cnt_col = [f for f in image_cyto_df.columns if 'Nuc_cnt_' in f][0]
-    print(cnt_col)
     for cell in zip(cd['Cell'], cd[cnt_col]):
         nuc_idx = [f[0] for f in zip(nd['Cell'], nd['Nuc_X'], nd['Nuc_Y']) if cv.pointPolygonTest(cell[1], [f[1], f[2]], False) == True]
         # returns list with nucleus index inside this cell
@@ -408,7 +405,6 @@ def split_dfs(
         col_to_remove.extend(cols_remove)
     
     all_col = list(complete_df)
-    print(all_col)
     col_results = [i for i in all_col if i not in col_to_remove]
     df_results = complete_df[col_results]
     col_draw = [i for i in col_list_cnt if i in all_col]
@@ -514,7 +510,7 @@ def draw_and_save(df: pd.DataFrame,
     specified images and then saves them.
     """
    
-    c_or_n = 'Nuc_' if is_cyto ==False else "Cyto_" 
+    c_or_n = 'Nuc_' if is_cyto == False else "Cyto_" 
     cols_to_draw = [ f for f in list(df.columns) if ch in f 
                     and 'Y_draw' not in f and 'Image_' not in f]
     
@@ -572,7 +568,6 @@ def saving_images(df_draw: pd.DataFrame,
    dirs = list(set(df_draw.origin_folder.values))
    
    c_or_n = 'Nucleus ' if is_cyto == False else "Cytoplasm "
-   use_cellpose = True if is_cyto == True else False
    df_draw.to_pickle(os.path.join(path_to_save,c_or_n + 'Results.pkl'))
    
    #    itera por cada pasta nesse df
@@ -588,7 +583,7 @@ def saving_images(df_draw: pd.DataFrame,
            os.mkdir(saving_dir_ch)        
            draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose, is_cyto, df_dir2, use_cp_nucs)
   
-          
+      
 # =============================================================================
 # 
 #     
