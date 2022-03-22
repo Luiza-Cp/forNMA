@@ -289,6 +289,9 @@ def match_nuc_cyto(image_nuc_df: pd.DataFrame,
     
     image_nuc_df['Origin_cell'] = np.nan
     
+    col = [f for f in image_cyto_df.columns if 'Image_name' in f][0]
+    image_nuc_df['Origin_cell_image'] = image_cyto_df[col].iloc[0]
+    
     cnt_col = [f for f in image_cyto_df.columns if 'Nuc_cnt_' in f][0]
     print(cnt_col)
     for cell in zip(cd['Cell'], cd[cnt_col]):
@@ -502,27 +505,30 @@ def draw_and_save(df: pd.DataFrame,
                  ch: str,
                  saving_dir: str,
                  use_cellpose: bool,
+                 is_cyto: bool,
+                 df2: Optional[pd.DataFrame] = None,
+                 use_cp_nucs: bool = False
 ):
     """ 
     Loop though a dataframe based on its channels and draws contours at the
     specified images and then saves them.
     """
-     
+   
+    c_or_n = 'Nuc_' if is_cyto ==False else "Cyto_" 
     cols_to_draw = [ f for f in list(df.columns) if ch in f 
                     and 'Y_draw' not in f and 'Image_' not in f]
     
-    df = df.filter(regex = ch+"|Cell|X")
+    df = df.filter(regex = ch+"|Frame|Cell|X")
     cnt_groupped = df.groupby(['Image_name_' + ch])
     fs = cv.getFontScaleFromHeight(2,15,2)   
     for name, group in  cnt_groupped:
         img = group['Image_'+ ch].iloc[0]
         img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
         cnt_nuc = list(group['Nuc_cnt_' + ch])
-        print(name)
         img = cv.drawContours(img, cnt_nuc, -1, (98,59,132), 1)
         for i in range(len(group['Cell'])):
             img = cv.putText(img, str(int(group['Cell'].iloc[i])), 
-                            ((group['X']+5).iloc[i], group['Y_draw_' + ch].iloc[i]), 
+                            ((group[c_or_n + 'X']+5).iloc[i], group['Y_draw_' + ch].iloc[i]), 
                             2, fs, (122, 144,248), 1)
          
         for col in cols_to_draw:
@@ -533,41 +539,58 @@ def draw_and_save(df: pd.DataFrame,
                  
             else:                           
                  cnt = list(group[col])
-                 cnt = [f[0] for f in cnt if len(f)> 0] if use_cellpose == False else cnt
+                 cnt = [f[0]for f in cnt if len(f)> 4] if use_cellpose == False else cnt
                  img = cv.drawContours(img, cnt, -1, (122, 144,248), 1)
-                                    
+                             
+        if df2 is not None: 
+            frame = group["Frame"].iloc[0]
+            nuc_cnt_df = df2.loc[df2['Frame'] == frame]
+            col2 = [f for f in df2.columns if "Nuc_cnt" in f][0]
+            nuc_cnt2 = list(nuc_cnt_df[col2])
+            #nuc_cnt2 = [f[0] for f in nuc_cnt2 if len(f)> 0] if use_cp_nucs == False else nuc_cnt2
+            print(frame)
+            img = cv.drawContours(img, nuc_cnt2, -1, (122, 144,248), 1)
+            
     
         cv.imwrite(os.path.join(saving_dir, name), img)
-    
-    
+   
 
 def saving_images(df_draw: pd.DataFrame,
                 path_to_save: str,
                 ch_name_list: List[str],
-                use_cellpose: bool
+                use_cellpose: bool,
+                is_cyto = bool,
+                df_draw2: Optional[pd.DataFrame] = None,
+                use_cp_nucs: bool = False, # when it has cytoplasm, were nuc contours generated with cellpose?
+                create_saving_dir: bool = True
 ):  
    """ 
    Splits dataframaccording to their folders, creates directories
    for saving and pass values to draw_and_save, that draws contours and saves
    images.
    """
+   
+   
    dirs = list(set(df_draw.origin_folder.values))
-   df_draw.to_pickle(os.path.join(path_to_save, 'Results.pkl'))
+   
+   c_or_n = 'Nucleus ' if is_cyto == False else "Cytoplasm "
+   use_cellpose = True if is_cyto == True else False
+   df_draw.to_pickle(os.path.join(path_to_save,c_or_n + 'Results.pkl'))
    
    #    itera por cada pasta nesse df
    for d in dirs:
        df_dir = df_draw[df_draw["origin_folder"]==d]
-       saving_dir = os.path.join(path_to_save, d[:-4] + '-') if os.path.isdir(os.path.join(path_to_save, d[:-4])) else os.path.join(path_to_save, d[:-4])
-       os.mkdir(saving_dir) 
+       d2 = d.replace("Cytoplasm", "Nucleus")
+       df_dir2 = df_draw2[df_draw2["origin_folder"]==d2] if df_draw2 is not None else None
+       saving_dir = os.path.join(path_to_save, d[:-4] )
+       os.mkdir(saving_dir) if create_saving_dir == True else None
        #    vai iterar sobre cada canal dessa pasta
        for ch in ch_name_list:
            saving_dir_ch = os.path.join(saving_dir, ch)
-           os.mkdir(saving_dir_ch)           
-           draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
-         
-    
-           
-   
+           os.mkdir(saving_dir_ch)        
+           draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose, is_cyto, df_dir2, use_cp_nucs)
+  
+          
 # =============================================================================
 # 
 #     

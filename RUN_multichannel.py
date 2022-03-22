@@ -16,7 +16,7 @@ ch2_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/g'  #pasta contendo 
 ch3_path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Verde'
 
 #como você nomeia o canal
-ch1_name =' 53bp1'
+ch1_name ='53bp1'
 ch2_name = 'ERK'
 ch3_name ='gH2AX'
 #add mais ch conforme demanda. Se usar só um, remover o restante.
@@ -88,7 +88,7 @@ param_ch2 = {'rescale_intensity': True,
            'remove_bg' : False,
            'radius_bg': 40,
            'match_hist' : False,
-           'wants_ktr' : True,
+           'wants_ktr' : False,
            'ring_size': 3,
            'use_ellipse': True,
            'wants_foci': False,
