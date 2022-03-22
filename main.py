@@ -129,29 +129,23 @@ def run(path_to_save: str,
         df_results_cyto = None
         df_draw_cyto = None 
    
-    return  df_draw_nuc, df_draw_cyto, path_to_save, ch_name_list
-    # ch_name list must contain all ch to draw that contour (cyto for cyto, nuc for nuc)
-
-
+   
     if wants_to_save == True:
+        ch_name_list_nuc =  [ f for f in df_draw_nuc if 'Image_name' in f]
+        ch_name_list_nuc =  [f.replace('Image_name_', '') for f in ch_name_list_nuc]
         if df_draw_nuc is not None:
-            saving_images(df_draw_nuc, path_to_save, ch_name_list, segment_dict['use_cellpose'], False) 
+            saving_images(df_draw_nuc, path_to_save, ch_name_list_nuc, segment_dict['use_cellpose'], False) 
         if df_draw_cyto is not None and df_draw_nuc is None:
             saving_images(df_draw_cyto, path_to_save, ch_name_list, True , True) 
-        
         if df_draw_cyto is not None and df_draw_nuc is not None:
-            ch_name_list_nuc =  [ f for f in df_draw_nuc if 'Image_name' in f]
-            ch_name_list_nuc =  [f.replace('Image_name_', '') for f in ch_name_list_nuc]
-            saving_images(df_draw_nuc, path_to_save, ch_name_list_nuc, segment_dict['use_cellpose']) 
-            
+            saving_images(df_draw_nuc, path_to_save, ch_name_list_nuc, True, True) 
             ch_name_list_cyto =  [ f for f in df_draw_cyto if 'Image_name' in f]
             ch_name_list_cyto =  [f.replace('Image_name_', '') for f in ch_name_list_cyto]
             saving_images(df_draw_cyto, path_to_save, ch_name_list_cyto, True, 
-                          df_draw_nuc, segment_dict['use_cellpose'], create_saving_dir= True)
+                          True, df_draw_nuc, segment_dict['use_cellpose'])
         
     
     
     # elimina os temp dirs
     
     temp_dir.cleanup()
-    

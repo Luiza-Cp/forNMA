@@ -548,7 +548,6 @@ def draw_and_save(df: pd.DataFrame,
             col2 = [f for f in df2.columns if "Nuc_cnt" in f][0]
             nuc_cnt2 = list(nuc_cnt_df[col2])
             #nuc_cnt2 = [f[0] for f in nuc_cnt2 if len(f)> 0] if use_cp_nucs == False else nuc_cnt2
-            print(frame)
             img = cv.drawContours(img, nuc_cnt2, -1, (122, 144,248), 1)
             
     
@@ -562,7 +561,6 @@ def saving_images(df_draw: pd.DataFrame,
                 is_cyto = bool,
                 df_draw2: Optional[pd.DataFrame] = None,
                 use_cp_nucs: bool = False, # when it has cytoplasm, were nuc contours generated with cellpose?
-                create_saving_dir: bool = True
 ):  
    """ 
    Splits dataframaccording to their folders, creates directories
@@ -583,7 +581,7 @@ def saving_images(df_draw: pd.DataFrame,
        d2 = d.replace("Cytoplasm", "Nucleus")
        df_dir2 = df_draw2[df_draw2["origin_folder"]==d2] if df_draw2 is not None else None
        saving_dir = os.path.join(path_to_save, d[:-4] )
-       os.mkdir(saving_dir) if create_saving_dir == True else None
+       os.mkdir(saving_dir) 
        #    vai iterar sobre cada canal dessa pasta
        for ch in ch_name_list:
            saving_dir_ch = os.path.join(saving_dir, ch)

@@ -57,7 +57,7 @@ segment_dict = {'magnification': 20,
                 'mask_threshold': 0.0 ,         # all pixels with value above threshold kept for masks, decrease to find more and larger masks
                 'use_gpu': True,
                 'model_for_cyto': 'cyto2',     #cellpose model for cytoplasmatic measures
-                'cyto_diameter': 60 ,               # if set to None, then diameter is automatically estimated if size model is loaded
+                'cyto_diameter': 70 ,               # if set to None, then diameter is automatically estimated if size model is loaded
                 'cyto_flow_threshold': 0.6,          # flow error threshold (all cells with errors below threshold are kept)
                 'cyto_mask_threshold': 0.0 ,   
     }
@@ -139,7 +139,7 @@ from main import run
 %matplotlib 
 ts = time.time()
 
-a =run (path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list,
+run (path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list,
      conditions, segment_dict, save_images)
 te = time.time()
 
