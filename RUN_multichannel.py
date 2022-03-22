@@ -9,9 +9,9 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save= '/media/luiza/DATA/àrea de trabalho/teste (del)'
+path_to_save= '/media/luiza/DATA/àrea de trabalho/teste (del)/teste 1 canal citoplasma'
 
-ch1_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/r' #pasta contendo as pastas de imagens de um canal 
+ch1_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/teste 1 canal citoplasma/g' #pasta contendo as pastas de imagens de um canal 
 ch2_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/g'  #pasta contendo as pastas de imagens de um canal 
 ch3_path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Verde'
 
@@ -21,7 +21,7 @@ ch2_name = 'ERK'
 ch3_name ='gH2AX'
 #add mais ch conforme demanda. Se usar só um, remover o restante.
 
-ch_with_nuc = ch1_path  #canal que possui imagens do núcleo
+ch_with_nuc = None  #canal que possui imagens do núcleo
 
 save_images = True #recomendo deixar True
 
@@ -79,7 +79,7 @@ param_ch1 = {'rescale_intensity': True,
            'foci_min_int' : None,               # int = intensidade 
            'foci_max_int' : None,       
            'foci_proeminence' : 1.2,            # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
-           'cytoplasm' : False
+           'cytoplasm' : True
            }
 
 #modificações a serem feitas nas imagens do canal 2.  Vão ser usados somente na quantificações
@@ -120,9 +120,9 @@ param_ch3 = {'rescale_intensity': False,
 #se existirem mais canais, mais params devem ser adicionados.
 #se existirem menos canais, parâmetros devem ser removidos
 
-ch_path_list = [ch1_path, ch2_path]#, ch3_path]
-ch_name_list = [ch1_name, ch2_name] #, ch3_name]
-parameter_list = [param_ch1,  param_ch2] #, param_ch3]
+ch_path_list = [ch1_path, ]#ch2_path]#, ch3_path]
+ch_name_list = [ch1_name,]# ch2_name] #, ch3_name]
+parameter_list = [param_ch1,]#  param_ch2] #, param_ch3]
 
 # para cada subpasta dentro da pasta mãe, adicionar uma lista de condições
 # se deixar vazia ou com numero diferente do tamanho de subpastas vai colcoar none

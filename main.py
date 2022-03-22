@@ -131,18 +131,24 @@ def run(path_to_save: str,
    
    
     if wants_to_save == True:
-        ch_name_list_nuc =  [ f for f in df_draw_nuc if 'Image_name' in f]
-        ch_name_list_nuc =  [f.replace('Image_name_', '') for f in ch_name_list_nuc]
-        ch_name_list_cyto =  [ f for f in df_draw_cyto if 'Image_name' in f]
-        ch_name_list_cyto =  [f.replace('Image_name_', '') for f in ch_name_list_cyto]
+        
         if df_draw_cyto is not None and df_draw_nuc is not None:
+            ch_name_list_nuc =  [ f for f in df_draw_nuc if 'Image_name' in f]
+            ch_name_list_nuc =  [f.replace('Image_name_', '') for f in ch_name_list_nuc]
+           
+            ch_name_list_cyto =  [ f for f in df_draw_cyto if 'Image_name' in f]
+            ch_name_list_cyto =  [f.replace('Image_name_', '') for f in ch_name_list_cyto]
             saving_images(df_draw_nuc, path_to_save, ch_name_list_nuc,
                           segment_dict['use_cellpose'], False) 
             saving_images(df_draw_cyto, path_to_save, ch_name_list_cyto, True, 
                           True, df_draw_nuc, segment_dict['use_cellpose'])
         elif df_draw_nuc is not None:
+            ch_name_list_nuc =  [ f for f in df_draw_nuc if 'Image_name' in f]
+            ch_name_list_nuc =  [f.replace('Image_name_', '') for f in ch_name_list_nuc]
             saving_images(df_draw_nuc, path_to_save, ch_name_list_nuc, segment_dict['use_cellpose'], False) 
         elif df_draw_cyto is not None and df_draw_nuc is None:
+            ch_name_list_cyto =  [ f for f in df_draw_cyto if 'Image_name' in f]
+            ch_name_list_cyto =  [f.replace('Image_name_', '') for f in ch_name_list_cyto]
             saving_images(df_draw_cyto, path_to_save, ch_name_list, True , True) 
         
     # elimina os temp dirs

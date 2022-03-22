@@ -112,6 +112,7 @@ def get_image_morphology_dataframe(nuc_contours: List[np.ndarray],
     the measured caracteristics and contours.
     """
     if len(nuc_contours) > 0:       # if there are nuclear contours
+        print ('ha contornos nucleares')
         df_morpho_nuc_list  = []
         for n in range(len(nuc_contours)):      # iterate over contours
             if len(nuc_contours[n]>5):          # if contour is not a square (has more than 4 points)
@@ -123,6 +124,7 @@ def get_image_morphology_dataframe(nuc_contours: List[np.ndarray],
         image_nuc_df = None
         
     if len(cyto_contours) > 0:      # if there are cytoplasmatic contours
+        print ('ha contornos citop')
         df_morpho_cyto_list  = []
         for n in range(len(cyto_contours)):
             if len(cyto_contours[n]>5):
@@ -174,7 +176,6 @@ def perform_measure(nuc_contours: List[np.ndarray],
         # checks if for that specific channel it wants to measure cytoplasm
         # utilising the segment_parameters (value[1])
         if value[1]['cytoplasm'] == True:
-            
             contours = cyto_contours        # pass the cytoplasm contours
             df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
                         ref_dict[key], contours, seg_param['magnification'], 
@@ -185,7 +186,6 @@ def perform_measure(nuc_contours: List[np.ndarray],
         
         # else is considered it wants to measure nuclei
         else:
-           
             contours = nuc_contours         # pass the nuclei contours
             df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
                         ref_dict[key], contours, seg_param['magnification'], 
@@ -195,6 +195,7 @@ def perform_measure(nuc_contours: List[np.ndarray],
             image_nuc_df = pd.merge(image_nuc_df, df_ch, on = 'Cell')
             image_nuc_df["Frame"] = img_n
    
+
     return image_nuc_df, image_cyto_df
 
 
