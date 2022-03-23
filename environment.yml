@@ -55,7 +55,7 @@ dependencies:
   - docutils=0.16=py39hf3d152e_3
   - entrypoints=0.4=pyhd8ed1ab_0
   - expat=2.4.4=h9c3ff4c_0
-  - ffmpeg=4.4.1=h6987444_0
+  - ffmpeg=4.3.2=h37c90e5_3
   - flake8=4.0.1=pyhd8ed1ab_1
   - font-ttf-dejavu-sans-mono=2.37=hab24e00_0
   - font-ttf-inconsolata=3.000=h77eed37_0
@@ -69,6 +69,7 @@ dependencies:
   - freetype=2.10.4=h0708190_1
   - fribidi=1.0.10=h36c2ea0_0
   - fsspec=2022.1.0=pyhd8ed1ab_0
+  - geos=3.10.2=h9c3ff4c_0
   - gettext=0.19.8.1=h73d1719_1008
   - giflib=5.2.1=h36c2ea0_2
   - gmp=6.2.1=h58526e2_0
@@ -228,6 +229,7 @@ dependencies:
   - pyqtwebengine=5.12.1=py39h0fcd23e_8
   - pyrsistent=0.18.1=py39h3811e60_0
   - pysocks=1.7.1=py39hf3d152e_4
+  - pystackreg=0.2.5=py39hde0f152_1
   - python=3.9.10=h85951f9_2_cpython
   - python-dateutil=2.8.2=pyhd8ed1ab_0
   - python-lsp-black=1.1.0=pyhd8ed1ab_0
@@ -258,6 +260,7 @@ dependencies:
   - seaborn-base=0.11.2=pyhd8ed1ab_0
   - secretstorage=3.3.1=py39hf3d152e_1
   - setuptools=60.8.1=py39hf3d152e_0
+  - shapely=1.8.0=py39ha65c37e_5
   - six=1.16.0=pyh6c4a22f_0
   - snappy=1.1.8=he1b5a44_3
   - snowballstemmer=2.2.0=pyhd8ed1ab_0
