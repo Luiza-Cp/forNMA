@@ -79,7 +79,7 @@ def drop_cols(
     
     
     for key, value in ch_dict.items():
-        if value[1]['cytoplasm'] == True :
+        if value[1]['cytoplasm'] == True and 'Cyto_NII' in df_cyto.columns :
             df_cyto.drop(columns = ('Cyto_NII'), inplace=True)
         if value[1]['wants_foci'] == False:
             drop_foci = ["Total_foci_" + key,"Total_foci_area_" + key,
@@ -112,7 +112,6 @@ def get_image_morphology_dataframe(nuc_contours: List[np.ndarray],
     the measured caracteristics and contours.
     """
     if len(nuc_contours) > 0:       # if there are nuclear contours
-        print ('ha contornos nucleares')
         df_morpho_nuc_list  = []
         for n in range(len(nuc_contours)):      # iterate over contours
             if len(nuc_contours[n]>5):          # if contour is not a square (has more than 4 points)
@@ -124,7 +123,6 @@ def get_image_morphology_dataframe(nuc_contours: List[np.ndarray],
         image_nuc_df = None
         
     if len(cyto_contours) > 0:      # if there are cytoplasmatic contours
-        print ('ha contornos citop')
         df_morpho_cyto_list  = []
         for n in range(len(cyto_contours)):
             if len(cyto_contours[n]>5):
@@ -378,6 +376,7 @@ def analyze_dict(
     else:
         all_cyto_df = None
     
+
     #drop columns here 
     all_nuc_df, all_cyto_df = drop_cols(all_nuc_df, all_cyto_df, ch_dict)
     
@@ -510,11 +509,10 @@ def draw_and_save(df: pd.DataFrame,
     Loop though a dataframe based on its channels and draws contours at the
     specified images and then saves them.
     """
-   
+    df = df.loc[:,~df.columns.duplicated()]
     c_or_n = 'Nuc_' if is_cyto == False else "Cyto_" 
     cols_to_draw = [ f for f in list(df.columns) if ch in f 
                     and 'Y_draw' not in f and 'Image_' not in f]
-    
     df = df.filter(regex = ch+"|Frame|Cell|X")
     cnt_groupped = df.groupby(['Image_name_' + ch])
     fs = cv.getFontScaleFromHeight(2,15,2)   
@@ -524,6 +522,7 @@ def draw_and_save(df: pd.DataFrame,
         cnt_nuc = list(group['Nuc_cnt_' + ch])
         img = cv.drawContours(img, cnt_nuc, -1, (98,59,132), 1)
         for i in range(len(group['Cell'])):
+         
             img = cv.putText(img, str(int(group['Cell'].iloc[i])), 
                             ((group[c_or_n + 'X']+5).iloc[i], group['Y_draw_' + ch].iloc[i]), 
                             2, fs, (122, 144,248), 1)
@@ -534,9 +533,9 @@ def draw_and_save(df: pd.DataFrame,
                  foci_cnt = [i for f in foci_cnt for i in f if len(f)> 0]
                  img = cv.drawContours(img, foci_cnt, -1, (122, 144,248), 1)
                  
-            else:                           
+            else: 
                  cnt = list(group[col])
-                 cnt = [f[0]for f in cnt if len(f)> 4] if use_cellpose == False else cnt
+                 cnt = [f[0]for f in cnt if len(f)> 4] if type(cnt[0]) == tuple else cnt
                  img = cv.drawContours(img, cnt, -1, (122, 144,248), 1)
                              
         if df2 is not None: 

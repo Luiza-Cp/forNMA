@@ -9,10 +9,10 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
-path_to_save= '/media/luiza/DATA/àrea de trabalho/teste (del)/teste 1 canal citoplasma'
+path_to_save= '/media/luiza/DATA/àrea de trabalho/teste (del)/2 canais só cyto'
 
-ch1_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/teste 1 canal citoplasma/g' #pasta contendo as pastas de imagens de um canal 
-ch2_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/g'  #pasta contendo as pastas de imagens de um canal 
+ch1_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/2 canais só cyto/r' #pasta contendo as pastas de imagens de um canal 
+ch2_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/2 canais só cyto/g'  #pasta contendo as pastas de imagens de um canal 
 ch3_path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Verde'
 
 #como você nomeia o canal
@@ -47,7 +47,7 @@ segment_dict = {'magnification': 20,
                 'max_radius': None, 
                 'fast_detection': False,
                 'weakly_labeled': False ,        # setar como true se tiverem marcações fracas e baixa densidade de cell
-                'use_cellpose': False,          # usar o cellpose pra detecção nuclear. Parametros do cellpose abaixo
+                'use_cellpose':True,          # usar o cellpose pra detecção nuclear. Parametros do cellpose abaixo
                 'invert': False,                # invert image pixel intensity before running network (if True, image is also normalized)
                 'normalize': True,              # normalize data so 0.0=1st percentile and 1.0=99th percentile of image intensities in each channel
                 'diameter': 5 ,               # if set to None, then diameter is automatically estimated if size model is loaded
@@ -88,7 +88,7 @@ param_ch2 = {'rescale_intensity': True,
            'remove_bg' : False,
            'radius_bg': 40,
            'match_hist' : False,
-           'wants_ktr' : False,
+           'wants_ktr' : True,
            'ring_size': 3,
            'use_ellipse': True,
            'wants_foci': False,
@@ -120,9 +120,9 @@ param_ch3 = {'rescale_intensity': False,
 #se existirem mais canais, mais params devem ser adicionados.
 #se existirem menos canais, parâmetros devem ser removidos
 
-ch_path_list = [ch1_path, ]#ch2_path]#, ch3_path]
-ch_name_list = [ch1_name,]# ch2_name] #, ch3_name]
-parameter_list = [param_ch1,]#  param_ch2] #, param_ch3]
+ch_path_list = [ch1_path, ch2_path]#, ch3_path]
+ch_name_list = [ch1_name, ch2_name] #, ch3_name]
+parameter_list = [param_ch1, param_ch2] #, param_ch3]
 
 # para cada subpasta dentro da pasta mãe, adicionar uma lista de condições
 # se deixar vazia ou com numero diferente do tamanho de subpastas vai colcoar none
