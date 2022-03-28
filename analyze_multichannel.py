@@ -168,7 +168,7 @@ def perform_measure(nuc_contours: List[np.ndarray],
     image_nuc_df, image_cyto_df = get_image_morphology_dataframe(nuc_contours,
                                        cyto_contours, seg_param)
 
-    
+   
     # iterate over image ch_dict 
     for key, value in ch_dict.items():
         # checks if for that specific channel it wants to measure cytoplasm
@@ -221,10 +221,10 @@ def segment_nuc_and_cyto(img_n: int,
     
     
     #se algum canal tem núcleo:
-    if ch_nuc != None:  
+    if ch_nuc is not None:  
         img_to_segment =  ch_dict[ch_nuc][0][img_n] # pega a imagem do canal do nucleo
         if seg_param['use_cellpose'] == True:  #usa os parametros do seg_param pra medir nucleos com ou sem cellpose
-            image_cp = load_image(img_to_segment) 
+            image_cp = load_image(img_to_segment,rescale_intensity = seg_param['rescale_intensity']) 
             nuc_contours = run_cellpose_nuc(image_cp, seg_param['use_gpu'], 
                             seg_param['diameter'], seg_param['magnification'],
                             seg_param['pixel_size'], seg_param['shape'], 
@@ -252,7 +252,7 @@ def segment_nuc_and_cyto(img_n: int,
         
     
     
-    if ch_cyto != None: #se quer medida de citoplasma
+    if ch_cyto is not None: #se quer medida de citoplasma
         '''# aqui pode ter uma opção de ter ou não cellpose_CYTO 
         # se opção for não, usar voronoi com centroide do contorno anterior.
         #Beautiful
@@ -342,7 +342,7 @@ def analyze_dict(
         # If there aro no contours, the image is skipped
         if len(nuc_contours) == 0 and len(cyto_contours)== 0: 
             continue
-        
+       
         # Utilising nuc and cyto contours, iterate over all channels to perform measurments
         image_nuc_df, image_cyto_df = perform_measure(nuc_contours,cyto_contours,
                                             img_n, ch_dict, ref_dict, seg_param)
