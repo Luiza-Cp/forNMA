@@ -17,22 +17,6 @@ import cv2 as cv
 from cellpose_integration import run_cellpose
 
 
-#channel dict: key = channel (1, 2 3, 4 ..)
-#value = list  ([files], dict{parameters do canal}, bool)
-# o bool só pode ter um true, que é o canal que vai ser usado pra segmentar nuc
-
-def check_size(ch_dict: dict)-> bool:
-    """ Sorts files and checks if all file_lists have the same size. """
-    
-    len_files = len (list(ch_dict.values())[0][0])      #first file list
-    for key, value in ch_dict.items():
-        value[0] = sorted(value[0])
-        if len(value[0]) != len_files:
-            
-            return False
-        
-    return True
-     
 
 #nessa função que tenho que mexer para add foci     
 def measure_image(

@@ -128,7 +128,7 @@ overtime = False
 
 
 import time 
-from main import run
+from run import run
 %matplotlib 
 ts = time.time()
 
