@@ -57,11 +57,11 @@ def measure_image(
 
 def drop_cols(
         complete_df: pd.DataFrame,
-        ch_dict: dict
+        subfolder_dict: dict
 )-> pd.DataFrame:
     """ Drops columns tht store values not required by user."""
     
-    for key, value in ch_dict.items():
+    for key, value in subfolder_dict.items():
         if value[1]['wants_foci'] == False:
             drop_foci = ["Total_foci_" + key,"Total_foci_area_" + key,
                          "Total_foci_mean_" + key, "Foci_area_fraction_" + key,
@@ -82,9 +82,9 @@ def drop_cols(
 
 def perform_measure(contours: np.ndarray,
                     img_n: int,
-                    ch_dict: dict,
+                    subfolder_dict: dict,
                     ref_dict: dict,
-                    seg_param: dict
+                    segment_dict: dict
                     ):
     """ 
         Applies functions needed for cell morphometry and intesity measures
@@ -94,15 +94,15 @@ def perform_measure(contours: np.ndarray,
     for n in range(len(contours)):
         #checar len(n) tem que ter ao menos 5 ptos no contorno para fitar uma elipse
         if len(contours[n]>5):
-            morpho = Morphology(n+1, contours[n], seg_param['use_cellpose'])
+            morpho = Morphology(n+1, contours[n], segment_dict['use_cellpose'])
             df_morpho_list.append(morpho.df)
     image_df = pd.concat(df_morpho_list)
       
     
-    for key, value in ch_dict.items():
+    for key, value in subfolder_dict.items():
         df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
-                        ref_dict[key], contours, seg_param['magnification'], 
-                        seg_param['pixel_size'], key)
+                        ref_dict[key], contours, segment_dict['magnification'], 
+                        segment_dict['pixel_size'], key)
         
         df_ch = pd.concat(df_ch_list)
         image_df = pd.merge(image_df, df_ch, on = 'Cell')
@@ -113,10 +113,9 @@ def perform_measure(contours: np.ndarray,
 
 
 #ELE nÂo salva imagens que estão sem contornos, tenho que corrigir isso 
-
 def analyze_dict(
-        ch_dict: dict,      # dic of every channel 
-        seg_param: dict,     # dic of global parameters
+        subfolder_dict: dict,      # dic of every channel 
+        segment_dict: dict,     # dic of global parameters
         is_overtime: bool,
         condition: Optional[str]
         
@@ -130,51 +129,51 @@ def analyze_dict(
     
     ref_dict = {}
     
-    for key, value in ch_dict.items():
+    for key, value in subfolder_dict.items():
         if value[2] == True:
             ch_segment = key
         ref_dict[key] = load_image(value[0][0]) if value[1]['match_hist'] else None
 
     all_df_list =  []    
-    for img_n in range(len((list(ch_dict.values())[0][0]))):      
-        img_to_segment = ch_dict[ch_segment][0][img_n]
+    for img_n in range(len((list(subfolder_dict.values())[0][0]))):      
+        img_to_segment = subfolder_dict[ch_segment][0][img_n]
         
-        cellpose =  seg_param['use_cellpose']
+        cellpose =  segment_dict['use_cellpose']
         
         if cellpose == True:
             #aqui chamo a função que vai pegar essa img já aberta e rodar... 
             #não sei se fazer ssim não deixa mais lento
             image_cp =load_image(img_to_segment)
-            contours = run_cellpose(image_cp, seg_param['use_gpu'], 
-                            seg_param['diameter'], seg_param['magnification'],
-                            seg_param['pixel_size'], seg_param['shape'], 
-                            seg_param['eccentricity'],seg_param['min_size'], 
-                            seg_param['max_size'],seg_param['min_radius'], 
-                            seg_param['max_radius'], seg_param['invert'], 
-                            seg_param['normalize'], seg_param['net_avg'],
-                            seg_param['resample'], seg_param['flow_threshold'],
-                            seg_param['mask_threshold'])
+            contours = run_cellpose(image_cp, segment_dict['use_gpu'], 
+                            segment_dict['diameter'], segment_dict['magnification'],
+                            segment_dict['pixel_size'], segment_dict['shape'], 
+                            segment_dict['eccentricity'],segment_dict['min_size'], 
+                            segment_dict['max_size'],segment_dict['min_radius'], 
+                            segment_dict['max_radius'], segment_dict['invert'], 
+                            segment_dict['normalize'], segment_dict['net_avg'],
+                            segment_dict['resample'], segment_dict['flow_threshold'],
+                            segment_dict['mask_threshold'])
            
             print(len(contours))
         else: 
             contours = find_contours(img_to_segment, 
-               magnification = seg_param['magnification'],
-               pixel_size = seg_param['pixel_size'], rescale_intensity = seg_param['rescale_intensity'],
-               remove_bg = seg_param['remove_bg'],radius_bg = seg_param['radius_bg'],
-               threshold = seg_param['threshold'], offset = seg_param['offset'], 
-               blur= seg_param['blur'], adjust_size= seg_param['adjust_size'], 
-               cut_edges = seg_param['cut_edges'], shape= seg_param['shape'], 
-               eccentricity = seg_param['eccentricity'],min_size= seg_param['min_size'], 
-               max_size= seg_param['max_size'],min_radius= seg_param['min_radius'], 
-               max_radius= seg_param['max_radius'],fast_detection = seg_param['fast_detection'],
-               weakly_labeled = seg_param['weakly_labeled']
+               magnification = segment_dict['magnification'],
+               pixel_size = segment_dict['pixel_size'], rescale_intensity = segment_dict['rescale_intensity'],
+               remove_bg = segment_dict['remove_bg'],radius_bg = segment_dict['radius_bg'],
+               threshold = segment_dict['threshold'], offset = segment_dict['offset'], 
+               blur= segment_dict['blur'], adjust_size= segment_dict['adjust_size'], 
+               cut_edges = segment_dict['cut_edges'], shape= segment_dict['shape'], 
+               eccentricity = segment_dict['eccentricity'],min_size= segment_dict['min_size'], 
+               max_size= segment_dict['max_size'],min_radius= segment_dict['min_radius'], 
+               max_radius= segment_dict['max_radius'],fast_detection = segment_dict['fast_detection'],
+               weakly_labeled = segment_dict['weakly_labeled']
                )
         
         #aqui vem o morphology e gero um df e todos os proximos vem ao lado 
         if len(contours) == 0:
             #ele ta dando continue, nem todas imagens vão estar no final pra serem salvas
             continue
-        image_df = perform_measure(contours, img_n, ch_dict, ref_dict, seg_param)
+        image_df = perform_measure(contours, img_n, subfolder_dict, ref_dict, segment_dict)
            
             
         all_df_list.append(image_df)
@@ -185,7 +184,7 @@ def analyze_dict(
     all_df = all_df.reset_index(drop= True)
     
     #drop columns here 
-    all_df = drop_cols(all_df, ch_dict)
+    all_df = drop_cols(all_df, subfolder_dict)
     
     return all_df   # esse df vai pra parte de remover outliers 
           
@@ -292,7 +291,7 @@ def save_dfs(df_results: pd.DataFrame,
         cols = [f for f in df_save.columns if 'foci_df' not in f]
         df_save = df_save[cols]        
         df_save.to_csv(os.path.join(path_save, t[:-4]) + ' Results.csv')
-        if df_foci != None:
+        if df_foci is not None:
             df_foci.to_csv(os.path.join(path_save, t[:-4]) + ' Foci Results.csv')
         print (os.path.join(path_save, t[:-4]))
     return print("files saved")
@@ -376,77 +375,3 @@ def saving_images(df_draw: pd.DataFrame,
 # depois que eu selecionar o que faz sentido pra mim, rodar uma pasta separando 
 # campos e poços e ploto so dotplots das médias de areqa e ativação de erk   
 
-#abaixo exemplo de como chamar para eventuais testes (sem ter que roar tudo a partir do run)   
-'''    
-       
-p1 = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/r/red'
-p2 = '/media/luiza/DATA/àrea de trabalho/video kaka/registradas/g/green'
-r = os.listdir (p1) 
-r = [os.path.join(p1, i) for i in r]
-g = os.listdir (p2 ) 
-g = [os.path.join(p2, i) for i in g]
-
-param_r = {'rescale_intensity' : True,
-           'remove_bg' : False,
-           'radius_bg': 50,
-           'match_hist' : False,
-           'wants_ktr' : False,
-           'ring_size': 3,
-           'use_ellipse': False,
-           'wants_foci': True,
-           'foci_min_size' : None,
-           'foci_max_size': None,
-           'foci_min_int' : None,
-           'foci_max_int' : None,
-           'foci_proeminence' : None
-           }
-
-param_g = {'rescale_intensity' : True,
-           'remove_bg' : False,
-           'radius_bg': 50,
-           'match_hist' : False,
-           'wants_ktr' : True,
-           'ring_size': 3,
-           'use_ellipse': True,
-           'wants_foci': False,
-           'foci_min_size' : None,
-           'foci_max_size': None,
-           'foci_min_int' : None,
-           'foci_max_int' : None,
-           'foci_proeminence' : None
-           }
-
-
-teste_dict = {'red': [r, param_r, True],
-              'green' : [g, param_g, False]}
-
-segment_dict = {'magnification': 20,
-                'pixel_size':  0.6,
-                'rescale_intensity':  True,
-                'remove_bg': False,
-                'radius_bg': 0,
-                'threshold': 'triangle',
-                'offset': 0,
-                'blur' : 12, 
-                'adjust_size': 0, 
-                'cut_edges':  0.7, 
-                'shape':  0.88, 
-                'eccentricity': None, 
-                'min_size': None, 
-                'max_size': None, 
-                'min_radius': None, 
-                'max_radius': None, 
-                'fast_detection': False,
-                'error': None 
-  }
-
-     
-check_size(teste_dict)
-c = analyze_dict(teste_dict, segment_dict, True, 'c')
-d = split_dfs(c, teste_dict)
-
-e = split_dfs(c, teste_dict)
-#h =draw_and_save( e[1], e[0], 'C:\\Users\\Luiza Cherobini\\Desktop\\', 'a',
-#              teste_dict, True)       
-
-'''               

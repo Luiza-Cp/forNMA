@@ -82,7 +82,7 @@ def find_contours(
     else:
         nuc_contours = [] 
     image_erased =img.copy()
-    if fast_detection == False:
+    if fast_detection == True: # fast_detection mudou o nome para weakly_labelled. Se é true, busca mais nucs em novas rodadas
         #it tries to find nuclei with less ifluorescence intensity by covering 
         #the already detected ones. If after 6 rounds of covering nuclei it still 
         #finds objects, forNMA will ignore them

@@ -7,10 +7,9 @@ Created on Fri Feb 11 15:35:41 2022
 """
 
 import numpy as np
-import skimage.io
 from cellpose import models, utils
 from typing import Optional, List
-from initializing_functions_multichannel import filter_contours
+from initializing_functions_multichannel import filter_contours, load_image
 
 def remove_edge_cnt(outlines_cnt, shape):
     """ Gets a list of contours and removes contours that touches the image borders."""
@@ -25,7 +24,7 @@ def remove_edge_cnt(outlines_cnt, shape):
     return cnts_not_border 
 
 
-def run_cellpose (image: np.ndarray, 
+def run_cellpose (image_path: str, 
                   use_gpu: bool, 
                   diameter: Optional[int],
                   mag: int, 
@@ -46,9 +45,9 @@ def run_cellpose (image: np.ndarray,
     
     """ 
     Runs cellpose nuclear model in a specified image and returns a
-    list of nuclei contours.
+    list of filtered nuclei contours.
     """
-    
+    image = load_image(image_path)
     model = models.Cellpose(model_type='nuclei', gpu= use_gpu)
     channels = [[0,0]]
     masks, flows, styles, diams = model.eval([image], diameter=diameter, channels=channels,
@@ -64,17 +63,4 @@ def run_cellpose (image: np.ndarray,
                                        min_size, max_size, min_radius, max_radius)
     
     return outlines_cnt
-        
-#######        
-#files = ['/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Azul/DAPI/WT_RPE WT ETOPOSIDE 0,2uM 2h_FOV 00301_DAPI.tif',
-#         '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Azul/DAPI/WT_RPE WT ETOPOSIDE 0,2uM 2h_FOV 00302_DAPI.tif' ,
-#         '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Azul/DAPI/WT_RPE WT ETOPOSIDE 0,2uM 2h_FOV 00303_DAPI.tif'       
-#         ]
-          
-#imgs = [skimage.io.imread(f) for f in files]      
-#aa = run_cellpose(imgs[1], True, 120, 40, 0.1,  0.75,  None, 50, 1000000, None, 100000, None,)
-
-#from matplotlib import pyplot as plt
-#import cv2 as cv
-#bb = cv.drawContours(imgs[1], aa, -1, (255, 255,255), 4)
-#plt.imshow(bb)
+  

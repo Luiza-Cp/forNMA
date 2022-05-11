@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-NAME ='/media/luiza/DATA/Doutorado/53BP1/git.csv'
+NAME ='/media/luiza/DATA/Doutorado/53BP1/results.csv'
 
 df = pd.read_csv(NAME)
 
