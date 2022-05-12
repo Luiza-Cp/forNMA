@@ -10,12 +10,13 @@ File that puts all functions together
 
 import os
 from typing import List, Tuple
-from analyze_multichannel import analyze_dict, saving_images,split_dfs, save_dfs
-import tempfile
+from analyze_multichannel import analyze_dict
 import pandas as pd 
 pd.options.mode.chained_assignment = None  # default='warn'
-from clean_dataframe import plot_and_clean, erase_df
-   
+import cv2 as cv
+import tempfile
+from df_managing.organize import filter_dataframe, get_foci_df, split_dfs
+
 
 def rename_channel_parameters(channel_parameters: dict) -> dict:
     """ Renames parameter dictionary keys"""
@@ -156,28 +157,94 @@ def check_size(ch_dict: dict)-> bool:
         
     return True
  
+   
+def save_dfs(df_results: pd.DataFrame,
+             path_save: str):
     
-def filter_dataframe(temp_dir: str,
-                     headless: bool = False,
-)-> pd.DataFrame:
+    """ Saves dataframes"""
+    tables = list(set(df_results['origin_folder']))
+    for t in tables:
+        df_foci, df_results = get_foci_df(df_results)
+        df_save =  df_results[df_results["origin_folder"]== t]
+        df_save = df_save.reindex(columns=(['Frame'] + list([a for a in df_save.columns if a != 'Frame']) ))
+        df_save.drop(columns= (["origin_folder"]), inplace=True)
+        cols = [f for f in df_save.columns if 'foci_df' not in f]
+        df_save = df_save[cols]        
+        df_save.to_csv(os.path.join(path_save, t[:-4]) + ' Results.csv')
+        if df_foci is not None:
+            df_foci.to_csv(os.path.join(path_save, t[:-4]) + ' Foci Results.csv')
+    return print("files saved")
+ 
+
+
+def draw_and_save(df: pd.DataFrame,
+                 ch: str,
+                 saving_dir: str,
+                 use_cellpose: bool
+):
     """ 
-    From all folders in a temporary directory, opens all dataframes stored as
-    pickle objects, appends all dataframes and applies user manual filtering. 
-    If headless, does not open graph to be adjusted and filtering is not applied.
+    Loop though a dataframe based on its channels and draws contours at the
+    specified images and then saves them.
     """
-    complete_df = pd.DataFrame()
-    for file in os.listdir(temp_dir.name):
-        path_to_temp_csv = os.path.join(temp_dir.name, file) 
-        df = pd.read_pickle(path_to_temp_csv)
-        df["origin_folder"]= file
-        complete_df = complete_df.append(df)
+     
+    cols_to_draw = [ f for f in list(df.columns) if ch in f 
+                    and 'Y_draw' not in f and 'Image_' not in f]
     
-    if headless == False:    
-        h_down, h_up, v_left, v_right = plot_and_clean(complete_df) 
-        complete_df = erase_df(complete_df, h_down, h_up, v_left, v_right)   
+    df = df.filter(regex = ch+"|Cell|X")
+    cnt_groupped = df.groupby(['Image_name_' + ch])
+    fs = cv.getFontScaleFromHeight(2,15,2)   
+    for name, group in  cnt_groupped:
+        img = group['Image_'+ ch].iloc[0]
+        img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
+        cnt_nuc = list(group['Nuc_cnt_' + ch])
+        img = cv.drawContours(img, cnt_nuc, -1, (98,59,132), 1)
+        for i in range(len(group['Cell'])):
+            img = cv.putText(img, str(int(group['Cell'].iloc[i])), 
+                            ((group['X']+5).iloc[i], group['Y_draw_' + ch].iloc[i]), 
+                            2, fs, (122, 144,248), 1)
+         
+        for col in cols_to_draw:
+            if 'Foci' in col:
+                 foci_cnt = list(group['Foci_cnt_' + ch])
+                 foci_cnt = [i for f in foci_cnt for i in f if len(f)> 0]
+                 img = cv.drawContours(img, foci_cnt, -1, (122, 144,248), 1)
+                 
+            else:                           
+                 cnt = list(group[col])
+                 cnt = [f[0] for f in cnt if len(f)> 0] if use_cellpose == False else cnt
+                 img = cv.drawContours(img, cnt, -1, (122, 144,248), 1)
+                                    
+    
+        cv.imwrite(os.path.join(saving_dir, name), img)
+    
+    
 
-    return complete_df
-
+def saving_images(df_draw: pd.DataFrame,
+                path_to_save: str,
+                ch_name_list: List[str],
+                use_cellpose: bool
+):  
+   """ 
+   Splits dataframaccording to their folders, creates directories
+   for saving and pass values to draw_and_save, that draws contours and saves
+   images.
+   """
+   dirs = list(set(df_draw.origin_folder.values))
+   df_draw.to_pickle(os.path.join(path_to_save, 'Results.pkl'))
+   
+   #    itera por cada pasta nesse df
+   for d in dirs:
+       df_dir = df_draw[df_draw["origin_folder"]==d]
+       saving_dir = os.path.join(path_to_save, d[:-4] + '-') if os.path.isdir(os.path.join(path_to_save, d[:-4])) else os.path.join(path_to_save, d[:-4])
+       os.mkdir(saving_dir) 
+       #    vai iterar sobre cada canal dessa pasta
+       for ch in ch_name_list:
+           saving_dir_ch = os.path.join(saving_dir, ch)
+           os.mkdir(saving_dir_ch)           
+           draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
+         
+    
+        
 
 def run(parameters_dict: dict,
         headless: bool  = False

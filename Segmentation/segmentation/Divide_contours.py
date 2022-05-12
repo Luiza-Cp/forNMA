@@ -6,12 +6,11 @@ Created on Sat Mar 13 21:12:53 2021
 
 
 """
-from matplotlib import pyplot as plt
 
 import cv2 as cv
+import math
 import numpy as np
 from skimage import color, img_as_ubyte
-import math
 from typing import Optional, List, Tuple
 
 def select_right_contour(
@@ -207,6 +206,7 @@ class Segmenting:
                new_contours.append(contour)
         return new_contours   
  
+    
     def watershed(self
         ) -> np.ndarray:
         """ Performs watershed segmentation in the selected ROI. """

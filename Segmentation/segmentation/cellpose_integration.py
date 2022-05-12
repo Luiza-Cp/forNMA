@@ -9,7 +9,8 @@ Created on Fri Feb 11 15:35:41 2022
 import numpy as np
 from cellpose import models, utils
 from typing import Optional, List
-from initializing_functions_multichannel import filter_contours, load_image
+from segmentation.find_contours_multichannel import load_image
+from segmentation.filters import filter_contours
 
 def remove_edge_cnt(outlines_cnt, shape):
     """ Gets a list of contours and removes contours that touches the image borders."""

@@ -10,18 +10,15 @@ Sem as partes do cálculo de NMA
 """
 
 import cv2 as cv
-import math 
 import numpy as np
 from scipy import signal
 from skimage.feature import local_binary_pattern
 from skimage.segmentation import clear_border
-from foci_class import Foci
+from measure.foci_class import Foci
 import pandas as pd
-import scipy
-from typing import Optional, List
+from typing import List
 
 
-#talvez eu não precise a binária -> excluir
 class Cell:
     """
     Stores and measures proprieties of a image object, i.e. the nucleus of a 
@@ -535,10 +532,6 @@ class Cell:
         
         return df_cell
                      
-   
-                     
-                     
-            
-        #cria aqui a linha do df completão
+
         
     

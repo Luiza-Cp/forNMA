@@ -6,11 +6,9 @@ Created on Sun Aug  1 20:46:57 2021
 """
 
 import matplotlib.pyplot as plt
-import matplotlib.lines as lines
-from Draggable_line import draggable_lines
+from df_managing.Draggable_line import draggable_lines
 import pandas as pd
 import seaborn as sns
-import numpy as np
 
 
 def plot_and_clean(df: pd.DataFrame) -> pd.DataFrame:   
@@ -55,8 +53,8 @@ def remove_repeated_nuc(df):
 def erase_df (df, h_down, h_up, v_left, v_right):
     df = df[df["Area"] < h_up]
     df = df[df["Area"] > h_down]
-    df = df[df["NII"] > v_left]
-    df = df[df["NII"] < v_right]
+    df = df[df["Roundness"] > v_left]
+    df = df[df["Roundness"] < v_right]
     
     frames = list(set(df.Frame.values))
     origin_folders = list(set(df.origin_folder.values))
