@@ -154,7 +154,7 @@ forNMA also has a headless mode, and each module can be called independently as 
 
 ### Segmentation and Feature Extraction
 ```sh
-   fornma run pparametes --headless
+   fornma run parameters --headless
   ```
    Where:
  * parameters is the path to the parameters.toml file 
