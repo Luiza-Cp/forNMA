@@ -4,16 +4,17 @@ Created on Sun May 16 20:11:52 2021
 
 @author: Luiza
 """
-import pandas as pd
-pd.options.mode.chained_assignment = None  # default='warn'
-from segmentation.find_contours_multichannel import fornma_contour_finding, load_image
-from measure.Morphology_class import Morphology 
-from measure.Cell_class_multichannel import Cell
 import numpy as np
-from typing import List, Optional
 import os
+import pandas as pd
+from typing import List, Optional
+from measure.Morphology import Morphology 
+from measure.Cell import Cell
+from segmentation.find_contours import fornma_contour_finding, load_image
 from segmentation.cellpose_integration import run_cellpose
    
+pd.options.mode.chained_assignment = None  # default='warn'
+
 def measure_image(
         path_image: str, 
         dict_param: dict,

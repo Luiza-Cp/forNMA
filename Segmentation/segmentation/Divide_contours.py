@@ -4,7 +4,6 @@ Created on Sat Mar 13 21:12:53 2021
 
 @author: Luiza
 
-
 """
 
 import cv2 as cv
@@ -12,6 +11,7 @@ import math
 import numpy as np
 from skimage import color, img_as_ubyte
 from typing import Optional, List, Tuple
+
 
 def select_right_contour(
         contour_list: List[np.ndarray], 
@@ -90,7 +90,35 @@ class Segmenting:
                  w: int, 
                  h: int, 
                  cut_edges: Optional[float]): 
-
+        """
+        Atributes
+        self.raw_contour = a contour with extent_hull bellow threshold
+        self.img = whole image
+        self.rf = resolution factor
+        self.ps = pixel size
+        self.adjusted_contours = list of new contours 
+        self.extent = contour extent 
+        self.x = contour bounding box x position
+        self.y = contour bounding box y position
+        self.w = contour bounding width
+        self.h = contour bounding height
+        self.cut_edges = value to force cut between two nuclei
+        self.x2 = contour expanded bounding box x position  
+        self.y2 = contour expanded bounding box y position  
+        self.w2 = contour expanded bounding box width
+        self.h2 = contour expanded bounding box height
+        self.roi_img = region of interest of self.img. ROI found with expanded biundig box coordinates 
+        self.roi_binary = binarized self.roi_img
+        self.bg = self.roi_image background region
+        self.fg = self.roi_image foreground region
+        self.unknown = self.roi_image unknown region (is bg or fg?)
+        self.markers = cv markers for watershedding
+        self.ws_contour = list of contours found trough watershedding
+        self.cut_contour = list of contours found by cutting nucleus
+        self.true_contour = list with final contours (the best divided)
+             
+        
+        """
         
         self.raw_contour = contour
         self.img = image
@@ -110,7 +138,7 @@ class Segmenting:
         self.ws_contour = self.watershed() # aqui tem a lista dos contornos 
         self.cut_contour = self.force_cut()
         self.true_contour = self.select_contour()
-              
+             
         
         
     def find_bigger_bbox(self) -> int:

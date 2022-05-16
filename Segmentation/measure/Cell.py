@@ -4,24 +4,21 @@ Created on Mon May 17 09:19:03 2021
 
 @author: Luiza
 
-Cell mas sem um segundo canal (analisa tudo no p´roprio canal de acordo com os 
-                               parâmetros passados no dict)
-Sem as partes do cálculo de NMA 
 """
 
 import cv2 as cv
 import numpy as np
+import pandas as pd
 from scipy import signal
 from skimage.feature import local_binary_pattern
 from skimage.segmentation import clear_border
-from measure.foci_class import Foci
-import pandas as pd
 from typing import List
+from measure.Foci import Foci
 
 
 class Cell:
     """
-    Stores and measures proprieties of a image object, i.e. the nucleus of a 
+    Stores and measures proprieties of an image object, i.e. the nucleus of a 
     cell.
     """
     def __init__(self, n, cnt, mag, ps, image, image_name, ch_name,
@@ -201,8 +198,6 @@ class Cell:
              else:
                 self.nc_ellipse = self.mean_int/self.ellipse_mean
                 
-             #conferir mean e median  da ellipse e ring 
-      
              self.ring_median = self.calc_median(self.nuc2, self.ring_mask)
              self.ellipse_median = self.calc_median(self.nuc2, self.ellipse_mask)
              self.cn_ring_med = self.ring_median/self.median_int
@@ -215,7 +210,7 @@ class Cell:
             self.GaussianKernel = self.calc_GaussianKernel()
             self.tophat = cv.morphologyEx(self.nuc, cv.MORPH_TOPHAT, self.GaussianKernel)
             self.lbp = self.calc_lbp()
-            #testar o inverso do LBP para nucléolo nas coisas da daph
+            # inverse of LBP maybe to dark nuclear spots? later
             self.foci_cnt, self.mask_foci = self.calc_foci_cnt()
             self.foci_raw_list = self.calc_nuc_foci()
             self.foci_list = self.filter_foci()
@@ -325,8 +320,7 @@ class Cell:
     
     
     def calc_lbp(self) -> np.ndarray:
-        """Mweasures the Local Binary Patterns os the nucleus. """
-        #não sei se esse raio não tem que ser adaptado de acordo com imagem?
+        """Mweasures the Local Binary Patterns of the nucleus. """
         radius = 5
         n_points = 8 * radius
         METHOD = 'uniform'
@@ -341,7 +335,7 @@ class Cell:
         Applies morphological Transformations to clean the LBP result, blurs it
         to smooth edges, and then finds its contours and filters the small objects
         according to user inputs or removes small spots.
-        Returns a contou list and nucleus image to use in foci object.
+        Returns a contour list and nucleus image to use in foci object.
         """
         find_dots = self.lbp < 18
         dots = find_dots.astype('uint8')
@@ -402,7 +396,7 @@ class Cell:
         for foc in foci_list:
             binary = self.nuc_mask
             int_bin = binary[foc.centroid_y, foc.centroid_x]
-            if int_bin>0:       #checks if the objct is inside the nucleus
+            if int_bin>0:       # checks if the objct is inside the nucleus
                 foci_list2.append(foc)
                 
         return foci_list2
@@ -412,7 +406,7 @@ class Cell:
         """
         Filters foci by user defined min and max intensities. Then, it creates
         a new mask to measure the nucleus mean intensity without considering the
-        found foci, so it can compare the proeminence of a focus with the 
+        found foci, so it can compare the prominence of a focus with the 
         background intensity of the nucleus. 
         It returns a filtered foci list.
         """
@@ -459,7 +453,7 @@ class Cell:
     
     
     def calc_tot_foc_area(self) -> float:
-        """ Sums up the areal of all foci in the Cell"""
+        """ Sums up the area of all foci in the Cell"""
         tot_area= 0
         if len(self.foci_list) > 0:
             for foc in self.foci_list:

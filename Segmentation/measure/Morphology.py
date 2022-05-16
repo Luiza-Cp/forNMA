@@ -3,8 +3,8 @@
 Created on Mon May 17 10:18:45 2021
 
 @author: Luiza
-Classe que calcula o NMA devolvendo um dict igual ao das imagens mas sem medidas
-de intensidade. Só morfoógicas
+
+Code tha stabilisha class for morphological features measuring.
 """
 
 import cv2 as cv
@@ -57,12 +57,11 @@ class Morphology:
         self.centroid_y = int(self.moments['m01']/self.moments['m00'])
         self.radius_ratio = self.calc_radius_ratio()
         self.NII = 0.9*self.aspect- 0.87*self.extent + 0.96*self.radius_ratio + 0.92*self.roundness
-       
         self.convex_area = cv.contourArea(cv.convexHull(self.cnt))/self.area
         self.df = self.create_df()
         
     def calc_aspect (self) -> float: 
-        """Given a fit ellipse, measures the ratio between the major and mino axis."""
+        """Given a fit ellipse, measures the ratio between the major and minor axis."""
         if self.fellipse[1][0] == 0 or  self.fellipse[1][1]==0 :
             print ('zero, usei 1 no lugar ')
             asp =1

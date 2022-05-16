@@ -7,15 +7,15 @@ Created on Wed Aug  4 14:25:56 2021
 File that puts all functions together 
 """
 
-
-import os
-from typing import List, Tuple
-from analyze_multichannel import analyze_dict
-import pandas as pd 
-pd.options.mode.chained_assignment = None  # default='warn'
 import cv2 as cv
+import os
+import pandas as pd 
 import tempfile
+from typing import List, Tuple
+from analyze import analyze_dict
 from df_managing.organize import filter_dataframe, get_foci_df, split_dfs
+
+pd.options.mode.chained_assignment = None  # default='warn'
 
 
 def rename_channel_parameters(channel_parameters: dict) -> dict:

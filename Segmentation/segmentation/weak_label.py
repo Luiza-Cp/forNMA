@@ -92,7 +92,7 @@ def adjust_binary_image(
     kernel = np.ones((3,3), np.uint8) 
     if pixel_size > 0.3:
         bin_im = adjust_low_res_binary_img(binary_image, kernel, pixel_size)
-        kernel_size = 9     # a bigger kernel makes the blur most efficient
+        kernel_size = 9     # a bigger kernel makes blur more efficient
     else: 
         bin_im = adjust_high_res_binary_img(binary_image, kernel, pixel_size)
         kernel_size = round(1/pixel_size)

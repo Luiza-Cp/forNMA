@@ -4,21 +4,16 @@ Created on Sun May 16 14:32:54 2021
 
 @author: Luiza
 
-Função que processa a imagem principal (ch 1) e encontra os nucleos.
-Busca os contornos somente (no load não vai remover bg ou match histog.)
-
-Análoga à RUN_IMAGE
-
+Code with all contour finding functions
 """
 
+import cv2 as cv
+import numpy as np
 from skimage import  img_as_ubyte, exposure, restoration
 from skimage.exposure import match_histograms
-import numpy as np
+from typing import Optional, List, Tuple
 from segmentation.thresholding import threshold_dict
-from typing import Optional, List
-import cv2 as cv
-from segmentation.Divide_contours import Segmenting, select_right_contour
-from typing import  Tuple
+from segmentation.Divide_contours import Segmenting, select_right_contour  
 from segmentation.weak_label import fluorescence_of_rings, adjust_binary_image
 from segmentation.filters import filter_debree, filter_contours
 

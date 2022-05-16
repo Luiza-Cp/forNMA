@@ -3,11 +3,10 @@
 Created on Thu Oct 15 11:09:28 2020
 
 @author: Luiza Cherobini
+
 """
 import cv2 as cv
 import numpy as np
-from scipy.stats import kurtosis
-from skimage.measure import profile_line
 import pandas as pd
 
 
