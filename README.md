@@ -180,7 +180,7 @@ Here write about filering function
  * -mg, --max_gap_closing_distance is the maximal distance for closing segment gaps;
  * -am, --allow_merging indicates whether object merging is allowed or not.
  
-Notice that optionalarguments must be optimized for every axperimental condition, and default values are just a suggestion.
+Notice that optional arguments must be optimized for every experimental condition, and default values are just a suggestion.
 
 #### Draw Tracking at Images
 ```sh
