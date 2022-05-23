@@ -179,6 +179,7 @@ Here write about filering function
  * -ms, --max_split_distanceis the maximal distance to link segment starts to segment middlepoints;
  * -mg, --max_gap_closing_distance is the maximal distance for closing segment gaps;
  * -am, --allow_merging indicates whether object merging is allowed or not.
+ 
 Notice that optionalarguments must be optimized for every axperimental condition, and default values are just a suggestion.
 
 #### Draw Tracking at Images
