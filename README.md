@@ -60,7 +60,9 @@
     <ul>
         <li><a href="#image-registration">Image Registration</a></li>
         <li><a href="#segmentation-and-feature-extraction">Segmentation and feature extraction</a></li>
-      </ul>
+        <li><a href="#filter-results">Filter Results</a></li>
+        <li><a href="#tracking">Tracking</a></li>
+    </ul>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -148,8 +150,8 @@ forNMA also has a headless mode, and each module can be called independently as 
    fornma registration path_list path_to_save --crop
    ```
  Where:
- * path_list is a list where each item is a path to a folder containing all images to be registered in one channel. Every folder in the list wil be registered against each other too. 
- * path_to_save is the path where registered images will be saved
+ * path_list is a list where each item is a path to a folder containing all images to be registered in one channel. Every folder in the list wil be registered against each other too; 
+ * path_to_save is the path where registered images will be saved;
  * -- crop is a boolean. If True, all images will be cropped to keep only the field that remains in view.
 
 ### Segmentation and Feature Extraction
@@ -157,10 +159,39 @@ forNMA also has a headless mode, and each module can be called independently as 
    fornma run parameters --headless
   ```
    Where:
- * parameters is the path to the parameters.toml file 
- * -- headless is true whan running without any GUI.
+ * parameters is the path to the parameters.toml file; 
+ * -- headless is true when running without any GUI.
  
  Here you find more infromation on how to use [TOML](https://toml.io/en/) and how to [set parameters](ufrgs.br/labsinal).
+
+### Filter Results 
+Here write about filering function
+
+### Tracking
+```sh
+   fornma tracking path_to_table path_to_save -md -t -ms -mg -am
+  ```
+  Where:
+ * path_to_table is the path to forNMA results CSV file;
+ * path_to_save is the path where tracked CSV will be saved;
+ * -md, --max_distance is the maximal distance to allow particle linking between frames;
+ * -t, --time_window is the maximal memory of the tracker to link track segments;
+ * -ms, --max_split_distanceis the maximal distance to link segment starts to segment middlepoints;
+ * -mg, --max_gap_closing_distance is the maximal distance for closing segment gaps;
+ * -am, --allow_merging indicates whether object merging is allowed or not.
+Notice that optionalarguments must be optimized for every axperimental condition, and default values are just a suggestion.
+
+#### Draw Tracking at Images
+```sh
+   fornma draw_tracking path_to_table path_to_images path_to_save -rs
+  ```
+  Where:
+ * path_to_table is the path to forNMA tracking results CSV file;
+ * path_to_images is the path to a folder containing images to be drawn;
+ * path_to_save is the path where images will be saved;
+ * -rs, --rescale_intesity indicates whether image intensities must be rescaled.
+
+
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
