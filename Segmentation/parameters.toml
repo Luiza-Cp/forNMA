@@ -31,9 +31,9 @@ save_images = true
 # now, let's set parameters. You can learn about them at www.ufrgs/labsinal/fornma
 [segmentation]
 magnification = 20   
-pixel_size = 0.6    
-rescale_intensity = true
-remove_background = true
+pixel_size = 0.5    
+rescale_intensity = false
+remove_background = false
 rolling_ball_radius = 40
 
 # forNMA and cellpose thresholds
@@ -60,7 +60,7 @@ weakly_labeled = false
 #parameters for running with cellpose 
 [segmentation.cellpose]   
 use_cellpose =  false
-diameter = 5
+diameter = 25
 flow_threshold = 0.4
 mask_threshold = 0.0
 use_gpu = false
