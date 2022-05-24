@@ -11,7 +11,17 @@ import skimage.io
 from cellpose import models, utils
 from typing import Optional, List
 from initializing_functions_multichannel import filter_contours
+import cv2 as cv
 
+def area_filter(cnt: List[np.ndarray]):
+    new_cnts = []
+    for c in cnt:
+        area =cv.contourArea(c)
+        if area>0:
+            new_cnts.append_cnt
+    return new_cnts
+    
+    
 def remove_edge_cnt(outlines_cnt, shape):
     """ Gets a list of contours and removes contours that touches the image borders."""
     cnts_not_border = [] 
@@ -61,6 +71,7 @@ def run_cellpose_nuc(image: np.ndarray,
     if len(outlines_cnt) >0 :
         outlines_cnt = filter_contours(outlines_cnt, mag, px_s, shape, eccentricity, 
                                        min_size, max_size, min_radius, max_radius)
+        outlines_cnt = area_filter(outlines_cnt)
     
     return outlines_cnt
 

@@ -9,11 +9,19 @@ Created on Sun May 30 09:36:15 2021
 #dicionários são adicionados 
 #sorry pelos typos e erros de ingês e português,fica à vontade pra corrigir tbm
 
+<<<<<<< HEAD
 path_to_save= '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/DAPI PARA NMA (expto A549 2 Inácio para Lu)/blur 0'
 
 ch1_path = '/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/DAPI PARA NMA (expto A549 2 Inácio para Lu)/Imagens/c_g_e' #pasta contendo as pastas de imagens de um canal 
 ch2_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/kaka teste/fotos/green'  #pasta contendo as pastas de imagens de um canal 
 ch3_path = '/media/luiza/DATA/àrea de trabalho/teste (del)/kaka teste/fotos/phase'
+=======
+path_to_save= '/home/luiza/dados/exp Karine-julia_STV + TMZ (3h 100uM)/results'
+
+ch1_path = '/home/luiza/dados/exp Karine-julia_STV + TMZ (3h 100uM)/red' #pasta contendo as pastas de imagens de um canal 
+ch2_path = '/home/luiza/dados/exp Karine-julia_STV + TMZ (3h 100uM)/green' #pasta contendo as pastas de imagens de um canal 
+ch3_path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/RPE retopo 0.2 um/Verde'
+>>>>>>> 5591fa39b942fb22da29fa672c3af73ee2aae507
 
 #como você nomeia o canal
 ch1_name ='53bp1'
@@ -36,10 +44,17 @@ segment_dict = {'magnification': 40,
                 'radius_bg': 0,                # raio da rolling-balll (igual ao imageJ)
                 'threshold':'yen',        # Descrição das opções vem abaixo 
                 'offset': 5,                    # Deve ser usado para os thresholds locais 
+<<<<<<< HEAD
                 'blur': 0,                     # o quanto deve suavizar o contorno do núcleo
                 'adjust_size': 0,               # Expandir ou diminuir o contorno (número negativo para diminuir)
                 'cut_edges':False,            # o quanto deve forçar o corte entre os núcleos, pode ser False 
                 'shape':  0.74,                 # remove células com formatos muito loucos
+=======
+                'blur': 13,                     # o quanto deve suavizar o contorno do núcleo
+                'adjust_size': -1,               # Expandir ou diminuir o contorno (número negativo para diminuir)
+                'cut_edges': 0.85,            # o quanto deve forçar o corte entre os núcleos, pode ser False 
+                'shape':  0.78,                 # remove células com formatos muito loucos
+>>>>>>> 5591fa39b942fb22da29fa672c3af73ee2aae507
                 'eccentricity': None,           # Vai de 0 a 1. Valores mais próximos de 0 represenntam mais circular, mais perto de 1 é mais oval
                 'min_size': 1300, 
                 'max_size': None, 
@@ -50,7 +65,11 @@ segment_dict = {'magnification': 40,
                 'use_cellpose': False,          # usar o cellpose pra detecção nuclear. Parametros do cellpose abaixo
                 'invert': False,                # invert image pixel intensity before running network (if True, image is also normalized)
                 'normalize': True,              # normalize data so 0.0=1st percentile and 1.0=99th percentile of image intensities in each channel
+<<<<<<< HEAD
                 'diameter': 120 ,               # if set to None, then diameter is automatically estimated if size model is loaded
+=======
+                'diameter': 25 ,               # if set to None, then diameter is automatically estimated if size model is loaded
+>>>>>>> 5591fa39b942fb22da29fa672c3af73ee2aae507
                 'net_avg': True,                # runs the 4 built-in networks and averages them if True, runs one network if False
                 'resample': True,               # run dynamics at original image size (will be slower but create more accurate boundaries)
                 'flow_threshold': 0.5,          # flow error threshold (all cells with errors below threshold are kept)
@@ -67,25 +86,29 @@ segment_dict = {'magnification': 40,
 #modificações a serem feitas nas imagens do canal 1. Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch1 = {'rescale_intensity': True,
-           'remove_bg' : False,
+           'remove_bg' : True,
            'radius_bg': 40,
            'match_hist' : False,
            'wants_ktr' : False,
            'ring_size': 3,                      # raio do citoplasma 
            'use_ellipse': False,                # deixar True se quer usar elipse
            'wants_foci': True,
-           'foci_min_size' : 7,
+           'foci_min_size' : 4,
            'foci_max_size': None,
            'foci_min_int' : None,               # int = intensidade 
            'foci_max_int' : None,       
+<<<<<<< HEAD
            'foci_proeminence' : 1.2,            # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
+=======
+           'foci_proeminence' : 1.3,            # quantas vezes mais intenso o ponto deve ser em relação ao núcleo
+>>>>>>> 5591fa39b942fb22da29fa672c3af73ee2aae507
            'cytoplasm' : False
            }
 
 #modificações a serem feitas nas imagens do canal 2.  Vão ser usados somente na quantificações
 # o ideal seria manter os 3 primeiros iguais entre todos os canais
 param_ch2 = {'rescale_intensity': True,
-           'remove_bg' : False,
+           'remove_bg' : True,
            'radius_bg': 40,
            'match_hist' : False,
            'wants_ktr' : True,

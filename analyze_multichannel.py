@@ -378,6 +378,7 @@ def analyze_dict(
     
 
     #drop columns here 
+   # if all_nuc_df is not None and all_cyto_df is not None:
     all_nuc_df, all_cyto_df = drop_cols(all_nuc_df, all_cyto_df, ch_dict)
     
     return all_nuc_df, all_cyto_df   # esses dfs vao pra parte de remover outliers 
