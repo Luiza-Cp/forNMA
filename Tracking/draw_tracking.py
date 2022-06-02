@@ -88,3 +88,8 @@ def draw_tracking(path_to_tracked_df: str,
     return None
        
 
+draw_tracking('/media/luiza/DATA/Doutorado/53bp1 py some info/FAQ fornma/tracking test/Results md=250 t=7 ms=25 mg=100.csv',
+              '/media/luiza/DATA/Doutorado/Teste tracking/2  arvores/imagens',
+              '/media/luiza/DATA/Doutorado/53bp1 py some info/FAQ fornma/tracking test/Results md=250 t=7 ms=25 mg=100',
+                  )
+                 

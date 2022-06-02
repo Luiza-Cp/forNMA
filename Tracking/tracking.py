@@ -40,19 +40,24 @@ def find_parent_track(df: pd.DataFrame)-> pd.DataFrame:
     tracks = set(list(df['track_id']))
     df2 = df.copy()
     df2['parent_track'] = None
+    parents = [] 
     for track in tracks:
+        if track in parents:
+           # print(track)
+            continue
         sub_df = df.loc[df['track_id']== track]
         first_frame = sub_df['Frame'].min()
         x = sub_df.loc[sub_df['Frame'] == first_frame, 'X'].iloc[0]
         y = sub_df.loc[sub_df['Frame'] == first_frame, 'Y'].iloc[0]
-        if first_frame == 0:
+        if first_frame == 0: # there is no parent track
             continue
         cells = df.loc[df['Frame'] == first_frame-1]
         x_list = list(cells['X'])
         y_list = list(cells['Y'])
         unique_ids = list(cells.unique_id)
-        unique = calc_distance(x, y, x_list, y_list, unique_ids)        
+        unique = calc_distance(x, y, x_list, y_list, unique_ids)
         track_id_parent = df.loc[df['unique_id'] == unique, 'track_id'].iloc[0]
+        parents.append(track_id_parent)
         df.drop(df[df['unique_id'] == unique].index, inplace = True)
         df2["parent_track"].mask( df2["track_id"] == track,track_id_parent, inplace=True )
 
@@ -86,6 +91,13 @@ def find_family_track(df: pd.DataFrame)-> pd.DataFrame:
     df['family_id'] = None
     for key, value in tree_dict.items():
         df["family_id"].mask( df["track_id"].isin(value), key, inplace=True )
+    
+    df_no_family = df[df["family_id"].isna()]
+    if df_no_family.shape[0] > 0 : # there are tracks with no family assigned
+        track_list = list(set(df_no_family['track_id']))
+        for i in track_list:
+            df["family_id"].mask( df["track_id"] == i,n, inplace=True )
+            n=n+1
         
     return df
         
@@ -101,8 +113,14 @@ def get_df_first_frames(df: pd.DataFrame)-> pd.DataFrame:
         first_frame = group['Frame'].min() 
         first_frame_row = group.loc[group['Frame'] == first_frame]
         rows.append(first_frame_row)
-    first_frame_df = pd.concat(rows)
-    
+    if len(rows) > 1:
+        first_frame_df = pd.concat(rows)
+    elif len(rows) == 1:
+        first_frame_df = rows[0]
+    else:
+        first_frame_df = None 
+
+        
     return first_frame_df
 
 
@@ -175,6 +193,13 @@ def create_tree_nomenclature(df: pd.DataFrame)-> pd.DataFrame:
         df_first_frames.sort_values(by=['Frame'], inplace=True)
         for track_id in df_first_frames['track_id'][1:]: # skips frame form main cell (1st frame)
             total_df = naming_cell_trees( track_id, df_first_frames, total_df, False)
+   
+    df_no_cell_id = df[df["Cell_id"].isna()]
+    track_list = list(set(df_no_cell_id['track_id']))
+    for i in track_list:
+        print(i)
+        df["Cell_id"].mask( df["track_id"] == i,str(df["family_id"].iloc[0]) + '.', inplace=True )
+        # cuidar o iloc 0
     
     return df
 
@@ -215,9 +240,9 @@ def tracking(path_to_table: str,
     final_df = table.merge(tracked_df[cols_to_use], how='outer', left_index=True, right_index=True) # merge dataframes
     
     final_df.to_csv(os.path.join(path_to_save, 'Tracked - ' + os.path.basename(path_to_table)))
-    final_df.drop(columns = ['filer'])
+    #final_df.drop(columns = ['filer'])
     
-    return None
+    return final_df
  
 
 
@@ -231,13 +256,17 @@ def tracking(path_to_table: str,
 #mg = 5
 md = 250
 t = 7
-ms = 25
+ms = 250
 mg = 10
 
 bb = tracking ('/media/luiza/DATA/Doutorado/Teste tracking/2  arvores/teste arvore mentira 2 arvores.csv',
-              max_distance = md,
+               '/media/luiza/DATA/Doutorado/53bp1 py some info/FAQ fornma/tracking test',
+               max_distance = md,
                time_window= t,
                max_split_distance = ms,
                max_gap_closing_distance = mg)
 
 
+name = 'md=' + str(md) + ' t=' + str(t) +' ms=' + str(ms) + ' mg=' + str(mg) 
+
+bb.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/FAQ fornma/tracking test/Results ' + name + '.csv')

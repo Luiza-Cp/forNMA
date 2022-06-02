@@ -84,7 +84,7 @@ class Morphology:
     
     def calc_radius_ratio(self) -> float:
         """ 
-        Finds minor and majo radius of an object in relation to its centroid
+        Finds minor and major radius of an object in relation to its centroid
         and measures the ratio of each other.
         """
         radius = []
