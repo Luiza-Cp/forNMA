@@ -127,7 +127,7 @@ def analyze_dict(
             ch_segment = key
         ref_dict[key] = load_image(value[0][0]) if value[1]['match_hist'] else None
 
-    all_df_list = []    #all dataframes to be concatenated    
+    all_df_list = []    #all dataframes to be concatenated   
     for img_n in range(len((list(subfolder_dict.values())[0][0]))):      
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
         
@@ -164,7 +164,10 @@ def analyze_dict(
         image_df = perform_measure(contours, img_n, subfolder_dict, ref_dict, segment_dict)
         all_df_list.append(image_df)
     
-    all_df = pd.concat(all_df_list) # all images dataframe
+    if len(all_df_list) == 0:
+       return None
+    
+    all_df = pd.concat(all_df_list) if len(all_df_list) >1 else all_df_list[0]# all images dataframe
     all_df["Condition"] = condition
     all_df["Overtime"] =  is_overtime
     all_df = all_df.reset_index(drop= True)

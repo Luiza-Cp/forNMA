@@ -257,7 +257,6 @@ def run(parameters_dict: dict,
     wants_to_save, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict = adjust_parameters(parameters_dict)
     subfolders, folder_dict = create_folder_dict(ch_name_list, ch_path_list,
                                                   ch_with_nuc, parameter_list)
-    
     # tests whether number of conditions match the number os subfolders
     if len(conditions) != len(subfolders):
         conditions = [False] * len(subfolders)
@@ -269,12 +268,16 @@ def run(parameters_dict: dict,
         if not check_size(subfolder_dict):
             raise("The folders contain different image number")
         total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
+        if total_df is None:
+            continue
         filename = os.path.basename(subfolders[i]) + '.zip'
         # adds files to temporary directory
         total_df.to_pickle(os.path.join(temp_dir.name, filename))
     
     
     complete_df = filter_dataframe(temp_dir, headless)
+    if complete_df.empty:
+       return print( 'No nucleus could be found at your images, adjust parameters and try again')
     
     # now the complete df is splitted in smaller ones and saved
     df_results, df_draw = split_dfs(complete_df, ch_name_list) 
@@ -285,3 +288,6 @@ def run(parameters_dict: dict,
     temp_dir.cleanup()
     
     return None
+
+import toml
+run(toml.load('/media/luiza/DATA/Doutorado/teste denise/parameters.toml'), True)
