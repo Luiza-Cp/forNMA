@@ -288,6 +288,3 @@ def run(parameters_dict: dict,
     temp_dir.cleanup()
     
     return None
-
-import toml
-run(toml.load('/media/luiza/DATA/Doutorado/teste denise/parameters.toml'), True)
