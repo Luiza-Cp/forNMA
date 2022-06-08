@@ -63,7 +63,7 @@ def perform_measure(contours: np.ndarray,
     df_morpho_list  = []
     for n in range(len(contours)):
         #checar len(n) tem que ter ao menos 5 ptos no contorno para fitar uma elipse
-        if len(contours[n]>5):
+        if len(contours[n])>5:
             morpho = Morphology(n+1, contours[n], segment_dict['use_cellpose'])
             df_morpho_list.append(morpho.df)
     image_df = pd.concat(df_morpho_list)
