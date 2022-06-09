@@ -60,20 +60,19 @@ def perform_measure(contours: np.ndarray,
         Applies functions needed for cell morphometry and intesity measures
     Returns a dataframe with all image information.
     """
+    contours = [f for f in contours if len(f)>5] # remove contours with less than 5 points
     df_morpho_list  = []
     for n in range(len(contours)):
-        #checar len(n) tem que ter ao menos 5 ptos no contorno para fitar uma elipse
-        if len(contours[n])>5:
-            morpho = Morphology(n+1, contours[n], segment_dict['use_cellpose'])
-            df_morpho_list.append(morpho.df)
+        morpho = Morphology(n+1, contours[n], segment_dict['use_cellpose'])
+        df_morpho_list.append(morpho.df)
     image_df = pd.concat(df_morpho_list)
       
     
     for key, value in subfolder_dict.items():
         df_ch_list, im, im_name= measure_image(value[0][img_n], value[1], 
-                        ref_dict[key], contours, segment_dict['magnification'], 
-                        segment_dict['pixel_size'], key)
-        
+                            ref_dict[key], contours, segment_dict['magnification'], 
+                            segment_dict['pixel_size'], key)
+            
         df_ch = pd.concat(df_ch_list)
         image_df = pd.merge(image_df, df_ch, on = 'Cell')
         image_df["Frame"] = img_n
@@ -165,7 +164,7 @@ def analyze_dict(
         all_df_list.append(image_df)
     
     if len(all_df_list) == 0:
-       return None
+       return False
     
     all_df = pd.concat(all_df_list) if len(all_df_list) >1 else all_df_list[0]# all images dataframe
     all_df["Condition"] = condition
