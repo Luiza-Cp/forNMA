@@ -273,6 +273,7 @@ def run(parameters_dict: dict,
         filename = os.path.basename(subfolders[i]) + '.zip'
         # adds files to temporary directory
         total_df.to_pickle(os.path.join(temp_dir.name, filename))
+        print(total_df)
     
     
     complete_df = filter_dataframe(temp_dir, headless)
@@ -288,4 +289,3 @@ def run(parameters_dict: dict,
     temp_dir.cleanup()
     
     return None
-

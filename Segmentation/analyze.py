@@ -60,7 +60,6 @@ def perform_measure(contours: np.ndarray,
         Applies functions needed for cell morphometry and intesity measures
     Returns a dataframe with all image information.
     """
-    contours = [f for f in contours if len(f)>5] # remove contours with less than 5 points
     df_morpho_list  = []
     for n in range(len(contours)):
         morpho = Morphology(n+1, contours[n], segment_dict['use_cellpose'])
@@ -157,6 +156,7 @@ def analyze_dict(
                weakly_labeled = segment_dict['weakly_labeled'])
         
         
+        contours = [f for f in contours if len(f)>5] # remove contours with less than 5 points
         if len(contours) == 0:  # skips execution if there are no contours
             continue
         
