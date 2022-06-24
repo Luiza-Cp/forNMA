@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6 import QtWidgets as qtw
+from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.utils import ExperimentTableWidget, SetExperimentDialog
 
@@ -16,18 +16,34 @@ class ExperimentDataParameters(qtw.QWidget):
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        self.label = qtw.QLabel('DataParameters')
+        self.label = qtw.QLabel('Welcome to forNMA!')
+        self.label.setStyleSheet('QLabel {font-size: 24px}')
+        self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
         layout.addWidget(self.label)
+
+        self.paths_label = qtw.QLabel("")
+        self.paths_label.setWordWrap(True)
+        layout.addWidget(self.paths_label)
+
+    @qtc.Slot(str)
+    def setPaths(
+            self,
+            paths: str,
+    ) -> None:
+        """Sets the received paths onto the label."""
+        self.paths_label.setText(paths)
 
 
 class ExperimentDataWidget(qtw.QWidget):
     """Class representing a widget where the main forNMA's data is set."""
     def __init__(
             self,
+            parameters: ExperimentDataParameters = None,
             parent: qtw.QWidget = None,
     ) -> None:
         """Initializes an ExperimentDataWidget instance."""
         super().__init__(parent=parent)
+        self.parameters = parameters
 
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
@@ -40,9 +56,7 @@ class ExperimentDataWidget(qtw.QWidget):
         self.set_experiment_button.clicked.connect(self.set_experiment)  # noqa
         layout.addWidget(self.set_experiment_button)
 
-        self.paths_label = qtw.QLabel("")
-        self.experiment_table.pathsChanged.connect(self.paths_label.setText)
-        layout.addWidget(self.paths_label)
+        self.experiment_table.pathsChanged.connect(self.parameters.setPaths)
 
     def set_experiment(self) -> None:
         """Opens a SetExperimentDialog and returns its value to the interface."""

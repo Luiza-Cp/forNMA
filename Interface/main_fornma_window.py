@@ -40,7 +40,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.tabs = qtw.QTabWidget()
         layout.addWidget(self.tabs)
 
-        self.data_tab = ExperimentDataWidget()
+        self.data_tab = ExperimentDataWidget(parameters=self.data_params)
         self.tabs.addTab(self.data_tab, "Data")
 
         self.analysis_tab = AnalysisWidget()

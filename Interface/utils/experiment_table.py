@@ -33,9 +33,12 @@ class ExperimentTableWidget(qtw.QTableView):
         """Sets the table layout, given the channels and groups list."""
         if not channels and not groups:  # No info received, do nothing
             return
-        # Sets the model data
         channel_labels = [f'Channel {channel}' for channel in channels]
-        data = pd.DataFrame(data={'Group': groups}, columns=['Group'] + channel_labels)
+        # Sets the model data
+        data = {channel: '' for channel in channel_labels}
+        data['Group'] = groups
+        columns = ['Group'] + channel_labels
+        data = pd.DataFrame(data=data, columns=columns, dtype=str)
         self._model.refresh_data(new_data=data)
         # Sets the buttons for the channel columns
         for row_index in range(data.shape[0]):
@@ -59,7 +62,7 @@ class ExperimentTableWidget(qtw.QTableView):
             group_name, *channels = row
             s += f'Group: {group_name}\n'
             for channel_label, channel_path in zip(data.columns[1:], channels):
-                s += f'{channel_label}: {channel_path or "UNDEFINED"}\n'
+                s += f'  -> {channel_label}: {channel_path or "UNDEFINED"}\n'
             s += '-----\n'
         self.pathsChanged.emit(s[:-1])
 
