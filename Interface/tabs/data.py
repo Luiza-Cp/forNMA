@@ -17,11 +17,13 @@ class ExperimentDataWidget(qtw.QWidget):
     def __init__(
             self,
             parameters: ExperimentDataParameters = None,
+            data_store: CentralDataStore = None,
             parent: qtw.QWidget = None,
     ) -> None:
         """Initializes an ExperimentDataWidget instance."""
         super().__init__(parent=parent)
         self.parameters = parameters
+        self.data_store = data_store
 
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
@@ -41,6 +43,7 @@ class ExperimentDataWidget(qtw.QWidget):
         dialog = SetExperimentDialog(self)
         if dialog.exec() == qtw.QDialog.Accepted:
             self.experiment_table.set_experiment(channels=dialog.channels, groups=dialog.groups)
+            self.data_store.channels = dialog.channels
 
 
 class ExperimentDataParameters(qtw.QWidget):

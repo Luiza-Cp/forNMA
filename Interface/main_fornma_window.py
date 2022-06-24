@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 
 from PySide6 import QtWidgets as qtw
 
@@ -18,6 +19,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         """Initializes a ForNMAMainWindow instance."""
         super().__init__(parent=parent)
         self.setMinimumSize(800, 600)
+        self.data_store = CentralDataStore()
 
         # MAIN WIDGET
         self.main_widget = qtw.QWidget()
@@ -40,7 +42,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.tabs = qtw.QTabWidget()
         layout.addWidget(self.tabs)
 
-        self.data_tab = ExperimentDataWidget(parameters=self.data_params)
+        self.data_tab = ExperimentDataWidget(parameters=self.data_params, data_store=self.data_store)
         self.tabs.addTab(self.data_tab, "Data")
 
         self.analysis_tab = AnalysisWidget()
@@ -50,6 +52,11 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.tabs.currentChanged.connect(self.stack.setCurrentIndex)  # noqa
         layout.setStretch(0, 1)  # Use 1/4 of the available space for the left column
         layout.setStretch(1, 3)  # Use 3/4 of the available space for the right column
+
+
+@dataclass
+class CentralDataStore:
+    channels = list
 
 
 def fornma_interface_main():
