@@ -37,11 +37,19 @@ class AnalysisParameters(qtw.QWidget):
         lay = qtw.QVBoxLayout()
         lay.addWidget(self.params)
 
-        self.segmentation_collapse = CollapsibleWidget(SegmentationParametersLayout(), title='Segmentation parameters')
+        self.segmentation_parameters = SegmentationParametersLayout()
+        self.segmentation_collapse = CollapsibleWidget(self.segmentation_parameters, title='Segmentation parameters')
         layout.addWidget(self.segmentation_collapse)
         self.detection_collapse = CollapsibleWidget(lay, title='Detection parameters')
         layout.addWidget(self.detection_collapse)
         layout.addStretch()
+
+    def set_channel_values(
+            self,
+            channels: list[str],
+    ) -> None:
+        """Sets the channel value names on the AnalysisParameters widget."""
+        self.segmentation_parameters.set_channel_values(channels=channels)
 
 
 class SegmentationParametersLayout(qtw.QVBoxLayout):
@@ -54,3 +62,13 @@ class SegmentationParametersLayout(qtw.QVBoxLayout):
 
         self.combobox = qtw.QComboBox()
         self.addWidget(self.combobox)
+
+    def set_channel_values(
+            self,
+            channels: list[str],
+    ) -> None:
+        """Sets the channel value names on the SegmentationParameters combobox."""
+        while self.combobox.currentIndex() != -1:
+            self.combobox.removeItem(0)
+        for channel in channels:
+            self.combobox.addItem(channel)

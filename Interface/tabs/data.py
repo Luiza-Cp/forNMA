@@ -2,28 +2,23 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.utils import ExperimentTableWidget, SetExperimentDialog
 
-if TYPE_CHECKING:
-    from Interface.main_fornma_window import CentralDataStore
-
 
 class ExperimentDataWidget(qtw.QWidget):
     """Class representing a widget where the main forNMA's data is set."""
+    dataChanged = qtc.Signal()
+
     def __init__(
             self,
             parameters: ExperimentDataParameters = None,
-            data_store: CentralDataStore = None,
             parent: qtw.QWidget = None,
     ) -> None:
         """Initializes an ExperimentDataWidget instance."""
         super().__init__(parent=parent)
         self.parameters = parameters
-        self.data_store = data_store
 
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
@@ -37,13 +32,26 @@ class ExperimentDataWidget(qtw.QWidget):
         layout.addWidget(self.set_experiment_button)
 
         self.experiment_table.pathsChanged.connect(self.parameters.setPaths)
+        self.experiment_table.dataChanged.connect(self.dataChanged)
+
+    @property
+    def channel_names(self) -> list[str]:
+        """Returns the names of the channels defined in the ExperimentTable."""
+        return self.experiment_table.channel_names
 
     def set_experiment(self) -> None:
         """Opens a SetExperimentDialog and returns its value to the interface."""
         dialog = SetExperimentDialog(self)
         if dialog.exec() == qtw.QDialog.Accepted:
             self.experiment_table.set_experiment(channels=dialog.channels, groups=dialog.groups)
-            self.data_store.channels = dialog.channels
+
+    def has_at_least_one_path_button(self) -> bool:
+        """Returns whether the experiment table has at least one FolderSelectButton in it."""
+        return self.experiment_table.is_defined()
+
+    def all_paths_are_defined(self) -> bool:
+        """Returns whether the experiment table has at least one FolderSelectButton in it."""
+        return self.experiment_table.paths_are_filled()
 
 
 class ExperimentDataParameters(qtw.QWidget):

@@ -13,6 +13,7 @@ from Interface.helpers import FolderSelectButton
 class ExperimentTableWidget(qtw.QTableView):
     """Class representing a table where the experiment is described (channels/groups and their respective paths)."""
     pathsChanged = qtc.Signal(str)
+    dataChanged = qtc.Signal()
 
     def __init__(
             self,
@@ -22,8 +23,10 @@ class ExperimentTableWidget(qtw.QTableView):
         super().__init__(parent=parent)
 
         self._model = ExperimentTableModel()
+        self._channels = None
+        self._groups = None
         self.setModel(self._model)
-        self._model.dataChanged.connect(self.on_model_data_changed)
+        self._model.dataChanged.connect(self.on_model_data_changed)  # noqa
 
     def set_experiment(
             self,
@@ -33,44 +36,72 @@ class ExperimentTableWidget(qtw.QTableView):
         """Sets the table layout, given the channels and groups list."""
         if not channels and not groups:  # No info received, do nothing
             return
-        channel_labels = [f'Channel {channel}' for channel in channels]
+        self._channels = channels
+        self._groups = groups
         # Sets the model data
-        data = {channel: '' for channel in channel_labels}
-        data['Group'] = groups
-        columns = ['Group'] + channel_labels
-        data = pd.DataFrame(data=data, columns=columns, dtype=str)
-        self._model.refresh_data(new_data=data)
+        self._model.set_data_from_lists(channels=channels, groups=groups)
         # Sets the buttons for the channel columns
-        for row_index in range(data.shape[0]):
-            for column_index in range(1, data.shape[1]):  # Skip first column
+        for row_index in range(self.nrows):
+            for column_index in range(1, self.ncols):  # Skip first column
                 index = self._model.index(row_index, column_index)
                 button = FolderSelectButton(parent=self, index=index)
-                button.folderSelected.connect(self._model.setData)
                 self.setIndexWidget(index, button)
+                button.folderSelected.connect(self._model.setData)
         # Sets the table header
         self.horizontalHeader().setSectionResizeMode(qtw.QHeaderView.Stretch)
         self.resizeColumnsToContents()
 
-    @qtc.Slot(pd.DataFrame)
+    @property
+    def nrows(self) -> int:
+        """Returns the number of rows in the Model."""
+        return self._model.nrows
+
+    @property
+    def ncols(self) -> int:
+        """Returns the number of columns in the Model."""
+        return self._model.ncols
+
+    @property
+    def channel_names(self) -> list[str]:
+        """Returns the channel names from the ExperimentTable."""
+        return self._channels
+
+    def is_defined(self) -> bool:
+        """Returns whether the ExperimentTable id defined, i.e. has channels on its columns and groups on its rows."""
+        return self.nrows > 0 and self.ncols > 1
+
+    def path_data(self) -> list[dict[str, str]]:
+        """Returns the path data as a dictionary"""
+        model_data = self._model.as_dataframe().set_index('Group')
+        return [
+            {
+                'channel': channel,
+                'group': group,
+                'path': model_data.at[group, channel],
+            }
+            for channel in self._channels
+            for group in self._groups
+        ]
+
+    def paths_are_filled(self) -> bool:
+        """Returns True if all paths in the current ExperimentTable have been selected."""
+        return all(bool(data['path']) for data in self.path_data())
+
+    @qtc.Slot(qtc.QModelIndex, qtc.QModelIndex, list)
     def on_model_data_changed(
             self,
-            data: pd.DataFrame,
+            top_left: qtc.QModelIndex,
+            bottom_right: qtc.QModelIndex,
+            roles: list[int]
     ) -> None:
         """Emits a signal containing a formatted string whenever the underlying model's data changes."""
-        s = ''
-        for index, row in data.iterrows():
-            group_name, *channels = row
-            s += f'Group: {group_name}\n'
-            for channel_label, channel_path in zip(data.columns[1:], channels):
-                s += f'  -> {channel_label}: {channel_path or "UNDEFINED"}\n'
-            s += '-----\n'
-        self.pathsChanged.emit(s[:-1])
+        text = self._model.as_textbox()
+        self.pathsChanged.emit(text)
+        self.dataChanged.emit()
 
 
 class ExperimentTableModel(qtc.QAbstractTableModel):
     """Model used for the ExperimentTableWidget."""
-    dataChanged = qtc.Signal(pd.DataFrame)
-
     def __init__(
             self,
             data: pd.DataFrame = None,
@@ -78,6 +109,31 @@ class ExperimentTableModel(qtc.QAbstractTableModel):
         """Initializes an ExperimentTableModel."""
         super().__init__()
         self._data = data or pd.DataFrame()
+
+    def as_dataframe(self) -> pd.DataFrame:
+        """Returns the DataFrame representation of the Model's data."""
+        return self._data
+
+    def as_textbox(self) -> str:
+        """Returns a string version of the data contained in the Model."""
+        s = ''
+        for index, row in self._data.iterrows():
+            group_name, *channels = row
+            s += f'Group: {group_name}\n'
+            for channel_label, channel_path in zip(self._data.columns[1:], channels):
+                s += f'  -> {channel_label}: {channel_path or "UNDEFINED"}\n'
+            s += '-----\n'
+            return s[-1]  # Remove the last newline
+
+    @property
+    def nrows(self) -> int:
+        """Returns the number of rows in the Model."""
+        return self._data.shape[0]
+
+    @property
+    def ncols(self) -> int:
+        """Returns the number of columns in the Model."""
+        return self._data.shape[1]
 
     def flags(
             self,
@@ -129,7 +185,7 @@ class ExperimentTableModel(qtc.QAbstractTableModel):
                 self._data.iloc[index.row(), index.column()] = value
             elif role == qtc.Qt.EditRole:
                 self._data.iloc[index.row(), index.column()] = value
-            self.dataChanged.emit(self._data)
+            self.dataChanged.emit(index, index, [qtc.Qt.DisplayRole, qtc.Qt.EditRole])  # noqa
             return True
         return False
 
@@ -155,3 +211,14 @@ class ExperimentTableModel(qtc.QAbstractTableModel):
         self.beginResetModel()
         self._data = new_data
         self.endResetModel()
+
+    def set_data_from_lists(
+            self,
+            channels: list[str],
+            groups: list[str],
+    ) -> None:
+        data = {channel: '' for channel in channels}
+        data['Group'] = groups
+        columns = ['Group'] + channels
+        new_data = pd.DataFrame(data=data, columns=columns, dtype=str)
+        self.refresh_data(new_data=new_data)
