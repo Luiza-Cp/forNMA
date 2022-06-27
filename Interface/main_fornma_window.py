@@ -6,7 +6,7 @@ import sys
 
 from PySide6 import QtWidgets as qtw
 
-from Interface.tabs import AnalysisParameters, AnalysisWidget, ExperimentDataParameters, ExperimentDataWidget
+from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
 
 DEBUG = True
 
@@ -29,29 +29,23 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.main_widget.setLayout(layout)
 
         # LEFT COLUMN
-        left_column = qtw.QVBoxLayout()
-        layout.addLayout(left_column)
-
         self.stack = qtw.QStackedWidget()
-        left_column.addWidget(self.stack)
+        layout.addWidget(self.stack)
         # Page 01
-        self.data_params = ExperimentDataParameters()
+        self.data_params = DataParametersWidget()
         self.stack.addWidget(self.data_params)
         # Page 02
-        self.analysis_params = AnalysisParameters()
+        self.analysis_params = AnalysisParametersWidget()
         self.stack.addWidget(self.analysis_params)
-        # Run button
-        self.run_button = qtw.QPushButton("Run forNMA")
-        left_column.addWidget(self.run_button)
 
         # RIGHT COLUMN
         self.tabs = qtw.QTabWidget()
         layout.addWidget(self.tabs)
         # Page 01
-        self.data_tab = ExperimentDataWidget(parameters=self.data_params)
+        self.data_tab = DataAreaWidget(parameters_widget=self.data_params)
         self.tabs.addTab(self.data_tab, "Data")
         # Page 02
-        self.analysis_tab = AnalysisWidget()
+        self.analysis_tab = AnalysisAreaWidget()
         self.tabs.addTab(self.analysis_tab, "Analysis")
         self.tabs.setTabEnabled(1, False)  # Analysis tab starts disabled
 
@@ -59,8 +53,8 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.data_tab.dataChanged.connect(self.on_data_tab_changed)  # noqa
         self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)  # noqa
         self.tabs.currentChanged.connect(self.stack.setCurrentIndex)  # noqa
-        layout.setStretch(0, 1)  # Use 1/4 of the available space for the left column
-        layout.setStretch(1, 3)  # Use 3/4 of the available space for the right column
+        layout.setStretch(0, 4)  # Use 4/10 of the available space for the left column
+        layout.setStretch(1, 6)  # Use 6/10 of the available space for the right column
 
     def on_data_tab_changed(self) -> None:
         """Enables or disables the Analysis tab whenever the content of the Data tab is updated."""
@@ -76,7 +70,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
             self,
             index: int,
     ) -> None:
-        """Displays useful messages whenever the tab bar is clicked."""
+        """Displays useful messages whenever a disabled tab in the bar is clicked."""
         if index == -1:  # clicked on disabled tab
             if not self.data_tab.has_at_least_one_path_button():
                 qtw.QMessageBox.information(self, "No experiment table", "Please create an experiment table")
@@ -84,7 +78,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
                 qtw.QMessageBox.information(self, "Undefined paths", "Please define a path for all channels and groups")
 
     def debug(self) -> None:
-        """Starts up the forNMA interface in debug mode."""
+        """Starts up forNMA's interface in debug mode."""
         # Simulates selecting the channels and groups names from the "Set experiment..." button
         channels = ['Red', 'Green', 'Phase']
         groups = ['Control', 'TMZ']
@@ -99,7 +93,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
 
 
 def fornma_interface_main(debug: bool):
-    """Initializes the forNMA's interface in the main loop."""
+    """Initializes forNMA's interface in the main loop."""
     app = qtw.QApplication(sys.argv)
     window = ForNMAMainWindow()
     window.show()
