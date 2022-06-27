@@ -1,4 +1,4 @@
-"""set_experiment_dialog.py - module that defines a dialog window used to set the ExperimentTable's initial data."""
+"""experiment/experiment_wizard.py - widgets for a dialog window used to set the ExperimentTable's layout."""
 
 from __future__ import annotations
 
@@ -7,22 +7,22 @@ from functools import partial
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
-class SetExperimentDialog(qtw.QWizard):
-    """Class representing a dialog wizard used to set the current experiment value."""
+class ExperimentWizard(qtw.QWizard):
+    """Class representing a wizard used to set the current experiment value."""
     def __init__(
             self,
             parent: qtw.QWidget = None,
     ) -> None:
-        """Initializes a SetExperimentDialog instance."""
+        """Initializes a ExperimentWizard instance."""
         super().__init__(parent=parent)
         self.data = None
 
         # ### PAGE ONE
-        self.channel_page = LabelPage(label_name='Channel')
+        self.channel_page = ExperimentPage(name='Channel')
         self.addPage(self.channel_page)
 
         # ### PAGE TWO
-        self.group_page = LabelPage(label_name='Group')
+        self.group_page = ExperimentPage(name='Group')
         self.addPage(self.group_page)
 
     @property
@@ -36,14 +36,17 @@ class SetExperimentDialog(qtw.QWizard):
         return self.group_page.get_labels()
 
 
-class LabelPage(qtw.QWizardPage):
-    """Class representing a list of labels that can expand or contract when clicking buttons."""
+class ExperimentPage(qtw.QWizardPage):
+    """
+    Class representing one of the pages in the ExperimentWizard.
+    Contains a list of labels that can expand or contract when the corresponding button is clicked.
+    """
     def __init__(
             self,
             parent: qtw.QWidget = None,
-            label_name: str = '',
+            name: str = '',
     ) -> None:
-        """Initializes a LabelList instance."""
+        """Initializes a ExperimentPage instance."""
         super().__init__(parent=parent)
 
         self.line_edits = []
@@ -51,14 +54,14 @@ class LabelPage(qtw.QWizardPage):
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        self.add_button = qtw.QPushButton(f'Add {label_name}')
+        self.add_button = qtw.QPushButton(f'Add {name}')
         self.add_button.clicked.connect(self.add)  # noqa
         layout.addWidget(self.add_button)
 
         layout.addStretch()
 
     def get_labels(self) -> list[str]:
-        """Returns the labels currently in the LabelList. Ignores line edits with empty strings in them."""
+        """Returns the labels currently in the ExperimentPage. Ignores line edits with empty strings in them."""
         labels = []
         for line_edit in self.line_edits:
             label_text = line_edit.text()
@@ -67,7 +70,7 @@ class LabelPage(qtw.QWizardPage):
         return labels
 
     def add(self) -> None:
-        """Adds a DeletableLabel to the LabelList."""
+        """Adds a DeletableLabel to the ExperimentPage."""
         label = DeletableLabel()
         self.layout().insertWidget(len(self.line_edits), label)
         self.line_edits.append(label.line_edit)
@@ -77,14 +80,14 @@ class LabelPage(qtw.QWizardPage):
             self,
             label: DeletableLabel,
     ) -> None:
-        """Removes the DeletableLabel from the LabelList."""
+        """Removes the DeletableLabel from the ExperimentPage."""
         self.line_edits.remove(label.line_edit)
         self.layout().removeWidget(label)
         label.setParent(None)  # noqa
 
 
 class DeletableLabel(qtw.QWidget):
-    """Class representing a QLineEdit with a QPushButton that deletes it."""
+    """Class representing a QLineEdit with a QPushButton responsible for deleting it."""
     deleted = qtc.Signal(name='lineEditDeleted')
 
     def __init__(

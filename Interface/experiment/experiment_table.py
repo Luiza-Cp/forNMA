@@ -1,4 +1,4 @@
-"""experiment_table.py - module bundling the necessary widgets for forNMA's ExperimentTable."""
+"""experiment/experiment_table.py - module bundling the necessary widgets for forNMA's ExperimentTable."""
 
 from __future__ import annotations
 
@@ -47,10 +47,6 @@ class ExperimentTableWidget(qtw.QTableView):
                 button = FolderSelectButton(parent=self, index=index)
                 self.setIndexWidget(index, button)
                 button.folderSelected.connect(self._model.setData)
-        self.adjust_size()
-
-    def adjust_size(self) -> None:
-        """Adjust the table's horizontal size."""
         self.horizontalHeader().setSectionResizeMode(qtw.QHeaderView.Stretch)
 
     @property
@@ -73,7 +69,7 @@ class ExperimentTableWidget(qtw.QTableView):
         return self.nrows > 0 and self.ncols > 1
 
     def path_data(self) -> list[dict[str, str]]:
-        """Returns the path data as a dictionary"""
+        """Returns the path data as a dictionary."""
         model_data = self._model.as_dataframe().set_index('Group')
         return [
             {
@@ -92,15 +88,15 @@ class ExperimentTableWidget(qtw.QTableView):
     @qtc.Slot(qtc.QModelIndex, qtc.QModelIndex, list)
     def on_model_data_changed(
             self,
-            top_left: qtc.QModelIndex,
-            bottom_right: qtc.QModelIndex,
-            roles: list[int]
+            top_left: qtc.QModelIndex,      # These parameters are not used in the method,
+            bottom_right: qtc.QModelIndex,  # but are present in the model's dataChanged signal
+            roles: list[int],               # so we must add them here
     ) -> None:
         """Emits a signal containing a formatted string whenever the underlying model's data changes."""
         text = self._model.as_textbox()
         self.pathsChanged.emit(text)
         self.dataChanged.emit()
-        self.adjust_size()
+        self.horizontalHeader().setSectionResizeMode(qtw.QHeaderView.Stretch)
 
 
 class ExperimentTableModel(qtc.QAbstractTableModel):

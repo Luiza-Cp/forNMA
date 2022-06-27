@@ -1,4 +1,4 @@
-"""folder_select_button.py - module containing a widget used to select a folder by clicking a button."""
+"""helpers/folder_select_button.py - module containing a widget used to select a folder by clicking a button."""
 
 from __future__ import annotations
 

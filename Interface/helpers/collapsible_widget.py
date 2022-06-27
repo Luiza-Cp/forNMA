@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
@@ -42,7 +42,7 @@ class CollapsibleWidget(qtw.QWidget):
         self.content_area.setFrameShape(qtw.QFrame.NoFrame)
         layout.addWidget(self.content_area)
 
-        # Toggle animation  # TOREVIEW: animations are needed? Should they be improved or removed?
+        # Toggle animation  # TODO: animations are needed? Should they be improved or removed?
         self.toggle_animation = qtc.QParallelAnimationGroup(self)
         self.toggle_animation.addAnimation(qtc.QPropertyAnimation(self, b"minimumHeight"))
         self.toggle_animation.addAnimation(qtc.QPropertyAnimation(self, b"maximumHeight"))
@@ -87,13 +87,3 @@ class CollapsibleWidget(qtw.QWidget):
         content_animation.setDuration(200)
         content_animation.setStartValue(0)
         content_animation.setEndValue(content_height)
-
-    def retrieve_settings(self) -> Dict[str, Any]:
-        """
-        Retrieve the settings contained inside the CollapsibleWidget's KeyGridLayout. Raises a TypeError
-        if the layout does not support key setting retrieval (i.e. it is not an instance of KeyGridLayout).
-        """
-        try:
-            return self.content_area.layout().retrieve_key_settings()
-        except AttributeError:
-            raise TypeError(f'Current layout of type {type(self.layout())} does not support key settings retrieval')

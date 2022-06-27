@@ -1,24 +1,27 @@
-"""main_fornma_window.py - file describing the main forNMA interface."""
+"""tabs/data.py - contains all widgets used in forNMA's "data" tab."""
 
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.utils import ExperimentTableWidget, SetExperimentDialog
+from Interface.experiment import ExperimentTableWidget, ExperimentWizard
 
 
-class ExperimentDataWidget(qtw.QWidget):
-    """Class representing a widget where the main forNMA's data is set."""
+class DataAreaWidget(qtw.QWidget):
+    """
+    Class representing the widget on the right-hand side of the "data" tab,
+    where the path to the forNMA's folders are set.
+    """
     dataChanged = qtc.Signal()
 
     def __init__(
             self,
-            parameters: ExperimentDataParameters = None,
+            parameters_widget: DataParametersWidget = None,
             parent: qtw.QWidget = None,
     ) -> None:
-        """Initializes an ExperimentDataWidget instance."""
+        """Initializes a DataAreaWidget instance."""
         super().__init__(parent=parent)
-        self.parameters = parameters
+        self.parameters = parameters_widget
 
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
@@ -41,9 +44,9 @@ class ExperimentDataWidget(qtw.QWidget):
 
     def set_experiment(self) -> None:
         """Opens a SetExperimentDialog and returns its value to the interface."""
-        dialog = SetExperimentDialog(self)
-        if dialog.exec() == qtw.QDialog.Accepted:
-            self.experiment_table.set_experiment(channels=dialog.channels, groups=dialog.groups)
+        experiment_wizard = ExperimentWizard(self)
+        if experiment_wizard.exec() == qtw.QDialog.Accepted:
+            self.experiment_table.set_experiment(channels=experiment_wizard.channels, groups=experiment_wizard.groups)
 
     def has_at_least_one_path_button(self) -> bool:
         """Returns whether the experiment table has at least one FolderSelectButton in it."""
@@ -54,11 +57,16 @@ class ExperimentDataWidget(qtw.QWidget):
         return self.experiment_table.paths_are_filled()
 
 
-class ExperimentDataParameters(qtw.QWidget):
+class DataParametersWidget(qtw.QWidget):
+    """
+    Class representing the widget on the left-hand side of the "data" tab,
+    where the paths to forNMA's folders are displayed.
+    """
     def __init__(
             self,
             parent: qtw.QWidget = None,
     ) -> None:
+        """Initializes a DataParametersWidget."""
         super().__init__(parent=parent)
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
