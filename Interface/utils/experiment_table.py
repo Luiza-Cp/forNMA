@@ -47,9 +47,11 @@ class ExperimentTableWidget(qtw.QTableView):
                 button = FolderSelectButton(parent=self, index=index)
                 self.setIndexWidget(index, button)
                 button.folderSelected.connect(self._model.setData)
-        # Sets the table header
+        self.adjust_size()
+
+    def adjust_size(self) -> None:
+        """Adjust the table's horizontal size."""
         self.horizontalHeader().setSectionResizeMode(qtw.QHeaderView.Stretch)
-        self.resizeColumnsToContents()
 
     @property
     def nrows(self) -> int:
@@ -98,6 +100,7 @@ class ExperimentTableWidget(qtw.QTableView):
         text = self._model.as_textbox()
         self.pathsChanged.emit(text)
         self.dataChanged.emit()
+        self.adjust_size()
 
 
 class ExperimentTableModel(qtc.QAbstractTableModel):
