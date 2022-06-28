@@ -5,7 +5,7 @@ from __future__ import annotations
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
-class DoubleSliderSpinBox(qtw.QHBoxLayout):
+class DoubleSliderSpinBox(qtw.QWidget):
     """
     Class representing a layout containing a DoubleSliderWidget and a spinbox to its side,
     that displays/selects the current value.
@@ -20,11 +20,15 @@ class DoubleSliderSpinBox(qtw.QHBoxLayout):
     ) -> None:
         """Initializes a DoubleSliderLabeledLayout instance."""
         super().__init__(parent=parent)
-        self.setContentsMargins(0, 0, 0, 0)
+
+        # Layout
+        layout = qtw.QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
 
         # Slider
         self.slider = DoubleSliderWidget()
-        self.addWidget(self.slider)
+        layout.addWidget(self.slider)
         # Slider params
         self.slider.setMaximum(maximum)
         self.slider.setMinimum(minimum)
@@ -33,7 +37,7 @@ class DoubleSliderSpinBox(qtw.QHBoxLayout):
 
         # Spinbox
         self.spinbox = qtw.QDoubleSpinBox()
-        self.addWidget(self.spinbox)
+        layout.addWidget(self.spinbox)
         # Spinbox params
         self.spinbox.setMaximum(maximum)
         self.spinbox.setMinimum(minimum)
