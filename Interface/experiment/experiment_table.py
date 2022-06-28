@@ -91,9 +91,9 @@ class ExperimentTableWidget(qtw.QTableView):
     @qtc.Slot(qtc.QModelIndex, qtc.QModelIndex, list)
     def on_model_data_changed(
             self,
-            top_left: qtc.QModelIndex,      # These parameters are not used in the method,
-            bottom_right: qtc.QModelIndex,  # but are present in the model's dataChanged signal
-            roles: list[int],               # so we must add them here
+            top_left: qtc.QModelIndex,      # These parameters are not used in the method,       # noqa
+            bottom_right: qtc.QModelIndex,  # but are present in the model's dataChanged signal  # noqa
+            roles: list[int],               # so we must add them here                           # noqa
     ) -> None:
         """Emits a signal containing a formatted string whenever the underlying model's data changes."""
         text = self._model.as_textbox()
