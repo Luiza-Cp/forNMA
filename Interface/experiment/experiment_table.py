@@ -83,7 +83,10 @@ class ExperimentTableWidget(qtw.QTableView):
 
     def paths_are_filled(self) -> bool:
         """Returns True if all paths in the current ExperimentTable have been selected."""
-        return all(bool(data['path']) for data in self.path_data())
+        paths = [data['path'] for data in self.path_data()]
+        if not paths:
+            return False
+        return all(paths)
 
     @qtc.Slot(qtc.QModelIndex, qtc.QModelIndex, list)
     def on_model_data_changed(
