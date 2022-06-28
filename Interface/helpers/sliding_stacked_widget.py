@@ -19,7 +19,7 @@ class SlidingStackedWidget(qtw.QStackedWidget):
         super(SlidingStackedWidget, self).__init__(parent)
 
         self.m_direction = qtc.Qt.Horizontal
-        self.m_speed = 500
+        self.m_speed = 200
         self.m_animation_type = qtc.QEasingCurve.OutCubic
         self.m_now = 0
         self.m_next = 0
@@ -118,13 +118,11 @@ class SlidingStackedWidget(qtw.QStackedWidget):
         self.widget(_next).show()
         self.widget(_next).raise_()
 
-        anim_group = qtc.QParallelAnimationGroup(
-            self,
-            finished=self.animationDoneSlot,  # noqa
-        )
-
+        anim_group = qtc.QParallelAnimationGroup(self, finished=self.animationDoneSlot)  # noqa
         for index, start, end in zip(
-            (_now, _next), (pnow, p_next - offset), (pnow + offset, p_next)
+            (_now, _next),
+            (pnow, p_next - offset),
+            (pnow + offset, p_next),
         ):
             animation = qtc.QPropertyAnimation(  # noqa
                 self.widget(index),

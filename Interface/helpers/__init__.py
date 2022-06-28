@@ -5,4 +5,4 @@ from Interface.helpers.double_slider_widget import DoubleSliderLabeledLayout, Do
 from Interface.helpers.folder_select_button import FolderSelectButton
 from Interface.helpers.row_layout import RowLayout
 from Interface.helpers.sliding_stacked_widget import SlidingStackedWidget
-from Interface.helpers.tooltip_layout import ToolTipLayout
+from Interface.helpers.tooltip_widget import ToolTipWidget
