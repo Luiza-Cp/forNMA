@@ -1,8 +1,21 @@
+"""
+helpers/sliding_stacked_widget.py - contains a stacked widgets that has a "sliding" animation
+when transitioning between widgets.
+
+Source:
+Python: https://stackoverflow.com/questions/52596386/slide-qstackedwidget-page
+"""
+
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
 class SlidingStackedWidget(qtw.QStackedWidget):
-    def __init__(self, parent=None):
+    """Stacked widget that has extra signals/slots for smooth, sliding transitions between its widgets."""
+    def __init__(
+            self,
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes a SlidingStackedWidget."""
         super(SlidingStackedWidget, self).__init__(parent)
 
         self.m_direction = qtc.Qt.Horizontal
@@ -16,51 +29,60 @@ class SlidingStackedWidget(qtw.QStackedWidget):
 
     def setDirection(
             self,
-            direction,
+            direction: qtc.Qt.Orientation,
     ) -> None:
         self.m_direction = direction
 
     def setSpeed(
             self,
-            speed,
+            speed: int,
     ) -> None:
         self.m_speed = speed
 
     def setAnimation(
             self,
-            animation_type,
+            animation_type: qtc.QEasingCurve,
     ) -> None:
         self.m_animation_type = animation_type
 
     def setWrap(
             self,
-            wrap,
+            wrap: bool,
     ) -> None:
         self.m_wrap = wrap
 
     @qtc.Slot()
-    def slideInPrevious(self):
+    def slideInPrevious(self) -> None:
+        """Slot used to slide in the previous widget in the stack."""
         now = self.currentIndex()
         if self.m_wrap or now > 0:
             self.slideInIndex(now - 1)
 
     @qtc.Slot()
     def slideInNext(self):
+        """Slot used to slide in the next widget in the stack."""
         now = self.currentIndex()
         if self.m_wrap or now < (self.count() - 1):
             self.slideInIndex(now + 1)
 
-    def slideInIndex(self, idx):
-        if idx > (self.count() - 1):
-            idx %= self.count()
-        elif idx < 0:
-            idx = (idx + self.count()) % self.count()
-        self.slideInWidget(self.widget(idx))
+    @qtc.Slot(int)
+    def slideInIndex(
+            self,
+            index: int,
+    ) -> None:
+        """Slot used to slide in the widget at the i-th index in the stack."""
+        if index > (self.count() - 1):
+            index %= self.count()
+        elif index < 0:
+            index = (index + self.count()) % self.count()
+        self.slideInWidget(self.widget(index))
 
+    @qtc.Slot(qtw.QWidget)
     def slideInWidget(
             self,
-            new_widget,
+            new_widget: qtw.QWidget,
     ) -> None:
+        """Slot used to slide in the given widget in the stack."""
         if self.m_active:
             return
 
@@ -121,6 +143,7 @@ class SlidingStackedWidget(qtw.QStackedWidget):
 
     @qtc.Slot()
     def animationDoneSlot(self):
+        """Slot used to indicate that the animation has finished."""
         self.setCurrentIndex(self.m_next)
         self.widget(self.m_now).hide()
         self.widget(self.m_now).move(self.m_pnow)
