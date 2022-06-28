@@ -8,8 +8,9 @@ from Interface.helpers import (
     CollapsibleWidget,
     DoubleSliderLabeledLayout,
     DoubleSliderSpinBox,
-    ToolTipLayout,
+    RowLayout,
     SlidingStackedWidget,
+    ToolTipLayout,
 )
 
 
@@ -22,9 +23,11 @@ class AnalysisAreaWidget(qtw.QWidget):
         """Initializes an AnalysisAreaWidget instance."""
         super().__init__(parent=parent)
 
+        # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
+        # Label
         self.label = qtw.QLabel('Select analysis parameters on the left')
         self.label.setStyleSheet('QLabel {font-size: 24px}')
         self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
@@ -33,6 +36,8 @@ class AnalysisAreaWidget(qtw.QWidget):
 
 class AnalysisParametersWidget(qtw.QWidget):
     """Class representing the widget on the left-hand side of the "analysis" tab."""
+    channelsSet = qtc.Signal(list)
+
     def __init__(
             self,
             parent: qtw.QWidget = None,
@@ -40,56 +45,53 @@ class AnalysisParametersWidget(qtw.QWidget):
         """Initializes an AnalysisParametersWidget instance."""
         super().__init__(parent=parent)
 
+        # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
+        # ### Widget pages (stack)
         self.stack = SlidingStackedWidget()
         layout.addWidget(self.stack)
+        # Main page
+        self.analysis_main_page = AnalysisMainPage()
+        self.analysis_main_page.segmentationButtonClicked.connect(self.switch_to_segmentation_parameters_page)
+        self.analysis_main_page.detectionButtonClicked.connect(self.switch_to_detection_parameters_page)
+        self.stack.addWidget(self.analysis_main_page)
+        # Segmentation page
+        self.segmentation_parameters_page = SegmentationParametersPage()
+        self.segmentation_parameters_page.backButtonClicked.connect(self.switch_to_analysis_main_page)
+        self.channelsSet.connect(self.segmentation_parameters_page.channelsSet)
+        self.stack.addWidget(self.segmentation_parameters_page)
+        # Detection page
+        self.detection_parameters_page = DetectionParametersPage()
+        self.detection_parameters_page.backButtonClicked.connect(self.switch_to_analysis_main_page)
+        self.stack.addWidget(self.detection_parameters_page)
 
-        self.analysis_parameters_home = AnalysisParametersHome()
-        self.analysis_parameters_home.segmentationButtonClicked.connect(self.switch_to_segmentation_parameters_page)
-        self.analysis_parameters_home.detectionButtonClicked.connect(self.switch_to_detection_parameters_page)
-        self.stack.addWidget(self.analysis_parameters_home)
-
-        self.segmentation_parameters = SegmentationParametersWidget()
-        self.segmentation_parameters.backButtonClicked.connect(self.switch_to_analysis_parameters_home)
-        self.stack.addWidget(self.segmentation_parameters)
-
-        self.detection_parameters = DetectionParametersWidget()
-        self.detection_parameters.backButtonClicked.connect(self.switch_to_analysis_parameters_home)
-        self.stack.addWidget(self.detection_parameters)
-
-        btn_layout = qtw.QHBoxLayout()
-        layout.addLayout(btn_layout)
-
+        # ### Button row
+        button_row_layout = RowLayout()
+        layout.addLayout(button_row_layout)
+        # Preview button
         self.preview_button = qtw.QPushButton('Preview')
-        btn_layout.addWidget(self.preview_button)
-
+        # Run button
         self.run_button = qtw.QPushButton('Run')
-        btn_layout.addWidget(self.run_button)
+        # Add buttons to row
+        button_row_layout.addWidgets([self.preview_button, self.run_button])
 
-    def switch_to_analysis_parameters_home(self) -> None:
-        """Changes the widget layout to the "home" page."""
-        self.stack.slideInWidget(self.analysis_parameters_home)
+    def switch_to_analysis_main_page(self) -> None:
+        """Changes the current widget to the analysis main page."""
+        self.stack.slideInWidget(self.analysis_main_page)
 
     def switch_to_segmentation_parameters_page(self) -> None:
-        """Changes the widget layout to the segmentation parameters."""
-        self.stack.slideInWidget(self.segmentation_parameters)
+        """Changes the current widget to the segmentation parameters page."""
+        self.stack.slideInWidget(self.segmentation_parameters_page)
 
     def switch_to_detection_parameters_page(self) -> None:
-        """Changes the widget layout to the detection parameters."""
-        self.stack.slideInWidget(self.detection_parameters)
-
-    def set_channel_values(
-            self,
-            channels: list[str],
-    ) -> None:
-        """Sets the channel value names on the SegmentationParametersWidget."""
-        self.segmentation_parameters.set_channel_values(channels=channels)
+        """Changes the current widget to the detection parameters page."""
+        self.stack.slideInWidget(self.detection_parameters_page)
 
 
-class AnalysisParametersHome(qtw.QWidget):
-    """Class defining the "home" layout of the AnalysisParametersWidget."""
+class AnalysisMainPage(qtw.QWidget):
+    """Class defining the main page layout of the AnalysisParametersWidget."""
     segmentationButtonClicked = qtc.Signal()
     detectionButtonClicked = qtc.Signal()
 
@@ -97,58 +99,92 @@ class AnalysisParametersHome(qtw.QWidget):
             self,
             parent: qtw.QWidget = None,
     ) -> None:
-        """Initializes an AnalysisParametersHome instance."""
+        """Initializes an AnalysisMainPage instance."""
         super().__init__(parent=parent)
 
+        # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
+        # Segmentation button
         self.segmentation_parameters_button = qtw.QPushButton('Segmentation parameters')
         self.segmentation_parameters_button.clicked.connect(self.segmentationButtonClicked)  # noqa
         layout.addWidget(self.segmentation_parameters_button)
 
+        # Detection button
         self.detection_parameters_button = qtw.QPushButton('Detection parameters')
         self.detection_parameters_button.clicked.connect(self.detectionButtonClicked)  # noqa
         layout.addWidget(self.detection_parameters_button)
 
+        # Parameters label
         self.parameters_label = qtw.QLabel("")
         layout.addWidget(self.parameters_label)
 
 
-class ParametersBaseWidget(qtw.QWidget):
-    """Class defining the base layout shared by the segmentation and detection widgets."""
+class ParametersPage(qtw.QWidget):
+    """Class defining the base layout shared by the segmentation/detection parameters pages."""
     backButtonClicked = qtc.Signal()
 
     def __init__(
             self,
-            title: str = "",
+            title: str,
+            params_widget: qtw.QWidget,
+            parent: qtw.QWidget = None,
     ) -> None:
-        """Initializes a ParametersBaseWidget instance."""
-        super().__init__()
+        """Initializes a ParametersPage instance."""
+        super().__init__(parent=parent)
+        self.params_widget = params_widget
 
+        # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        top_row_layout = qtw.QHBoxLayout()
+        # ### Top row
+        top_row_layout = RowLayout()
         layout.addLayout(top_row_layout)
-
+        # Back button
         self.back_button = qtw.QPushButton("Back")
         self.back_button.clicked.connect(self.backButtonClicked)  # noqa
-        top_row_layout.addWidget(self.back_button)
-
+        # Title label
         self.title_label = qtw.QLabel(title)
         top_row_layout.addWidget(self.title_label)
+        # Add widgets to top row layout
+        top_row_layout.addWidgets([self.back_button, self.title_label])
+
+        # Params widget area
+        self.scroll_area = qtw.QScrollArea()
+        layout.addWidget(self.scroll_area)
+        if self.params_widget is not None:
+            self.scroll_area.setWidget(self.params_widget)
 
 
-class SegmentationParametersWidget(ParametersBaseWidget):
+class SegmentationParametersPage(ParametersPage):
+    """Subclass of ParametersPage responsible for displaying the segmentation parameters."""
+    channelsSet = qtc.Signal(list)
+
+    def __init__(
+            self,
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes a SegmentationParametersPage instance."""
+        params_widget = SegmentationParametersWidget()
+        super().__init__(title='Segmentation', params_widget=params_widget, parent=parent)
+
+        # This connection servers as a "tunnel" in order to the channel names reach the params_widget
+        self.channelsSet.connect(params_widget.set_channel_values)
+
+
+class SegmentationParametersWidget(qtw.QWidget):
     """Class defining the layout and widgets for the segmentation parameters."""
     def __init__(
             self,
-            title: str = "Segmentation",
+            parent: qtw.QWidget = None,
     ) -> None:
         """Initializes a SegmentationParametersWidget instance."""
-        super().__init__(title=title)
-        layout = self.layout()
+        super().__init__(parent=parent)
+
+        layout = qtw.QVBoxLayout()
+        self.setLayout(layout)
 
         # Header
         self.nuclei_channel_combobox = qtw.QComboBox()
@@ -160,38 +196,44 @@ class SegmentationParametersWidget(ParametersBaseWidget):
         layout.addLayout(nuclei_channel_layout)
 
         # forNMA
-        self.fornma_params_scroll_area = qtw.QScrollArea()
-        layout.addWidget(self.fornma_params_scroll_area)
         self.fornma_params_widget = ForNMAParamsWidget()
-        self.fornma_params_scroll_area.setWidget(self.fornma_params_widget)
+        layout.addWidget(self.fornma_params_widget)
 
         # Cellpose
-        # Cellpose collapse - all widgets go under here
-        self.cellpose_params_scroll_area = qtw.QScrollArea()
-        layout.addWidget(self.cellpose_params_scroll_area)
         self.cellpose_params_widget = CollapsibleWidget(qtw.QVBoxLayout(), title="Cellpose")  # TODO: replace with class
-        self.cellpose_params_scroll_area.setWidget(self.cellpose_params_widget)
+        layout.addWidget(self.cellpose_params_widget)
 
+    @qtc.Slot(list)
     def set_channel_values(
             self,
             channels: list[str],
     ) -> None:
-        """Sets the channel value names on the SegmentationParameters combobox."""
+        """Slot for setting the channel value names in the nuclei channel combobox."""
         while self.nuclei_channel_combobox.currentIndex() != -1:
             self.nuclei_channel_combobox.removeItem(0)
         for channel in channels:
             self.nuclei_channel_combobox.addItem(channel)
 
 
-class DetectionParametersWidget(ParametersBaseWidget):
+class DetectionParametersPage(ParametersPage):
+    """Subclass of ParametersPage responsible for displaying the segmentation parameters."""
+    def __init__(
+            self,
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes a DetectionParametersPage instance."""
+        super().__init__(title='Detection', params_widget=DetectionParametersWidget(), parent=parent)
+
+
+class DetectionParametersWidget(qtw.QWidget):
     """Class defining the layout and widgets for the detection parameters."""
     def __init__(
             self,
-            title: str = "Detection",
+            parent: qtw.QWidget = None,
     ) -> None:
         """Initializes a DetectionParametersWidget instance."""
-        super().__init__(title=title)
-        layout = self.layout()
+        super().__init__(parent=parent)
+        layout = qtw.QVBoxLayout()
 
         layout.addStretch()
 

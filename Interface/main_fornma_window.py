@@ -65,7 +65,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
             self.tabs.setTabEnabled(1, False)
         else:
             self.tabs.setTabEnabled(1, True)
-            self.analysis_params.set_channel_values(self.data_tab.channel_names)
+            self.analysis_params.channelsSet.emit(self.data_tab.channel_names)
 
     def on_tab_bar_clicked(
             self,
