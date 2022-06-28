@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.helpers import CollapsibleWidget, ToolTipLayout
+from Interface.helpers import CollapsibleWidget, ToolTipLayout, SlidingStackedWidget
 
 
 class AnalysisAreaWidget(qtw.QWidget):
@@ -37,7 +37,7 @@ class AnalysisParametersWidget(qtw.QWidget):
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        self.stack = qtw.QStackedWidget()
+        self.stack = SlidingStackedWidget()
         layout.addWidget(self.stack)
 
         self.analysis_parameters_home = AnalysisParametersHome()
@@ -66,15 +66,15 @@ class AnalysisParametersWidget(qtw.QWidget):
 
     def switch_to_analysis_parameters_home(self) -> None:
         """Changes the widget layout to the "home" page."""
-        self.stack.setCurrentWidget(self.analysis_parameters_home)
+        self.stack.slideInWidget(self.analysis_parameters_home)
 
     def switch_to_segmentation_parameters_page(self) -> None:
         """Changes the widget layout to the segmentation parameters."""
-        self.stack.setCurrentWidget(self.segmentation_parameters)
+        self.stack.slideInWidget(self.segmentation_parameters)
 
     def switch_to_detection_parameters_page(self) -> None:
         """Changes the widget layout to the detection parameters."""
-        self.stack.setCurrentWidget(self.detection_parameters)
+        self.stack.slideInWidget(self.detection_parameters)
 
     def set_channel_values(
             self,

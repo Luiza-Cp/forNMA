@@ -6,6 +6,7 @@ import sys
 
 from PySide6 import QtWidgets as qtw
 
+from Interface.helpers import SlidingStackedWidget
 from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
 
 DEBUG = True
@@ -29,7 +30,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.main_widget.setLayout(layout)
 
         # LEFT COLUMN
-        self.stack = qtw.QStackedWidget()
+        self.stack = SlidingStackedWidget()
         layout.addWidget(self.stack)
         # Page 01
         self.data_params = DataParametersWidget()
@@ -52,7 +53,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         # CONFIG
         self.data_tab.dataChanged.connect(self.on_data_tab_changed)  # noqa
         self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)  # noqa
-        self.tabs.currentChanged.connect(self.stack.setCurrentIndex)  # noqa
+        self.tabs.currentChanged.connect(self.stack.slideInIndex)  # noqa
         layout.setStretch(0, 4)  # Use 4/10 of the available space for the left column
         layout.setStretch(1, 6)  # Use 6/10 of the available space for the right column
 
