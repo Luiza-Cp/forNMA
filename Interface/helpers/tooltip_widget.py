@@ -3,28 +3,11 @@ from __future__ import annotations
 
 from PySide6 import QtGui as qtg, QtWidgets as qtw
 
+from Interface.helpers import SliderSpinBox, AutoSpinBox
+
 
 class ToolTipWidget(qtw.QWidget):
     """Widget containing an informative tooltip/info button to the left, and an optional checkbox at the top."""
-    _tooltips = {
-        'channel_with_nuclei': "This is the channel with nuclei text.",
-        'magnification': "No tooltip yet!",
-        'pixel_size': "Tooltip",
-        'threshold': "Tooltip",
-        'offset': "tooltip",
-        'blur': "This is smooth + blur",
-        'adjust_size': "ADJUST SIZE tooltip",
-        'shape': "SHAPE tooltip",
-        'eccentricity': "eccentricity tooltip",
-        'cut_edges': "cut_edges tooltip",
-        'size': "SIZE MIN MAX tooltip",
-        'radius': "RADIUS MIN MAX tooltip",
-        'rescale_intensity': "Rescale???",
-        'remove_bg': "Remove???",
-        'radius_bg': "Rolling ball",
-        'weakly_labeled': "These are some weakly labeled stuff",
-        'find_low_intensity_nucleus': "Let's try to find them!",
-    }
 
     def __init__(
             self,
@@ -82,3 +65,22 @@ class ToolTipWidget(qtw.QWidget):
     def display_tooltip_information(self) -> None:
         """Displays the tooltip information in a textbox."""
         qtw.QMessageBox.information(self, self.tooltip_name, self.tooltip_text)
+
+
+class ToolTipSpinBox(ToolTipWidget):
+    """Widget representing a ToolTipWidget with a spinbox as its main widget, which optionally includes a slider."""
+    def __init__(
+            self,
+            name: str,
+            label: str,
+            add_slider: bool = False,
+            spinbox_params: dict[str, float] = None,
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes a ToolTipSpinBox instance."""
+        spinbox_params = spinbox_params or {}
+        if add_slider is True:
+            widget = SliderSpinBox(**spinbox_params)
+        else:
+            widget = AutoSpinBox(**spinbox_params)
+        super().__init__(widget=widget, tooltip_name=name, top_label=label, parent=parent)

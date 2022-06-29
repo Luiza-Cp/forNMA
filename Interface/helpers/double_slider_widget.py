@@ -5,20 +5,20 @@ from __future__ import annotations
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
-class DoubleSliderSpinBox(qtw.QWidget):
+class SliderSpinBox(qtw.QWidget):
     """
-    Class representing a layout containing a DoubleSliderWidget and a spinbox to its side,
-    that displays/selects the current value.
+    Class representing a layout containing a slider widget and a spinbox to its side,
+    which both displays and selects the current widget value.
     """
     def __init__(
             self,
             minimum: int | float = 0.0,
             maximum: int | float = 1.0,
-            step: int | float = 0.05,
+            singleStep: int | float = 0.05,
             value: int | float = 0.5,
             parent: qtw.QWidget = None,
     ) -> None:
-        """Initializes a DoubleSliderLabeledLayout instance."""
+        """Initializes a SliderSpinBox instance."""
         super().__init__(parent=parent)
 
         # Layout
@@ -27,22 +27,12 @@ class DoubleSliderSpinBox(qtw.QWidget):
         self.setLayout(layout)
 
         # Slider
-        self.slider = DoubleSliderWidget()
+        self.slider = AutoSlider(minimum=minimum, maximum=maximum, singleStep=singleStep, value=value)
         layout.addWidget(self.slider)
-        # Slider params
-        self.slider.setMaximum(maximum)
-        self.slider.setMinimum(minimum)
-        self.slider.setSingleStep(step)
-        self.slider.setValue(value)
 
         # Spinbox
-        self.spinbox = qtw.QDoubleSpinBox()
+        self.spinbox = AutoSpinBox(minimum=minimum, maximum=maximum, singleStep=singleStep, value=value)
         layout.addWidget(self.spinbox)
-        # Spinbox params
-        self.spinbox.setMaximum(maximum)
-        self.spinbox.setMinimum(minimum)
-        self.spinbox.setSingleStep(step)
-        self.spinbox.setValue(value)
 
         # Connect slider to label
         self.slider.doubleValueChanged.connect(self.spinbox.setValue)  # noqa
@@ -76,7 +66,7 @@ class DoubleSliderLabeledLayout(qtw.QHBoxLayout):
             self.left_label.setEnabled(enabled)
 
         # Slider
-        self.slider = DoubleSliderWidget()
+        self.slider = DoubleSlider()
         self.addWidget(self.slider)
         # Slider params
         self.slider.setMaximum(maximum)
@@ -114,7 +104,7 @@ class DoubleSliderLabeledLayout(qtw.QHBoxLayout):
         self.label.setEnabled(enabled)
 
 
-class DoubleSliderWidget(qtw.QSlider):
+class DoubleSlider(qtw.QSlider):
     """
     A QSlider that works with float values, instead of integers.
     source: https://stackoverflow.com/questions/42820380/use-float-for-qslider
@@ -171,3 +161,37 @@ class DoubleSliderWidget(qtw.QSlider):
     ) -> None:
         """Sets the single step value on the slider."""
         return super().setSingleStep(value * self._multi)
+
+
+def AutoSpinBox(
+        minimum: int | float = 0.0,
+        maximum: int | float = 1.0,
+        singleStep: int | float = 0.05,
+        value: int | float = 0.5,
+) -> qtw.QDoubleSpinBox | qtw.QSpinBox:
+    """Returns the proper spinbox class depending on the type of the input parameters."""
+    spinbox = qtw.QSpinBox()
+    if any(isinstance(v, float) for v in [minimum, maximum, singleStep, value]):  # User wants to use floats
+        spinbox = qtw.QDoubleSpinBox()
+    spinbox.setMinimum(minimum)
+    spinbox.setMaximum(maximum)
+    spinbox.setSingleStep(singleStep)
+    spinbox.setValue(value)
+    return spinbox
+
+
+def AutoSlider(
+        minimum: int | float = 0.0,
+        maximum: int | float = 1.0,
+        singleStep: int | float = 0.05,
+        value: int | float = 0.5,
+) -> qtw.QSlider | DoubleSlider:
+    """Returns the proper slider class depending on the type of the input parameters."""
+    slider = qtw.QSlider()
+    if any(isinstance(v, float) for v in [minimum, maximum, singleStep, value]):  # User wants to use floats
+        slider = DoubleSlider()
+    slider.setMinimum(minimum)
+    slider.setMaximum(maximum)
+    slider.setSingleStep(singleStep)
+    slider.setValue(value)
+    return slider
