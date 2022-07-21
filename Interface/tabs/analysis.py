@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.helpers import (
+from Interface.custom_widgets import (
     CollapsableButton,
     DoubleSliderLabeledLayout,
     RowLayout,
@@ -12,7 +12,7 @@ from Interface.helpers import (
     ToolTipSpinBox,
     ToolTipWidget,
 )
-from Interface.templates import NumericLimits, ThresholdTypes
+from Interface.fornma_parameters import get_default_threshold, get_threshold_names, threshold_has_offset
 
 
 class AnalysisAreaWidget(qtw.QWidget):
@@ -192,7 +192,7 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.nuclear_detection_channel_combobox = qtw.QComboBox()
         self.nuclear_detection_channel_widget = ToolTipWidget(
             widget=self.nuclear_detection_channel_combobox,
-            tooltip_name='channel_with_nuclei',
+            fornma_id='channel_with_nuclei',
             top_label="Channel for nuclear detection",
         )
         layout.addWidget(self.nuclear_detection_channel_widget)
@@ -248,21 +248,11 @@ class ForNMAParamsWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Magnification
-        self.magnification_widget = ToolTipSpinBox(
-            name='magnification',
-            label='Objective magnification',
-            add_slider=False,
-            spinbox_params=NumericLimits.get('magnification')
-        )
+        self.magnification_widget = ToolTipSpinBox(fornma_id='magnification', include_slider=False)
         layout.addWidget(self.magnification_widget)
 
         # Pixel size
-        self.pixel_size_widget = ToolTipSpinBox(
-            name='pixel_size',
-            label='Pixel size',
-            add_slider=False,
-            spinbox_params=NumericLimits.get('pixel_size')
-        )
+        self.pixel_size_widget = ToolTipSpinBox(fornma_id='pixel_size', include_slider=False)
         layout.addWidget(self.pixel_size_widget)
 
         # ### Threshold stuff  # TODO: Refactor this
@@ -270,12 +260,12 @@ class ForNMAParamsWidget(qtw.QWidget):
         self.threshold_combobox = qtw.QComboBox()
         self.threshold_widget = ToolTipWidget(
             widget=self.threshold_combobox,
-            tooltip_name="threshold",
-            top_label="Threshold type"
+            fornma_id='threshold',
+            top_label='Select threshold type:',
         )
         # Sets the existing thresholds in the combobox
-        self.threshold_combobox.addItems(ThresholdTypes.get_names())
-        self.threshold_combobox.setCurrentText(ThresholdTypes.default_threshold)
+        self.threshold_combobox.addItems(get_threshold_names())
+        self.threshold_combobox.setCurrentText(get_default_threshold())
         layout.addWidget(self.threshold_widget)
         # Threshold offset (a layout, not a widget!)
         self.threshold_offset_layout = DoubleSliderLabeledLayout(
@@ -291,47 +281,22 @@ class ForNMAParamsWidget(qtw.QWidget):
         self.threshold_combobox.currentTextChanged.connect(self.on_threshold_combobox_changed)  # noqa
 
         # Blur
-        self.blur_widget = ToolTipSpinBox(
-            name='blur',
-            label='Smooth',
-            add_slider=True,
-            spinbox_params=NumericLimits.get('blur')
-        )
+        self.blur_widget = ToolTipSpinBox(fornma_id='blur', include_slider=True)
 
         # Adjust size
-        self.adjust_size_widget = ToolTipSpinBox(
-            name='adjust_size',
-            label='Adjust Size',
-            add_slider=True,
-            spinbox_params=NumericLimits.get('adjust_size')
-        )
+        self.adjust_size_widget = ToolTipSpinBox(fornma_id='adjust_size', include_slider=True)
         layout.addWidget(self.adjust_size_widget)
 
         # Shape
-        self.shape_widget = ToolTipSpinBox(
-            name='shape',
-            label='Shape',
-            add_slider=True,
-            spinbox_params=NumericLimits.get('shape')
-        )
+        self.shape_widget = ToolTipSpinBox(fornma_id='shape', include_slider=True)
         layout.addWidget(self.shape_widget)
 
         # Eccentricity
-        self.eccentricity_widget = ToolTipSpinBox(
-            name='eccentricity',
-            label='Eccentricity',
-            add_slider=True,
-            spinbox_params=NumericLimits.get('eccentricity')
-        )
+        self.eccentricity_widget = ToolTipSpinBox(fornma_id='eccentricity', include_slider=True)
         layout.addWidget(self.eccentricity_widget)
 
         # Cut edges
-        self.cut_edges_widget = ToolTipSpinBox(
-            name='cut_edges',
-            label='Cut edges',
-            add_slider=True,
-            spinbox_params=NumericLimits.get('cut_edges')
-        )
+        self.cut_edges_widget = ToolTipSpinBox(fornma_id='cut_edges', include_slider=True)
         layout.addWidget(self.cut_edges_widget)
 
         # Size spinboxes
@@ -356,8 +321,8 @@ class ForNMAParamsWidget(qtw.QWidget):
             selected: str,
     ) -> None:
         """Enables/disables the threshold offset slider whenever the threshold combobox changes its value."""
-
-        self.threshold_offset_layout.setEnabled(enabled)
+        has_threshold = threshold_has_offset(threshold_name=selected)
+        self.threshold_offset_layout.setEnabled(has_threshold)
 
 
 class CellposeParamsWidget(qtw.QWidget):
@@ -377,7 +342,7 @@ class CellposeParamsWidget(qtw.QWidget):
         self.param_spinbox = qtw.QSpinBox(minimum=0, maximum=1000, singleStep=5, value=20)  # noqa
         self.param_widget = ToolTipWidget(
             widget=self.param_spinbox,
-            tooltip_name='param',
+            fornma_id='param',
             top_label="Some param",
         )
         layout.addWidget(self.param_widget)

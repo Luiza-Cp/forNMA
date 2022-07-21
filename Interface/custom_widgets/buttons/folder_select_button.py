@@ -26,7 +26,7 @@ class FolderSelectButton(qtw.QPushButton):
 
     def select_folder(self) -> None:
         """Opens a FileDialog and emits a Signal containing the file path."""
-        folder_path = qtw.QFileDialog.getExistingDirectory(self.parent(), "Select folder", ".") or ''
+        folder_path = qtw.QFileDialog.getExistingDirectory(self.parent(), "Select folder", "..") or ''
         self.set_icon(bool(folder_path))
         self.folderSelected.emit(self.index, folder_path)
 

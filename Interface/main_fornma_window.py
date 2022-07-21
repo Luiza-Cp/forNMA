@@ -6,10 +6,10 @@ import sys
 
 from PySide6 import QtWidgets as qtw
 
-from Interface.helpers import SlidingStackedWidget
+from Interface.custom_widgets import SlidingStackedWidget
 from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
 
-DEBUG = True
+_DEBUG = False
 
 
 class ForNMAMainWindow(qtw.QMainWindow):
@@ -104,4 +104,4 @@ def fornma_interface_main(debug: bool):
 
 
 if __name__ == '__main__':
-    fornma_interface_main(debug=DEBUG)
+    fornma_interface_main(debug=_DEBUG)
