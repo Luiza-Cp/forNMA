@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from Interface.fornma_parameters import (
     get_fornma_help_message,
     get_fornma_numeric_limits,
     get_fornma_label,
     get_fornma_name,
-    get_fornma_tooltip,
+    get_fornma_tooltip, get_fornma_value,
 )
 
 _INSTANCES = {}
@@ -38,3 +39,11 @@ class _ForNMAParameter:
         self.tooltip_text = get_fornma_tooltip(fornma_id=self._fornma_id)
         self.help_message = get_fornma_help_message(fornma_id=self._fornma_id)
         self.numeric_limits = get_fornma_numeric_limits(fornma_id=self._fornma_id)
+        self.value = get_fornma_value(fornma_id=self._fornma_id)
+
+    def set_value(
+            self,
+            new_value: Any,
+    ) -> None:
+        """Sets the parameter value."""
+        self.value = new_value
