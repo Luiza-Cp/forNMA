@@ -10,7 +10,8 @@ class ToolTipWidget(qtw.QWidget):
     """Widget containing a tooltip text, an informative help button to the left, and an optional checkbox at the top."""
     def __init__(
             self,
-            widget: qtw.QWidget,
+            numeric_limits: dict[str, int | float] = None,
+            include_slider: bool = False,
             label_as_checkbox: bool = False,
             parent: qtw.QWidget = None,
     ) -> None:
@@ -31,7 +32,11 @@ class ToolTipWidget(qtw.QWidget):
         layout.addWidget(self.label, 0, 0, 1, 2)
 
         # Widget
-        self.widget = widget
+        numeric_limits = numeric_limits or {}
+        if include_slider is True:
+            self.widget = SliderSpinBox(**numeric_limits)
+        else:
+            self.widget = AutoSpinBox(**numeric_limits)
         layout.addWidget(self.widget, 1, 1, 1, 1)
 
     def set_tooltip(
