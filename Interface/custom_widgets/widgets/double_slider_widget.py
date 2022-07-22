@@ -6,6 +6,7 @@ from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
 class SliderSpinBox(qtw.QWidget):
+    valueChanged = qtc.Signal(object)  # int | float
     """
     Class representing a layout containing a slider widget and a spinbox to its side,
     which both displays and selects the current widget value.
@@ -35,8 +36,23 @@ class SliderSpinBox(qtw.QWidget):
         layout.addWidget(self.spinbox)
 
         # Connect slider to label
-        self.slider.doubleValueChanged.connect(self.spinbox.setValue)  # noqa
-        self.spinbox.valueChanged.connect(self.slider.setValue)  # noqa
+        self.slider.doubleValueChanged.connect(self.on_value_changed)  # noqa
+        self.spinbox.valueChanged.connect(self.on_value_changed)  # noqa
+
+    def on_value_changed(
+            self,
+            new_value: float | int,
+    ) -> None:
+        """Updates the slider value whenever the spinbox value changes, and emits it."""
+        if (sender := self.sender()) == self.slider:
+            self.spinbox.blockSignals(True)
+            self.spinbox.setValue(new_value)
+            self.spinbox.blockSignals(False)
+        elif sender == self.spinbox:
+            self.slider.blockSignals(True)
+            self.slider.setValue(new_value)
+            self.slider.blockSignals(False)
+        self.valueChanged.emit(new_value)
 
 
 class DoubleSliderLabeledLayout(qtw.QHBoxLayout):
