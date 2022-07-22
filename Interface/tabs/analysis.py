@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
+from Interface import ForNMAWidget
 from Interface.custom_widgets import (
     CollapsableButton,
     DoubleSliderLabeledLayout,
@@ -189,13 +192,11 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Header
-        self.nuclear_detection_channel_combobox = qtw.QComboBox()
-        self.nuclear_detection_channel_widget = ToolTipWidget(
-            widget=self.nuclear_detection_channel_combobox,
+        self.nuclear_detection_channel_widget = ForNMAWidget(
             fornma_id='channel_with_nuclei',
             top_label="Channel for nuclear detection",
         )
-        layout.addWidget(self.nuclear_detection_channel_widget)
+        layout.addWidget(self.nuclear_detection_channel_widget.widget)
 
         # forNMA Parameters
         self.fornma_params_widget = CollapsableButton("forNMA", widget_to_hide=ForNMAParamsWidget())
@@ -214,27 +215,24 @@ class SegmentationParametersWidget(qtw.QWidget):
             channels: list[str],
     ) -> None:
         """Slot for setting the channel value names in the nuclei channel combobox."""
-        while self.nuclear_detection_channel_combobox.currentIndex() != -1:
-            self.nuclear_detection_channel_combobox.removeItem(0)
+        while self.nuclear_detection_channel_widget.widget.currentIndex() != -1:
+            self.nuclear_detection_channel_widget.widget.removeItem(0)
         for channel in channels:
-            self.nuclear_detection_channel_combobox.addItem(channel)
+            self.nuclear_detection_channel_widget.widget.addItem(channel)
 
 
 class ForNMAParamsWidget(qtw.QWidget):
     """Widget containing all of forNMA's parameters in it."""
-    threshold_types = {  # structured as { threshold_name: uses_offset? }
-        'Isodata': False,
-        'Li': False,
-        'Mean': False,
-        'Minimum': False,
-        'Median': False,
-        'Multi-otsu': False,
-        'Otsu': False,
-        'Triangle': False,
-        'Yen': False,
-        'Local Mean': True,
-        'Local Gaussian': True,
-    }
+    _blueprint = (
+        ('magnification', False),
+        ('pixel_size', False),
+        ('blur', True),
+        ('adjust_size', True),
+        ('shape', True),
+        ('eccentricity', True),
+        ('cut_edges', True),
+        ('rescale_intensity', True),
+    )
 
     def __init__(
             self,
@@ -247,57 +245,68 @@ class ForNMAParamsWidget(qtw.QWidget):
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        # Magnification
-        self.magnification_widget = ToolTipSpinBox(fornma_id='magnification', include_slider=False)
-        layout.addWidget(self.magnification_widget)
+        for fornma_id, include_slider in self._blueprint:
+            fornma_widget = ForNMAWidget(fornma_id=fornma_id, include_slider=include_slider)
+            setattr(self, f'_{fornma_id}_param', fornma_widget.param)
+            setattr(self, f'_{fornma_id}_widget', fornma_widget.widget)
+            layout.addWidget(fornma_widget.widget)
 
-        # Pixel size
-        self.pixel_size_widget = ToolTipSpinBox(fornma_id='pixel_size', include_slider=False)
-        layout.addWidget(self.pixel_size_widget)
+        # # Magnification
+        # self.magnification_widget = ForNMAWidget(fornma_id='magnification', include_slider=False)
+        # layout.addWidget(self.magnification_widget)
+        #
+        # # Pixel size
+        # self.pixel_size_widget = ForNMAWidget(fornma_id='pixel_size', include_slider=False)
+        # layout.addWidget(self.pixel_size_widget)
 
-        # ### Threshold stuff  # TODO: Refactor this
-        # Threshold selection
-        self.threshold_combobox = qtw.QComboBox()
-        self.threshold_widget = ToolTipWidget(
-            widget=self.threshold_combobox,
-            fornma_id='threshold',
-            top_label='Select threshold type:',
-        )
-        # Sets the existing thresholds in the combobox
-        self.threshold_combobox.addItems(get_threshold_names())
-        self.threshold_combobox.setCurrentText(get_default_threshold())
-        layout.addWidget(self.threshold_widget)
-        # Threshold offset (a layout, not a widget!)
-        self.threshold_offset_layout = DoubleSliderLabeledLayout(
-            left_label='offset',
-            minimum=0.0,
-            maximum=1.0,
-            value=0.5,
-            step=0.05,
-            enabled=False,
-        )
-        layout.addLayout(self.threshold_offset_layout)
-        # Links threshold selection and threshold offset
-        self.threshold_combobox.currentTextChanged.connect(self.on_threshold_combobox_changed)  # noqa
+        # # ### Threshold stuff
+        # # Threshold selection
+        # self.threshold_combobox = qtw.QComboBox()
+        # self.threshold_widget = ToolTipWidget(
+        #     widget=self.threshold_combobox,
+        #     fornma_id='threshold',
+        #     top_label='Select threshold type:',
+        # )
+        # # Sets the existing thresholds in the combobox
+        # self.threshold_combobox.addItems(get_threshold_names())
+        # self.threshold_combobox.setCurrentText(get_default_threshold())
+        # layout.addWidget(self.threshold_widget)
+        # # Threshold offset (a layout, not a widget!)
+        # self.threshold_offset_layout = DoubleSliderLabeledLayout(
+        #     left_label='offset',
+        #     minimum=0.0,
+        #     maximum=1.0,
+        #     value=0.5,
+        #     step=0.05,
+        #     enabled=False,
+        # )
+        # layout.addLayout(self.threshold_offset_layout)
+        # # Links threshold selection and threshold offset
+        # self.threshold_combobox.currentTextChanged.connect(self.on_threshold_combobox_changed)  # noqa
 
-        # Blur
-        self.blur_widget = ToolTipSpinBox(fornma_id='blur', include_slider=True)
-
-        # Adjust size
-        self.adjust_size_widget = ToolTipSpinBox(fornma_id='adjust_size', include_slider=True)
-        layout.addWidget(self.adjust_size_widget)
-
-        # Shape
-        self.shape_widget = ToolTipSpinBox(fornma_id='shape', include_slider=True)
-        layout.addWidget(self.shape_widget)
-
-        # Eccentricity
-        self.eccentricity_widget = ToolTipSpinBox(fornma_id='eccentricity', include_slider=True)
-        layout.addWidget(self.eccentricity_widget)
-
-        # Cut edges
-        self.cut_edges_widget = ToolTipSpinBox(fornma_id='cut_edges', include_slider=True)
-        layout.addWidget(self.cut_edges_widget)
+        # # Blur
+        # self.blur_widget = ForNMAWidget(fornma_id='blur', include_slider=True)
+        # layout.addWidget(self.blur_widget)
+        #
+        # # Adjust size
+        # self.adjust_size_widget = ForNMAWidget(fornma_id='adjust_size', include_slider=True)
+        # layout.addWidget(self.adjust_size_widget)
+        #
+        # # Shape
+        # self.shape_widget = ForNMAWidget(fornma_id='shape', include_slider=True)
+        # layout.addWidget(self.shape_widget)
+        #
+        # # Eccentricity
+        # self.eccentricity_widget = ForNMAWidget(fornma_id='eccentricity', include_slider=True)
+        # layout.addWidget(self.eccentricity_widget)
+        #
+        # # Cut edges
+        # self.cut_edges_widget = ForNMAWidget(fornma_id='cut_edges', include_slider=True)
+        # layout.addWidget(self.cut_edges_widget)
+        #
+        # # Rescale intensity
+        # self.rescale_intensity_widget = ForNMAWidget(fornma_id='rescale_intensity')
+        # layout.addWidget(self.rescale_intensity_widget)
 
         # Size spinboxes
         # self.min_size_spinbox = qtw.QSpinBox()
@@ -324,6 +333,13 @@ class ForNMAParamsWidget(qtw.QWidget):
         has_threshold = threshold_has_offset(threshold_name=selected)
         self.threshold_offset_layout.setEnabled(has_threshold)
 
+    def get_values(self) -> dict[str, Any]:
+        """Return the name and value of each forNMA parameter."""
+        return {
+            name: getattr(self, f'_{name}_param').value
+            for name, _ in self._blueprint
+        }
+
 
 class CellposeParamsWidget(qtw.QWidget):
     """Widget containing all of Cellpose's parameters in it."""
@@ -339,13 +355,13 @@ class CellposeParamsWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Param
-        self.param_spinbox = qtw.QSpinBox(minimum=0, maximum=1000, singleStep=5, value=20)  # noqa
-        self.param_widget = ToolTipWidget(
-            widget=self.param_spinbox,
-            fornma_id='param',
-            top_label="Some param",
-        )
-        layout.addWidget(self.param_widget)
+        # self.param_spinbox = qtw.QSpinBox(minimum=0, maximum=1000, singleStep=5, value=20)  # noqa
+        # self.param_widget = ToolTipWidget(
+        #     widget=self.param_spinbox,
+        #     fornma_id='param',
+        #     top_label="Some param",
+        # )
+        # layout.addWidget(self.param_widget)
 
 
 class DetectionParametersPage(ParametersPage):
