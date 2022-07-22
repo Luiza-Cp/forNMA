@@ -1,8 +1,21 @@
 """fornma_parameters/blueprint.py - module containing a blueprint for creating all of forNMA's parameters."""
+from typing import Any
 
-_FORNMA_BLUEPRINT = [
-    {
-        'fornma_id': 'channel_with_nuclei',
+_DEFAULT_THRESHOLD = "Triangle"
+_DEFAULT_HAS_OFFSET = False
+_DEFAULT_NAME = "<NO NAME FOUND>"
+_DEFAULT_LABEL = "<NO LABEL FOUND>"
+_DEFAULT_TOOLTIP = "<NO TOOLTIP TEXT FOUND>"
+_DEFAULT_HELP_MESSAGE = "<NO HELP MESSAGE FOUND>"
+_DEFAULT_NUMERIC_LIMITS = {
+    'minimum': 0.0,
+    'maximum': 1.0,
+    'singleStep': 0.01,
+    'value': 0.5,
+}
+
+_FORNMA_BLUEPRINT = {
+    'channel_with_nuclei': {
         'text': {
             'name': "Channel with Nuclei",
             'label': "Select the channel with nuclei:",
@@ -11,13 +24,12 @@ _FORNMA_BLUEPRINT = [
         },
         'data': {
             'type': str,
-            # Value and options start empty because the values come from user input
-            'value': "",
+            # Options and value start empty because the values come from user input
             'options': {},
+            'value': "",
         }
     },
-    {
-        'fornma_id': 'magnification',
+    'magnification': {
         'text': {
             'name': "Magnification",
             'label': "Select the image magnification:",
@@ -30,12 +42,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0,
                 'maximum': 1000,
                 'singleStep': 5,
-                'value': 20,
+                'value': (value := 20),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'pixel_size',
+    'pixel_size': {
         'text': {
             'name': "Pixel Size",
             'label': "Select the pixel size (µm):",
@@ -48,12 +60,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0001,
                 'maximum': 1_000.0,
                 'singleStep': 0.01,
-                'value': 0.5,
+                'value': (value := 0.5),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'threshold',
+    'threshold': {
         'text': {
             'name': "Threshold Type",
             'label': "Select the threshold strategy:",
@@ -62,7 +74,6 @@ _FORNMA_BLUEPRINT = [
         },
         'data': {
             'type': str,
-            'value': "Triangle",
             'options': {
                 'Isodata': {'has_offset': False},
                 'Li': {'has_offset': False},
@@ -76,10 +87,10 @@ _FORNMA_BLUEPRINT = [
                 'Local Mean': {'has_offset': True},
                 'Local Gaussian': {'has_offset': True},
             },
+            'value': _DEFAULT_THRESHOLD,
         },
     },
-    {
-        'fornma_id': 'offset',
+    'offset': {
         'text': {
             'name': "Threshold Offset",
             'label': "Set the offset:",
@@ -92,12 +103,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.05,
-                'value': 0.5,
+                'value': (value := 0.5),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'blur',
+    'blur': {
         'text': {
             'name': "Smooth",
             'label': "Set the smoothness:",
@@ -110,12 +121,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 100.0,
                 'singleStep': 0.05,
-                'value': 12.0,
+                'value': (value := 12.0),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'adjust_size',
+    'adjust_size': {
         'text': {
             'name': "Adjust Size",
             'label': "Set the adjust size value:",
@@ -128,12 +139,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': -1_000.0,
                 'maximum': 1_000.0,
                 'singleStep': 0.05,
-                'value': 0.0,
+                'value': (value := 0.0),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'shape',
+    'shape': {
         'text': {
             'name': "Shape",
             'label': "Set the shape value:",
@@ -146,12 +157,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': 0.88,
+                'value': (value := 0.88),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'eccentricity',
+    'eccentricity': {
         'text': {
             'name': "Eccentricity",
             'label': "Set the eccentricity value:",
@@ -164,12 +175,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': 0.0,
+                'value': (value := 0.0),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'cut_edges',
+    'cut_edges': {
         'text': {
             'name': "Cut Edges",
             'label': "Set the cut edges value:",
@@ -182,12 +193,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': 0.5,
+                'value': (value := 0.5),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'min_size',
+    'min_size': {
         'text': {
             'name': "Min Size",
             'label': "Set the min size",
@@ -200,12 +211,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': 0.5,
+                'value': (value := 0.5),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'max_size',
+    'max_size': {
         'text': {
             'name': "Max Size",
             'label': "Set the max size",
@@ -218,12 +229,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': 0.5,
+                'value': (value := 0.5),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'min_radius',
+    'min_radius': {
         'text': {
             'name': "Min Size",
             'label': "Set the min radius",
@@ -236,12 +247,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': 0.5,
+                'value': (value := 0.5),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'max_radius',
+    'max_radius': {
         'text': {
             'name': "Max Size",
             'label': "Set the max radius",
@@ -254,12 +265,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': 0.5,
+                'value': (value := 0.5),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'rescale_intensity',
+    'rescale_intensity': {
         'text': {
             'name': "Rescale Intensity",
             'label': "Rescale intensity?",
@@ -268,11 +279,10 @@ _FORNMA_BLUEPRINT = [
         },
         'data': {
             'type': bool,
-            'state': False,
+            'value': False,
         },
     },
-    {
-        'fornma_id': 'remove_background',
+    'remove_background': {
         'text': {
             'name': "Remove Background",
             'label': "Remove background?",
@@ -281,11 +291,10 @@ _FORNMA_BLUEPRINT = [
         },
         'data': {
             'type': bool,
-            'state': False,
+            'value': False,
         },
     },
-    {
-        'fornma_id': 'radius_bg',
+    'radius_bg': {
         'text': {
             'name': "Rolling Ball",
             'label': "Radius rolling-ball",
@@ -298,12 +307,12 @@ _FORNMA_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 100.0,
                 'singleStep': 0.01,
-                'value': 10.0,
+                'value': (value := 10.0),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'weakly_labeled',
+    'weakly_labeled': {
         'text': {
             'name': "Weakly Labeled",
             'label': "Images are weakly labeled?",
@@ -312,11 +321,10 @@ _FORNMA_BLUEPRINT = [
         },
         'data': {
             'type': bool,
-            'state': False,
+            'value': False,
         },
     },
-    {
-        'fornma_id': 'find_low_intensity_nucleus',
+    'find_low_intensity_nucleus': {
         'text': {
             'name': "Find Low Intensity Nuclei",
             'label': "Find low intensity nuclei?",
@@ -325,14 +333,13 @@ _FORNMA_BLUEPRINT = [
         },
         'data': {
             'type': bool,
-            'state': False,
+            'value': False,
         },
     },
-]
+}
 
-_CELLPOSE_BLUEPRINT = [
-    {
-        'fornma_id': 'diameter',
+_CELLPOSE_BLUEPRINT = {
+    'diameter': {
         'text': {
             'name': "Nuclear Diameter",
             'label': "Select the nuclear diameter:",
@@ -345,12 +352,12 @@ _CELLPOSE_BLUEPRINT = [
                 'minimum': 0,
                 'maximum': 1000,
                 'singleStep': 5,
-                'value': 20,
+                'value': (value := 20),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'flow_threshold',
+    'flow_threshold': {
         'text': {
             'name': "Flow Threshold",
             'label': "Select the flow threshold:",
@@ -363,12 +370,12 @@ _CELLPOSE_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1000.0,
                 'singleStep': 0.5,
-                'value': 20.0,
+                'value': (value := 20.0),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'mask_threshold',
+    'mask_threshold': {
         'text': {
             'name': "Mask Threshold",
             'label': "Select the mask threshold:",
@@ -381,12 +388,12 @@ _CELLPOSE_BLUEPRINT = [
                 'minimum': 0.0,
                 'maximum': 1000.0,
                 'singleStep': 0.5,
-                'value': 20.0,
+                'value': (value := 20.0),
             },
+            'value': value,
         },
     },
-    {
-        'fornma_id': 'cellpose_rescale_intensity',  # TODO: confirmar se são parâmetros separados ou não
+    'cellpose_rescale_intensity': {  # TODO: confirmar se são parâmetros separados ou não
         'text': {
             'name': "Rescale Intensity",
             'label': "Rescale intensity?",
@@ -395,11 +402,10 @@ _CELLPOSE_BLUEPRINT = [
         },
         'data': {
             'type': bool,
-            'state': False,
+            'value': False,
         },
     },
-    {
-        'fornma_id': 'cellpose_remove_background',  # TODO: confirmar se são parâmetros separados ou não
+    'cellpose_remove_background': {  # TODO: confirmar se são parâmetros separados ou não
         'text': {
             'name': "Remove Background",
             'label': "Remove background?",
@@ -408,11 +414,10 @@ _CELLPOSE_BLUEPRINT = [
         },
         'data': {
             'type': bool,
-            'state': False,
+            'value': False,
         },
     },
-    {
-        'fornma_id': 'use_gpu',
+    'use_gpu': {
         'text': {
             'name': "Run in GPU",
             'label': "Run in GPU?",
@@ -421,7 +426,101 @@ _CELLPOSE_BLUEPRINT = [
         },
         'data': {
             'type': bool,
-            'state': False,
+            'value': False,
         },
     },
-]
+}
+
+
+_BLUEPRINTS = dict(**_FORNMA_BLUEPRINT, **_CELLPOSE_BLUEPRINT)
+
+
+def _get_from_dict(
+        fornma_id: str,
+        dict_name: str,
+        key: str,
+        default: Any,
+) -> Any:
+    """Returns the text parameter for the given forNMA ID."""
+    return _BLUEPRINTS.get(fornma_id, {}).get(dict_name, {}).get(key, default)
+
+
+# TEXT DICT -------------------------------------------------------------------
+
+def _get_from_text_dict(
+        fornma_id: str,
+        key: str,
+        default: Any,
+) -> str:
+    """Returns the text parameter for the given forNMA ID."""
+    return _get_from_dict(fornma_id=fornma_id, dict_name='text', key=key, default=default)
+
+
+def get_fornma_name(fornma_id: str) -> str:
+    """Returns the parameter name for the given forNMA ID."""
+    return _get_from_text_dict(fornma_id=fornma_id, key='name', default=_DEFAULT_NAME)
+
+
+def get_fornma_label(fornma_id: str) -> str:
+    """Returns the descriptive label for the given forNMA ID."""
+    return _get_from_text_dict(fornma_id=fornma_id, key='label', default=_DEFAULT_LABEL)
+
+
+def get_fornma_tooltip(fornma_id: str) -> str:
+    """Returns the tooltip text for the given forNMA ID."""
+    return _get_from_text_dict(fornma_id=fornma_id, key='tooltip', default=_DEFAULT_TOOLTIP)
+
+
+def get_fornma_help_message(fornma_id: str) -> str:
+    """Returns the help message for the given forNMA ID."""
+    return _get_from_text_dict(fornma_id=fornma_id, key='help', default=_DEFAULT_HELP_MESSAGE)
+
+
+# DATA DICT -------------------------------------------------------------------
+
+def _get_from_data_dict(
+        fornma_id: str,
+        key: str,
+        default: Any,
+) -> Any:
+    """Returns the data parameter for the given forNMA ID."""
+    return _get_from_dict(fornma_id=fornma_id, dict_name='data', key=key, default=default)
+
+
+def get_fornma_numeric_limits(fornma_id: str) -> dict[str, int | float]:
+    """Returns the limit values for the given forNMA ID."""
+    return _get_from_data_dict(fornma_id=fornma_id, key='limits', default=_DEFAULT_HELP_MESSAGE)
+
+
+def get_fornma_value(fornma_id: str) -> dict[str, int | float]:
+    """Returns the value for the given forNMA ID."""
+    return _get_from_data_dict(fornma_id=fornma_id, key='value', default=None)
+
+
+def get_fornma_data_type(fornma_id: str) -> dict[str, int | float]:
+    """Returns the limit values for the given forNMA ID."""
+    return _get_from_data_dict(fornma_id=fornma_id, key='type', default=None)
+
+
+# THRESHOLDS ------------------------------------------------------------------
+
+def get_default_threshold() -> str:
+    """Returns the name of the default threshold."""
+    return _DEFAULT_THRESHOLD
+
+
+def _get_threshold_options() -> dict[str, dict]:
+    """Returns a dictionary of the threshold options."""
+    return _get_from_data_dict(fornma_id='threshold', key='options', default={})
+
+
+def get_threshold_names() -> list[str]:
+    """Returns a list of all available thresholds."""
+    thresholds = _get_threshold_options()
+    return list(thresholds.keys())
+
+
+def threshold_has_offset(threshold_name: str) -> bool:
+    """Returns whether a given threshold name utilizes an offset parameter or not."""
+    thresholds = _get_threshold_options()
+    return thresholds.get(threshold_name, {}).get('has_offset', _DEFAULT_HAS_OFFSET)
