@@ -23,7 +23,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for channel with nuclei",
         },
         'data': {
-            'type': str,
+            'dtype': str,
             # Options and value start empty because the values come from user input
             'options': {},
             'value': "",
@@ -37,7 +37,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for magnification",
         },
         'data': {
-            'type': int,
+            'dtype': int,
             'limits': {
                 'minimum': 0,
                 'maximum': 1000,
@@ -55,7 +55,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for pixel size",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0001,
                 'maximum': 1_000.0,
@@ -73,7 +73,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for threshold",
         },
         'data': {
-            'type': str,
+            'dtype': str,
             'options': {
                 'Isodata': {'has_offset': False},
                 'Li': {'has_offset': False},
@@ -98,7 +98,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for offset",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -116,7 +116,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for blur",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 100.0,
@@ -134,7 +134,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for adjust_size",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': -1_000.0,
                 'maximum': 1_000.0,
@@ -152,7 +152,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for shape",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -170,7 +170,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for eccentricity",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -188,7 +188,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for cut edges",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -206,7 +206,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for min size",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -224,7 +224,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for max size",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -242,7 +242,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for min radius",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -260,7 +260,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for max radius",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -278,7 +278,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for rescale_intensity",
         },
         'data': {
-            'type': bool,
+            'dtype': bool,
             'value': False,
         },
     },
@@ -290,7 +290,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for remove_background",
         },
         'data': {
-            'type': bool,
+            'dtype': bool,
             'value': False,
         },
     },
@@ -302,7 +302,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for radius_bg",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 100.0,
@@ -320,7 +320,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for weakly_labeled",
         },
         'data': {
-            'type': bool,
+            'dtype': bool,
             'value': False,
         },
     },
@@ -332,7 +332,7 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for find_low_intensity_nucleus",
         },
         'data': {
-            'type': bool,
+            'dtype': bool,
             'value': False,
         },
     },
@@ -347,7 +347,7 @@ _CELLPOSE_BLUEPRINT = {
             'help': "HELP MESSAGE for diameter",
         },
         'data': {
-            'type': int,
+            'dtype': int,
             'limits': {
                 'minimum': 0,
                 'maximum': 1000,
@@ -365,7 +365,7 @@ _CELLPOSE_BLUEPRINT = {
             'help': "HELP MESSAGE for flow_threshold",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1000.0,
@@ -383,7 +383,7 @@ _CELLPOSE_BLUEPRINT = {
             'help': "HELP MESSAGE for mask_threshold",
         },
         'data': {
-            'type': float,
+            'dtype': float,
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1000.0,
@@ -401,7 +401,7 @@ _CELLPOSE_BLUEPRINT = {
             'help': "HELP MESSAGE for rescale_intensity",
         },
         'data': {
-            'type': bool,
+            'dtype': bool,
             'value': False,
         },
     },
@@ -413,7 +413,7 @@ _CELLPOSE_BLUEPRINT = {
             'help': "HELP MESSAGE for remove_background",
         },
         'data': {
-            'type': bool,
+            'dtype': bool,
             'value': False,
         },
     },
@@ -425,7 +425,7 @@ _CELLPOSE_BLUEPRINT = {
             'help': "HELP MESSAGE for use_gpu",
         },
         'data': {
-            'type': bool,
+            'dtype': bool,
             'value': False,
         },
     },
@@ -433,6 +433,14 @@ _CELLPOSE_BLUEPRINT = {
 
 
 _BLUEPRINTS = dict(**_FORNMA_BLUEPRINT, **_CELLPOSE_BLUEPRINT)
+
+
+# MAIN FUNCTIONS --------------------------------------------------------------
+
+def validate_fornma_id(fornma_id: str) -> None:
+    """Raises a ValueError if the forNMA ID is not valid."""
+    if fornma_id not in _BLUEPRINTS:
+        raise ValueError(f"forNMA ID {fornma_id} not found in blueprint file.")
 
 
 def _get_from_dict(
@@ -497,9 +505,9 @@ def get_fornma_value(fornma_id: str) -> dict[str, int | float]:
     return _get_from_data_dict(fornma_id=fornma_id, key='value', default=None)
 
 
-def get_fornma_data_type(fornma_id: str) -> dict[str, int | float]:
-    """Returns the limit values for the given forNMA ID."""
-    return _get_from_data_dict(fornma_id=fornma_id, key='type', default=None)
+def get_fornma_dtype(fornma_id: str) -> dict[str, int | float]:
+    """Returns the data type of the value for the given forNMA ID."""
+    return _get_from_data_dict(fornma_id=fornma_id, key='dtype', default=None)
 
 
 # THRESHOLDS ------------------------------------------------------------------
