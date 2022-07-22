@@ -9,13 +9,10 @@ from PySide6 import QtCore as qtc, QtWidgets as qtw
 from Interface import ForNMAWidget
 from Interface.custom_widgets import (
     CollapsableButton,
-    DoubleSliderLabeledLayout,
     RowLayout,
     SlidingStackedWidget,
-    ToolTipSpinBox,
-    ToolTipWidget,
 )
-from Interface.fornma_parameters import get_default_threshold, get_threshold_names, threshold_has_offset
+from Interface.fornma_parameters import threshold_has_offset
 
 
 class AnalysisAreaWidget(qtw.QWidget):
@@ -224,6 +221,7 @@ class SegmentationParametersWidget(qtw.QWidget):
 class ForNMAParamsWidget(qtw.QWidget):
     """Widget containing all of forNMA's parameters in it."""
     _blueprint = (
+        # Format: ( forNMA ID, include_slider )
         ('magnification', False),
         ('pixel_size', False),
         ('blur', True),
@@ -247,8 +245,6 @@ class ForNMAParamsWidget(qtw.QWidget):
 
         for fornma_id, include_slider in self._blueprint:
             fornma_widget = ForNMAWidget(fornma_id=fornma_id, include_slider=include_slider)
-            setattr(self, f'_{fornma_id}_param', fornma_widget.param)
-            setattr(self, f'_{fornma_id}_widget', fornma_widget.widget)
             layout.addWidget(fornma_widget.widget)
 
         # # Magnification
