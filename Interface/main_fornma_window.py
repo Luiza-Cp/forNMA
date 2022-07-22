@@ -54,8 +54,13 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.data_tab.dataChanged.connect(self.on_data_tab_changed)  # noqa
         self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)  # noqa
         self.tabs.currentChanged.connect(self.stack.slideInIndex)  # noqa
+        self.analysis_params.run_button.clicked.connect(self.TEST_on_run_button_clicked)
         layout.setStretch(0, 4)  # Use 4/10 of the available space for the left column
         layout.setStretch(1, 6)  # Use 6/10 of the available space for the right column
+
+    def TEST_on_run_button_clicked(self) -> None:
+        text = self.analysis_params.segmentation_parameters_page.params_widget.fornma_params_widget.widget_to_hide.get_values()
+        print(text)
 
     def on_data_tab_changed(self) -> None:
         """Enables or disables the Analysis tab whenever the content of the Data tab is updated."""
