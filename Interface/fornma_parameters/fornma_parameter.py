@@ -13,17 +13,6 @@ from Interface.fornma_parameters import (
     validate_fornma_id,
 )
 
-# _INSTANCES = {}
-#
-#
-# def ForNMAParameter(fornma_id: str) -> ForNMAParameter:
-#     """Interface for getting ForNMAParameter instances. Avoid re-creating the same instance for a given ID."""
-#     global _INSTANCES
-#     if (instance := _INSTANCES.get(fornma_id)) is None:
-#         instance = _ForNMAParameter(fornma_id=fornma_id)
-#         _INSTANCES[fornma_id] = instance
-#     return instance
-
 
 class ForNMAParameter:
     """

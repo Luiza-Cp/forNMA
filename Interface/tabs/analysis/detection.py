@@ -132,17 +132,9 @@ class ChannelWidget(qtw.QWidget):
             self._fornma_params[fornma_id] = fornma_widget
             fornma_widget.valueChanged.connect(self.paramsChanged)
 
-        # # Mock values just for testing right now
-        # self.label = qtw.QLabel(f'{self._channel_name} Channel Parameters!')
-        # layout.addWidget(self.label)
-        # self.spinbox = qtw.QSpinBox()
-        # layout.addWidget(self.spinbox)
-        # self.spinbox.valueChanged.connect(self.paramsChanged)  # noqa
-
     def get_values(self) -> dict[str, Any]:
         """Return the name and value of each forNMA parameter."""
         return {
             widget.objectName(): (widget.value() if widget.isEnabled() else None)
             for _, widget in self._fornma_params.items()
         }
-        # return {'checkbox': self.spinbox.value()}
