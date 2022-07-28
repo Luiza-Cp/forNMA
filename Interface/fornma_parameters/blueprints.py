@@ -1,8 +1,22 @@
 """fornma_parameters/blueprint.py - module containing a blueprint for creating all of forNMA's parameters."""
 from typing import Any
 
+_THRESHOLD_HAS_OFFSET = {
+    'Isodata': False,
+    'Li': False,
+    'Mean': False,
+    'Minimum': False,
+    'Median': False,
+    'Multi-otsu': False,
+    'Otsu': False,
+    'Triangle': False,
+    'Yen': False,
+    'Local Mean': True,
+    'Local Gaussian': True,
+}
 _DEFAULT_THRESHOLD = "Triangle"
-_DEFAULT_HAS_OFFSET = False
+_DEFAULT_HAS_OFFSET = _THRESHOLD_HAS_OFFSET.get(_DEFAULT_THRESHOLD)
+
 _DEFAULT_NAME = "<NO NAME FOUND>"
 _DEFAULT_LABEL = "<NO LABEL FOUND>"
 _DEFAULT_TOOLTIP = "<NO TOOLTIP TEXT FOUND>"
@@ -12,6 +26,12 @@ _DEFAULT_NUMERIC_LIMITS = {
     'maximum': 1.0,
     'singleStep': 0.01,
     'value': 0.5,
+}
+_DEFAULT_TEXT_OPTIONS = {
+    'some_text': False,
+    'other_text': True,
+    'yet_another_text': True,
+    'value': False,
 }
 
 _FORNMA_BLUEPRINT = {
@@ -24,8 +44,9 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': str,
+            'wtype': 'combobox',
             # Options and value start empty because the values come from user input
-            'options': {},
+            'options': [],
             'value': "",
         }
     },
@@ -38,6 +59,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': int,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0,
                 'maximum': 1000,
@@ -56,6 +78,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0001,
                 'maximum': 1_000.0,
@@ -74,6 +97,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': str,
+            'wtype': 'combobox',
             'options': {
                 'Isodata': {'has_offset': False},
                 'Li': {'has_offset': False},
@@ -99,6 +123,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -117,6 +142,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 100.0,
@@ -135,6 +161,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': -1_000.0,
                 'maximum': 1_000.0,
@@ -153,6 +180,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -171,6 +199,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -189,6 +218,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -207,6 +237,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -225,6 +256,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -243,6 +275,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -261,6 +294,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1.0,
@@ -279,6 +313,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': bool,
+            'wtype': 'checkbox',
             'value': False,
         },
     },
@@ -291,6 +326,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': bool,
+            'wtype': 'checkbox',
             'value': False,
         },
     },
@@ -303,6 +339,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 100.0,
@@ -321,6 +358,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': bool,
+            'wtype': 'checkbox',
             'value': False,
         },
     },
@@ -333,6 +371,7 @@ _FORNMA_BLUEPRINT = {
         },
         'data': {
             'dtype': bool,
+            'wtype': 'checkbox',
             'value': False,
         },
     },
@@ -348,6 +387,7 @@ _CELLPOSE_BLUEPRINT = {
         },
         'data': {
             'dtype': int,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0,
                 'maximum': 1000,
@@ -366,6 +406,7 @@ _CELLPOSE_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1000.0,
@@ -384,6 +425,7 @@ _CELLPOSE_BLUEPRINT = {
         },
         'data': {
             'dtype': float,
+            'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
                 'maximum': 1000.0,
@@ -402,6 +444,7 @@ _CELLPOSE_BLUEPRINT = {
         },
         'data': {
             'dtype': bool,
+            'wtype': 'checkbox',
             'value': False,
         },
     },
@@ -414,6 +457,7 @@ _CELLPOSE_BLUEPRINT = {
         },
         'data': {
             'dtype': bool,
+            'wtype': 'checkbox',
             'value': False,
         },
     },
@@ -426,6 +470,7 @@ _CELLPOSE_BLUEPRINT = {
         },
         'data': {
             'dtype': bool,
+            'wtype': 'checkbox',
             'value': False,
         },
     },
@@ -495,10 +540,13 @@ def _get_from_data_dict(
     return _get_from_dict(fornma_id=fornma_id, dict_name='data', key=key, default=default)
 
 
+def get_fornma_text_options(fornma_id: str) -> dict[str, int | float]:
+    """Returns the text options for the given forNMA ID."""
+    return _get_from_data_dict(fornma_id=fornma_id, key='options', default=_DEFAULT_TEXT_OPTIONS)
+
 def get_fornma_numeric_limits(fornma_id: str) -> dict[str, int | float]:
     """Returns the limit values for the given forNMA ID."""
-    return _get_from_data_dict(fornma_id=fornma_id, key='limits', default=_DEFAULT_HELP_MESSAGE)
-
+    return _get_from_data_dict(fornma_id=fornma_id, key='limits', default=_DEFAULT_NUMERIC_LIMITS)
 
 def get_fornma_value(fornma_id: str) -> dict[str, int | float]:
     """Returns the value for the given forNMA ID."""

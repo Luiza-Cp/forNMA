@@ -15,26 +15,6 @@ from Interface.custom_widgets import (
 from Interface.fornma_parameters import threshold_has_offset
 
 
-class AnalysisAreaWidget(qtw.QWidget):
-    """Class representing the widget on the right-hand side of the "analysis" tab."""
-    def __init__(
-            self,
-            parent: qtw.QWidget = None,
-    ) -> None:
-        """Initializes an AnalysisAreaWidget instance."""
-        super().__init__(parent=parent)
-
-        # Layout
-        layout = qtw.QVBoxLayout()
-        self.setLayout(layout)
-
-        # Label
-        self.label = qtw.QLabel('Select analysis parameters on the left')
-        self.label.setStyleSheet('QLabel {font-size: 24px}')
-        self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
-        layout.addWidget(self.label)
-
-
 class AnalysisParametersWidget(qtw.QWidget):
     """Class representing the widget on the left-hand side of the "analysis" tab."""
     channelsSet = qtc.Signal(list)
@@ -77,6 +57,9 @@ class AnalysisParametersWidget(qtw.QWidget):
         self.run_button = qtw.QPushButton('Run')
         # Add buttons to row
         button_row_layout.addWidgets([self.preview_button, self.run_button])
+
+        # Signal aliases
+        self.segmentationParamsChanged = self.segmentation_parameters_page.segmentationParamsChanged
 
     def switch_to_analysis_main_page(self) -> None:
         """Changes the current widget to the analysis main page."""
@@ -163,6 +146,7 @@ class ParametersPage(qtw.QWidget):
 class SegmentationParametersPage(ParametersPage):
     """Subclass of ParametersPage responsible for displaying the segmentation parameters."""
     channelsSet = qtc.Signal(list)
+    segmentationDataChanged = qtc.Signal(dict)
 
     def __init__(
             self,
@@ -175,9 +159,14 @@ class SegmentationParametersPage(ParametersPage):
         # This connection servers as a "tunnel" in order to the channel names reach the params_widget
         self.channelsSet.connect(params_widget.set_channel_values)
 
+        # Signal aliases
+        self.segmentationParamsChanged = params_widget.segmentationParamsChanged
+
 
 class SegmentationParametersWidget(qtw.QWidget):
     """Class defining the layout and widgets for the segmentation parameters."""
+    segmentationParamsChanged = qtc.Signal(dict)
+
     def __init__(
             self,
             parent: qtw.QWidget = None,
@@ -189,22 +178,26 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Header
-        self.nuclear_detection_channel_widget = ForNMAWidget(
-            fornma_id='channel_with_nuclei',
-            top_label="Channel for nuclear detection",
-        )
-        layout.addWidget(self.nuclear_detection_channel_widget.widget)
+        self.nuclear_detection_channel_widget = ForNMAWidget(fornma_id='channel_with_nuclei')
+        layout.addWidget(self.nuclear_detection_channel_widget)
 
         # forNMA Parameters
-        self.fornma_params_widget = CollapsableButton("forNMA", widget_to_hide=ForNMAParamsWidget())
-        layout.addWidget(self.fornma_params_widget)
+        self.fornma_params_widget = ForNMAParamsWidget()
+        self.fornma_collapsable_button = CollapsableButton("forNMA", widget_to_hide=self.fornma_params_widget)
+        layout.addWidget(self.fornma_collapsable_button)
 
         # Cellpose Parameters
-        self.cellpose_params_widget = CollapsableButton("Cellpose", widget_to_hide=CellposeParamsWidget())
-        layout.addWidget(self.cellpose_params_widget)
+        self.cellpose_params_widget = CellposeParamsWidget()
+        self.cellpose_collapsable_button = CollapsableButton("Cellpose", widget_to_hide=self.cellpose_params_widget)
+        layout.addWidget(self.cellpose_collapsable_button)
 
         # Keep widgets at the top
         layout.addStretch()
+
+        # Connection
+        self.nuclear_detection_channel_widget.valueChanged.connect(self.on_params_changed)
+        self.fornma_params_widget.paramsChanged.connect(self.on_params_changed)
+        self.cellpose_params_widget.paramsChanged.connect(self.on_params_changed)
 
     @qtc.Slot(list)
     def set_channel_values(
@@ -212,14 +205,29 @@ class SegmentationParametersWidget(qtw.QWidget):
             channels: list[str],
     ) -> None:
         """Slot for setting the channel value names in the nuclei channel combobox."""
-        while self.nuclear_detection_channel_widget.widget.currentIndex() != -1:
-            self.nuclear_detection_channel_widget.widget.removeItem(0)
+        while self.nuclear_detection_channel_widget.currentIndex() != -1:
+            self.nuclear_detection_channel_widget.removeItem(0)
         for channel in channels:
-            self.nuclear_detection_channel_widget.widget.addItem(channel)
+            self.nuclear_detection_channel_widget.addItem(channel)
+
+    def on_params_changed(
+            self,
+            _: Any,  # Parameter that has changed - we don't need it because we will get all parameters anyway
+    ) -> None:
+        """Emits all segmentation parameters at once."""
+        params = {
+            'fornma': self.fornma_params_widget.get_values(),
+            'cellpose': self.cellpose_params_widget.get_values(),
+        }
+        # "Manually" add channel information
+        k = self.nuclear_detection_channel_widget.objectName()
+        params['fornma'][k] = self.nuclear_detection_channel_widget.value()
+        self.segmentationParamsChanged.emit(params)
 
 
 class ForNMAParamsWidget(qtw.QWidget):
     """Widget containing all of forNMA's parameters in it."""
+    paramsChanged = qtc.Signal(object)  # type does not matter
     _blueprint = (
         # Format: ( forNMA ID, include_slider )
         ('magnification', False),
@@ -242,83 +250,13 @@ class ForNMAParamsWidget(qtw.QWidget):
         # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
+        self._fornma_params = []
 
-        for fornma_id, include_slider in self._blueprint:
-            fornma_widget = ForNMAWidget(fornma_id=fornma_id, include_slider=include_slider)
-            layout.addWidget(fornma_widget.widget)
-
-        # # Magnification
-        # self.magnification_widget = ForNMAWidget(fornma_id='magnification', include_slider=False)
-        # layout.addWidget(self.magnification_widget)
-        #
-        # # Pixel size
-        # self.pixel_size_widget = ForNMAWidget(fornma_id='pixel_size', include_slider=False)
-        # layout.addWidget(self.pixel_size_widget)
-
-        # # ### Threshold stuff
-        # # Threshold selection
-        # self.threshold_combobox = qtw.QComboBox()
-        # self.threshold_widget = ToolTipWidget(
-        #     widget=self.threshold_combobox,
-        #     fornma_id='threshold',
-        #     top_label='Select threshold type:',
-        # )
-        # # Sets the existing thresholds in the combobox
-        # self.threshold_combobox.addItems(get_threshold_names())
-        # self.threshold_combobox.setCurrentText(get_default_threshold())
-        # layout.addWidget(self.threshold_widget)
-        # # Threshold offset (a layout, not a widget!)
-        # self.threshold_offset_layout = DoubleSliderLabeledLayout(
-        #     left_label='offset',
-        #     minimum=0.0,
-        #     maximum=1.0,
-        #     value=0.5,
-        #     step=0.05,
-        #     enabled=False,
-        # )
-        # layout.addLayout(self.threshold_offset_layout)
-        # # Links threshold selection and threshold offset
-        # self.threshold_combobox.currentTextChanged.connect(self.on_threshold_combobox_changed)  # noqa
-
-        # # Blur
-        # self.blur_widget = ForNMAWidget(fornma_id='blur', include_slider=True)
-        # layout.addWidget(self.blur_widget)
-        #
-        # # Adjust size
-        # self.adjust_size_widget = ForNMAWidget(fornma_id='adjust_size', include_slider=True)
-        # layout.addWidget(self.adjust_size_widget)
-        #
-        # # Shape
-        # self.shape_widget = ForNMAWidget(fornma_id='shape', include_slider=True)
-        # layout.addWidget(self.shape_widget)
-        #
-        # # Eccentricity
-        # self.eccentricity_widget = ForNMAWidget(fornma_id='eccentricity', include_slider=True)
-        # layout.addWidget(self.eccentricity_widget)
-        #
-        # # Cut edges
-        # self.cut_edges_widget = ForNMAWidget(fornma_id='cut_edges', include_slider=True)
-        # layout.addWidget(self.cut_edges_widget)
-        #
-        # # Rescale intensity
-        # self.rescale_intensity_widget = ForNMAWidget(fornma_id='rescale_intensity')
-        # layout.addWidget(self.rescale_intensity_widget)
-
-        # Size spinboxes
-        # self.min_size_spinbox = qtw.QSpinBox()
-        # self.max_size_spinbox = qtw.QSpinBox()
-        # row = qtw.QHBoxLayout()
-        # row.addWidget(qtw.QLabel('Min'))
-        # row.addWidget(self.min_size_spinbox)
-        # row.addWidget(qtw.QLabel('Max'))
-        # row.addWidget(self.max_size_spinbox)
-        # self.size_widget = ToolTipWidget(
-        #     widget=row,
-        #     tooltip_name='size',
-        #     top_label='Size',
-        #     checkbox=True,
-        # )
-        # layout.addLayout(self.size_widget)
+        for fornma_id, add_slider in self._blueprint:
+            fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider)
+            layout.addWidget(fornma_widget)
+            self._fornma_params.append(fornma_widget)
+            fornma_widget.valueChanged.connect(self.paramsChanged)
 
     @qtc.Slot(str)
     def on_threshold_combobox_changed(
@@ -327,18 +265,32 @@ class ForNMAParamsWidget(qtw.QWidget):
     ) -> None:
         """Enables/disables the threshold offset slider whenever the threshold combobox changes its value."""
         has_threshold = threshold_has_offset(threshold_name=selected)
-        self.threshold_offset_layout.setEnabled(has_threshold)
+        for widget in self._fornma_params:
+            if widget.objectName() == 'offset':  # HARD-CODED: parameter name in blueprint must be exact!
+                widget.setEnabled(has_threshold)
+                return
 
     def get_values(self) -> dict[str, Any]:
         """Return the name and value of each forNMA parameter."""
         return {
-            name: getattr(self, f'_{name}_param').value
-            for name, _ in self._blueprint
+            widget.objectName(): widget.value()
+            for widget in self._fornma_params
         }
 
 
 class CellposeParamsWidget(qtw.QWidget):
     """Widget containing all of Cellpose's parameters in it."""
+    paramsChanged = qtc.Signal(object)  # type does not matter
+    _blueprint = (
+        # Format: ( forNMA ID, include_slider )
+        ('diameter', True),
+        ('flow_threshold', True),
+        ('mask_threshold', True),
+        ('cellpose_rescale_intensity', False),
+        ('cellpose_remove_background', False),
+        ('use_gpu', False),
+    )
+
     def __init__(
             self,
             parent: qtw.QWidget = None,
@@ -349,15 +301,20 @@ class CellposeParamsWidget(qtw.QWidget):
         # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
+        self._fornma_params = []
 
-        # Param
-        # self.param_spinbox = qtw.QSpinBox(minimum=0, maximum=1000, singleStep=5, value=20)  # noqa
-        # self.param_widget = ToolTipWidget(
-        #     widget=self.param_spinbox,
-        #     fornma_id='param',
-        #     top_label="Some param",
-        # )
-        # layout.addWidget(self.param_widget)
+        for fornma_id, add_slider in self._blueprint:
+            fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider)
+            layout.addWidget(fornma_widget)
+            self._fornma_params.append(fornma_widget)
+            fornma_widget.valueChanged.connect(self.paramsChanged)
+
+    def get_values(self) -> dict[str, Any]:
+        """Return the name and value of each forNMA parameter."""
+        return {
+            widget.objectName(): widget.value()
+            for widget in self._fornma_params
+        }
 
 
 class DetectionParametersPage(ParametersPage):
@@ -384,3 +341,26 @@ class DetectionParametersWidget(qtw.QWidget):
         layout.addWidget(self.label)
 
         layout.addStretch()
+
+
+class AnalysisAreaWidget(qtw.QWidget):
+    """Class representing the widget on the right-hand side of the "analysis" tab."""
+    def __init__(
+            self,
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes an AnalysisAreaWidget instance."""
+        super().__init__(parent=parent)
+
+        # Layout
+        layout = qtw.QVBoxLayout()
+        self.setLayout(layout)
+
+        # Label
+        self.label = qtw.QLabel('Select analysis parameters on the left')
+        self.label.setStyleSheet('QLabel {font-size: 14px}')
+        self.label.setAlignment(qtc.Qt.AlignLeft)  # noqa
+        layout.addWidget(self.label)
+
+        # Method aliases
+        self.setText = self.label.setText

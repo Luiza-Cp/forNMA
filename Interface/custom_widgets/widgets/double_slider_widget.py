@@ -6,17 +6,18 @@ from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
 class SliderSpinBox(qtw.QWidget):
-    valueChanged = qtc.Signal(object)  # int | float
     """
     Class representing a layout containing a slider widget and a spinbox to its side,
-    which both displays and selects the current widget value.
+    which both displays and selects the current widget integer value.
     """
+    valueChanged = qtc.Signal(int)
+
     def __init__(
             self,
-            minimum: int | float = 0.0,
-            maximum: int | float = 1.0,
-            singleStep: int | float = 0.05,
-            value: int | float = 0.5,
+            minimum: int = 0,
+            maximum: int = 10,
+            singleStep: int = 1,
+            value: int = 5,
             parent: qtw.QWidget = None,
     ) -> None:
         """Initializes a SliderSpinBox instance."""
@@ -28,20 +29,97 @@ class SliderSpinBox(qtw.QWidget):
         self.setLayout(layout)
 
         # Slider
-        self.slider = AutoSlider(minimum=minimum, maximum=maximum, singleStep=singleStep, value=value)
+        self.slider = qtw.QSlider(  # noqa
+            minimum=minimum,
+            maximum=maximum,
+            singleStep=singleStep,
+            value=value,
+        )
         layout.addWidget(self.slider)
 
         # Spinbox
-        self.spinbox = AutoSpinBox(minimum=minimum, maximum=maximum, singleStep=singleStep, value=value)
+        self.spinbox = qtw.QSpinBox(
+            minimum=minimum,  # noqa
+            maximum=maximum,  # noqa
+            singleStep=singleStep,  # noqa
+            value=value,  # noqa
+        )
         layout.addWidget(self.spinbox)
 
-        # Connect slider to label
-        self.slider.doubleValueChanged.connect(self.on_value_changed)  # noqa
+        # Method aliases
+        self.value = self.slider.value
+
+        # Connect slider to spinbox
+        self.slider.valueChanged.connect(self.on_value_changed)  # noqa
         self.spinbox.valueChanged.connect(self.on_value_changed)  # noqa
 
     def on_value_changed(
             self,
-            new_value: float | int,
+            new_value: int,
+    ) -> None:
+        """Updates the slider value whenever the spinbox value changes, and emits it."""
+        if (sender := self.sender()) == self.slider:
+            self.spinbox.blockSignals(True)
+            self.spinbox.setValue(new_value)
+            self.spinbox.blockSignals(False)
+        elif sender == self.spinbox:
+            self.slider.blockSignals(True)
+            self.slider.setValue(new_value)
+            self.slider.blockSignals(False)
+        self.valueChanged.emit(new_value)
+
+
+class DoubleSliderSpinBox(qtw.QWidget):
+    """
+    Class representing a layout containing a slider widget and a spinbox to its side,
+    which both displays and selects the current widget float value.
+    """
+    valueChanged = qtc.Signal(float)
+
+    def __init__(
+            self,
+            minimum: int = 0.0,
+            maximum: int = 1.0,
+            singleStep: int = 0.05,
+            value: int = 0.5,
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes a DoubleSliderSpinBox instance."""
+        super().__init__(parent=parent)
+
+        # Layout
+        layout = qtw.QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+        # Slider
+        self.slider = DoubleSlider(  # noqa
+            minimum=minimum,
+            maximum=maximum,
+            singleStep=singleStep,
+            value=value,
+        )
+        layout.addWidget(self.slider)
+
+        # Spinbox
+        self.spinbox = qtw.QDoubleSpinBox(
+            minimum=minimum,  # noqa
+            maximum=maximum,  # noqa
+            singleStep=singleStep,  # noqa
+            value=value,  # noqa
+        )
+        layout.addWidget(self.spinbox)
+
+        # Connect slider to spinbox
+        self.slider.doubleValueChanged.connect(self.on_value_changed)  # noqa
+        self.spinbox.valueChanged.connect(self.on_value_changed)  # noqa
+
+        # Method aliases
+        self.value = self.slider.value
+
+    def on_value_changed(
+            self,
+            new_value: int,
     ) -> None:
         """Updates the slider value whenever the spinbox value changes, and emits it."""
         if (sender := self.sender()) == self.slider:
@@ -131,11 +209,23 @@ class DoubleSlider(qtw.QSlider):
             self,
             decimals: int = 3,
             orientation: qtc.Qt.Orientation = qtc.Qt.Horizontal,
+            minimum: float = None,
+            maximum: float = None,
+            singleStep: float = None,
+            value: float = None,
     ) -> None:
         """Initializes a DoubleSlider instance."""
         super().__init__(orientation=orientation)
         self._multi = 10 ** decimals
         self.valueChanged.connect(self.emitDoubleValueChanged)  # noqa
+        if minimum is not None:
+            self.setMinimum(minimum)
+        if maximum is not None:
+            self.setMaximum(maximum)
+        if singleStep is not None:
+            self.setSingleStep(singleStep)
+        if value is not None:
+            self.setValue(value)
 
     def emitDoubleValueChanged(self) -> None:  # noqa
         """Signal that emits an appropriately scaled float value."""

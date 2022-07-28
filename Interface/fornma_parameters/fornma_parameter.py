@@ -12,6 +12,7 @@ from Interface.fornma_parameters import (
     get_fornma_label,
     get_fornma_name,
     get_fornma_tooltip,
+    get_fornma_text_options,
     get_fornma_value,
     validate_fornma_id,
 )
@@ -44,11 +45,14 @@ class _ForNMAParameter(qtc.QObject):
         super().__init__(parent=parent)
         validate_fornma_id(fornma_id=fornma_id)
         self._fornma_id = fornma_id
+        # Text
         self.name = get_fornma_name(fornma_id=self._fornma_id)
         self.label = get_fornma_label(fornma_id=self._fornma_id)
         self.tooltip_text = get_fornma_tooltip(fornma_id=self._fornma_id)
         self.help_message = get_fornma_help_message(fornma_id=self._fornma_id)
-        self._dtype = get_fornma_dtype(fornma_id=self._fornma_id)
+        # Data
+        self.dtype = get_fornma_dtype(fornma_id=self._fornma_id)
+        self.text_options = get_fornma_text_options(fornma_id=self._fornma_id)
         self.numeric_limits = get_fornma_numeric_limits(fornma_id=self._fornma_id)
         self.value = get_fornma_value(fornma_id=self._fornma_id)
 

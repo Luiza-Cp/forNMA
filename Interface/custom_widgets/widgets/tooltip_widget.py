@@ -8,6 +8,8 @@ from Interface.custom_widgets import AutoSpinBox, SliderSpinBox
 
 class ToolTipWidget(qtw.QWidget):
     """Widget containing a tooltip text, an informative help button to the left, and an optional checkbox at the top."""
+    valueChanged = qtc.Signal(object)  # int | float
+
     def __init__(
             self,
             numeric_limits: dict[str, int | float] = None,
@@ -53,30 +55,37 @@ class ToolTipWidget(qtw.QWidget):
         """Sets the label text."""
         self.label.setText(label_text)
 
-
-class ToolTipSpinBox(ToolTipWidget):
-    """Widget representing a ToolTipWidget with a spinbox as its main widget, which optionally includes a slider."""
-    valueChanged = qtc.Signal(object)  # int | float
-
-    def __init__(
-            self,
-            numeric_limits: dict[str, int | float] = None,
-            include_slider: bool = False,
-            label_as_checkbox: bool = False,
-            parent: qtw.QWidget = None,
-    ) -> None:
-        """Initializes a ToolTipSpinBox instance."""
-        numeric_limits = numeric_limits or {}
-        if include_slider is True:
-            widget = SliderSpinBox(**numeric_limits)
-        else:
-            widget = AutoSpinBox(**numeric_limits)
-        super().__init__(widget=widget, label_as_checkbox=label_as_checkbox, parent=parent)
-        widget.valueChanged.connect(self.on_spinbox_value_changed)  # noqa
-
     def on_spinbox_value_changed(
             self,
             new_value: int | float,
     ) -> None:
         """Emits a signal whenever the spinbox value changes."""
         self.valueChanged.emit(new_value)
+
+
+# class ToolTipSpinBox(ToolTipWidget):
+#     """Widget representing a ToolTipWidget with a spinbox as its main widget, which optionally includes a slider."""
+#     valueChanged = qtc.Signal(object)  # int | float
+#
+#     def __init__(
+#             self,
+#             numeric_limits: dict[str, int | float] = None,
+#             include_slider: bool = False,
+#             label_as_checkbox: bool = False,
+#             parent: qtw.QWidget = None,
+#     ) -> None:
+#         """Initializes a ToolTipSpinBox instance."""
+#         numeric_limits = numeric_limits or {}
+#         if include_slider is True:
+#             widget = SliderSpinBox(**numeric_limits)
+#         else:
+#             widget = AutoSpinBox(**numeric_limits)
+#         super().__init__(widget=widget, label_as_checkbox=label_as_checkbox, parent=parent)
+#         widget.valueChanged.connect(self.on_spinbox_value_changed)  # noqa
+#
+#     def on_spinbox_value_changed(
+#             self,
+#             new_value: int | float,
+#     ) -> None:
+#         """Emits a signal whenever the spinbox value changes."""
+#         self.valueChanged.emit(new_value)

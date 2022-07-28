@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pprint
 import sys
 
 from PySide6 import QtWidgets as qtw
@@ -13,6 +14,7 @@ _DEBUG = True
 
 
 class ForNMAMainWindow(qtw.QMainWindow):
+    _current_params = {}
     """Class representing forNMA's main interface."""
     def __init__(
             self,
@@ -20,7 +22,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
     ) -> None:
         """Initializes a ForNMAMainWindow instance."""
         super().__init__(parent=parent)
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(1200, 800)
 
         # MAIN WIDGET
         self.main_widget = qtw.QWidget()
@@ -54,13 +56,24 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.data_tab.dataChanged.connect(self.on_data_tab_changed)  # noqa
         self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)  # noqa
         self.tabs.currentChanged.connect(self.stack.slideInIndex)  # noqa
-        self.analysis_params.run_button.clicked.connect(self.TEST_on_run_button_clicked)
+        self.analysis_params.segmentationParamsChanged.connect(self.on_segmentation_params_changed)
+        self.analysis_params.run_button.clicked.connect(self.on_run_button_clicked)
         layout.setStretch(0, 4)  # Use 4/10 of the available space for the left column
         layout.setStretch(1, 6)  # Use 6/10 of the available space for the right column
 
-    def TEST_on_run_button_clicked(self) -> None:
-        text = self.analysis_params.segmentation_parameters_page.params_widget.fornma_params_widget.widget_to_hide.get_values()
-        print(text)
+    def on_segmentation_params_changed(
+            self,
+            new_segmentation_params: dict,
+    ) -> None:
+        self._current_params = new_segmentation_params
+        self.analysis_tab.setText(
+            'Current Parameters:'
+            f'\n\nfornma:\n{pprint.pformat(self._current_params["fornma"])}'
+            f'\n\ncellpose:\n{pprint.pformat(self._current_params["cellpose"])}'
+        )
+
+    def on_run_button_clicked(self) -> None:
+        print(f"RUNNING FORNMA WITH PARAMETERS: {pprint.pformat(self._current_params)}")
 
     def on_data_tab_changed(self) -> None:
         """Enables or disables the Analysis tab whenever the content of the Data tab is updated."""
