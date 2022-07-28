@@ -7,7 +7,7 @@ from Interface import ForNMAParameter
 
 
 def ForNMAHelpButton(fornma_id: str = None):
-    """Interface for creating a _HelpButton instance from a forNMA ID."""
+    """Interface for creating a HelpButton instance from a forNMA ID."""
     if fornma_id is not None:
         fornma_params = ForNMAParameter(fornma_id=fornma_id)
         return HelpButton(

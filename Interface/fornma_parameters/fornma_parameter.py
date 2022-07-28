@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from PySide6 import QtCore as qtc
 
-from typing import Any
-
 from Interface.fornma_parameters import (
     get_fornma_dtype,
     get_fornma_help_message,
@@ -29,13 +27,11 @@ def ForNMAParameter(fornma_id: str) -> ForNMAParameter:
     return instance
 
 
-class _ForNMAParameter(qtc.QObject):
+class _ForNMAParameter:
     """
     Class bundling forNMA information for a given forNMA ID.
     Meant to be created and accessed in any place in the code.
     """
-    valueChanged = qtc.Signal(object)  # Any value type
-
     def __init__(
             self,
             fornma_id: str,
@@ -55,15 +51,3 @@ class _ForNMAParameter(qtc.QObject):
         self.text_options = get_fornma_text_options(fornma_id=self._fornma_id)
         self.numeric_limits = get_fornma_numeric_limits(fornma_id=self._fornma_id)
         self.value = get_fornma_value(fornma_id=self._fornma_id)
-
-    def set_value(
-            self,
-            new_value: Any,
-    ) -> None:
-        """Sets the parameter value."""
-        self.value = new_value
-        self.emit_current_value()
-
-    def emit_current_value(self) -> None:
-        """Emits the current parameter value."""
-        self.valueChanged.emit(self.value)

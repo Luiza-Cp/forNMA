@@ -1,33 +1,27 @@
 """fornma_parameters/fornma_widget.py - module defining the interface between forNMA parameters and its widgets."""
 from __future__ import annotations
 
+from typing import Type
+
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface import ForNMAParameter
-from Interface.custom_widgets import SliderSpinBox, ForNMAHelpButton
-from Interface.custom_widgets.widgets.double_slider_widget import DoubleSliderSpinBox
+from Interface.custom_widgets import AutoSpinBox, ForNMAHelpButton, SliderSpinBoxWidget
 from Interface.fornma_parameters import get_fornma_dtype
 
 
 def ForNMAWidget(
         fornma_id: str,
         add_slider: bool = False,
-) -> _ForNMAIntWidget | _ForNMAFloatWidget | _ForNMAStringWidget | _ForNMABoolWidget:
+) -> _ForNMANumericWidget | _ForNMAStringWidget | _ForNMABoolWidget:
     """Returns a properly structured PySide Widget for each forNMA parameter."""
     dtype = get_fornma_dtype(fornma_id=fornma_id)
     fornma_parameter = ForNMAParameter(fornma_id=fornma_id)
     fornma_help_button = ForNMAHelpButton(fornma_id=fornma_id)
-    if dtype == int:
-        widget = _ForNMAIntWidget(
+    if dtype in (int, float):
+        widget = _ForNMANumericWidget(
             name=fornma_id,
-            label=fornma_parameter.label,
-            help_button=fornma_help_button,
-            limits=fornma_parameter.numeric_limits,
-            add_slider=add_slider,
-        )
-    elif dtype == float:
-        widget = _ForNMAFloatWidget(
-            name=fornma_id,
+            dtype=dtype,
             label=fornma_parameter.label,
             help_button=fornma_help_button,
             limits=fornma_parameter.numeric_limits,
@@ -88,11 +82,12 @@ class _BaseForNMAWidget(qtw.QWidget):
         self.valueChanged.emit(new_value)
 
 
-class _ForNMAIntWidget(_BaseForNMAWidget):
-    """Class representing an integer forNMA parameter."""
+class _ForNMANumericWidget(_BaseForNMAWidget):
+    """Class representing a numeric( integer or float) forNMA parameter."""
     def __init__(
             self,
             name: str = "",
+            dtype: Type[int] | Type[float] = int,
             label: str = "",
             help_button: qtw.QWidget = None,
             limits: dict = None,
@@ -103,30 +98,8 @@ class _ForNMAIntWidget(_BaseForNMAWidget):
         super().__init__(name=name, label=label, help_button=help_button, parent=parent)
         layout: qtw.QGridLayout = self.layout()
 
-        self.widget = SliderSpinBox(**limits) if add_slider is True else qtw.QSpinBox(**limits)
-        layout.addWidget(self.widget, self._current_row, 1, 1, 1)
-        self.widget.valueChanged.connect(self._on_widget_value_changed)
-
-        # Method aliases
-        self.value = self.widget.value
-
-
-class _ForNMAFloatWidget(_BaseForNMAWidget):
-    """Class representing a float forNMA parameter."""
-    def __init__(
-            self,
-            name: str = "",
-            label: str = "",
-            help_button: qtw.QWidget = None,
-            limits: dict = None,
-            add_slider: bool = False,
-            parent: qtw.QWidget = None
-    ) -> None:
-        """Initializes a _ForNMAFloatWidget instance."""
-        super().__init__(name=name, label=label, help_button=help_button, parent=parent)
-        layout: qtw.QGridLayout = self.layout()
-
-        self.widget = DoubleSliderSpinBox(**limits) if add_slider is True else qtw.QDoubleSpinBox(**limits)
+        Widget = SliderSpinBoxWidget if add_slider is True else AutoSpinBox
+        self.widget = Widget(dtype=dtype, **limits)
         layout.addWidget(self.widget, self._current_row, 1, 1, 1)
         self.widget.valueChanged.connect(self._on_widget_value_changed)
 
@@ -181,58 +154,3 @@ class _ForNMABoolWidget(_BaseForNMAWidget):
 
         # Method aliases
         self.value = self.widget.isChecked
-
-
-# class _ForNMAWidget:
-#     """Class representing a forNMA parameter encapsulated inside a PySide Widget."""
-#     valueChanged = qtc.Signal(object)
-#
-#     def __init__(
-#             self,
-#             fornma_id: str,
-#             add_slider: bool = False,
-#     ) -> None:
-#         """Initializes a ForNMAWidget instance."""
-#         self.fornma_id = fornma_id
-#         self._fornma_parameter = ForNMAParameter(fornma_id=self.fornma_id)
-#         self._help_button = ForNMAHelpButton(fornma_id=self.fornma_id)
-#         self._widget = self._get_widget(add_slider=add_slider)
-#         self._widget.valueChanged.connect(self.valueChanged)  # noqa
-#         # self.connect()
-#
-#     def _get_widget(
-#             self,
-#             add_slider: bool,
-#     ) -> qtw.QWidget:
-#         """Returns the proper widget for the given forNMA ID."""
-#         dtype = get_fornma_dtype(fornma_id=self.fornma_id)
-#         if dtype == int:
-#             widget = _ForNMAIntWidget(
-#                 label=self._fornma_parameter.label,
-#                 help_button=self._help_button,
-#                 add_slider=add_slider,
-#                 limits=self._fornma_parameter.numeric_limits,
-#             ).widget
-#         elif dtype == float:
-#             widget = _ForNMAFloatWidget(
-#                 label=self._fornma_parameter.label,
-#                 help_button=self._help_button,
-#                 add_slider=add_slider,
-#                 limits=self._fornma_parameter.numeric_limits,
-#             ).widget
-#         elif dtype == str:
-#             widget = _ForNMAStringWidget(
-#                 label=self._fornma_parameter.label,
-#                 help_button=self._help_button,
-#                 options=['foo', 'bar'],
-#             ).widget
-#         elif dtype == bool:
-#             widget = _ForNMABoolWidget(
-#                 label="",
-#                 help_button=self._help_button,
-#                 checkbox_text=self._fornma_parameter.label,
-#             ).widget
-#         else:
-#             raise ValueError(f'Invalid dtype: {dtype}')
-#         widget.setToolTip(self)
-#         return widget

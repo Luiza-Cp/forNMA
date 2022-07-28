@@ -7,11 +7,7 @@ from typing import Any
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface import ForNMAWidget
-from Interface.custom_widgets import (
-    CollapsableButton,
-    RowLayout,
-    SlidingStackedWidget,
-)
+from Interface.custom_widgets import CollapsableButton, RowLayout, SlidingStackedWidget
 from Interface.fornma_parameters import threshold_has_offset
 
 
@@ -57,6 +53,7 @@ class AnalysisParametersWidget(qtw.QWidget):
         self.run_button = qtw.QPushButton('Run')
         # Add buttons to row
         button_row_layout.addWidgets([self.preview_button, self.run_button])
+        button_row_layout.addStretch()
 
         # Signal aliases
         self.segmentationParamsChanged = self.segmentation_parameters_page.segmentationParamsChanged

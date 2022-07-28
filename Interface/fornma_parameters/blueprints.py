@@ -1,6 +1,9 @@
 """fornma_parameters/blueprint.py - module containing a blueprint for creating all of forNMA's parameters."""
-from typing import Any
+from __future__ import annotations
 
+from typing import Any, Type
+
+# Threshold values -> has offset?
 _THRESHOLD_HAS_OFFSET = {
     'Isodata': False,
     'Li': False,
@@ -15,7 +18,7 @@ _THRESHOLD_HAS_OFFSET = {
     'Local Gaussian': True,
 }
 _DEFAULT_THRESHOLD = "Triangle"
-_DEFAULT_HAS_OFFSET = _THRESHOLD_HAS_OFFSET.get(_DEFAULT_THRESHOLD)
+_DEFAULT_HAS_OFFSET = _THRESHOLD_HAS_OFFSET.get(_DEFAULT_THRESHOLD, False)
 
 _DEFAULT_NAME = "<NO NAME FOUND>"
 _DEFAULT_LABEL = "<NO LABEL FOUND>"
@@ -544,16 +547,18 @@ def get_fornma_text_options(fornma_id: str) -> dict[str, int | float]:
     """Returns the text options for the given forNMA ID."""
     return _get_from_data_dict(fornma_id=fornma_id, key='options', default=_DEFAULT_TEXT_OPTIONS)
 
+
 def get_fornma_numeric_limits(fornma_id: str) -> dict[str, int | float]:
     """Returns the limit values for the given forNMA ID."""
     return _get_from_data_dict(fornma_id=fornma_id, key='limits', default=_DEFAULT_NUMERIC_LIMITS)
+
 
 def get_fornma_value(fornma_id: str) -> dict[str, int | float]:
     """Returns the value for the given forNMA ID."""
     return _get_from_data_dict(fornma_id=fornma_id, key='value', default=None)
 
 
-def get_fornma_dtype(fornma_id: str) -> dict[str, int | float]:
+def get_fornma_dtype(fornma_id: str) -> Type[int] | Type[float] | Type[str] | Type[bool]:
     """Returns the data type of the value for the given forNMA ID."""
     return _get_from_data_dict(fornma_id=fornma_id, key='dtype', default=None)
 

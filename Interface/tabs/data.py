@@ -1,5 +1,4 @@
 """tabs/data.py - contains all widgets used in forNMA's "data" tab."""
-
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
