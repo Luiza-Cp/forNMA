@@ -1,8 +1,6 @@
 """fornma_parameters/fornma_parameter.py - module defining the ForNMAParameter interface."""
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc
-
 from Interface.fornma_parameters import (
     get_fornma_dtype,
     get_fornma_help_message,
@@ -15,19 +13,19 @@ from Interface.fornma_parameters import (
     validate_fornma_id,
 )
 
-_INSTANCES = {}
+# _INSTANCES = {}
+#
+#
+# def ForNMAParameter(fornma_id: str) -> ForNMAParameter:
+#     """Interface for getting ForNMAParameter instances. Avoid re-creating the same instance for a given ID."""
+#     global _INSTANCES
+#     if (instance := _INSTANCES.get(fornma_id)) is None:
+#         instance = _ForNMAParameter(fornma_id=fornma_id)
+#         _INSTANCES[fornma_id] = instance
+#     return instance
 
 
-def ForNMAParameter(fornma_id: str) -> ForNMAParameter:
-    """Interface for getting ForNMAParameter instances. Avoid re-creating the same instance for a given ID."""
-    global _INSTANCES
-    if (instance := _INSTANCES.get(fornma_id)) is None:
-        instance = _ForNMAParameter(fornma_id=fornma_id)
-        _INSTANCES[fornma_id] = instance
-    return instance
-
-
-class _ForNMAParameter:
+class ForNMAParameter:
     """
     Class bundling forNMA information for a given forNMA ID.
     Meant to be created and accessed in any place in the code.

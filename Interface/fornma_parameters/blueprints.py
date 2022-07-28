@@ -342,12 +342,12 @@ _FORNMA_BLUEPRINT = {
             'help': "HELP MESSAGE for radius_bg",
         },
         'data': {
-            'dtype': float,
+            'dtype': int,
             'wtype': 'spinbox',
             'limits': {
-                'minimum': 0.0,
-                'maximum': 100.0,
-                'singleStep': 0.01,
+                'minimum': 0,
+                'maximum': 500.0,
+                'singleStep': 1,
                 'value': (value := 10.0),
             },
             'value': value,
@@ -480,7 +480,222 @@ _CELLPOSE_BLUEPRINT = {
 }
 
 
-_BLUEPRINTS = dict(**_FORNMA_BLUEPRINT, **_CELLPOSE_BLUEPRINT)
+_CHANNELS_BLUEPRINT = {
+    'match_hist': {
+        'text': {
+            'name': "Match Histograms",
+            'label': "Match histograms?",
+            'tooltip': "TOOLTIP for match histograms",
+            'help': "HELP MESSAGE for match histograms",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'channel_rescale_intensity': {
+        'text': {
+            'name': "Rescale Intensity",
+            'label': "Rescale Intensity?",
+            'tooltip': "TOOLTIP for rescale intensity",
+            'help': "HELP MESSAGE for rescale intensity",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'remove_bg': {
+        'text': {
+            'name': "Remove Background",
+            'label': "Remove Background?",
+            'tooltip': "TOOLTIP for remove bg",
+            'help': "HELP MESSAGE for remove bg",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'channel_radius_bg': {
+        'text': {
+            'name': "Rolling Ball",
+            'label': "Radius rolling-ball",
+            'tooltip': "TOOLTIP for radius_bg",
+            'help': "HELP MESSAGE for radius_bg",
+        },
+        'data': {
+            'dtype': int,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0,
+                'maximum': 500,
+                'singleStep': 1,
+                'value': (value := 10),
+            },
+            'value': value,
+        },
+    },
+    'wants_ktr': {
+        'text': {
+            'name': "Translocation",
+            'label': "Use KTR translocation?",
+            'tooltip': "TOOLTIP for wants_ktr",
+            'help': "HELP MESSAGE for wants KTR",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'ring_size': {
+        'text': {
+            'name': "Ring Size",
+            'label': "Select ring size:",
+            'tooltip': "TOOLTIP for ring size",
+            'help': "HELP MESSAGE for ring size",
+        },
+        'data': {
+            'dtype': int,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0,
+                'maximum': 500,
+                'singleStep': 1,
+                'value': (value := 10),
+            },
+            'value': value,
+        },
+    },
+    'use_ellipse': {
+        'text': {
+            'name': "Use Ellipse",
+            'label': "Use ellipse?",
+            'tooltip': "TOOLTIP for use_ellipse",
+            'help': "HELP MESSAGE for use_ellipse",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'wants_foci': {
+        'text': {
+            'name': "Foci",
+            'label': "Use Foci?",
+            'tooltip': "TOOLTIP for wants_foci",
+            'help': "HELP MESSAGE for wants FOCI",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'foci_min_size': {
+        'text': {
+            'name': "Min Size",
+            'label': "Select Foci min size:",
+            'tooltip': "TOOLTIP for foci min size",
+            'help': "HELP MESSAGE for foci min size",
+        },
+        'data': {
+            'dtype': int,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0,
+                'maximum': 500,
+                'singleStep': 1,
+                'value': (value := 10),
+            },
+            'value': value,
+        },
+    },
+    'foci_max_size': {
+        'text': {
+            'name': "Max Size",
+            'label': "Select Foci max size:",
+            'tooltip': "TOOLTIP for foci max size",
+            'help': "HELP MESSAGE for foci max size",
+        },
+        'data': {
+            'dtype': int,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0,
+                'maximum': 500,
+                'singleStep': 1,
+                'value': (value := 100),
+            },
+            'value': value,
+        },
+    },
+    'foci_min_int': {
+        'text': {
+            'name': "Min Intensity",
+            'label': "Select Foci min intensity:",
+            'tooltip': "TOOLTIP for foci min intensity",
+            'help': "HELP MESSAGE for foci min intensity",
+        },
+        'data': {
+            'dtype': int,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0,
+                'maximum': 500,
+                'singleStep': 1,
+                'value': (value := 10),
+            },
+            'value': value,
+        },
+    },
+    'foci_max_int': {
+        'text': {
+            'name': "Max Intensity",
+            'label': "Select Foci max intensity:",
+            'tooltip': "TOOLTIP for foci max intensity",
+            'help': "HELP MESSAGE for foci max intensity",
+        },
+        'data': {
+            'dtype': int,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0,
+                'maximum': 500,
+                'singleStep': 1,
+                'value': (value := 100),
+            },
+            'value': value,
+        },
+    },
+    'foci_proeminence': {  # TODO: typo aqui
+        'text': {
+            'name': "Prominence",
+            'label': "Select Foci prominence:",
+            'tooltip': "TOOLTIP for foci prominence",
+            'help': "HELP MESSAGE for foci prominence",
+        },
+        'data': {
+            'dtype': float,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0.0,
+                'maximum': 10.0,
+                'singleStep': 0.05,
+                'value': (value := 1.0),
+            },
+            'value': value,
+        },
+    },
+}
+
+
+_BLUEPRINTS = dict(**_FORNMA_BLUEPRINT, **_CELLPOSE_BLUEPRINT, **_CHANNELS_BLUEPRINT)
 
 
 # MAIN FUNCTIONS --------------------------------------------------------------

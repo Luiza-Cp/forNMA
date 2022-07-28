@@ -114,9 +114,10 @@ class AnalysisAreaWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Label
-        self.label = qtw.QLabel('Select analysis parameters on the left')
+        self.label = qtw.QTextEdit('Select analysis parameters on the left')
         self.label.setStyleSheet('QLabel {font-size: 14px}')
         self.label.setAlignment(qtc.Qt.AlignLeft)  # noqa
+        self.label.setReadOnly(True)
         layout.addWidget(self.label)
 
         # Method aliases

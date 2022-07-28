@@ -6,6 +6,7 @@ from typing import Any
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
+from Interface import ForNMAWidget
 from Interface.custom_widgets import CollapsableButton
 from Interface.tabs import BaseParametersPage
 
@@ -93,7 +94,23 @@ class DetectionParametersWidget(qtw.QWidget):
 
 class ChannelWidget(qtw.QWidget):
     """Widget containing a channel's parameters in it."""
-    paramsChanged = qtc.Signal(int)  # type does not matter
+    paramsChanged = qtc.Signal(object)  # type does not matter
+    _blueprint = (
+        # Format: ( forNMA ID, include_slider )
+        ('match_hist', False),
+        ('rescale_intensity', False),
+        ('remove_bg', False),
+        ('radius_bg', True),
+        ('wants_ktr', False),
+        ('ring_size', True),
+        ('use_ellipse', False),
+        ('wants_foci', False),
+        ('foci_min_size', True),
+        ('foci_max_size', True),
+        ('foci_min_int', True),
+        ('foci_max_int', True),
+        ('foci_proeminence', True),
+    )
 
     def __init__(
             self,
@@ -108,17 +125,24 @@ class ChannelWidget(qtw.QWidget):
         self.setLayout(layout)
         self._channel_name = channel_name
 
-        # Mock values just for testing right now
-        self.label = qtw.QLabel(f'{self._channel_name} Channel Parameters!')
-        layout.addWidget(self.label)
-        self.spinbox = qtw.QSpinBox()
-        layout.addWidget(self.spinbox)
-        self.spinbox.valueChanged.connect(self.paramsChanged)  # noqa
+        self._fornma_params = {}
+        for fornma_id, add_slider in self._blueprint:
+            fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider)
+            layout.addWidget(fornma_widget)
+            self._fornma_params[fornma_id] = fornma_widget
+            fornma_widget.valueChanged.connect(self.paramsChanged)
+
+        # # Mock values just for testing right now
+        # self.label = qtw.QLabel(f'{self._channel_name} Channel Parameters!')
+        # layout.addWidget(self.label)
+        # self.spinbox = qtw.QSpinBox()
+        # layout.addWidget(self.spinbox)
+        # self.spinbox.valueChanged.connect(self.paramsChanged)  # noqa
 
     def get_values(self) -> dict[str, Any]:
         """Return the name and value of each forNMA parameter."""
-        return {'checkbox': self.spinbox.value()}
-        # return {
-        #     widget.objectName(): (widget.value() if widget.isEnabled() else None)
-        #     for _, widget in self._fornma_params.items()
-        # }
+        return {
+            widget.objectName(): (widget.value() if widget.isEnabled() else None)
+            for _, widget in self._fornma_params.items()
+        }
+        # return {'checkbox': self.spinbox.value()}
