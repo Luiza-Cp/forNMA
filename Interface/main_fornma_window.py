@@ -56,20 +56,23 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.data_tab.dataChanged.connect(self.on_data_tab_changed)  # noqa
         self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)  # noqa
         self.tabs.currentChanged.connect(self.stack.slideInIndex)  # noqa
-        self.analysis_params.segmentationParamsChanged.connect(self.on_segmentation_params_changed)
+        self.analysis_params.segmentationParamsChanged.connect(self.on_analysis_params_changed)
+        self.analysis_params.detectionParamsChanged.connect(self.on_analysis_params_changed)
         self.analysis_params.run_button.clicked.connect(self.on_run_button_clicked)
         layout.setStretch(0, 4)  # Use 4/10 of the available space for the left column
         layout.setStretch(1, 6)  # Use 6/10 of the available space for the right column
 
-    def on_segmentation_params_changed(
+    def on_analysis_params_changed(
             self,
             new_segmentation_params: dict,
     ) -> None:
-        self._current_params = new_segmentation_params
+        self._current_params.update(new_segmentation_params)
         self.analysis_tab.setText(
             'Current Parameters:'
-            f'\n\nfornma:\n{pprint.pformat(self._current_params["fornma"])}'
-            f'\n\ncellpose:\n{pprint.pformat(self._current_params["cellpose"])}'
+            + ''.join([
+                f'\n\n{key}:\n{pprint.pformat(value)}'
+                for key, value in self._current_params.items()
+            ])
         )
 
     def on_run_button_clicked(self) -> None:

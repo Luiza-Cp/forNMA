@@ -80,7 +80,7 @@ class SegmentationParametersWidget(qtw.QWidget):
 
     def on_params_changed(
             self,
-            _: Any,  # Parameter that has changed - we don't need it because we will get all parameters anyway
+            _: Any = None,  # Parameter that has changed - we don't need it because we will get all parameters anyway
     ) -> None:
         """Emits all segmentation parameters at once."""
         params = {

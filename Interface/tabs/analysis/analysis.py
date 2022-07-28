@@ -38,6 +38,7 @@ class AnalysisParametersWidget(qtw.QWidget):
         # Detection page
         self.detection_parameters_page = DetectionParametersPage()
         self.detection_parameters_page.backButtonClicked.connect(self.switch_to_analysis_main_page)
+        self.channelsSet.connect(self.detection_parameters_page.channelsSet)
         self.stack.addWidget(self.detection_parameters_page)
 
         # ### Button row
@@ -53,6 +54,7 @@ class AnalysisParametersWidget(qtw.QWidget):
 
         # Signal aliases
         self.segmentationParamsChanged = self.segmentation_parameters_page.segmentationParamsChanged
+        self.detectionParamsChanged = self.detection_parameters_page.detectionParamsChanged
 
     def switch_to_analysis_main_page(self) -> None:
         """Changes the current widget to the analysis main page."""
@@ -96,44 +98,6 @@ class AnalysisMainPage(qtw.QWidget):
         # Parameters label
         self.parameters_label = qtw.QLabel("")
         layout.addWidget(self.parameters_label)
-
-
-class ParametersPage(qtw.QWidget):
-    """Class defining the base layout shared by the segmentation/detection parameters pages."""
-    backButtonClicked = qtc.Signal()
-
-    def __init__(
-            self,
-            title: str,
-            params_widget: qtw.QWidget,
-            parent: qtw.QWidget = None,
-    ) -> None:
-        """Initializes a ParametersPage instance."""
-        super().__init__(parent=parent)
-        self.params_widget = params_widget
-
-        # Layout
-        layout = qtw.QVBoxLayout()
-        self.setLayout(layout)
-
-        # ### Top row
-        top_row_layout = RowLayout()
-        layout.addLayout(top_row_layout)
-        # Back button
-        self.back_button = qtw.QPushButton("Back")
-        self.back_button.clicked.connect(self.backButtonClicked)  # noqa
-        # Title label
-        self.title_label = qtw.QLabel(title)
-        top_row_layout.addWidget(self.title_label)
-        # Add widgets to top row layout
-        top_row_layout.addWidgets([self.back_button, self.title_label])
-
-        # Params widget area
-        self.scroll_area = qtw.QScrollArea()
-        layout.addWidget(self.scroll_area)
-        if self.params_widget is not None:
-            self.scroll_area.setWidget(self.params_widget)
-            self.scroll_area.setWidgetResizable(True)
 
 
 class AnalysisAreaWidget(qtw.QWidget):
