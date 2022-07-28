@@ -109,6 +109,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
                 index = self.data_tab.experiment_table.model().index(row_idx, column_idx)  # Gets the index
                 self.data_tab.experiment_table.model().setData(index, value)  # Sets model data
                 self.data_tab.experiment_table.indexWidget(index).set_icon(True)  # Sets button icon to "OK"
+                self.data_tab.experiment_table.indexWidget(index).set_tooltip(value)  # Sets button icon to "OK"
 
 
 def fornma_interface_main(debug: bool):

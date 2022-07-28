@@ -21,13 +21,15 @@ class FolderSelectButton(qtw.QPushButton):
         """Initializes a FolderSelectButton."""
         super().__init__(parent=parent)
         self.index = index
-        self.set_icon(False)
+        self.set_icon(checked=False)
+        self.set_tooltip(path='')
         self.clicked.connect(self.select_folder)  # noqa
 
     def select_folder(self) -> None:
         """Opens a FileDialog and emits a Signal containing the file path."""
         folder_path = qtw.QFileDialog.getExistingDirectory(self.parent(), "Select folder", "..") or ''
-        self.set_icon(bool(folder_path))
+        self.set_icon(checked=bool(folder_path))
+        self.set_tooltip(path=folder_path)
         self.folderSelected.emit(self.index, folder_path)
 
     def set_icon(
@@ -39,3 +41,13 @@ class FolderSelectButton(qtw.QPushButton):
             self.setIcon(self.style().standardIcon(getattr(qtw.QStyle, "SP_DialogOkButton")))
         else:
             self.setIcon(self.style().standardIcon(getattr(qtw.QStyle, "SP_DialogNoButton")))
+
+    def set_tooltip(
+            self,
+            path: str,
+    ) -> None:
+        """Sets the tooltip text of the button."""
+        if not path:
+            self.setToolTip('Click to select folder...')
+        else:
+            self.setToolTip(f'Selected folder:\n{path}')
