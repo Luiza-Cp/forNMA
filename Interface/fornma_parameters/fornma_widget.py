@@ -37,7 +37,8 @@ def ForNMAWidget(
     elif dtype == bool:
         widget = _ForNMABoolWidget(
             name=fornma_id,
-            label=fornma_parameter.label,
+            label="",
+            checkbox_text=fornma_parameter.label,
             help_button=fornma_help_button,
         )
     else:
@@ -76,7 +77,7 @@ class _BaseForNMAWidget(qtw.QWidget):
 
     def _on_widget_value_changed(
             self,
-            new_value: int,
+            new_value: object,
     ) -> None:
         """Emits the new values through the valueChanged slot."""
         self.valueChanged.emit(new_value)
@@ -87,7 +88,7 @@ class _ForNMANumericWidget(_BaseForNMAWidget):
     def __init__(
             self,
             name: str = "",
-            dtype: Type[int] | Type[float] = int,
+            dtype: Type[int, float] = int,
             label: str = "",
             help_button: qtw.QWidget = None,
             limits: dict = None,
@@ -105,6 +106,7 @@ class _ForNMANumericWidget(_BaseForNMAWidget):
 
         # Method aliases
         self.value = self.widget.value
+        self.setValue = self.widget.setValue
 
 
 class _ForNMAStringWidget(_BaseForNMAWidget):
@@ -128,6 +130,7 @@ class _ForNMAStringWidget(_BaseForNMAWidget):
         layout.addWidget(self.widget, self._current_row, 1, 1, 1)
 
         # Method aliases
+        self.setCurrentText = self.widget.setCurrentText
         self.addItem = self.widget.addItem
         self.removeItem = self.widget.removeItem
         self.currentIndex = self.widget.currentIndex
@@ -154,3 +157,4 @@ class _ForNMABoolWidget(_BaseForNMAWidget):
 
         # Method aliases
         self.value = self.widget.isChecked
+        self.setChecked = self.widget.setChecked

@@ -35,10 +35,8 @@ class _ForNMAParameter:
     def __init__(
             self,
             fornma_id: str,
-            parent: qtc.QObject = None,
     ) -> None:
         """Sets the default value of the mutable parameters of ForNMAParameter instances."""
-        super().__init__(parent=parent)
         validate_fornma_id(fornma_id=fornma_id)
         self._fornma_id = fornma_id
         # Text

@@ -8,7 +8,7 @@ from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface import ForNMAWidget
 from Interface.custom_widgets import CollapsableButton, RowLayout, SlidingStackedWidget
-from Interface.fornma_parameters import threshold_has_offset
+from Interface.fornma_parameters import threshold_has_offset, get_default_threshold
 
 
 class AnalysisParametersWidget(qtw.QWidget):
@@ -229,12 +229,22 @@ class ForNMAParamsWidget(qtw.QWidget):
         # Format: ( forNMA ID, include_slider )
         ('magnification', False),
         ('pixel_size', False),
+        ('threshold', False),
+        ('offset', False),
         ('blur', True),
         ('adjust_size', True),
         ('shape', True),
         ('eccentricity', True),
         ('cut_edges', True),
+        ('min_size', True),
+        ('max_size', True),
+        ('min_radius', True),
+        ('max_radius', True),
         ('rescale_intensity', True),
+        ('remove_background', True),
+        ('radius_bg', True),
+        ('weakly_labeled', True),
+        ('find_low_intensity_nucleus', True),
     )
 
     def __init__(
@@ -247,13 +257,29 @@ class ForNMAParamsWidget(qtw.QWidget):
         # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
-        self._fornma_params = []
+        self._fornma_params = {}
 
         for fornma_id, add_slider in self._blueprint:
             fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider)
             layout.addWidget(fornma_widget)
-            self._fornma_params.append(fornma_widget)
-            fornma_widget.valueChanged.connect(self.paramsChanged)
+            self._fornma_params[fornma_id] = fornma_widget
+            if fornma_id == 'threshold':  # Specific routing for threshold widget
+                fornma_widget.valueChanged.connect(self.on_threshold_combobox_changed)
+            elif fornma_id == 'remove_background':  # Specific routing for remove background widget
+                fornma_widget.valueChanged.connect(self.on_remove_background_checkbox_clicked)
+            elif fornma_id in ('min_size', 'min_radius'):  # Specific routing for min size and min radius
+                fornma_widget.valueChanged.connect(self.on_min_value_changed)
+            elif fornma_id in ('max_size', 'max_radius'):  # Specific routing for max size and max radius
+                fornma_widget.valueChanged.connect(self.on_max_value_changed)
+            else:  # Generic routing for all other widgets
+                fornma_widget.valueChanged.connect(self.paramsChanged)
+
+        # Final setup
+        threshold_widget = self._fornma_params['threshold']
+        threshold_widget.setCurrentText(get_default_threshold())
+        offset_widget = self._fornma_params['remove_background']
+        offset_widget.setChecked(True)  # Checks and unchecks the checkbox just to make sure that the signal is emitted
+        offset_widget.setChecked(False)
 
     @qtc.Slot(str)
     def on_threshold_combobox_changed(
@@ -262,16 +288,51 @@ class ForNMAParamsWidget(qtw.QWidget):
     ) -> None:
         """Enables/disables the threshold offset slider whenever the threshold combobox changes its value."""
         has_threshold = threshold_has_offset(threshold_name=selected)
-        for widget in self._fornma_params:
-            if widget.objectName() == 'offset':  # HARD-CODED: parameter name in blueprint must be exact!
-                widget.setEnabled(has_threshold)
-                return
+        offset_widget = self._fornma_params['offset']  # HARD-CODED: parameter name in blueprint must be exact!
+        offset_widget.setEnabled(has_threshold)
+        self.paramsChanged.emit(selected)
+
+    @qtc.Slot(str)
+    def on_remove_background_checkbox_clicked(
+            self,
+            checked: bool,
+    ) -> None:
+        """Enables/disables the rolling ball radius whenever the remove_background checkbox is clicked."""
+        offset_widget = self._fornma_params['radius_bg']  # HARD-CODED: parameter name in blueprint must be exact!
+        offset_widget.setEnabled(checked)
+        self.paramsChanged.emit(checked)
+
+    @qtc.Slot(float)
+    def on_min_value_changed(
+            self,
+            new_value: float,
+    ) -> None:
+        """Changes the max value of the related widget if the min value is greater than it."""
+        sender_name = self.sender().objectName()  # 'min_size' or 'min_radius'
+        max_size_widget_name = sender_name.replace('min', 'max')
+        max_size_widget = self._fornma_params[max_size_widget_name]
+        if max_size_widget.value() < new_value:
+            max_size_widget.setValue(new_value)
+        self.paramsChanged.emit(new_value)
+
+    @qtc.Slot(float)
+    def on_max_value_changed(
+            self,
+            new_value: float,
+    ) -> None:
+        """Changes the min value of the related widget if the max value is less than it."""
+        sender_name = self.sender().objectName()  # 'max_size' or 'max_radius'
+        min_size_widget_name = sender_name.replace('max', 'min')
+        min_size_widget = self._fornma_params[min_size_widget_name]
+        if min_size_widget.value() > new_value:
+            min_size_widget.setValue(new_value)
+        self.paramsChanged.emit(new_value)
 
     def get_values(self) -> dict[str, Any]:
         """Return the name and value of each forNMA parameter."""
         return {
-            widget.objectName(): widget.value()
-            for widget in self._fornma_params
+            widget.objectName(): (widget.value() if widget.isEnabled() else None)
+            for _, widget in self._fornma_params.items()
         }
 
 
@@ -298,19 +359,19 @@ class CellposeParamsWidget(qtw.QWidget):
         # Layout
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
-        self._fornma_params = []
+        self._fornma_params = {}
 
         for fornma_id, add_slider in self._blueprint:
             fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider)
             layout.addWidget(fornma_widget)
-            self._fornma_params.append(fornma_widget)
+            self._fornma_params[fornma_id] = fornma_widget
             fornma_widget.valueChanged.connect(self.paramsChanged)
 
     def get_values(self) -> dict[str, Any]:
         """Return the name and value of each forNMA parameter."""
         return {
-            widget.objectName(): widget.value()
-            for widget in self._fornma_params
+            widget.objectName(): (widget.value() if widget.isEnabled() else None)
+            for _, widget in self._fornma_params.items()
         }
 
 

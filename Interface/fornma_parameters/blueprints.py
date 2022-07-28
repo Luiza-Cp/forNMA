@@ -37,6 +37,7 @@ _DEFAULT_TEXT_OPTIONS = {
     'value': False,
 }
 
+
 _FORNMA_BLUEPRINT = {
     'channel_with_nuclei': {
         'text': {
@@ -245,7 +246,7 @@ _FORNMA_BLUEPRINT = {
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': (value := 0.5),
+                'value': (value := 0.2),
             },
             'value': value,
         },
@@ -264,7 +265,7 @@ _FORNMA_BLUEPRINT = {
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': (value := 0.5),
+                'value': (value := 0.8),
             },
             'value': value,
         },
@@ -283,7 +284,7 @@ _FORNMA_BLUEPRINT = {
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': (value := 0.5),
+                'value': (value := 0.2),
             },
             'value': value,
         },
@@ -302,7 +303,7 @@ _FORNMA_BLUEPRINT = {
                 'minimum': 0.0,
                 'maximum': 1.0,
                 'singleStep': 0.01,
-                'value': (value := 0.5),
+                'value': (value := 0.8),
             },
             'value': value,
         },
@@ -379,7 +380,6 @@ _FORNMA_BLUEPRINT = {
         },
     },
 }
-
 _CELLPOSE_BLUEPRINT = {
     'diameter': {
         'text': {

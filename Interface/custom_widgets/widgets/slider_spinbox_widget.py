@@ -61,6 +61,7 @@ class SliderSpinBoxWidget(qtw.QWidget):
 
         # Method aliases
         self.value = self.slider.value
+        self.setValue = self.slider.setValue
 
         # Connect slider to spinbox
         if isinstance(self.slider, DoubleSlider):
