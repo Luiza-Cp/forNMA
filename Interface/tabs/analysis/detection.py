@@ -62,6 +62,7 @@ class DetectionParametersWidget(qtw.QWidget):
             layout.addWidget(CollapsableButton(f'Channel: {channel}', widget_to_hide=channel_widget))
             self._channels[channel] = channel_widget
         layout.addStretch()
+        self.on_params_changed()  # Emit signal as soon as new channels are set
 
     def on_params_changed(
             self,

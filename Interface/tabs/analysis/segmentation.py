@@ -77,6 +77,7 @@ class SegmentationParametersWidget(qtw.QWidget):
             self.nuclear_detection_channel_widget.removeItem(0)
         for channel in channels:
             self.nuclear_detection_channel_widget.addItem(channel)
+        self.on_params_changed()  # Emit signal as soon as new channels are set
 
     def on_params_changed(
             self,

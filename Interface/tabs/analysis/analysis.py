@@ -1,4 +1,4 @@
-"""tabs/analysis.py - contains all widgets used in forNMA's "analysis" tab."""
+"""tabs/analysis.py - contains the main widget used in forNMA's "analysis" tab."""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
@@ -52,6 +52,9 @@ class AnalysisParametersWidget(qtw.QWidget):
         button_row_layout.addWidgets([self.preview_button, self.run_button])
         button_row_layout.addStretch()
 
+        # Method aliases
+        self.setText = self.analysis_main_page.setText
+
         # Signal aliases
         self.segmentationParamsChanged = self.segmentation_parameters_page.segmentationParamsChanged
         self.detectionParamsChanged = self.detection_parameters_page.detectionParamsChanged
@@ -96,8 +99,24 @@ class AnalysisMainPage(qtw.QWidget):
         layout.addWidget(self.detection_parameters_button)
 
         # Parameters label
-        self.parameters_label = qtw.QLabel("")
+        self.parameters_label = qtw.QTextEdit()
+        self.parameters_label.setStyleSheet('QTextEdit {font-size: 14px}')
+        self.parameters_label.setAlignment(qtc.Qt.AlignLeft)  # noqa
+        self.parameters_label.setReadOnly(True)
         layout.addWidget(self.parameters_label)
+
+    def setText(
+            self,
+            params: dict,
+    ) -> None:
+        """Sets the parameters label text, given the params dictionary."""
+        text = '--- Current Parameters ---\n\n'
+        for param_section_name, param_dict in params.items():
+            text += f' -> {param_section_name.capitalize()} Parameters:\n'
+            for key, value in param_dict.items():
+                text += f'{key}: {value}\n'
+            text += '\n'
+        self.parameters_label.setText(text)
 
 
 class AnalysisAreaWidget(qtw.QWidget):
@@ -114,11 +133,7 @@ class AnalysisAreaWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Label
-        self.label = qtw.QTextEdit('Select analysis parameters on the left')
-        self.label.setStyleSheet('QLabel {font-size: 14px}')
-        self.label.setAlignment(qtc.Qt.AlignLeft)  # noqa
-        self.label.setReadOnly(True)
+        self.label = qtw.QLabel('Select analysis parameters on the left')
+        self.label.setStyleSheet('QLabel {font-size: 24px}')
+        self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
         layout.addWidget(self.label)
-
-        # Method aliases
-        self.setText = self.label.setText

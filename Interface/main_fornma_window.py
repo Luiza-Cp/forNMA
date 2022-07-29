@@ -58,6 +58,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.tabs.currentChanged.connect(self.stack.slideInIndex)  # noqa
         self.analysis_params.segmentationParamsChanged.connect(self.on_analysis_params_changed)
         self.analysis_params.detectionParamsChanged.connect(self.on_analysis_params_changed)
+        self.analysis_params.preview_button.clicked.connect(self.on_preview_button_clicked)
         self.analysis_params.run_button.clicked.connect(self.on_run_button_clicked)
         layout.setStretch(0, 4)  # Use 4/10 of the available space for the left column
         layout.setStretch(1, 6)  # Use 6/10 of the available space for the right column
@@ -67,15 +68,18 @@ class ForNMAMainWindow(qtw.QMainWindow):
             new_segmentation_params: dict,
     ) -> None:
         self._current_params.update(new_segmentation_params)
-        self.analysis_tab.setText(
-            'Current Parameters:'
-            + ''.join([
-                f'\n\n{key}:\n{pprint.pformat(value)}'
-                for key, value in self._current_params.items()
-            ])
-        )
+        self.analysis_params.setText(self._current_params)
+
+    def on_preview_button_clicked(self) -> None:
+        params = self._current_params.copy()
+        params['preview'] = True
+        # ##### MUDAR AQUI - pegar o dicionário de params e passar para a função do forNMA
+        print(f"RUNNING FORNMA WITH PARAMETERS: {pprint.pformat(self._current_params)}")
 
     def on_run_button_clicked(self) -> None:
+        params = self._current_params.copy()
+        params['preview'] = False
+        # ##### MUDAR AQUI - pegar o dicionário de params e passar para a função do forNMA
         print(f"RUNNING FORNMA WITH PARAMETERS: {pprint.pformat(self._current_params)}")
 
     def on_data_tab_changed(self) -> None:
