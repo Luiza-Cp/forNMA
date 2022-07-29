@@ -147,11 +147,20 @@ class ForNMAParamsWidget(qtw.QWidget):
                 fornma_widget.valueChanged.connect(self.paramsChanged)
 
         # Final setup
+        # Set threshold values
         threshold_widget = self._fornma_params['threshold']
         threshold_widget.setCurrentText(get_default_threshold())
+        # Checks and unchecks the checkbox just to make sure that its sub-widgets are disabled
         offset_widget = self._fornma_params['remove_background']
-        offset_widget.setChecked(True)  # Checks and unchecks the checkbox just to make sure that the signal is emitted
+        offset_widget.setChecked(True)
         offset_widget.setChecked(False)
+
+    def get_values(self) -> dict[str, Any]:
+        """Return the name and value of each forNMA parameter."""
+        return {
+            widget.objectName(): (widget.value() if widget.isEnabled() else None)
+            for _, widget in self._fornma_params.items()
+        }
 
     @qtc.Slot(str)
     def on_threshold_combobox_changed(
@@ -164,7 +173,7 @@ class ForNMAParamsWidget(qtw.QWidget):
         offset_widget.setEnabled(has_threshold)
         self.paramsChanged.emit(selected)
 
-    @qtc.Slot(str)
+    @qtc.Slot(bool)
     def on_remove_background_checkbox_clicked(
             self,
             checked: bool,
@@ -199,13 +208,6 @@ class ForNMAParamsWidget(qtw.QWidget):
         if min_size_widget.value() > new_value:
             min_size_widget.setValue(new_value)
         self.paramsChanged.emit(new_value)
-
-    def get_values(self) -> dict[str, Any]:
-        """Return the name and value of each forNMA parameter."""
-        return {
-            widget.objectName(): (widget.value() if widget.isEnabled() else None)
-            for _, widget in self._fornma_params.items()
-        }
 
 
 class CellposeParamsWidget(qtw.QWidget):

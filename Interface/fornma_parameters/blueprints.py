@@ -478,8 +478,6 @@ _CELLPOSE_BLUEPRINT = {
         },
     },
 }
-
-
 _CHANNELS_BLUEPRINT = {
     'match_hist': {
         'text': {

@@ -99,9 +99,9 @@ class ChannelWidget(qtw.QWidget):
     _blueprint = (
         # Format: ( forNMA ID, include_slider )
         ('match_hist', False),
-        ('rescale_intensity', False),
+        ('channel_rescale_intensity', False),
         ('remove_bg', False),
-        ('radius_bg', True),
+        ('channel_radius_bg', True),
         ('wants_ktr', False),
         ('ring_size', True),
         ('use_ellipse', False),
@@ -131,7 +131,28 @@ class ChannelWidget(qtw.QWidget):
             fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider)
             layout.addWidget(fornma_widget)
             self._fornma_params[fornma_id] = fornma_widget
-            fornma_widget.valueChanged.connect(self.paramsChanged)
+            if fornma_id == 'remove_bg':  # Specific routing for remove background widget
+                fornma_widget.valueChanged.connect(self.on_remove_background_checkbox_clicked)
+            elif fornma_id == 'wants_ktr':  # Specific routing for wants KTR widget
+                fornma_widget.valueChanged.connect(self.on_wants_ktr_checkbox_clicked)
+            elif fornma_id == 'wants_foci':  # Specific routing for wants Foci widget
+                fornma_widget.valueChanged.connect(self.on_wants_foci_checkbox_clicked)
+            elif fornma_id in ('foci_min_size', 'foci_min_int'):  # Specific routing for foci min size and foci min int
+                fornma_widget.valueChanged.connect(self.on_min_value_changed)
+            elif fornma_id in ('foci_max_size', 'foci_max_int'):  # Specific routing for foci min size and foci max int
+                fornma_widget.valueChanged.connect(self.on_max_value_changed)
+            else:  # Generic routing for all other widgets
+                fornma_widget.valueChanged.connect(self.paramsChanged)
+
+        # Final setup
+        for widget_name in [  # Checks and unchecks the checkbox just to make sure that its sub-widgets are disabled
+            'remove_bg',
+            'wants_ktr',
+            'wants_foci',
+        ]:
+            widget = self._fornma_params[widget_name]
+            widget.setChecked(True)
+            widget.setChecked(False)
 
     def get_values(self) -> dict[str, Any]:
         """Return the name and value of each forNMA parameter."""
@@ -139,3 +160,67 @@ class ChannelWidget(qtw.QWidget):
             widget.objectName(): (widget.value() if widget.isEnabled() else None)
             for _, widget in self._fornma_params.items()
         }
+
+    @qtc.Slot(bool)
+    def on_remove_background_checkbox_clicked(
+            self,
+            checked: bool,
+    ) -> None:
+        """Enables/disables the rolling ball radius whenever the remove_background checkbox is clicked."""
+        offset_widget = self._fornma_params['channel_radius_bg']  # HARD-CODED: parameter name in blueprint must match!
+        offset_widget.setEnabled(checked)
+        self.paramsChanged.emit(checked)
+
+    @qtc.Slot(bool)
+    def on_wants_ktr_checkbox_clicked(
+            self,
+            checked: bool,
+    ) -> None:
+        """Enables/disables the KTR widgets whenever the wants_ktr checkbox is clicked."""
+        for widget_name in ['ring_size', 'use_ellipse']:  # HARD-CODED: names in blueprint must match!
+            widget = self._fornma_params[widget_name]
+            widget.setEnabled(checked)
+        self.paramsChanged.emit(checked)
+
+    @qtc.Slot(bool)
+    def on_wants_foci_checkbox_clicked(
+            self,
+            checked: bool,
+    ) -> None:
+        """Enables/disables the Foci widgets whenever the wants_ktr checkbox is clicked."""
+        for widget_name in [
+            'foci_min_size',
+            'foci_max_size',
+            'foci_min_int',
+            'foci_max_int',
+            'foci_proeminence',
+        ]:  # HARD-CODED: names in blueprint must match!
+            widget = self._fornma_params[widget_name]
+            widget.setEnabled(checked)
+        self.paramsChanged.emit(checked)
+
+    @qtc.Slot(float)
+    def on_min_value_changed(
+            self,
+            new_value: float,
+    ) -> None:
+        """Changes the max value of the related widget if the min value is greater than it."""
+        sender_name = self.sender().objectName()  # 'foci_min_size' or 'foci_min_int'
+        max_size_widget_name = sender_name.replace('min', 'max')
+        max_size_widget = self._fornma_params[max_size_widget_name]
+        if max_size_widget.value() < new_value:
+            max_size_widget.setValue(new_value)
+        self.paramsChanged.emit(new_value)
+
+    @qtc.Slot(float)
+    def on_max_value_changed(
+            self,
+            new_value: float,
+    ) -> None:
+        """Changes the min value of the related widget if the max value is less than it."""
+        sender_name = self.sender().objectName()  # 'foci_max_size' or 'foci_max_int'
+        min_size_widget_name = sender_name.replace('max', 'min')
+        min_size_widget = self._fornma_params[min_size_widget_name]
+        if min_size_widget.value() > new_value:
+            min_size_widget.setValue(new_value)
+        self.paramsChanged.emit(new_value)
