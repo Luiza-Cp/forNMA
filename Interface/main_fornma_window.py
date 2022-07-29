@@ -10,7 +10,7 @@ from PySide6 import QtWidgets as qtw
 from Interface.custom_widgets import SlidingStackedWidget
 from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
 
-_DEBUG = True
+_DEBUG = False
 
 
 class ForNMAMainWindow(qtw.QMainWindow):
