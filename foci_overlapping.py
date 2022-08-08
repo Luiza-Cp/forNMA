@@ -112,8 +112,8 @@ def save_images_ch(group: pd.DataFrame,
     direc = os.path.join(path_to_save, 'Overlay Images','Frame '+ str(frame))
     os.makedirs(direc)
     image_names = [os.path.join(direc, 'Cell ' + str(f) + '.png') for f in list(group['Cell'])]
-    
-    save = [cv.imwrite(f, j) for f, j in zip(image_names, images_to_save)]
+    if len(images_to_save)>1:
+        save = [cv.imwrite(f, j) for f, j in zip(image_names, images_to_save) if j.size != 0]
     
     return 
   
@@ -126,8 +126,8 @@ def foci_overlay(contour_df: pd.DataFrame, # vem do pkl
                 
 ):
     
-    
-    
+   # channel_list = [ '53BP1', 'gH2AX']
+    contour_df.reset_index(inplace=True)
        
     color_list = [(0, 0, 255 ), (255,0, 0), (0,255,0), (0, 128, 255), 
                   (0, 255, 255),(255, 255, 0), (255, 0, 255), (127, 0, 255), 
@@ -150,7 +150,7 @@ def foci_overlay(contour_df: pd.DataFrame, # vem do pkl
         df_pixel_count['Frame']= name
         all_pixel_count_dfs.append(df_pixel_count)
         if save_images == True:
-            path_save = '/media/luiza/DATA/teste'
+            #path_save = '/media/luiza/DATA/teste'
             save_images_ch(group, channel_list, shape, color_list, cnt_col,
                            path_save, name)
     final_df = pd.concat( all_pixel_count_dfs)
@@ -213,7 +213,9 @@ def plot_proflie(frame: int,
  
  #### COMO CHAMAR
  
-path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imgs teste/Results.pkl'
+path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imagens/forNMA results/results 11/Results.pkl'
 contour_df = pd.read_pickle(path)
-foci_overlay(contour_df, True, '/media/luiza/DATA/Doutorado/Teste',
-             ['Dapi', '53bp1', 'gH2AX'] )
+contour_df2= contour_df.loc[contour_df['origin_folder'] == 'RPE WT ETOPOSIDE .zip']
+
+foci_overlay(contour_df2, True, '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imagens/forNMA results/results 11/overlapping',
+           [ '53BP1', 'gH2AX'] )
