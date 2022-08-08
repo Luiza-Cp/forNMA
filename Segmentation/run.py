@@ -232,12 +232,12 @@ def saving_images(df_draw: pd.DataFrame,
    dirs = list(set(df_draw.origin_folder.values))
    df_draw.to_pickle(os.path.join(path_to_save, 'Results.pkl'))
    
-   #    itera por cada pasta nesse df
+   #    iterates over each folder in the datframe
    for d in dirs:
        df_dir = df_draw[df_draw["origin_folder"]==d]
        saving_dir = os.path.join(path_to_save, d[:-4] + '-') if os.path.isdir(os.path.join(path_to_save, d[:-4])) else os.path.join(path_to_save, d[:-4])
        os.mkdir(saving_dir) 
-       #    vai iterar sobre cada canal dessa pasta
+       #    iterates over each image channel inside the folder
        for ch in ch_name_list:
            saving_dir_ch = os.path.join(saving_dir, ch)
            os.mkdir(saving_dir_ch)           
@@ -247,6 +247,7 @@ def saving_images(df_draw: pd.DataFrame,
         
 
 def run(parameters_dict: dict,
+        preview: bool = False,
         headless: bool  = False
 )-> None:
     """
@@ -266,14 +267,13 @@ def run(parameters_dict: dict,
     for i in range(len(subfolders)):
         subfolder_dict = create_subfolder_dict(folder_dict, i)
         if not check_size(subfolder_dict):
-            raise("The folders contain different image number")
-        total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i]) # ju usa esse pra remover outliers
+            raise("The folders contain different image numbers")
+        total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview) # ju usa esse pra remover outliers
         if total_df is None:
             continue
         filename = os.path.basename(subfolders[i]) + '.zip'
         # adds files to temporary directory
         total_df.to_pickle(os.path.join(temp_dir.name, filename))
-        print(total_df)
     
     
     complete_df = filter_dataframe(temp_dir, headless)
@@ -287,5 +287,7 @@ def run(parameters_dict: dict,
         saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) # aqui dentro eu crio os pkl dos foci
     
     temp_dir.cleanup()
+    from find_contours import not_processed
     
     return None
+

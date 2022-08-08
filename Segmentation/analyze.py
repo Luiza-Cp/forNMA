@@ -109,7 +109,8 @@ def analyze_dict(
         subfolder_dict: dict,      # dict of every channel 
         segment_dict: dict,        # dict of global parameters
         is_overtime: bool,
-        condition: Optional[str]
+        condition: Optional[str],
+        preview: bool,
         
 )-> pd.DataFrame:
     
@@ -126,11 +127,16 @@ def analyze_dict(
         ref_dict[key] = load_image(value[0][0]) if value[1]['match_hist'] else None
 
     all_df_list = []    #all dataframes to be concatenated   
-    for img_n in range(len((list(subfolder_dict.values())[0][0]))):      
+    total_images = len((list(subfolder_dict.values())[0][0])) # number of imagens in the forlder
+    # if running on preview mode, analyzes just the first 5 images of each folder
+    total_images = 5 if preview == True and total_images>10 else total_images
+    print(total_images, 'total_images')
+    
+    for img_n in range(total_images):      
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
         
         cellpose =  segment_dict['use_cellpose']
-        if cellpose == True:    # calls cellpose
+        if cellpose == True:    #    calls cellpose
             contours = run_cellpose(img_to_segment, segment_dict['use_gpu'], 
                             segment_dict['diameter'], segment_dict['magnification'],
                             segment_dict['pixel_size'], segment_dict['shape'], 
@@ -142,7 +148,7 @@ def analyze_dict(
                             segment_dict['mask_threshold'])
            
     
-        else:   # calls forNMA pipeline
+        else:   #   calls forNMA pipeline
             contours = fornma_contour_finding(img_to_segment, 
                magnification = segment_dict['magnification'],
                pixel_size = segment_dict['pixel_size'], rescale_intensity = segment_dict['rescale_intensity'],

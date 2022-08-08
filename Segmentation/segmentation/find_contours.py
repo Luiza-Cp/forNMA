@@ -17,7 +17,7 @@ from segmentation.Divide_contours import Segmenting, select_right_contour
 from segmentation.weak_label import fluorescence_of_rings, adjust_binary_image
 from segmentation.filters import filter_debree, filter_contours
 
-not_processed = [] # PENSAR NO QUE FAZER COM ISSO 
+not_processed = [] #images that were not analyzed
 
 def load_image(
         filename: str,
@@ -232,7 +232,7 @@ def fornma_contour_finding(
         nuc_contours = [] 
     image_erased =img.copy()
     if fast_detection == True: 
-        # fast_detection mudou o nome para find low intensity. Se é true, busca mais nucs em novas rodadas
+        # fast_cetection interface name is find low intensity. If true, performs new rounds of nuclei detection
        
         # it tries to find nuclei with less ifluorescence intensity by covering 
         # the already detected ones. If after 6 rounds of covering nuclei it still 

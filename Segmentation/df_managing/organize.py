@@ -42,7 +42,7 @@ def split_dfs(
         ch_name_list: List[str]
 )-> Tuple[pd.DataFrame, pd.DataFrame]:
     """ 
-    Gets a complete DataFrame and separates it in the user output and the 
+    Gets a complete DataFrame and divides it in the user output and the 
     dataframe with information to draw images.
     """
     col_list_cnt =['Frame', 'Cell', 'X', 'origin_folder']
