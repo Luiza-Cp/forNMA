@@ -43,8 +43,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Channel with Nuclei",
             'label': "Select the channel with nuclei:",
-            'tooltip': "TOOLTIP for channel with nuclei",
-            'help': "HELP MESSAGE for channel with nuclei",
+            'tooltip': "Path to the folder of the chanel where nuclei will be segmented",
+            'help': " Is the path to the folder of the chanel where nuclei will be segmented. forNMA uses this path to identify images with stained nuclei. For example in an experiment with DAPI staining, this folder will contain blue channel images.",
         },
         'data': {
             'dtype': str,
@@ -58,8 +58,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Magnification",
             'label': "Select the image magnification:",
-            'tooltip': "TOOLTIP for magnification",
-            'help': "HELP MESSAGE for magnification",
+            'tooltip': "Number identifying the objective magnification",
+            'help': "Number identifying the objective magnification",
         },
         'data': {
             'dtype': int,
@@ -77,8 +77,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Pixel Size",
             'label': "Select the pixel size (µm):",
-            'tooltip': "TOOLTIP for pixel size",
-            'help': "HELP MESSAGE for pixel size",
+            'tooltip': "Size of one pixel, in micrometers, at the image",
+            'help': "Corresponding size of one pixel, in micrometers, at the image. You can obtain this information within your microscope specifications. Although it is not mandatory to add a value here, the pixel size helps forNMA a lot in its measurements.",
         },
         'data': {
             'dtype': float,
@@ -96,8 +96,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Threshold Type",
             'label': "Select the threshold strategy:",
-            'tooltip': "TOOLTIP for threshold",
-            'help': "HELP MESSAGE for threshold",
+            'tooltip': "Thresholding method used to differentiate between a nucleus and the image background",
+            'help': "Is the thresholding method to be used to differentiate between a nucleus and the image background. There are 9 global thresholds and 2 local thresholds. The local thresholds also require an offset, which is a constant subtracted from weighted mean of neighborhood to calculate the local threshold value. The available thresholds are: Isodata, Li, Mean, Minimum, Median, Multi-otsu, Otsu, Triangle, Yen, Local Mean and Local Gaussian.",
         },
         'data': {
             'dtype': str,
@@ -122,8 +122,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Threshold Offset",
             'label': "Set the offset:",
-            'tooltip': "TOOLTIP for offset",
-            'help': "HELP MESSAGE for offset",
+            'tooltip': "Value subtracted from the  mean of pixel neighborhood",
+            'help': "It is a constant subtracted from weighted mean of neighborhood to calculate the local threshold value.",
         },
         'data': {
             'dtype': float,
@@ -141,8 +141,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Smooth",
             'label': "Set the smoothness:",
-            'tooltip': "TOOLTIP for blur",
-            'help': "HELP MESSAGE for blur",
+            'tooltip': "How much you want to smooth the nucleus edge",
+            'help': "It is a value of how much the nucleus edges must be smoothed. It blurs the nuclear mask to make the contours more regular or smoother.",
         },
         'data': {
             'dtype': float,
@@ -160,8 +160,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Adjust Size",
             'label': "Set the adjust size value:",
-            'tooltip': "TOOLTIP for adjust_size",
-            'help': "HELP MESSAGE for adjust_size",
+            'tooltip': "Reduces or enlarges nucleus contour",
+            'help': "Value used to adjust contours to the nucleus edge. Positive values will enlarge the contour in the specified number of pixels and negative values will reduce it.",
         },
         'data': {
             'dtype': float,
@@ -179,8 +179,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Shape",
             'label': "Set the shape value:",
-            'tooltip': "TOOLTIP for shape",
-            'help': "HELP MESSAGE for shape",
+            'tooltip': "Filters nucleus by its irregularity.",
+            'help': "Removes from analysis all nucleus that has irregular shapes. Higher values will be restrictive for more regular nucleus. Try to set lower values if you are working with treatments that affect nuclei shape.",
         },
         'data': {
             'dtype': float,
@@ -198,8 +198,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Eccentricity",
             'label': "Set the eccentricity value:",
-            'tooltip': "TOOLTIP for eccentricity",
-            'help': "HELP MESSAGE for eccentricity",
+            'tooltip': "Filters nucleus by its eccentricity",
+            'help': "Filters nuclei by their eccentricity, which is a value that shows you how 'un-circular' the curve is. Bigger eccentricities are less curved. A circle has an eccentricity of 0, and a ellipse will have an eccentricity of 1.",
         },
         'data': {
             'dtype': float,
@@ -217,8 +217,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Cut Edges",
             'label': "Set the cut edges value:",
-            'tooltip': "TOOLTIP for cut edges",
-            'help': "HELP MESSAGE for cut edges",
+            'tooltip': "Forces a cut between two nuclei",
+            'help': "If active, forces a cut between two nuclei when watershed segmentation was not able to distinguish between two close nuclei. Bigger values will be more restrictive about when to generate a cut.",
         },
         'data': {
             'dtype': float,
@@ -236,8 +236,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Min Size",
             'label': "Set the min size",
-            'tooltip': "TOOLTIP for min size",
-            'help': "HELP MESSAGE for min size",
+            'tooltip': "Minimum nucleus area",
+            'help': "Minimum area, in pixels, of a nucleus.",
         },
         'data': {
             'dtype': float,
@@ -255,8 +255,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Max Size",
             'label': "Set the max size",
-            'tooltip': "TOOLTIP for max size",
-            'help': "HELP MESSAGE for max size",
+            'tooltip': "Maximum nucleus area",
+            'help': "Maximum area, in pixels, of a nucleus.",
         },
         'data': {
             'dtype': float,
@@ -272,10 +272,10 @@ _FORNMA_BLUEPRINT = {
     },
     'min_radius': {
         'text': {
-            'name': "Min Size",
+            'name': "Min Radius",
             'label': "Set the min radius",
-            'tooltip': "TOOLTIP for min radius",
-            'help': "HELP MESSAGE for min radius",
+            'tooltip':  "Minimum nucleus radius",
+            'help': "Minimum radius, in pixels, of a nucleus.",
         },
         'data': {
             'dtype': float,
@@ -291,10 +291,10 @@ _FORNMA_BLUEPRINT = {
     },
     'max_radius': {
         'text': {
-            'name': "Max Size",
+            'name': "Max Radius",
             'label': "Set the max radius",
-            'tooltip': "TOOLTIP for max radius",
-            'help': "HELP MESSAGE for max radius",
+            'tooltip': "Maximum nucleus radius",
+            'help': "Maximum radius, in pixels, of a nucleus.",
         },
         'data': {
             'dtype': float,
@@ -312,8 +312,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Rescale Intensity",
             'label': "Rescale intensity?",
-            'tooltip': "TOOLTIP for rescale_intensity",
-            'help': "HELP MESSAGE for rescale_intensity",
+            'tooltip': "Crerates new intensity scale to images",
+            'help': "Re-distributes image intensity so the brightest image pixel will be equivalent to the biggest intensity value and the less bright pixel will correspond to the minimum value. This enhances image contrast and is highly recommended for high background images.",
         },
         'data': {
             'dtype': bool,
@@ -325,8 +325,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Remove Background",
             'label': "Remove background?",
-            'tooltip': "TOOLTIP for remove_background",
-            'help': "HELP MESSAGE for remove_background",
+            'tooltip': "Background subtraction with rolling-ball algorithm",
+            'help': "Applies rolling-ball algorithm for background subtraction. This parameter also requires a rolling-ball radius, that should be set to at least the size of the largest object that is not part of the background.",
         },
         'data': {
             'dtype': bool,
@@ -336,10 +336,10 @@ _FORNMA_BLUEPRINT = {
     },
     'radius_bg': {
         'text': {
-            'name': "Rolling Ball",
+            'name': "Rolling Ball Radius",
             'label': "Radius rolling-ball",
-            'tooltip': "TOOLTIP for radius_bg",
-            'help': "HELP MESSAGE for radius_bg",
+            'tooltip': "Is the rolling-ball radius used for background subtraction.",
+            'help': "Is the rolling-ball radius used for background subtraction. Larger radius takes longer times to process.",
         },
         'data': {
             'dtype': int,
@@ -357,8 +357,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Weakly Labeled",
             'label': "Images are weakly labeled?",
-            'tooltip': "TOOLTIP for weakly_labeled",
-            'help': "HELP MESSAGE for weakly_labeled",
+            'tooltip': "Activate this function if your nucleus is weakly stained",
+            'help': "This parameter is used when nuclei stain is weak and the nuclear edges are not so clear for forNMA to identify. It is responsible for activate some extra functions that will try to identify correctly the nuclear edges.",
         },
         'data': {
             'dtype': bool,
@@ -370,8 +370,8 @@ _FORNMA_BLUEPRINT = {
         'text': {
             'name': "Find Low Intensity Nuclei",
             'label': "Find low intensity nuclei?",
-            'tooltip': "TOOLTIP for find_low_intensity_nucleus",
-            'help': "HELP MESSAGE for find_low_intensity_nucleus",
+            'tooltip': "Activate this function if some nuclei are less brighter than others.",
+            'help': "This parameter is responsible for executing a loop at images where previous found nucleus are covered and then forNMA tries to find new nucleus at image. It is recommended if some nuclei are way less brighter than others. This function can generate detection errors with squares being drawn around nuclues.",
         },
         'data': {
             'dtype': bool,
@@ -385,8 +385,8 @@ _CELLPOSE_BLUEPRINT = {
         'text': {
             'name': "Nuclear Diameter",
             'label': "Select the nuclear diameter:",
-            'tooltip': "TOOLTIP for diameter",
-            'help': "HELP MESSAGE for diameter",
+            'tooltip': "Is the nuclei diameter, in pixel",
+            'help': "Is the nuclei diameter, in pixel.",
         },
         'data': {
             'dtype': int,
@@ -404,8 +404,8 @@ _CELLPOSE_BLUEPRINT = {
         'text': {
             'name': "Flow Threshold",
             'label': "Select the flow threshold:",
-            'tooltip': "TOOLTIP for flow_threshold",
-            'help': "HELP MESSAGE for flow_threshold",
+            'tooltip': "Flow error threshold",
+            'help': "Flow error threshold (all cells with errors below threshold are kept)",
         },
         'data': {
             'dtype': float,
@@ -423,8 +423,8 @@ _CELLPOSE_BLUEPRINT = {
         'text': {
             'name': "Mask Threshold",
             'label': "Select the mask threshold:",
-            'tooltip': "TOOLTIP for mask_threshold",
-            'help': "HELP MESSAGE for mask_threshold",
+            'tooltip': "All pixels with value above threshold kept for masks.",
+            'help': "All pixels with value above threshold kept for masks, decrease to find more and larger masks.",
         },
         'data': {
             'dtype': float,
@@ -468,8 +468,8 @@ _CELLPOSE_BLUEPRINT = {
         'text': {
             'name': "Run in GPU",
             'label': "Run in GPU?",
-            'tooltip': "TOOLTIP for use_gpu",
-            'help': "HELP MESSAGE for use_gpu",
+            'tooltip': "Allows the Cellpose operations to be performed using GPU.",
+            'help': "Allows the Cellpose operations to be performed using GPU.",
         },
         'data': {
             'dtype': bool,
@@ -483,8 +483,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Match Histograms",
             'label': "Match histograms?",
-            'tooltip': "TOOLTIP for match histograms",
-            'help': "HELP MESSAGE for match histograms",
+            'tooltip': "Matches all image histograms.",
+            'help': "Matches all image histogram with the first image in order to correct for illumination distortions.",
         },
         'data': {
             'dtype': bool,
@@ -496,8 +496,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Rescale Intensity",
             'label': "Rescale Intensity?",
-            'tooltip': "TOOLTIP for rescale intensity",
-            'help': "HELP MESSAGE for rescale intensity",
+            'tooltip':  "Crerates new intensity scale to images",
+            'help': "Re-distributes image intensity so the brightest image pixel will be equivalent to the biggest intensity value and the less bright pixel will correspond to the minimum value. This enhances image contrast and is highly recommended for high background images.",
         },
         'data': {
             'dtype': bool,
@@ -509,8 +509,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Remove Background",
             'label': "Remove Background?",
-            'tooltip': "TOOLTIP for remove bg",
-            'help': "HELP MESSAGE for remove bg",
+            'tooltip': "Background subtraction with rolling-ball algorithm",
+            'help': "Applies rolling-ball algorithm for background subtraction. This parameter also requires a rolling-ball radius, that should be set to at least the size of the largest object that is not part of the background.",
         },
         'data': {
             'dtype': bool,
@@ -522,8 +522,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Rolling Ball",
             'label': "Radius rolling-ball",
-            'tooltip': "TOOLTIP for radius_bg",
-            'help': "HELP MESSAGE for radius_bg",
+            'tooltip': "Is the rolling-ball radius used for background subtraction.",
+            'help': "Is the rolling-ball radius used for background subtraction. Larger radius takes longer times to process.",
         },
         'data': {
             'dtype': int,
@@ -540,9 +540,9 @@ _CHANNELS_BLUEPRINT = {
     'wants_ktr': {
         'text': {
             'name': "Translocation",
-            'label': "Use KTR translocation?",
-            'tooltip': "TOOLTIP for wants_ktr",
-            'help': "HELP MESSAGE for wants KTR",
+            'label': "Measure translocation?",
+            'tooltip': "Activate protein translocation measures at this channel.",
+            'help': "If selected, creates a cytoplasmic ring around the nucleus contour to measure fluorescence ratios between nucleus and cytoplasm.",
         },
         'data': {
             'dtype': bool,
@@ -554,8 +554,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Ring Size",
             'label': "Select ring size:",
-            'tooltip': "TOOLTIP for ring size",
-            'help': "HELP MESSAGE for ring size",
+            'tooltip': "Is the cytoplasmic ring size in pixels.",
+            'help': "Is the cytoplasmic ring size in pixels.",
         },
         'data': {
             'dtype': int,
@@ -573,8 +573,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Use Ellipse",
             'label': "Use ellipse?",
-            'tooltip': "TOOLTIP for use_ellipse",
-            'help': "HELP MESSAGE for use_ellipse",
+            'tooltip': "Uses an ellipse around the nucleus instead of just enlarging nucleus.",
+            'help': "Instead of enlarging the nuclear contour to create the cytoplasmic ring, uses an ellipse as the cytoplasmic ring, oriented towards nuclei direction. This is recommended in stretched cell lines, where cytoplasm is not equally distributed trough all nuclei edges.",
         },
         'data': {
             'dtype': bool,
@@ -585,9 +585,9 @@ _CHANNELS_BLUEPRINT = {
     'wants_foci': {
         'text': {
             'name': "Foci",
-            'label': "Use Foci?",
-            'tooltip': "TOOLTIP for wants_foci",
-            'help': "HELP MESSAGE for wants FOCI",
+            'label': "Measure Foci?",
+            'tooltip': "Counts and measures foci inside the nuclei.",
+            'help': "Counts and measures foci inside the nuclei.",
         },
         'data': {
             'dtype': bool,
@@ -599,8 +599,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Min Size",
             'label': "Select Foci min size:",
-            'tooltip': "TOOLTIP for foci min size",
-            'help': "HELP MESSAGE for foci min size",
+            'tooltip': "Minimum number of pixels to consider as a foci",
+            'help': "Minimum number of pixels to consider as a foci. If nothing is set, all foci will be included.",
         },
         'data': {
             'dtype': int,
@@ -618,8 +618,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Max Size",
             'label': "Select Foci max size:",
-            'tooltip': "TOOLTIP for foci max size",
-            'help': "HELP MESSAGE for foci max size",
+            'tooltip': "Maximum number of pixels to consider as a foci",
+            'help': "Maximum number of pixels to consider as a foci. If nothing is set, all foci will be included.",
         },
         'data': {
             'dtype': int,
@@ -637,8 +637,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Min Intensity",
             'label': "Select Foci min intensity:",
-            'tooltip': "TOOLTIP for foci min intensity",
-            'help': "HELP MESSAGE for foci min intensity",
+            'tooltip': "Minimum mean intensity of a region to be considered a foci.",
+            'help': "Minimum mean intensity of a region to be considered a foci.",
         },
         'data': {
             'dtype': int,
@@ -656,8 +656,8 @@ _CHANNELS_BLUEPRINT = {
         'text': {
             'name': "Max Intensity",
             'label': "Select Foci max intensity:",
-            'tooltip': "TOOLTIP for foci max intensity",
-            'help': "HELP MESSAGE for foci max intensity",
+            'tooltip': "Maximum mean intensity of a region to be considered a foci.",
+            'help': "Maximum mean intensity of a region to be considered a foci.",
         },
         'data': {
             'dtype': int,
@@ -671,12 +671,12 @@ _CHANNELS_BLUEPRINT = {
             'value': value,
         },
     },
-    'foci_proeminence': {  # TODO: typo aqui
+    'foci_proeminence': {  # TODO: typo aqui - I know, mas deixei o parametro errado mesmo kkk
         'text': {
             'name': "Prominence",
             'label': "Select Foci prominence:",
-            'tooltip': "TOOLTIP for foci prominence",
-            'help': "HELP MESSAGE for foci prominence",
+            'tooltip': "Number of times that foci intensity has to be more intense than the nucleus.",
+            'help': "Number of times that foci intensity has to be more intense than the nucleus.",
         },
         'data': {
             'dtype': float,
