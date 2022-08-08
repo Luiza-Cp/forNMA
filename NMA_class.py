@@ -28,12 +28,6 @@ from NMA_draggable_line import draggable_lines
 #ALÉM DE CADA USUÁRIO PODER ADD SUAS LINHAGENS, A GENTE PODE DISPONIBILIZAR TABELAS ATUALIZADAS NO SITE
 
 
-
-
-
-
-# Na funcçao graph init eu já tenho a infp de quem é controle. E é lá que a pesoa passa uma tabela de controle,
-#logo, não preciso essa other_control e o controle eu tenho que fazer o subset de acordo com o is_control 
 # se nenhuma do is control for true, ele avisa que é necessário ter uma condição controle (caixa de erro mesmo)
 
 
@@ -45,7 +39,7 @@ class NMA:
         Atributes:
         
         self.df: pandas DataFrame with all value information
-        self.coontrols: tuple containing gorup name and frmae. One of them can be none
+        self.coontrols: name of condition of control group
         self.sd: float representing the standard deviation from mean to use for NMA threshold
         self.control_df: dataframe only with control group rows
         self.mean_NII: mean NII value of control gorup
@@ -69,7 +63,7 @@ class NMA:
         self.df = df
         self.controls = controls
         self.sd = sd
-        self.control_df = self.subset_df(self.controls) #if other_control != None else other_control
+        self.control_df = self.subset_df((self.controls,  None)) #if other_control != None else other_control
         self.mean_NII, self.mean_a, self.std_NII, self.std_a, self.circle = self.calc_threshold_NMA()
         self.h_x, self.h_y_up,self.h_y_down = self.calc_lines()
         self.graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7,  ec="#bdbbbb", lw=1)
@@ -159,8 +153,15 @@ class NMA:
        bottom_line_x2 = self.mean_NII + 2.5*self.std_NII
        
        sns.set_theme()
+       sns.set_palette('rainbow', 9)
        fig= plt.figure()
-       ax = fig.add_subplot(sns.scatterplot(data=self.control_df, x="NII", y="Area", color = '#d8b8b8')) 
+       df_sample, boolean = self.get_sample(self.control_df , None, None)
+       while boolean == False:
+           df_sample, boolean = self.get_sample(self.control_df, None, None)
+         
+      
+       ax = fig.add_subplot(sns.scatterplot(data=df_sample, x="NII", y="Area",)) 
+      
        ax.plot (self.h_x, self.h_y_up,self.h_x, self.h_y_down, color='black')
        ax.plot(self.mean_NII+(self.sd*self.std_NII)*np.cos(self.circle) , 
                self.mean_a+(self.sd*self.std_a)*np.sin(self.circle), color= 'black' )
@@ -229,7 +230,7 @@ class NMA:
             # tem controles E tempo
             conditions = self.df.groupby('Condition')
             for name, group in conditions:
-                frames = self.df.groupby("Frame")
+                frames =group.groupby("Frame")
                 for frame_name, frame in frames:
                     lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(frame)
                     new_row = [name, frame_name, frame.shape[0], lr, li, n, i, sr, s, si ]
@@ -286,7 +287,7 @@ class NMA:
         Finds statistcally significant samples from a population based on Area,
         NII and other specified column values.
         """
-        df_sample = df.sample(n = 200)
+        df_sample = df.sample(n = 500)
         p_NII_var = self.f_test(df['NII'].values, df_sample['NII'].values)
         p_a_var = self.f_test( df['Area'].values,df_sample['Area'].values)
         
@@ -354,8 +355,6 @@ class NMA:
                      subset_of_df: pd.DataFrame, 
                      hue: Optional[str] = None,
                      size: Optional[str] = None,
-                     hue_norm: Optional[tuple] = None,
-                     size_norm: Optional[tuple] = None,
                      sample: bool = False
                      ):
         """ 
@@ -374,21 +373,20 @@ class NMA:
        
             subset_of_df = df_sample
         
-       #CONFERIR ESSAS COISAS DOS PERCENTS 
+       
         if all(item is None for item in condition_time_tuple):
-            print ('q')
             title = ' '
             percentages = None
-        elif condition_time_tuple[0] == None:
+        elif condition_time_tuple[0] is None:
             title = 'Frame ' + str(condition_time_tuple[1])
             percentages = self.percentages.loc[self.percentages['Frame'] == condition_time_tuple[1]]
-        elif condition_time_tuple[1] == None:
+        elif condition_time_tuple[1] is None:
             title =  str(condition_time_tuple[0])
             percentages = self.percentages.loc[self.percentages['Condition'] == condition_time_tuple[0]]
         else:
-            title = condition_time_tuple[0] + ' Frame ' +  str(condition_time_tuple[0])
-            percentages = self.percentages.loc[(self.percentages['Condition'] == condition_time_tuple[0])
-                        & self.percentages['Frame'] == condition_time_tuple[1]]
+            title = condition_time_tuple[0] + ' Frame ' +  str(condition_time_tuple[1])
+            percentages = self.percentages.loc[(self.percentages['Condition'] == condition_time_tuple[0])]
+            percentages = percentages.loc[percentages['Frame'] == condition_time_tuple[1]]
             
         
         #make the values out of graph limits group at the limit (cytometry-like)
@@ -398,6 +396,16 @@ class NMA:
         
         fig,ax = plt.subplots(1)
         
+        hue_norm = None
+        size_norm = None
+        if hue is not None:
+            df_hue = self.df[(np.abs(stats.zscore(self.df[hue].fillna(self.df[hue].mean()))) < 3)]
+            hue_norm = (df_hue[hue].min(), df_hue[hue].max())
+        if size is not None:
+            df_size = self.df[(np.abs(stats.zscore(self.df[size].fillna(self.df[size].mean()))) < 3)]
+            size_norm = (df_size[size].min(), df_size[size].max())
+        
+
         sns.scatterplot(data=subset_of_df, x="NII", y="Area", size = size, hue = hue,
                         hue_norm = hue_norm, size_norm = size_norm, ax=ax, palette = 'rainbow') 
         ax.plot(self.mean_NII+(self.sd*self.std_NII)*np.cos(self.circle) , 
@@ -411,31 +419,31 @@ class NMA:
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
         #ax.set_title(title)
-        
         if isinstance(percentages, pd.DataFrame) or isinstance(percentages, pd.DataFrame) and sample== True:
             if percentages.shape[0]>1:
                 percentages = percentages.drop(columns = ['Condition', 'Frame', 'Total Cells'])
                 n = percentages.shape[0]
                 percentages = (percentages.sum()/n).to_frame()
                 percentages = percentages.transpose()
-            print (percentages)
+           
             
             ax.text(self.v_upx[0]-1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 
-                    str(round(percentages['LR'].iloc[0],2)),size=10, bbox=self.graph_box)
+                        str(round(percentages['LR'].iloc[0],2)),size=10, bbox=self.graph_box)
             ax.text(self.v_upx[0]+1, self.h_y_up[0]+0.3*self.sd*self.mean_a, 
-                    str(round(percentages['LI'].iloc[0],2)), size=10, bbox=self.graph_box)
+                        str(round(percentages['LI'].iloc[0],2)), size=10, bbox=self.graph_box)
             ax.text(self.mean_NII, self.mean_a, str(round(percentages['N'].iloc[0],2)), 
-                    size=10, bbox=self.graph_box)
+                        size=10, bbox=self.graph_box)
             ax.text(self.v_midx[0]+1, self.mean_a, str(round(percentages['I'].iloc[0],2)),
-                    size=10, bbox=self.graph_box)
+                        size=10, bbox=self.graph_box)
             ax.text(self.v_downx[0]-0.7, self.h_y_down[0]-0.1*self.sd*self.mean_a,
-                    str(round(percentages['SR'].iloc[0],2)), size=10, bbox=self.graph_box)
+                        str(round(percentages['SR'].iloc[0],2)), size=10, bbox=self.graph_box)
             ax.text(self.v_downx[0]+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a,
-                    str(round(percentages['S'].iloc[0],2)), size=10, bbox=self.graph_box)
+                        str(round(percentages['S'].iloc[0],2)), size=10, bbox=self.graph_box)
             ax.text(self.v_downx2[0]+0.5, self.h_y_down[0]-0.1*self.sd*self.mean_a, 
-                    str(round(percentages['SI'].iloc[0],2)), size=10, bbox=self.graph_box)
-            
+                        str(round(percentages['SI'].iloc[0],2)), size=10, bbox=self.graph_box)
+                
         ax.set_title(title)   
+      
         
         return fig    
 
@@ -493,25 +501,49 @@ class NMA:
         
         return df2
 
+    def percentages_overtime(self, 
+                             group: str,
+                             frames: Optional[List[int]] = None):
+        
+        """ Given a group and an optional list of frames, plots the
+        NMA groups percentage overtime"""
+        
+        df = self.percentages[self.percentages['Frame'].isin(frames)] if frames is not None else self.percentages
+        df.drop(columns = ['Total Cells'], inplace = True)
+        df = df.loc[df['Condition'] == group]
+        df.set_index('Frame', inplace= True)
+        sns.set_palette('rainbow',7)
+        fig, ax = plt.subplots()
+        df.plot(kind='bar', stacked=True, ax= ax)
+        ax.set_title('NMA groups')
+         
+        return fig
+
+
+
+
+
 ## COMO CHAMAR
-       
-nma_df_ignacio = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/NMA_organizado.csv')
-nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results_blur12.csv') 
-
-
-
-
-#ig= NMA(nma_df_ignacio, ('Control', None), 1.8)
-fornma= NMA(nma_df_fornma, ('Control', None),1.8,)
-
-t_for = fornma.plot_NMA_dot(('Control', None),fornma.subset_df(('Control', None)), hue = 'Total_foci_Dapi')
-t_ig_htm =  fornma.plot_NMA_heatmap(fornma.subset_df(('Etoposide', None)), 'Etoposide')
-
-
-# se o usuário quiser fazer gate baseado nesse gráfico ele pode tbm, chama assim
-
-df_gated = fornma.calc_gates()
-
+# =============================================================================
+#        
+# nma_df_ignacio = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/NMA_organizado.csv')
+# nma_df_fornma = pd.read_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/forNMA recente/Validations/NMA/Fornma_results_blur12.csv') 
+# 
+# 
+# 
+# 
+# #ig= NMA(nma_df_ignacio, ('Control', None), 1.8)
+# fornma= NMA(nma_df_fornma, ('Control', None),1.8,)
+# 
+# t_for = fornma.plot_NMA_dot(('Control', None),fornma.subset_df(('Control', None)), hue = 'Total_foci_Dapi')
+# t_ig_htm =  fornma.plot_NMA_heatmap(fornma.subset_df(('Etoposide', None)), 'Etoposide')
+# 
+# 
+# # se o usuário quiser fazer gate baseado nesse gráfico ele pode tbm, chama assim
+# 
+# df_gated = fornma.calc_gates()
+# 
+# =============================================================================
 # =============================================================================
 #c_ig = ig.plot_NMA_dot(ig.subset_df(('Control', None)), 'Control', hue = 'Aspect')
 # c_ig_htm = ig.plot_NMA_heatmap(ig.subset_df(('Control', None)), 'Control')
@@ -525,3 +557,11 @@ df_gated = fornma.calc_gates()
 # 
 # =============================================================================
 
+df3 = pd.read_csv('/media/luiza/DATA/Triagem Denise/Triagem 2/results tables/Adjusted complete table.csv')
+
+df3 = df3[(np.abs(stats.zscore(df3['Area'])) < 3)]
+#df3 = df3[(np.abs(stats.zscore(df3['Total_foci_red'])) < 3)]
+df3 = df3[(np.abs(stats.zscore(df3['Roundness'])) < 3)]
+df3=df3.loc[df3['time'] != '01d10h56m']
+df3=df3.loc[df3['time'] != '00d10h56m']
+df3['Overtime'] = True
