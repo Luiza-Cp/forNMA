@@ -8,6 +8,7 @@ Created on Fri Nov 12 15:43:42 2021
 import math
 import os
 import pandas as pd
+pd.options.mode.chained_assignment = None 
 from typing import List
 from LapTracker.LapTracker import LapTracker
 
@@ -16,7 +17,8 @@ def calc_distance(x: float,
                   y: float, 
                   x_list: List[float], 
                   y_list: List[float], 
-                  unique_ids: List[int]
+                  unique_ids: List[int],
+                  max_distance: int,
 )-> int:
     """Measures the distance betwen a point (given by x y) to a series of 
     points (in x_lis, y_list) and returns the unique_id of the closest 
@@ -27,12 +29,13 @@ def calc_distance(x: float,
         dist = math.dist((x,y), (x_list[i], y_list[i]))
         dist_dict[unique_ids[i]]= dist 
     
-    u_id =  min(dist_dict, key=dist_dict.get)
-    
+    u_id = None if  min(dist_dict.values()) > max_distance else  min(dist_dict, key=dist_dict.get)
+  
     return u_id
 
 
-def find_parent_track(df: pd.DataFrame)-> pd.DataFrame:
+def find_parent_track(df: pd.DataFrame,
+                      max_distance: int)-> pd.DataFrame:
     """
     Searches the parent track of a track (given by track_id) in a dataframe
     with tracking information
@@ -55,10 +58,14 @@ def find_parent_track(df: pd.DataFrame)-> pd.DataFrame:
         x_list = list(cells['X'])
         y_list = list(cells['Y'])
         unique_ids = list(cells.unique_id)
-        unique = calc_distance(x, y, x_list, y_list, unique_ids)
-        track_id_parent = df.loc[df['unique_id'] == unique, 'track_id'].iloc[0]
-        parents.append(track_id_parent)
-        df.drop(df[df['unique_id'] == unique].index, inplace = True)
+        unique = calc_distance(x, y, x_list, y_list, unique_ids, max_distance)
+        if unique is None:
+            track_id_parent = None 
+            parents.append(track_id_parent)
+        else:
+            track_id_parent = df.loc[df['unique_id'] == unique, 'track_id'].iloc[0]
+            parents.append(track_id_parent)
+            df.drop(df[df['unique_id'] == unique].index, inplace = True)
         df2["parent_track"].mask( df2["track_id"] == track,track_id_parent, inplace=True )
 
     return df2
@@ -136,40 +143,55 @@ def naming_cell_trees(track_id: int,
     
     if main == True:
         n = str(df_first_frames['family_id'].iloc[0]) + '.' # first tree number (n.1.1.1...)
+        print ('1')
     else: 
         parent_frame =  df_final.loc[df_final['track_id']==track_id, 'Frame'].min() -1  # first frame of current track -1
-        parant_track_id = df_final.loc[df_final['track_id']==track_id, 'parent_track'].iloc[0] 
-        df_previous_frame = df_final.loc[df_final['Frame'] == parent_frame]
-        n =  str(df_previous_frame.loc[ df_previous_frame['track_id']== parant_track_id, 'Cell_id'].iloc[0]) 
+        if parent_frame == -1:
+            print ('2.', track_id, 'shit ')
+            n = str(df_first_frames['family_id'].iloc[0]) + '.' # não sei não heinnn
+        else:
+            parant_track_id = df_final.loc[df_final['track_id']==track_id, 'parent_track'].iloc[0] 
+            df_previous_frame = df_final.loc[df_final['Frame'] == parent_frame]
+            if  parant_track_id is not None:
+                n =  str(df_previous_frame.loc[ df_previous_frame['track_id']== parant_track_id, 'Cell_id'].iloc[0])
+                print ('3')
+            else:
+                n = str(df_first_frames['family_id'].iloc[0]) + '.'
+                print ('4')
+    print (n)        
         
     # find daughters of current track
     daughters = list(df_first_frames.loc[df_first_frames['parent_track'] == track_id, 'Frame'])
 
-    df_track = df_final.loc[df_final['track_id']==track_id] # selects only current track from eh complete dataframe
+    df_track = df_final.loc[df_final['track_id']==track_id] # selects only current track from the complete dataframe
     df_track['Cell_id'] = str(n)  # adds the n.
           
     # this if/else statement adds .1 or .2 to tracks (.2 in daughters)
     if main == True:
         if len(daughters)== 0:
-            df_track['Cell_id'] = str(n) + '1.'
+            df_track['Cell_id'] = str(n) #+ '1.'
             return df_final 
         df_track["Cell_id"].mask(df_track["Frame"] >= daughters[0], str(n)+ '1.', inplace=True ) # aqui seria else
-        n = str(n) + '1.'
-        if len(daughters)>1:
+        n = str(n) #+ '1.'
+        print ('a')
+        if len(daughters)>1: # ELSE? ######
             for i in daughters[1:]:
                 df_track["Cell_id"].mask(df_track["Frame"] >= i, str(n)+ '1.', inplace=True )
-                n = str(n) + '1.'
+            n = str(n) + '1.'
+            print ('b')
         
     else:
         df_track['Cell_id'] = str(n) + '2.'
-        n = str(n) + '2.'
+        n = str(n) #+ '2.'
+        print ('c')
         if len(daughters)== 0:
             df_final.update(df_track)
             return df_final 
         else: 
             for i in daughters:
                 df_track["Cell_id"].mask(df_track["Frame"] >= i, str(n)+ '1.', inplace=True )
-                n = str(n) + '1.'
+            n = str(n) + '1.'
+            print ('d')
                  
     df_final.update(df_track)        
     return df_final
@@ -232,7 +254,7 @@ def tracking(path_to_table: str,
                          max_gap_closing_distance=max_gap_closing_distance)
     tracker.track_df(df2, identifiers=cols)
     tracked_df = tracker.df
-    tracked_df = find_parent_track(tracked_df)
+    tracked_df = find_parent_track(tracked_df, max_distance)
     tracked_df =find_family_track(tracked_df)
     tracked_df = create_tree_nomenclature(tracked_df)
     
@@ -254,13 +276,13 @@ def tracking(path_to_table: str,
 #t = 10 
 #ms = 5
 #mg = 5
-md = 250
-t = 7
-ms = 250
-mg = 10
+md = 70
+t = 9
+ms = 10
+mg = 5
 
-bb = tracking ('/media/luiza/DATA/Doutorado/Teste tracking/2  arvores/teste arvore mentira 2 arvores.csv',
-               '/media/luiza/DATA/Doutorado/53bp1 py some info/FAQ fornma/tracking test',
+bb = tracking ('/media/luiza/DATA/Doutorado/forNMA/video tracking/Results/Expt populacional karine 1 - poço c8-2 Results.csv',
+               '/media/luiza/DATA/Doutorado/forNMA/video tracking/Results/tracking/all',
                max_distance = md,
                time_window= t,
                max_split_distance = ms,
@@ -269,4 +291,4 @@ bb = tracking ('/media/luiza/DATA/Doutorado/Teste tracking/2  arvores/teste arvo
 
 name = 'md=' + str(md) + ' t=' + str(t) +' ms=' + str(ms) + ' mg=' + str(mg) 
 
-bb.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/FAQ fornma/tracking test/Results ' + name + '.csv')
+#bb.to_csv('/media/luiza/DATA/Doutorado/53bp1 py some info/FAQ fornma/tracking test/Results ' + name + '.csv')
