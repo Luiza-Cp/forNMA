@@ -46,7 +46,6 @@ def find_parent_track(df: pd.DataFrame,
     parents = [] 
     for track in tracks:
         if track in parents:
-           # print(track)
             continue
         sub_df = df.loc[df['track_id']== track]
         first_frame = sub_df['Frame'].min()

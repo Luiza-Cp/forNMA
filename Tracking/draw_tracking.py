@@ -70,13 +70,13 @@ def draw_tracking(path_to_tracked_df: str,
 #         
 # =============================================================================
         
-        for family in list(set(df['family_id'])): # iterate over each family
+        for family in list(set(df['family_id'])): # iterates over each family
             color = family_color_dict[family]
             df_frames = df[(df['family_id'] == family) & (df['Frame'] <= frames[i])] # nessa familia
             ids =  sorted(list(set(df_frames['Cell_id'])), key=len)
 
             
-            for j in range(len(ids)): # iterate over cell_id 
+            for j in range(len(ids)): # iterates over cell_id 
                 color2 = (color[0] + len(ids[j])*15, color[1] + len(ids[j])*15 , color[2]+ len(ids[j])*15)
                 df_id = df_frames.loc[df_frames['Cell_id'] == ids[j]]
                 x = [int(f) for f in list(df_id['X'])]
