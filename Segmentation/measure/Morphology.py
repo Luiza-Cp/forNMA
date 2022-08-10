@@ -63,7 +63,7 @@ class Morphology:
     def calc_aspect (self) -> float: 
         """Given a fit ellipse, measures the ratio between the major and minor axis."""
         if self.fellipse[1][0] == 0 or  self.fellipse[1][1]==0 :
-            print ('zero, usei 1 no lugar ')
+            print ('zero, usei 1 no lugar ') # aqui deveria ser algum tipo de 'warn', eu deveria olhar com calma rodando
             asp =1
    
         elif self.fellipse[1][0] > self.fellipse[1][1]:

@@ -173,7 +173,7 @@ def save_dfs(df_results: pd.DataFrame,
         df_save.to_csv(os.path.join(path_save, t[:-4]) + ' Results.csv')
         if df_foci is not None:
             df_foci.to_csv(os.path.join(path_save, t[:-4]) + ' Foci Results.csv')
-    return print("files saved")
+    return None#print("files saved")
  
 
 
@@ -267,7 +267,7 @@ def run(parameters_dict: dict,
     for i in range(len(subfolders)):
         subfolder_dict = create_subfolder_dict(folder_dict, i)
         if not check_size(subfolder_dict):
-            raise("The folders contain different image numbers")
+            raise Exception("The folders contain different image numbers")
         total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview) # ju usa esse pra remover outliers
         if total_df is None:
             continue
@@ -278,7 +278,7 @@ def run(parameters_dict: dict,
     
     complete_df = filter_dataframe(temp_dir, headless)
     if complete_df.empty:
-       return print( 'No nucleus could be found at your images, adjust parameters and try again')
+       raise Exception( 'No nucleus could be found at your images, adjust parameters and try again')
     
     # now the complete df is splitted in smaller ones and saved
     df_results, df_draw = split_dfs(complete_df, ch_name_list) 

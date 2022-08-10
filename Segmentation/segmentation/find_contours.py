@@ -31,7 +31,7 @@ def load_image(
     converts image to ubyte. If file can not be opened, adds the file
     to not_procesed list.
     """
-    print ('file: ',filename)
+    #print ('file: ',filename)
     img = cv.imread(filename,cv.IMREAD_ANYDEPTH)
     if  img is None or img.size == 0:
         not_processed.append(filename)

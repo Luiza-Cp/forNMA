@@ -31,7 +31,7 @@ parser.add_argument('--crop',
 
 # Execute the parse_args() method
 args = parser.parse_args()
-
+print (args)
 paths = args.list_of_paths
 save = args.path_to_save
 crop= args.crop
