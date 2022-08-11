@@ -141,7 +141,7 @@ def create_subfolder_dict(folder_dict: dict,
         files = sorted(os.listdir(value[0][iterator]))
         files = [os.path.join(value[0][iterator], f) for f in files ]
         subfolder_dict[key] = [files, value[1], value[2]]
-   
+    
     return subfolder_dict  
 
 
@@ -243,8 +243,18 @@ def saving_images(df_draw: pd.DataFrame,
            os.mkdir(saving_dir_ch)           
            draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
          
+def is_file_supported(subfolder_dict: dict)-> None:
+    """ Checks if all images within image folders are supported file formats."""
+    supported_files = ['.bmp', '.dib', '.jpeg', '.jpg', '.jpe', '.jp2', '.png', 
+                       '.webp', '.pbm', '.pgm', '.ppm', '.pxm', '.pnm',  '.sr', 
+                       '.ras', '.tiff', '.tif', '.exr', '.hdr', '.pic' ]
+    not_supported = []
+    for key,value in subfolder_dict.items():
+        wrong_file_formats = [f for f in value[0] if not f.lower().endswith(tuple(supported_files))]
+        not_supported.append(wrong_file_formats)
     
-        
+    return not_supported
+
 
 def run(parameters_dict: dict,
         preview: bool = False,
@@ -268,6 +278,11 @@ def run(parameters_dict: dict,
         subfolder_dict = create_subfolder_dict(folder_dict, i)
         if not check_size(subfolder_dict):
             raise Exception("The folders contain different image numbers")
+        
+        not_supported = is_file_supported(subfolder_dict)  
+        if len(not_supported) != 0:
+            return not_supported
+        
         total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview) # ju usa esse pra remover outliers
         if total_df is None:
             continue
