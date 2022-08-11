@@ -16,11 +16,6 @@ def fornma_mock_function(
         **kwargs,
 ) -> pd.DataFrame():
     """A mock function that simulates executing forNMA."""
-    callback.emit({  # noqa
-            'type': 'message',
-            'data': (args, kwargs),
-            'message': '',
-        })
     for i in range(100):
         callback.emit({  # noqa
             'type': 'progress',
@@ -39,7 +34,7 @@ def fornma_mock_function(
                 'data': None,
                 'message': f'Something bad happened at iteration {i}...'
             })
-        if random.random() < 0.0:
+        if random.random() < 0.1:
             raise ValueError('Bad Things!')
     return pd.DataFrame({
         'foo': [1, 2, 3],
