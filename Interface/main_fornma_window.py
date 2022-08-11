@@ -9,8 +9,8 @@ from typing import Any, Type
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import SlidingStackedWidget
-from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
 from Interface.runner import Runner, fornma_mock_function
+from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
 
 _DEBUG = True
 
@@ -71,36 +71,48 @@ class ForNMAMainWindow(qtw.QMainWindow):
             self,
             new_segmentation_params: dict,
     ) -> None:
+        """Updates the current_params dictionary whenever one of the underlying parameter changes."""
         self._current_params.update(new_segmentation_params)
         self.analysis_params.setText(self._current_params)
 
     def on_preview_button_clicked(self) -> None:
+        """Runs fornma in Preview mode."""
         params = self._current_params.copy()
         params['preview'] = True
         # ##### MUDAR AQUI - pegar o dicionário de params e passar para a função do forNMA
         print(f"RUNNING FORNMA WITH PARAMETERS: {pprint.pformat(self._current_params)}")
 
     def on_run_button_clicked(self) -> None:
+        """Runs fornma in Run mode."""
         params = self._current_params.copy()
-        params['preview'] = False
-        # ##### MUDAR AQUI - pegar o dicionário de params e passar para a função do forNMA
-        print(f"RUNNING FORNMA WITH PARAMETERS: {pprint.pformat(self._current_params)}")
-        runner = Runner(func=fornma_mock_function)
+        runner = Runner(func=fornma_mock_function, kwargs=params)
+        runner.signals.started.connect(self.on_fornma_started_signal)
         runner.signals.finished.connect(self.on_fornma_finished_signal)
         runner.signals.success.connect(self.on_fornma_success_signal)
         runner.signals.error.connect(self.on_fornma_error_signal)
         runner.signals.callback.connect(self.on_fornma_callback_received)
         self.threadpool.start(runner)
 
-    @staticmethod
-    def on_fornma_finished_signal() -> None:
-        """Handles the finished signal emitted by forNMA's runner."""
-        print('forNMA finished')
+    def on_fornma_started_signal(self) -> None:
+        """Handles the started signal emitted by forNMA's runner."""
+        self.analysis_tab.reset_log()
+        self.analysis_tab.write_title('forNMA started Executing!')
 
-    @staticmethod
-    def on_fornma_success_signal(return_value: Any) -> None:
-        """Handles the success signal emitted by forNMA's runner."""
-        print(f'forNMA success: {return_value}')
+    def on_fornma_callback_received(
+            self,
+            callback: dict,
+    ) -> None:
+        """Handles the callback received by forNMA's runner."""
+        _type = callback.get('type')
+        if _type == 'progress':
+            progress = callback.get('data')
+            self.analysis_tab.update_progress_bar(progress)
+        elif _type == 'log':
+            message = callback.get('message')
+            self.analysis_tab.write_message(message=message)
+        elif _type == 'warning':
+            message = callback.get('message')
+            self.analysis_tab.write_warning(message=message)
 
     def on_fornma_error_signal(
             self,
@@ -108,13 +120,22 @@ class ForNMAMainWindow(qtw.QMainWindow):
     ) -> None:
         """Handles the error signal emitted by forNMA's runner."""
         exception, trace = exception_tuple
-        message = f'forNMA error: {exception}\nTraceback:\n{trace}'
+        message = f'forNMA reached an error during execution:\n{exception}\n\nFullTraceback:\n{trace}'
         qtw.QMessageBox.critical(self, 'Error!', message, qtw.QMessageBox.Ok)  # noqa
 
-    @staticmethod
-    def on_fornma_callback_received(callback: dict) -> None:
-        """Handles the callback received by forNMA's runner."""
-        print(f'forNMA callback: {callback}')
+    def on_fornma_success_signal(
+            self,
+            return_value: Any,
+    ) -> None:
+        """Handles the success signal emitted by forNMA's runner."""
+        message = f'forNMA finished execution successfully!\n\nReturned data:\n{return_value}'
+        qtw.QMessageBox.information(self, 'Success!', message, qtw.QMessageBox.Ok)
+
+    def on_fornma_finished_signal(self) -> None:
+        """Handles the finished signal emitted by forNMA's runner."""
+        self.analysis_tab.write_title('forNMA finished Executing!')
+        self.analysis_tab.reset_progress_bar()
+        qtc.QTimer.singleShot(5_000, self.analysis_tab.write_default_text)
 
     def on_data_tab_changed(self) -> None:
         """Enables or disables the Analysis tab whenever the content of the Data tab is updated."""

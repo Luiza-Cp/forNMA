@@ -132,8 +132,46 @@ class AnalysisAreaWidget(qtw.QWidget):
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        # Label
-        self.label = qtw.QLabel('Select analysis parameters on the left')
-        self.label.setStyleSheet('QLabel {font-size: 24px}')
-        self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
-        layout.addWidget(self.label)
+        # Log Area
+        self.log_area = qtw.QTextEdit()
+        self.log_area.setReadOnly(True)
+        self.write_default_text()
+        layout.addWidget(self.log_area)
+
+        # Progress bar
+        self.progress_bar = qtw.QProgressBar()
+        layout.addWidget(self.progress_bar)
+
+        # aliases
+        self.update_progress_bar = self.progress_bar.setValue
+        self.reset_progress_bar = self.progress_bar.reset
+
+    def reset_log(self) -> None:
+        """Resets the log area."""
+        self.log_area.setText("")
+
+    def write_default_text(self) -> None:
+        """Resets the log area and writes the default text into it."""
+        self.reset_log()
+        self.write_title('Select the analysis parameters on the left')
+
+    def write_title(
+            self,
+            message: str,
+    ) -> None:
+        """Writes the message as a title."""
+        self.log_area.append(f'<span style="font-size:18pt; font-weight:600; color:#232323;">{message}</span>')
+
+    def write_message(
+            self,
+            message: str,
+    ) -> None:
+        """Writes the message as a regular message."""
+        self.log_area.append(f'<span style="font-size:10pt; font-weight:400; color:#232323;">{message}</span>')
+
+    def write_warning(
+            self,
+            message: str,
+    ) -> None:
+        """Writes the message as a warning."""
+        self.log_area.append(f'<span style="font-size:10pt; font-weight:600; color:#ff3333;">{message}</span>')
