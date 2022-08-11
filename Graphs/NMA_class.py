@@ -130,7 +130,7 @@ class NMA:
             
          rx= self.sd* self.std_NII # number of stantadard deviations * standard deviation
          ry = self.sd* self.std_a
-         horizontal_x =  [self.mean_NII -rx,  self.mean_NII + 3*rx]
+         horizontal_x=[self.mean_NII -rx,  self.mean_NII + 3*rx]
          horizontal_y_up = [self.mean_a +ry, self.mean_a +ry]
          horizontal_y_down= [self.mean_a-ry, self.mean_a-ry]
         
@@ -159,19 +159,18 @@ class NMA:
         df = self.control_df
         df = df.loc[(np.abs(stats.zscore(df["Area"])) < 3)] # removes 3 z-scores 
         df = df.loc[(np.abs(stats.zscore(df["NII"])) < 3)]
-                
-        %matplotlib qt
+
                 
         sns.set_theme()
         sns.set_palette('rainbow', 9)
-        df_sample, boolean = self.get_sample(df , None, None)
+        df_sample, boolean = self.get_sample(df, None, None)
         
         while boolean == False: # if any of variances is not preserved, repeat 
             df_sample, boolean = self.get_sample(df, None, None)
           
        
         fig, ax = plt.subplots()
-        sns.scatterplot(data=df_sample, x="NII", y="Area",ax = ax) 
+        sns.scatterplot(data=df_sample, x="NII", y="Area", ax=ax)
       
         ellipse = mp.Ellipse((self.mean_NII,self.mean_a), 
                            2*self.sd*self.std_NII,
@@ -600,10 +599,11 @@ class NMA:
 
 # ===========Como chamar=======================================================
 # 
-# df3 = pd.read_csv('/media/luiza/DATA/Triagem Denise/Triagem 2/results tables/Adjusted complete table.csv')
+df3 = pd.read_csv('/media/luiza/DATA/Triagem Denise/Triagem 2/results tables/Adjusted complete table.csv')
 # 
-# df3=df3.loc[df3['time'] != '01d10h56m']
-# df3=df3.loc[df3['time'] != '00d10h56m']
-# df3['is_control'] = np.where(
-#     df3['Condition'] == 'C', 'y', 'n')
+df3=df3.loc[df3['time'] != '01d10h56m']
+df3=df3.loc[df3['time'] != '00d10h56m']
+df3['is_control'] = np.where(
+    df3['Condition'] == 'C', 'y', 'n')
+nma = NMA(df3, 2)
 # =============================================================================
