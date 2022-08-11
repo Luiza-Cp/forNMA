@@ -97,20 +97,20 @@ class ChannelWidget(qtw.QWidget):
     """Widget containing a channel's parameters in it."""
     paramsChanged = qtc.Signal(object)  # type does not matter
     _blueprint = (
-        # Format: ( forNMA ID, include_slider )
-        ('match_hist', False),
-        ('channel_rescale_intensity', False),
-        ('remove_bg', False),
-        ('channel_radius_bg', True),
-        ('wants_ktr', False),
-        ('ring_size', True),
-        ('use_ellipse', False),
-        ('wants_foci', False),
-        ('foci_min_size', True),
-        ('foci_max_size', True),
-        ('foci_min_int', True),
-        ('foci_max_int', True),
-        ('foci_proeminence', True),
+        # Format: ( forNMA ID, add_slider, add_help)
+        ('channel_rescale_intensity', False, True),
+        ('remove_bg', False, True),
+        ('channel_radius_bg', True, True),
+        ('match_hist', False, True),
+        ('wants_ktr', False, True),
+        ('ring_size', True, True),
+        ('use_ellipse', False, True),
+        ('wants_foci', False, True),
+        ('foci_min_size', True, True),
+        ('foci_max_size', True, True),
+        ('foci_min_int', True, True),
+        ('foci_max_int', True, True),
+        ('foci_prominence', True, True),
     )
 
     def __init__(
@@ -127,8 +127,8 @@ class ChannelWidget(qtw.QWidget):
         self._channel_name = channel_name
 
         self._fornma_params = {}
-        for fornma_id, add_slider in self._blueprint:
-            fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider)
+        for fornma_id, add_slider, add_help in self._blueprint:
+            fornma_widget = ForNMAWidget(fornma_id=fornma_id, add_slider=add_slider, add_help=add_help)
             layout.addWidget(fornma_widget)
             self._fornma_params[fornma_id] = fornma_widget
             if fornma_id == 'remove_bg':  # Specific routing for remove background widget
@@ -193,7 +193,7 @@ class ChannelWidget(qtw.QWidget):
             'foci_max_size',
             'foci_min_int',
             'foci_max_int',
-            'foci_proeminence',
+            'foci_prominence',
         ]:  # HARD-CODED: names in blueprint must match!
             widget = self._fornma_params[widget_name]
             widget.setEnabled(checked)

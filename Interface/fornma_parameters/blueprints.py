@@ -38,7 +38,7 @@ _DEFAULT_TEXT_OPTIONS = {
 }
 
 
-_FORNMA_BLUEPRINT = {
+_GLOBAL_BLUEPRINT = {
     'channel_with_nuclei': {
         'text': {
             'name': "Channel with Nuclei",
@@ -90,6 +90,182 @@ _FORNMA_BLUEPRINT = {
                 'value': (value := 0.5),
             },
             'value': value,
+        },
+    },
+    'rescale_intensity': {
+        'text': {
+            'name': "Rescale Intensity",
+            'label': "Rescale intensity?",
+            'tooltip': "Creates new intensity scale to images",
+            'help': "Re-distributes image intensity so the brightest image pixel will be equivalent to the biggest intensity value and the less bright pixel will correspond to the minimum value. This enhances image contrast and is highly recommended for high background images.",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'remove_background': {
+        'text': {
+            'name': "Remove Background",
+            'label': "Remove background?",
+            'tooltip': "Background subtraction with rolling-ball algorithm",
+            'help': "Applies rolling-ball algorithm for background subtraction. This parameter also requires a rolling-ball radius, that should be set to at least the size of the largest object that is not part of the background.",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+    },
+    'radius_bg': {
+        'text': {
+            'name': "Rolling Ball Radius",
+            'label': "Radius rolling-ball",
+            'tooltip': "Is the rolling-ball radius used for background subtraction.",
+            'help': "Is the rolling-ball radius used for background subtraction. Larger radius takes longer times to process.",
+        },
+        'data': {
+            'dtype': int,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0,
+                'maximum': 500.0,
+                'singleStep': 1,
+                'value': (value := 10.0),
+            },
+            'value': value,
+        },
+    },
+    'shape': {
+        'text': {
+            'name': "Shape",
+            'label': "Set the shape value:",
+            'tooltip': "Filters nucleus by its irregularity.",
+            'help': "Removes from analysis all nucleus that has irregular shapes. Higher values will be restrictive for more regular nucleus. Try to set lower values if you are working with treatments that affect nuclei shape.",
+        },
+        'data': {
+            'dtype': float,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0.0,
+                'maximum': 1.0,
+                'singleStep': 0.01,
+                'value': (value := 0.88),
+            },
+            'value': value,
+        },
+    },
+    'eccentricity': {
+        'text': {
+            'name': "Eccentricity",
+            'label': "Set the eccentricity value:",
+            'tooltip': "Filters nucleus by its eccentricity",
+            'help': "Filters nuclei by their eccentricity, which is a value that shows you how 'un-circular' the curve is. Bigger eccentricities are less curved. A circle has an eccentricity of 0, and a ellipse will have an eccentricity of 1.",
+        },
+        'data': {
+            'dtype': float,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0.0,
+                'maximum': 1.0,
+                'singleStep': 0.01,
+                'value': (value := 0.0),
+            },
+            'value': value,
+        },
+    },
+    'min_size': {
+        'text': {
+            'name': "Min Size",
+            'label': "Set the min size",
+            'tooltip': "Minimum nucleus area",
+            'help': "Minimum area, in pixels, of a nucleus.",
+        },
+        'data': {
+            'dtype': float,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0.0,
+                'maximum': 1.0,
+                'singleStep': 0.01,
+                'value': (value := 0.2),
+            },
+            'value': value,
+        },
+    },
+    'max_size': {
+        'text': {
+            'name': "Max Size",
+            'label': "Set the max size",
+            'tooltip': "Maximum nucleus area",
+            'help': "Maximum area, in pixels, of a nucleus.",
+        },
+        'data': {
+            'dtype': float,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0.0,
+                'maximum': 1.0,
+                'singleStep': 0.01,
+                'value': (value := 0.8),
+            },
+            'value': value,
+        },
+    },
+    'min_radius': {
+        'text': {
+            'name': "Min Radius",
+            'label': "Set the min radius",
+            'tooltip':  "Minimum nucleus radius",
+            'help': "Minimum radius, in pixels, of a nucleus.",
+        },
+        'data': {
+            'dtype': float,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0.0,
+                'maximum': 1.0,
+                'singleStep': 0.01,
+                'value': (value := 0.2),
+            },
+            'value': value,
+        },
+    },
+    'max_radius': {
+        'text': {
+            'name': "Max Radius",
+            'label': "Set the max radius",
+            'tooltip': "Maximum nucleus radius",
+            'help': "Maximum radius, in pixels, of a nucleus.",
+        },
+        'data': {
+            'dtype': float,
+            'wtype': 'spinbox',
+            'limits': {
+                'minimum': 0.0,
+                'maximum': 1.0,
+                'singleStep': 0.01,
+                'value': (value := 0.8),
+            },
+            'value': value,
+        },
+    },
+}
+
+
+_FORNMA_BLUEPRINT = {
+    'use_fornma': {
+        'text': {
+            'name': "Use forNMA?",
+            'label': "Use forNMA?",
+            'tooltip': "FIXME",
+            'help': "FIXME",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': True,
         },
     },
     'threshold': {
@@ -175,44 +351,6 @@ _FORNMA_BLUEPRINT = {
             'value': value,
         },
     },
-    'shape': {
-        'text': {
-            'name': "Shape",
-            'label': "Set the shape value:",
-            'tooltip': "Filters nucleus by its irregularity.",
-            'help': "Removes from analysis all nucleus that has irregular shapes. Higher values will be restrictive for more regular nucleus. Try to set lower values if you are working with treatments that affect nuclei shape.",
-        },
-        'data': {
-            'dtype': float,
-            'wtype': 'spinbox',
-            'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.88),
-            },
-            'value': value,
-        },
-    },
-    'eccentricity': {
-        'text': {
-            'name': "Eccentricity",
-            'label': "Set the eccentricity value:",
-            'tooltip': "Filters nucleus by its eccentricity",
-            'help': "Filters nuclei by their eccentricity, which is a value that shows you how 'un-circular' the curve is. Bigger eccentricities are less curved. A circle has an eccentricity of 0, and a ellipse will have an eccentricity of 1.",
-        },
-        'data': {
-            'dtype': float,
-            'wtype': 'spinbox',
-            'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.0),
-            },
-            'value': value,
-        },
-    },
     'cut_edges': {
         'text': {
             'name': "Cut Edges",
@@ -232,125 +370,17 @@ _FORNMA_BLUEPRINT = {
             'value': value,
         },
     },
-    'min_size': {
+    'find_low_intensity_nucleus': {
         'text': {
-            'name': "Min Size",
-            'label': "Set the min size",
-            'tooltip': "Minimum nucleus area",
-            'help': "Minimum area, in pixels, of a nucleus.",
-        },
-        'data': {
-            'dtype': float,
-            'wtype': 'spinbox',
-            'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.2),
-            },
-            'value': value,
-        },
-    },
-    'max_size': {
-        'text': {
-            'name': "Max Size",
-            'label': "Set the max size",
-            'tooltip': "Maximum nucleus area",
-            'help': "Maximum area, in pixels, of a nucleus.",
-        },
-        'data': {
-            'dtype': float,
-            'wtype': 'spinbox',
-            'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.8),
-            },
-            'value': value,
-        },
-    },
-    'min_radius': {
-        'text': {
-            'name': "Min Radius",
-            'label': "Set the min radius",
-            'tooltip':  "Minimum nucleus radius",
-            'help': "Minimum radius, in pixels, of a nucleus.",
-        },
-        'data': {
-            'dtype': float,
-            'wtype': 'spinbox',
-            'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.2),
-            },
-            'value': value,
-        },
-    },
-    'max_radius': {
-        'text': {
-            'name': "Max Radius",
-            'label': "Set the max radius",
-            'tooltip': "Maximum nucleus radius",
-            'help': "Maximum radius, in pixels, of a nucleus.",
-        },
-        'data': {
-            'dtype': float,
-            'wtype': 'spinbox',
-            'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.8),
-            },
-            'value': value,
-        },
-    },
-    'rescale_intensity': {
-        'text': {
-            'name': "Rescale Intensity",
-            'label': "Rescale intensity?",
-            'tooltip': "Crerates new intensity scale to images",
-            'help': "Re-distributes image intensity so the brightest image pixel will be equivalent to the biggest intensity value and the less bright pixel will correspond to the minimum value. This enhances image contrast and is highly recommended for high background images.",
+            'name': "Find Low Intensity Nuclei",
+            'label': "Find low intensity nuclei?",
+            'tooltip': "Activate this function if some nuclei are less brighter than others.",
+            'help': "This parameter is responsible for executing a loop at images where previous found nucleus are covered and then forNMA tries to find new nucleus at image. It is recommended if some nuclei are way less brighter than others. This function can generate detection errors with squares being drawn around nucleus.",
         },
         'data': {
             'dtype': bool,
             'wtype': 'checkbox',
             'value': False,
-        },
-    },
-    'remove_background': {
-        'text': {
-            'name': "Remove Background",
-            'label': "Remove background?",
-            'tooltip': "Background subtraction with rolling-ball algorithm",
-            'help': "Applies rolling-ball algorithm for background subtraction. This parameter also requires a rolling-ball radius, that should be set to at least the size of the largest object that is not part of the background.",
-        },
-        'data': {
-            'dtype': bool,
-            'wtype': 'checkbox',
-            'value': False,
-        },
-    },
-    'radius_bg': {
-        'text': {
-            'name': "Rolling Ball Radius",
-            'label': "Radius rolling-ball",
-            'tooltip': "Is the rolling-ball radius used for background subtraction.",
-            'help': "Is the rolling-ball radius used for background subtraction. Larger radius takes longer times to process.",
-        },
-        'data': {
-            'dtype': int,
-            'wtype': 'spinbox',
-            'limits': {
-                'minimum': 0,
-                'maximum': 500.0,
-                'singleStep': 1,
-                'value': (value := 10.0),
-            },
-            'value': value,
         },
     },
     'weakly_labeled': {
@@ -366,12 +396,16 @@ _FORNMA_BLUEPRINT = {
             'value': False,
         },
     },
-    'find_low_intensity_nucleus': {
+}
+
+
+_CELLPOSE_BLUEPRINT = {
+    'use_cellpose': {
         'text': {
-            'name': "Find Low Intensity Nuclei",
-            'label': "Find low intensity nuclei?",
-            'tooltip': "Activate this function if some nuclei are less brighter than others.",
-            'help': "This parameter is responsible for executing a loop at images where previous found nucleus are covered and then forNMA tries to find new nucleus at image. It is recommended if some nuclei are way less brighter than others. This function can generate detection errors with squares being drawn around nuclues.",
+            'name': "Use Cellpose?",
+            'label': "Use Cellpose?",
+            'tooltip': "FIXME",
+            'help': "FIXME",
         },
         'data': {
             'dtype': bool,
@@ -379,8 +413,6 @@ _FORNMA_BLUEPRINT = {
             'value': False,
         },
     },
-}
-_CELLPOSE_BLUEPRINT = {
     'diameter': {
         'text': {
             'name': "Nuclear Diameter",
@@ -438,32 +470,6 @@ _CELLPOSE_BLUEPRINT = {
             'value': value,
         },
     },
-    'cellpose_rescale_intensity': {  # TODO: confirmar se são parâmetros separados ou não
-        'text': {
-            'name': "Rescale Intensity",
-            'label': "Rescale intensity?",
-            'tooltip': "TOOLTIP for rescale_intensity",
-            'help': "HELP MESSAGE for rescale_intensity",
-        },
-        'data': {
-            'dtype': bool,
-            'wtype': 'checkbox',
-            'value': False,
-        },
-    },
-    'cellpose_remove_background': {  # TODO: confirmar se são parâmetros separados ou não
-        'text': {
-            'name': "Remove Background",
-            'label': "Remove background?",
-            'tooltip': "TOOLTIP for remove_background",
-            'help': "HELP MESSAGE for remove_background",
-        },
-        'data': {
-            'dtype': bool,
-            'wtype': 'checkbox',
-            'value': False,
-        },
-    },
     'use_gpu': {
         'text': {
             'name': "Run in GPU",
@@ -478,25 +484,14 @@ _CELLPOSE_BLUEPRINT = {
         },
     },
 }
+
+
 _CHANNELS_BLUEPRINT = {
-    'match_hist': {
-        'text': {
-            'name': "Match Histograms",
-            'label': "Match histograms?",
-            'tooltip': "Matches all image histograms.",
-            'help': "Matches all image histogram with the first image in order to correct for illumination distortions.",
-        },
-        'data': {
-            'dtype': bool,
-            'wtype': 'checkbox',
-            'value': False,
-        },
-    },
     'channel_rescale_intensity': {
         'text': {
             'name': "Rescale Intensity",
             'label': "Rescale Intensity?",
-            'tooltip':  "Crerates new intensity scale to images",
+            'tooltip':  "Creates new intensity scale to images",
             'help': "Re-distributes image intensity so the brightest image pixel will be equivalent to the biggest intensity value and the less bright pixel will correspond to the minimum value. This enhances image contrast and is highly recommended for high background images.",
         },
         'data': {
@@ -535,6 +530,19 @@ _CHANNELS_BLUEPRINT = {
                 'value': (value := 10),
             },
             'value': value,
+        },
+    },
+    'match_hist': {
+        'text': {
+            'name': "Match Histograms",
+            'label': "Match histograms?",
+            'tooltip': "Matches all image histograms.",
+            'help': "Matches all image histogram with the first image in order to correct for illumination distortions.",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
         },
     },
     'wants_ktr': {
@@ -671,7 +679,7 @@ _CHANNELS_BLUEPRINT = {
             'value': value,
         },
     },
-    'foci_proeminence': {  # TODO: typo aqui - I know, mas deixei o parametro errado mesmo kkk
+    'foci_prominence': {
         'text': {
             'name': "Prominence",
             'label': "Select Foci prominence:",
@@ -693,7 +701,7 @@ _CHANNELS_BLUEPRINT = {
 }
 
 
-_BLUEPRINTS = dict(**_FORNMA_BLUEPRINT, **_CELLPOSE_BLUEPRINT, **_CHANNELS_BLUEPRINT)
+_BLUEPRINTS = dict(**_GLOBAL_BLUEPRINT, **_FORNMA_BLUEPRINT, **_CELLPOSE_BLUEPRINT, **_CHANNELS_BLUEPRINT)
 
 
 # MAIN FUNCTIONS --------------------------------------------------------------

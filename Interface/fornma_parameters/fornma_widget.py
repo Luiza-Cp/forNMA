@@ -13,11 +13,14 @@ from Interface.fornma_parameters import get_fornma_dtype
 def ForNMAWidget(
         fornma_id: str,
         add_slider: bool = False,
+        add_help: bool = True,
 ) -> _ForNMANumericWidget | _ForNMAStringWidget | _ForNMABoolWidget:
     """Returns a properly structured PySide Widget for each forNMA parameter."""
     dtype = get_fornma_dtype(fornma_id=fornma_id)
     fornma_parameter = ForNMAParameter(fornma_id=fornma_id)
-    fornma_help_button = ForNMAHelpButton(fornma_id=fornma_id)
+    fornma_help_button = None
+    if add_help is True:
+        fornma_help_button = ForNMAHelpButton(fornma_id=fornma_id)
     if dtype in (int, float):
         widget = _ForNMANumericWidget(
             name=fornma_id,
@@ -72,8 +75,9 @@ class _BaseForNMAWidget(qtw.QWidget):
             layout.addWidget(self.label, self._current_row, 0, 1, 2)
             self._current_row += 1
 
-        self.help_button = help_button
-        layout.addWidget(self.help_button, self._current_row, 0, 1, 1)
+        if help_button is not None:
+            self.help_button = help_button
+            layout.addWidget(self.help_button, self._current_row, 0, 1, 1)
 
     def _on_widget_value_changed(
             self,

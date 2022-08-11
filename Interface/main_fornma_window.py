@@ -16,8 +16,9 @@ _DEBUG = True
 
 
 class ForNMAMainWindow(qtw.QMainWindow):
-    _current_params = {}
     """Class representing forNMA's main interface."""
+    _current_params = {}
+
     def __init__(
             self,
             parent: qtw.QWidget = None,
