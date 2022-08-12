@@ -11,7 +11,9 @@ import cv2 as cv
 import numpy as np
 import copy
 import math
-from typing import  List, Tuple
+from typing import List, Tuple, Any, Union
+
+from numpy import ndarray
 
 
 def filter_debree(
@@ -21,7 +23,7 @@ def filter_debree(
         rf: float
 ) -> List[np.ndarray]:
     """
-    Elimiates small objects based on the magnification (mag) and pixel size (ps). 
+    Eliminates small objects based on the magnification (mag) and pixel size (ps).
     This will prevent the code from analyzing spurious contours.
     """
     min_val = 15*mag*ps*rf      # this is an arbitrary small value
@@ -42,19 +44,18 @@ def size_filter(
 )-> Tuple[List[np.ndarray], List[float], List[float]]:
     """ 
     Filter objects according to the input values or sets 1/4 of the mean
-    area as minimum value and 10 times the median as maximun value.
+    area as minimum value and 10 times the median as maximum value.
     """
     area_list2 =  copy.deepcopy(area_list)
-    if min_size == None:
+    if min_size is None:
         min_size = (sum(area_list2)/len(area_list2))/4
-    if max_size == None:
+    if max_size is None:
         i = round( len(area_list2)/2)
         area_list2.sort()
         median = area_list[i]
         max_size = 30*median
     filtered_contours = [b for a, b in zip(area_list, contours) if  min_size < a < max_size]  
-   
-    
+
     return filtered_contours
 
 
@@ -63,25 +64,25 @@ def radius_and_eccentricity_filter(
         eccentricity: float, 
         min_radius: int, 
         max_radius: int,
-) -> Tuple[List[np.ndarray], List[float], List[float]]:
+) -> list[ndarray]:
     """
     Filters objects according to the given values of eccentricity, min radius 
     and max radius. If none of then is given, the filter is not applied. 
     This function will measure min and max radius of the fitting ellipse of the 
-    object and the eccinticity is given by: 
+    object and the eccentricity is given by:
         sqrt((major ellipse axis**2)-(minor ellipse axis** 2))/major ellipse axis
     """
     new_cnt_list = []
-    if min_radius == None:
+    if min_radius is None:
         min_radius = 0
-    if eccentricity ==None:
+    if eccentricity is None:
         eccentricity = 1
     for i in range(len(contours)):
         center, axis, rotation = cv.fitEllipse(contours[i])
         w = axis[0]      # minor axis
         h = axis[1]         # major axis
         e = math.sqrt((h**2)- (w**2))/h**2       # eccentricity
-        if max_radius == None or  h < max_radius:
+        if max_radius is None or h < max_radius:
             if w > min_radius and e < eccentricity:
                 new_cnt_list.append(contours[i])
         else:
@@ -93,7 +94,7 @@ def radius_and_eccentricity_filter(
 def hull_filter(
         contours: np.ndarray, 
         shape: float,
-) -> Tuple[List[np.ndarray], List[float], List[float]]:
+) -> list[Any]:
     """
     This function divides the area of the convex hull of a contour by its area 
     and removes the objects below this user-defined value.
@@ -124,7 +125,7 @@ def filter_contours(
         min_radius: int, 
         max_radius: int,
         
-) -> Tuple[List[np.ndarray], List[float], List[float]]:
+) -> Union[list[Any], list[ndarray]]:
     """
     Given a set of standard and user-defined parameters, it filters the contours 
     that does not match the conditions. Returns the filtered contour list.
@@ -135,14 +136,13 @@ def filter_contours(
     contours = size_filter(contour_list, areas, min_size, max_size)         
 
     if len(contours) == 0:
-        return  []
+        return []
     contours = hull_filter(contours, shape)
     
     if len(contours) == 0:
         return []
-    if eccentricity != None or min_radius != None or max_radius !=None:
-        contours = radius_and_eccentricity_filter(contours, eccentricity, 
-                                            min_radius, max_radius)
+    if eccentricity is not None or min_radius is not None or max_radius is not None:
+        contours = radius_and_eccentricity_filter(contours, eccentricity, min_radius, max_radius)
     
     return contours
    

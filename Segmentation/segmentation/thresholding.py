@@ -19,12 +19,14 @@ def isodata(image: np.ndarray, offset: int) -> np.ndarray:
     binary = binary.astype('uint8')
     return binary 
 
+
 def li(image: np.ndarray, offset: int) -> np.ndarray:
     """ Applies skimage li threshold. """
     thresh = threshold_li(image)
     binary = image <= thresh 
     binary = binary.astype('uint8')
     return binary 
+
 
 def mean(image: np.ndarray, offset: int) -> np.ndarray:
     """ Applies skimage mean threshold. """
@@ -33,12 +35,14 @@ def mean(image: np.ndarray, offset: int) -> np.ndarray:
     binary = binary.astype('uint8')
     return binary 
 
+
 def minimum(image: np.ndarray, offset: int) -> np.ndarray:
     """ Applies skimage minimum threshold. """
     thresh = threshold_minimum(image)
     binary = image <= thresh 
     binary = binary.astype('uint8')
     return binary 
+
 
 def otsu(image: np.ndarray, offset: int) -> np.ndarray:
     """ Applies skimage otsu threshold. """
@@ -47,12 +51,14 @@ def otsu(image: np.ndarray, offset: int) -> np.ndarray:
     binary = binary.astype('uint8')
     return binary 
 
+
 def triangle(image: np.ndarray, offset: int) -> np.ndarray:
     """ Applies skimage triangle threshold. """
     thresh = threshold_triangle(image)
     binary = image <= thresh 
     binary = binary.astype('uint8')
     return binary  
+
 
 def yen(image: np.ndarray, offset: int) -> np.ndarray:
     """ Applies skimage yen threshold. """
@@ -61,13 +67,15 @@ def yen(image: np.ndarray, offset: int) -> np.ndarray:
     binary = binary.astype('uint8')
     return binary 
 
+
 def median(image: np.ndarray, offset: int) -> np.ndarray:
     """Measures median of image and sets it as threshold. """
     thresh = np.median(image)
     binary = image <= thresh 
     binary = binary.astype('uint8')
     return binary 
-   
+
+
 def multiotsu(image: np.ndarray, offset: int) -> np.ndarray:
     """ 
     Applies skimage mulitsu threshold, fill holes and
@@ -79,6 +87,7 @@ def multiotsu(image: np.ndarray, offset: int) -> np.ndarray:
     binary = binary.astype('uint8')
     binary = cv.bitwise_not(binary)
     return binary
+
 
 def local_mean(image: np.ndarray, offset: int) -> np.ndarray:
     """ 
@@ -92,6 +101,7 @@ def local_mean(image: np.ndarray, offset: int) -> np.ndarray:
     binary = cv.bitwise_not(binary)
     binary = binary.astype('uint8')
     return binary
+
 
 def local_gaussian(image: np.ndarray, offset: int) -> np.ndarray:
     """ 
