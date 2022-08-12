@@ -4,7 +4,6 @@ Execute this file directly to run forNMA's interface.
 """
 from __future__ import annotations
 
-import pprint
 import sys
 from typing import Type
 
@@ -24,7 +23,8 @@ _DEBUG = True
 
 class ForNMAMainWindow(qtw.QMainWindow):
     """Class representing forNMA's main interface."""
-    _current_params = {}
+    _current_fornma_params = {}
+    _current_nma_params = {}
 
     def __init__(
             self,
@@ -71,15 +71,19 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.nma_area = NMAAreaWidget()
         self.tabs.addTab(self.nma_area, "NMA")
 
-        # Establish connections across widgets
-        self.data_area.pathsChanged.connect(self.data_params.setPaths)
-        self.data_area.dataChanged.connect(self.on_data_tab_changed)
+        # Establishes connections across widgets
         self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)  # noqa
         self.tabs.currentChanged.connect(self.stack.slideInIndex)  # noqa
+        # Data connections
+        self.data_area.pathsChanged.connect(self.data_params.setPaths)
+        self.data_area.dataChanged.connect(self.on_data_tab_changed)
+        # Analysis connections
         self.analysis_params.segmentationParamsChanged.connect(self.on_analysis_params_changed)
         self.analysis_params.detectionParamsChanged.connect(self.on_analysis_params_changed)
-        self.analysis_params.preview_button.clicked.connect(self.on_preview_button_clicked)
-        self.analysis_params.run_button.clicked.connect(self.on_run_button_clicked)
+        self.analysis_params.run_button.clicked.connect(self.on_fornma_run_button_clicked)
+        # NMA connections
+        self.nma_params.fileListChanged.connect(self.on_nma_file_list_changed)
+        self.nma_params.run_button.clicked.connect(self.on_nma_run_button_clicked)
 
         # Set column sizes
         layout.setStretch(0, 4)  # Use 4/10 of the available space for the left column
@@ -111,20 +115,23 @@ class ForNMAMainWindow(qtw.QMainWindow):
             self,
             new_segmentation_params: dict,
     ) -> None:
-        """Updates the current_params dictionary whenever one of the underlying parameter changes."""
-        self._current_params.update(new_segmentation_params)
-        self.analysis_params.setText(self._current_params)
+        """Updates the current_fornma_params dictionary whenever one of the underlying parameter changes."""
+        self._current_fornma_params.update(new_segmentation_params)
+        self.analysis_params.setText(self._current_fornma_params)
 
-    def on_preview_button_clicked(self) -> None:
-        """Runs fornma in Preview mode."""
-        params = self._current_params.copy()
-        params['preview'] = True
-        # ##### MUDAR AQUI - pegar o dicionário de params e passar para a função do forNMA
-        print(f"RUNNING FORNMA WITH PARAMETERS: {pprint.pformat(self._current_params)}")
+    def on_nma_file_list_changed(
+            self,
+            file_list: list[str],
+    ) -> None:
+        """Updates the current_nma_params dictionary whenever the NMA file list changes."""
+        self._current_nma_params.clear()
+        for file in file_list:
+            self._current_nma_params[file] = 'Analyse this'
 
-    def on_run_button_clicked(self) -> None:
-        """Runs fornma in Run mode."""
-        params = self._current_params.copy()
+    # forNMA RUN ---------------------------------------------------------------
+    def on_fornma_run_button_clicked(self) -> None:
+        """Runs forNMA."""
+        params = self._current_fornma_params.copy()
         runner = Runner(func=fornma_mock_function, kwargs=params)
         runner.signals.started.connect(self.on_fornma_started_signal)
         runner.signals.callback.connect(self.on_fornma_callback_received)
@@ -133,7 +140,6 @@ class ForNMAMainWindow(qtw.QMainWindow):
         runner.signals.finished.connect(self.on_fornma_finished_signal)
         self.threadpool.start(runner)
 
-    # RUN ----------------------------------------------------------------------
     def on_fornma_started_signal(self) -> None:
         """Handles the started signal emitted by forNMA's runner."""
         self.analysis_area.reset_log()
@@ -186,6 +192,14 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.analysis_area.write_title('forNMA finished Executing!')
         self.analysis_area.reset_progress_bar()
         qtc.QTimer.singleShot(5_000, self.analysis_area.write_default_text)
+
+    # NMA RUN ------------------------------------------------------------------
+    def on_nma_run_button_clicked(self) -> None:
+        """Runs NMA."""
+        params = self._current_nma_params.copy()
+        message = f'Selected files: {params}'
+        self.nma_area.write_message(message=message)
+        qtc.QTimer.singleShot(5_000, self.nma_area.write_default_text)
 
     # DEBUG --------------------------------------------------------------------
     def debug(self) -> None:

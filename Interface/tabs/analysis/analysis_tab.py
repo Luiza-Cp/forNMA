@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import RowLayout, SlidingStackedWidget
+from Interface.custom_widgets import LogAreaWidget, RowLayout, SlidingStackedWidget
 from .detection_page import DetectionParametersPage
 from .segmentation_page import SegmentationParametersPage
 
@@ -128,45 +128,18 @@ class AnalysisAreaWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Log Area
-        self.log_area = qtw.QTextEdit()
-        self.log_area.setReadOnly(True)
-        self.write_default_text()
+        self.log_area = LogAreaWidget(default_text='Select forNMA parameters on the left')
         layout.addWidget(self.log_area)
 
         # Progress bar
         self.progress_bar = qtw.QProgressBar()
         layout.addWidget(self.progress_bar)
 
-        # aliases
+        # Aliases
         self.update_progress_bar = self.progress_bar.setValue
         self.reset_progress_bar = self.progress_bar.reset
-
-    def reset_log(self) -> None:
-        """Resets the log area."""
-        self.log_area.setText("")
-
-    def write_default_text(self) -> None:
-        """Resets the log area and writes the default text into it."""
-        self.reset_log()
-        self.write_title('Select forNMA analysis parameters on the left')
-
-    def write_title(
-            self,
-            message: str,
-    ) -> None:
-        """Writes the message as a title."""
-        self.log_area.append(f'<span style="font-size:18pt; font-weight:600; color:#232323;">{message}</span>')
-
-    def write_message(
-            self,
-            message: str,
-    ) -> None:
-        """Writes the message as a regular message."""
-        self.log_area.append(f'<span style="font-size:10pt; font-weight:400; color:#232323;">{message}</span>')
-
-    def write_warning(
-            self,
-            message: str,
-    ) -> None:
-        """Writes the message as a warning."""
-        self.log_area.append(f'<span style="font-size:10pt; font-weight:600; color:#ff3333;">{message}</span>')
+        self.reset_log = self.log_area.reset_log
+        self.write_default_text = self.log_area.write_default_text
+        self.write_message = self.log_area.write_message
+        self.write_warning = self.log_area.write_warning
+        self.write_title = self.log_area.write_title
