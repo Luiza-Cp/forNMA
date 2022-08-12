@@ -216,6 +216,11 @@ class ForNMAMainWindow(qtw.QMainWindow):
                 self.data_area.experiment_table.model().setData(index, value)  # Sets model data
                 self.data_area.experiment_table.indexWidget(index).set_icon(True)  # Sets button icon to "OK"
                 self.data_area.experiment_table.indexWidget(index).set_tooltip(value)  # Sets button icon to "OK"
+        # Simulates selecting file names in the NMA tab
+        files = ['some/file/name.xlsx', '/another/file/path.csv', 'this/is/a/great/FileName.xlsx']
+        for file in files:
+            self.nma_params.file_list.addItem(file)
+        self.nma_params.fileListChanged.emit(files)
 
 
 def fornma_interface_main(debug: bool):
