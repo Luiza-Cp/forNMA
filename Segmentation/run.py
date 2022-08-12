@@ -306,7 +306,7 @@ def run(parameters_dict: dict,
         # adds files to temporary directory
         total_df.to_pickle(os.path.join(temp_dir.name, filename))
 
-    complete_df = filter_dataframe(temp_dir, headless)
+    complete_df = filter_dataframe(temp_dir, headless) #TODO AQUI QUE FILTRA, EU DIVIDIRIA EM 2 FUNÇÔES
     if complete_df.empty:
         raise Exception('No nucleus could be found at your images, adjust parameters and try again')
 
