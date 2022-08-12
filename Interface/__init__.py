@@ -2,3 +2,4 @@
 
 from .fornma_parameters.fornma_parameter import ForNMAParameter
 from .fornma_parameters.fornma_widget import ForNMAWidget
+from .types import ForNMAEmitDict, ForNMAReturnDict

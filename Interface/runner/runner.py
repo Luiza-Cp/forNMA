@@ -9,37 +9,44 @@ from typing import Callable
 import pandas as pd
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
+from Interface import ForNMAReturnDict
+
 
 def fornma_mock_function(
         callback: Signal,
         *args,
         **kwargs,
-) -> pd.DataFrame():
+) -> ForNMAReturnDict:
     """A mock function that simulates executing forNMA."""
     for i in range(100):
         callback.emit({  # noqa
             'type': 'progress',
-            'data': i,
-            'message': None,
+            'message': '',
+            'data': [i],
         })
         callback.emit({  # noqa
             'type': 'log',
-            'data': None,
-            'message': f'i equals to {i} right now!'
+            'message': f'i equals to {i} right now!',
+            'data': [],
         })
-        time.sleep(random.randint(1, 2))
         if random.random() < 0.5:
             callback.emit({  # noqa
                 'type': 'warning',
-                'data': None,
-                'message': f'Something bad happened at iteration {i}...'
+                'message': f'Something bad happened at iteration {i}...',
+                'data': ['bad', 'data', 'here'],
             })
-        if random.random() < 0.1:
+        if random.random() < 0.0:
             raise ValueError('Bad Things!')
-    return pd.DataFrame({
-        'foo': [1, 2, 3],
-        'bar': [4, 5, 9],
-    })
+    return {
+        'status': 'ok',
+        'message': 'forNMA finished executing successfully!',
+        'data': [
+            pd.DataFrame({
+                'foo': [1, 2, 3],
+                'bar': [4, 5, 9],
+            }),
+        ],
+    }
 
 
 class Runner(QRunnable):
