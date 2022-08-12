@@ -120,14 +120,16 @@ class ExperimentTableModel(qtc.QAbstractTableModel):
 
     def as_textbox(self) -> str:
         """Returns a string version of the data contained in the Model."""
-        s = ''
+        s = 'Selected Folders:\n\n'
+        print(self._data)
         for index, row in self._data.iterrows():
+            print(index)
             group_name, *channels = row
-            s += f'Group: {group_name}\n'
+            s += f'Group: {group_name}\n\n'
             for channel_label, channel_path in zip(self._data.columns[1:], channels):
                 s += f'  -> {channel_label}: {channel_path or "UNDEFINED"}\n'
-            s += '-----\n'
-            return s[-1]  # Remove the last newline
+            s += '-----\n\n'
+        return s[:-1]  # Remove the last newline
 
     @property
     def nrows(self) -> int:

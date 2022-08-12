@@ -21,14 +21,17 @@ class DataParametersWidget(qtw.QWidget):
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
-        self.label = qtw.QLabel('Welcome to forNMA!')
-        self.label.setStyleSheet('QLabel {font-size: 24px}')
-        self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
-        layout.addWidget(self.label)
+        self.welcome_label = qtw.QLabel('Welcome to forNMA!')
+        self.welcome_label.setStyleSheet('QLabel {font-size: 24px}')
+        self.welcome_label.setAlignment(qtc.Qt.AlignCenter)  # noqa
+        layout.addWidget(self.welcome_label)
 
         self.paths_label = qtw.QLabel("")
+        self.paths_label.setStyleSheet('QLabel {font-size: 16px}')
         self.paths_label.setWordWrap(True)
         layout.addWidget(self.paths_label)
+
+        layout.addStretch()
 
     @qtc.Slot(str)
     def setPaths(
@@ -44,16 +47,13 @@ class DataAreaWidget(qtw.QWidget):
     Class representing the widget on the right-hand side of the "data" tab,
     where the path to the forNMA's folders are set.
     """
-    dataChanged = qtc.Signal()
 
     def __init__(
             self,
-            parameters_widget: DataParametersWidget = None,
             parent: qtw.QWidget = None,
     ) -> None:
         """Initializes a DataAreaWidget instance."""
         super().__init__(parent=parent)
-        self.parameters = parameters_widget
 
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
@@ -66,8 +66,9 @@ class DataAreaWidget(qtw.QWidget):
         self.set_experiment_button.clicked.connect(self.set_experiment)  # noqa
         layout.addWidget(self.set_experiment_button)
 
-        self.experiment_table.pathsChanged.connect(self.parameters.setPaths)
-        self.experiment_table.dataChanged.connect(self.dataChanged)
+        # aliases
+        self.pathsChanged = self.experiment_table.pathsChanged
+        self.dataChanged = self.experiment_table.dataChanged
 
     @property
     def channel_names(self) -> list[str]:
