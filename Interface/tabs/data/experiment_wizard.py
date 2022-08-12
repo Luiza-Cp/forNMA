@@ -1,5 +1,7 @@
-"""experiment/experiment_wizard.py - widgets for a dialog window used to set the ExperimentTable's layout."""
-
+"""
+Interface/tabs/data/experiment_wizard.py - contains the widgets of the dialog ("wizard") window
+used to set the experiment table's layout.
+"""
 from __future__ import annotations
 
 from functools import partial

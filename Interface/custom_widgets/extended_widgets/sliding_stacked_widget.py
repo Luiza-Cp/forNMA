@@ -1,7 +1,6 @@
 """
-helpers/sliding_stacked_widget.py - contains a stacked widgets that has a "sliding" animation
-when transitioning between widgets.
-
+Interface/custom_widgets/extended_widgets/sliding_stacked_widget.py - contains a stacked widget
+that has a "sliding" animation when transitioning between widgets.
 Source:
 Python: https://stackoverflow.com/questions/52596386/slide-qstackedwidget-page
 """

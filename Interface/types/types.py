@@ -1,4 +1,4 @@
-"""Interface/types.py - define variáveis de tipagem utilizada pelo pacote Interface do forNMA."""
+"""Interface/types.py - defines custom types used by forNMA's interface."""
 from __future__ import annotations
 
 from typing import TypedDict, Literal, Any

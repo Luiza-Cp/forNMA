@@ -1,10 +1,11 @@
-"""tabs/analysis.py - contains the main widget used in forNMA's "analysis" tab."""
+"""Interface/tabs/analysis/analysis_tab.py - contains the top-level widgets used in forNMA's "Analysis" tab."""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import RowLayout, SlidingStackedWidget
-from Interface.tabs import SegmentationParametersPage, DetectionParametersPage
+from .detection_page import DetectionParametersPage
+from .segmentation_page import SegmentationParametersPage
 
 
 class AnalysisParametersWidget(qtw.QWidget):

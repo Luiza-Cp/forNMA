@@ -1,15 +1,14 @@
-"""worker.py - defines a Worker thread object."""
+"""Interface/runner/runner.py - defines a Runner object used to run a function in a separate thread."""
 from __future__ import annotations
 
 import random
-import time
 import traceback
 from typing import Callable
 
 import pandas as pd
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
-from Interface import ForNMAReturnDict
+from Interface.types import ForNMAReturnDict
 
 
 def fornma_mock_function(

@@ -1,5 +1,7 @@
-"""helpers/row_layout.py - defines a RowLayout used to add rows of widgets to a single, unobtrusive layout."""
-
+"""
+Interface/custom_widgets/layouts/row_layout.py - defines a RowLayout used to add rows
+of widgets to a single, unobtrusive layout.
+"""
 from __future__ import annotations
 
 from typing import Iterator
@@ -8,7 +10,7 @@ from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
 class RowLayout(qtw.QHBoxLayout):
-    """Class representing a row layout, that accepts any numer of widgets. By default, it has no margins."""
+    """Class representing a row layout that accepts any numer of widgets. By default, it has no margins."""
     def __init__(
             self,
             parent: qtw.QWidget = None,

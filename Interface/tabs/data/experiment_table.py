@@ -1,4 +1,7 @@
-"""experiment/experiment_table.py - module bundling the necessary widgets for forNMA's ExperimentTable."""
+"""
+Interface/tabs/data/experiment_table.py - contains the widgets used to
+define the experiment table in forNMA's "Data" tab.
+"""
 from __future__ import annotations
 
 from typing import Any

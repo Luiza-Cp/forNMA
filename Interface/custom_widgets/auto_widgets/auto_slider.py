@@ -1,6 +1,6 @@
 """
-widgets/auto_slider.py - contains a function that can returns the proper slider type
-(meant to look like a class when using).
+Interface/custom_widgets/auto_widgets/auto_slider.py - contains a function that returns
+the proper slider type (meant to look like a class when using).
 """
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import DoubleSlider
+from ..extended_widgets.double_slider_widget import DoubleSlider
 
 
 def AutoSlider(

@@ -1,5 +1,5 @@
 """
-helpers/double_slider_widget.py - module containing SliderSpinBoxes,
+Interface/custom_widgets/combined_widgets/slider_spinbox_widget.py - module containing SliderSpinBoxWidget,
 combining a Slider and a Spinbox into a single widget.
 """
 from __future__ import annotations

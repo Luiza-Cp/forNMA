@@ -1,19 +1,19 @@
-"""custom_widgets module - contains custom widgets created for the forNMA interface."""
+"""Interface/custom_widgets module - contains custom widgets created for the forNMA interface."""
+# Extended Widgets
+from .extended_widgets.collapsable_widget import CollapsableWidget
+from .extended_widgets.double_slider_widget import DoubleSlider
+from .extended_widgets.sliding_stacked_widget import SlidingStackedWidget
+
 # Buttons
-from .buttons.collapsable_button import CollapsableButton
 from .buttons.folder_select_button import FolderSelectButton
-from .buttons.help_button import ForNMAHelpButton, HelpButton
+from .buttons.help_button import HelpButton
 
-# Double slider (import this first)
-from .widgets.double_slider_widget import DoubleSlider
+# Auto Widgets
+from .auto_widgets.auto_slider import AutoSlider
+from .auto_widgets.auto_spinbox import AutoSpinBox
 
-# Auto-widgets
-from .widgets.auto_slider import AutoSlider
-from .widgets.auto_spinbox import AutoSpinBox
-
-# Widgets
-from .widgets.slider_spinbox_widget import SliderSpinBoxWidget
-from .widgets.sliding_stacked_widget import SlidingStackedWidget
+# Combined Widgets
+from .combined_widgets.slider_spinbox_widget import SliderSpinBoxWidget
 
 # Layouts
 from .layouts.row_layout import RowLayout

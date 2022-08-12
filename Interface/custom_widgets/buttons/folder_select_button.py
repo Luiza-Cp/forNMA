@@ -1,5 +1,7 @@
-"""helpers/folder_select_button.py - module containing a widget used to select a folder by clicking a button."""
-
+"""
+Interface/custom_widgets/buttons/folder_select_button.py - module containing a widget
+used to select and set a folder by clicking a button.
+"""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw

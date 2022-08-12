@@ -1,4 +1,7 @@
-"""helpers/double_slider_widget.py - module containing a slider widget that accepts floating point values."""
+"""
+Interface/custom_widgets/extended_widgets/double_slider_widget.py - contains a slider widget
+that accepts floating point values.
+"""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw

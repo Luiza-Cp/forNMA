@@ -1,4 +1,7 @@
-"""fornma_parameters/blueprint.py - module containing a blueprint for creating all of forNMA's parameters."""
+"""
+Interface/fornma_core/fornma_blueprints.py - module containing the blueprints
+for creating all of forNMA's parameters.
+"""
 from __future__ import annotations
 
 from typing import Any, Type

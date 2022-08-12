@@ -1,6 +1,6 @@
 """
-helpers/spoiler.py - contains the CollapsableButton widget, used to dynamically show/hide other widgets.
-
+Interface/custom_widgets/extended_widgets/collapsable_widgets.py - contains the CollapsableWidget
+used to dynamically show/hide other widgets.
 Source:
   - https://stackoverflow.com/questions/32476006/how-to-make-an-expandable-collapsable-section-widget-in-qt
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 
-class CollapsableButton(qtw.QWidget):
+class CollapsableWidget(qtw.QWidget):
     """Widget representing a "collapsable" button, which reveals widgets upon being clicked."""
     def __init__(
             self,

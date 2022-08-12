@@ -1,5 +1,7 @@
-"""main_fornma_window.py - file describing the main forNMA interface."""
-
+"""
+Interface/main_fornma_window.py - file describing the main forNMA interface.
+Execute this file directly to run forNMA's interface.
+"""
 from __future__ import annotations
 
 import pprint
@@ -8,10 +10,10 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface import ForNMAEmitDict, ForNMAReturnDict
 from Interface.custom_widgets import SlidingStackedWidget
 from Interface.runner import Runner, fornma_mock_function
 from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
+from Interface.types import ForNMAEmitDict, ForNMAReturnDict
 
 _DEBUG = True
 

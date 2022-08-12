@@ -1,6 +1,5 @@
-"""fornma_parameters module - contains static information of forNMA parameters."""
-
-from .blueprints import (
+"""Interface/fornma_core module - contains information of forNMA parameters and widgets."""
+from .fornma_blueprints import (
     get_default_threshold,
     get_fornma_dtype,
     get_fornma_help_message,
@@ -14,3 +13,5 @@ from .blueprints import (
     threshold_has_offset,
     validate_fornma_id,
 )
+from .fornma_parameter import ForNMAParameter
+from .fornma_widget import ForNMAWidget

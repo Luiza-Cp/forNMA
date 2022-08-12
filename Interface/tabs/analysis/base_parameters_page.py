@@ -1,4 +1,7 @@
-"""tabs/parameters_page.py - contains the base "page" widget used in forNMA's "analysis" tab, left-hand side."""
+"""
+Interface/tabs/analysis/base_parameters_page.py - contains the base "page" widget
+used in forNMA's "Analysis" tab, left-hand side.
+"""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw

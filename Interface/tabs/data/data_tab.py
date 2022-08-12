@@ -1,9 +1,42 @@
-"""tabs/data.py - contains all widgets used in forNMA's "data" tab."""
+"""Interface/tabs/data/data_tab.py - contains the top-level widgets used in forNMA's "Data" tab."""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.experiment import ExperimentTableWidget, ExperimentWizard
+from .experiment_table import ExperimentTableWidget
+from .experiment_wizard import ExperimentWizard
+
+
+class DataParametersWidget(qtw.QWidget):
+    """
+    Class representing the widget on the left-hand side of the "data" tab,
+    where the paths to forNMA's folders are displayed.
+    """
+    def __init__(
+            self,
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes a DataParametersWidget."""
+        super().__init__(parent=parent)
+        layout = qtw.QVBoxLayout()
+        self.setLayout(layout)
+
+        self.label = qtw.QLabel('Welcome to forNMA!')
+        self.label.setStyleSheet('QLabel {font-size: 24px}')
+        self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
+        layout.addWidget(self.label)
+
+        self.paths_label = qtw.QLabel("")
+        self.paths_label.setWordWrap(True)
+        layout.addWidget(self.paths_label)
+
+    @qtc.Slot(str)
+    def setPaths(
+            self,
+            paths: str,
+    ) -> None:
+        """Sets the received paths onto the label."""
+        self.paths_label.setText(paths)
 
 
 class DataAreaWidget(qtw.QWidget):
@@ -54,35 +87,3 @@ class DataAreaWidget(qtw.QWidget):
     def all_paths_are_defined(self) -> bool:
         """Returns whether the experiment table has at least one FolderSelectButton in it."""
         return self.experiment_table.paths_are_filled()
-
-
-class DataParametersWidget(qtw.QWidget):
-    """
-    Class representing the widget on the left-hand side of the "data" tab,
-    where the paths to forNMA's folders are displayed.
-    """
-    def __init__(
-            self,
-            parent: qtw.QWidget = None,
-    ) -> None:
-        """Initializes a DataParametersWidget."""
-        super().__init__(parent=parent)
-        layout = qtw.QVBoxLayout()
-        self.setLayout(layout)
-
-        self.label = qtw.QLabel('Welcome to forNMA!')
-        self.label.setStyleSheet('QLabel {font-size: 24px}')
-        self.label.setAlignment(qtc.Qt.AlignCenter)  # noqa
-        layout.addWidget(self.label)
-
-        self.paths_label = qtw.QLabel("")
-        self.paths_label.setWordWrap(True)
-        layout.addWidget(self.paths_label)
-
-    @qtc.Slot(str)
-    def setPaths(
-            self,
-            paths: str,
-    ) -> None:
-        """Sets the received paths onto the label."""
-        self.paths_label.setText(paths)

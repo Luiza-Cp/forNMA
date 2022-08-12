@@ -1,13 +1,25 @@
-"""fornma_parameters/fornma_widget.py - module defining the interface between forNMA parameters and its widgets."""
+"""Interface/fornma_core/fornma_widget.py - module defining the interface between forNMA parameters and its widgets."""
 from __future__ import annotations
 
 from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface import ForNMAParameter
-from Interface.custom_widgets import AutoSpinBox, ForNMAHelpButton, SliderSpinBoxWidget
-from Interface.fornma_parameters import get_fornma_dtype
+from Interface.custom_widgets import AutoSpinBox, HelpButton, SliderSpinBoxWidget
+from .fornma_blueprints import get_fornma_dtype
+from .fornma_parameter import ForNMAParameter
+
+
+def ForNMAHelpButton(fornma_id: str = None):
+    """Interface for creating a HelpButton instance from a forNMA ID."""
+    if fornma_id is not None:
+        fornma_params = ForNMAParameter(fornma_id=fornma_id)
+        return HelpButton(
+            tooltip_text=fornma_params.tooltip_text,
+            help_title=fornma_params.name,
+            help_message=fornma_params.help_message,
+        )
+    return HelpButton()
 
 
 def ForNMAWidget(
