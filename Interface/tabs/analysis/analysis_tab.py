@@ -42,16 +42,10 @@ class AnalysisParametersWidget(qtw.QWidget):
         self.channelsSet.connect(self.detection_parameters_page.channelsSet)
         self.stack.addWidget(self.detection_parameters_page)
 
-        # ### Button row
-        button_row_layout = RowLayout()
-        layout.addLayout(button_row_layout)
-        # Preview button
-        self.preview_button = qtw.QPushButton('Preview')
-        # Run button
-        self.run_button = qtw.QPushButton('Run')
-        # Add buttons to row
-        button_row_layout.addWidgets([self.preview_button, self.run_button])
-        button_row_layout.addStretch()
+        # Run button in a row layout
+        self.run_button = qtw.QPushButton('Run forNMA Analysis')
+        row_layout = RowLayout(widgets=['stretch', self.run_button])
+        layout.addLayout(row_layout)
 
         # Method aliases
         self.setText = self.analysis_main_page.setText
@@ -154,7 +148,7 @@ class AnalysisAreaWidget(qtw.QWidget):
     def write_default_text(self) -> None:
         """Resets the log area and writes the default text into it."""
         self.reset_log()
-        self.write_title('Select the analysis parameters on the left')
+        self.write_title('Select forNMA analysis parameters on the left')
 
     def write_title(
             self,
