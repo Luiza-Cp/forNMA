@@ -4,7 +4,7 @@ of widgets to a single, unobtrusive layout.
 """
 from __future__ import annotations
 
-from typing import Iterator
+from typing import Iterator, Literal
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
@@ -14,13 +14,22 @@ class RowLayout(qtw.QHBoxLayout):
     def __init__(
             self,
             parent: qtw.QWidget = None,
-            widgets: list[qtw.QWidget] = None,
+            widgets: list[qtw.QWidget | Literal['stretch']] = None,
+            stretch: Literal['before', 'after'] = None,
     ) -> None:
         """Initializes a RowLayout instance."""
-        self._widgets = widgets or []
+        self._contained_widgets = []
+        widgets = widgets or []
         super().__init__(parent=parent)
-        for widget in self._widgets:
-            self.addWidget(widget)
+        if stretch == 'before':
+            self.addStretch()
+        for widget in widgets:
+            if widget == 'stretch':
+                self.addStretch()
+            else:  # Assume it's an actual widget
+                self.addWidget(widget)
+        if stretch == 'after':
+            self.addStretch()
         self.setContentsMargins(0, 0, 0, 0)
 
     def __contains__(
@@ -28,11 +37,11 @@ class RowLayout(qtw.QHBoxLayout):
             widget: qtw.QWidget,
     ) -> bool:
         """Implements the "in" operator by returning whether the given widget is inside the RowLayout."""
-        return widget in self._widgets
+        return widget in self._contained_widgets
 
     def __iter__(self) -> Iterator[qtw.QWidget]:
         """Implements iterating over a RowLayout by iterating over its widgets."""
-        return iter(self._widgets)
+        return iter(self._contained_widgets)
 
     def addWidget(
             self,
@@ -41,7 +50,7 @@ class RowLayout(qtw.QHBoxLayout):
             alignment: qtc.Qt.Alignment = qtc.Qt.Alignment(),
     ) -> None:
         """Adds a Widget to the layout."""
-        self._widgets.append(widget)
+        self._contained_widgets.append(widget)
         return super().addWidget(widget, stretch, alignment)
 
     def addWidgets(
@@ -53,4 +62,4 @@ class RowLayout(qtw.QHBoxLayout):
         """Adds multiple Widgets to the layout."""
         for widget in widgets:
             self.addWidget(widget, stretch, alignment)
-        self._widgets.extend(widgets)
+        self._contained_widgets.extend(widgets)
