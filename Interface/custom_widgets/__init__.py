@@ -2,6 +2,7 @@
 # Extended Widgets
 from .extended_widgets.collapsable_widget import CollapsableWidget
 from .extended_widgets.double_slider_widget import DoubleSlider
+from .extended_widgets.log_area_widget import LogAreaWidget
 from .extended_widgets.sliding_stacked_widget import SlidingStackedWidget
 
 # Buttons
