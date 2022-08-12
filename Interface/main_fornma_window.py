@@ -10,7 +10,7 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import SlidingStackedWidget
+from Interface.custom_widgets import DraggableCanvasWidget, SlidingStackedWidget
 from Interface.runner import Runner, fornma_mock_function
 from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
 from Interface.types import ForNMAEmitDict, ForNMAReturnDict
@@ -28,8 +28,10 @@ class ForNMAMainWindow(qtw.QMainWindow):
     ) -> None:
         """Initializes a ForNMAMainWindow instance."""
         super().__init__(parent=parent)
-        self.threadpool = qtc.QThreadPool(self)
         self.setMinimumSize(1200, 800)
+
+        self.threadpool = qtc.QThreadPool(self)
+        self._canvas_window = None  # Placeholder
 
         # MAIN WIDGET
         self.main_widget = qtw.QWidget()
@@ -135,8 +137,13 @@ class ForNMAMainWindow(qtw.QMainWindow):
             return_value: ForNMAReturnDict,
     ) -> None:
         """Handles the success signal emitted by forNMA's runner (containing the return value)."""
-        message = return_value["message"] + '\n\n' + '\n'.join(str(thing) for thing in return_value['data'])
-        qtw.QMessageBox.information(self, 'Success!', message, qtw.QMessageBox.Ok)
+        self._canvas_window = DraggableCanvasWidget(data=return_value['data'].pop())
+        if self._canvas_window.exec() == qtw.QDialog.Accepted:
+            data = self._canvas_window.get_data()
+            message = f'{return_value["message"]}\n\nFiltered Data:\n\n{data}'
+            qtw.QMessageBox.information(self, 'Success!', message, qtw.QMessageBox.Ok)
+        else:
+            qtw.QMessageBox.information(self, 'Aborted!', 'User decided to cancel operation.', qtw.QMessageBox.Ok)
 
     def on_fornma_finished_signal(self) -> None:
         """Handles the finished signal emitted by forNMA's runner."""

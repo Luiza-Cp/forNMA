@@ -17,3 +17,6 @@ from .combined_widgets.slider_spinbox_widget import SliderSpinBoxWidget
 
 # Layouts
 from .layouts.row_layout import RowLayout
+
+# Plotting
+from .plotting.draggable_canvas import DraggableCanvasWidget

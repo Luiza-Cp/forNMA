@@ -41,8 +41,8 @@ def fornma_mock_function(
         'message': 'forNMA finished executing successfully!',
         'data': [
             pd.DataFrame({
-                'foo': [1, 2, 3],
-                'bar': [4, 5, 9],
+                'Area': [1, 2, 3],
+                'Roundness': [4, 5, 9],
             }),
         ],
     }
