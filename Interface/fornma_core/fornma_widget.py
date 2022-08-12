@@ -5,8 +5,8 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import AutoSpinBox, HelpButton, SliderSpinBoxWidget
-from .fornma_blueprints import get_fornma_dtype
+from Interface.custom_widgets import AutoSpinBox, HelpButton, FolderSelectButton, SliderSpinBoxWidget
+from .fornma_blueprints import get_fornma_dtype, get_fornma_wtype
 from .fornma_parameter import ForNMAParameter
 
 
@@ -29,6 +29,7 @@ def ForNMAWidget(
 ) -> _ForNMANumericWidget | _ForNMAStringWidget | _ForNMABoolWidget:
     """Returns a properly structured PySide Widget for each forNMA parameter."""
     dtype = get_fornma_dtype(fornma_id=fornma_id)
+    wtype = get_fornma_wtype(fornma_id=fornma_id)
     fornma_parameter = ForNMAParameter(fornma_id=fornma_id)
     fornma_help_button = None
     if add_help is True:
@@ -43,12 +44,20 @@ def ForNMAWidget(
             add_slider=add_slider,
         )
     elif dtype == str:
-        widget = _ForNMAStringWidget(
-            name=fornma_id,
-            label=fornma_parameter.label,
-            help_button=fornma_help_button,
-            options=fornma_parameter.text_options,
-        )
+        if wtype == 'folder_button':
+            widget = _ForNMAFolderSelectWidget(
+                name=fornma_id,
+                label=fornma_parameter.label,
+                help_button=fornma_help_button,
+                starting_path=fornma_parameter.value,
+            )
+        else:  # defaults to combobox
+            widget = _ForNMAStringWidget(
+                name=fornma_id,
+                label=fornma_parameter.label,
+                help_button=fornma_help_button,
+                options=fornma_parameter.text_options,
+            )
     elif dtype == bool:
         widget = _ForNMABoolWidget(
             name=fornma_id,
@@ -123,6 +132,31 @@ class _ForNMANumericWidget(_BaseForNMAWidget):
         # Method aliases
         self.value = self.widget.value
         self.setValue = self.widget.setValue
+
+
+class _ForNMAFolderSelectWidget(_BaseForNMAWidget):
+    """Class representing a string forNMA parameter retrieved via a folder select button."""
+    def __init__(
+            self,
+            name: str = "",
+            label: str = "",
+            help_button: qtw.QWidget = None,
+            starting_path: str = "",
+            parent: qtw.QWidget = None,
+    ) -> None:
+        """Initializes a _ForNMAFloatWidget instance."""
+        super().__init__(name=name, label=label, help_button=help_button, parent=parent)
+        layout: qtw.QGridLayout = self.layout()
+
+        self._label = qtw.QLabel('Click to select a folder:')
+        layout.addWidget(self._label, self._current_row, 1, 1, 1)
+        self.widget = FolderSelectButton()
+        self.widget.set_path(path=starting_path)
+        layout.addWidget(self.widget, self._current_row, 2, 1, 1)
+
+        # Method aliases
+        self.value = self.widget.get_last_folder
+        self.valueChanged = self.widget.folderSelected
 
 
 class _ForNMAStringWidget(_BaseForNMAWidget):

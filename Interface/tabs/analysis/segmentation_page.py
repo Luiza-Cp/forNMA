@@ -45,6 +45,8 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Header
+        self.output_folder_widget = ForNMAWidget(fornma_id='output_folder', add_slider=False, add_help=True)
+        layout.addWidget(self.output_folder_widget)
         self.nuclear_detection_channel_widget = ForNMAWidget(
             fornma_id='channel_with_nuclei',
             add_slider=False,
@@ -79,16 +81,17 @@ class SegmentationParametersWidget(qtw.QWidget):
             widget_to_hide=self.cellpose_params_widget,
         )
         layout.addWidget(self.cellpose_collapsable_button)
-        layout.addWidget(self.cellpose_collapsable_button)
 
         # Keep widgets at the top
         layout.addStretch()
 
-        # Start with cellpose_collapsable_button disabled
+        # Start with fornma_checkbox checked
         self.fornma_checkbox.setChecked(True)
+        # Start with cellpose_collapsable_button disabled
         self.cellpose_collapsable_button.setEnabled(False)
 
-        # Connection
+        # Connections
+        self.output_folder_widget.valueChanged.connect(self.on_params_changed)
         self.nuclear_detection_channel_widget.valueChanged.connect(self.on_params_changed)
         self.global_params_widget.paramsChanged.connect(self.on_params_changed)
         self.fornma_params_widget.paramsChanged.connect(self.on_params_changed)
@@ -126,7 +129,7 @@ class SegmentationParametersWidget(qtw.QWidget):
     ) -> None:
         """Emits all segmentation parameters at once."""
         params = {
-            'global': self.global_params_widget.get_values(),
+            'global': self.get_global_params(),
             'fornma': self.get_fornma_params(),
             'cellpose': self.get_cellpose_params(),
         }
@@ -134,7 +137,10 @@ class SegmentationParametersWidget(qtw.QWidget):
 
     def get_global_params(self) -> dict[str, Any]:
         """Returns the global segmentation parameters."""
-        params = {self.nuclear_detection_channel_widget.objectName(): self.nuclear_detection_channel_widget.value()}
+        params = {
+            self.nuclear_detection_channel_widget.objectName(): self.nuclear_detection_channel_widget.value(),
+            self.output_folder_widget.objectName(): self.output_folder_widget.value(),
+        }
         params.update(self.global_params_widget.get_values())
         return params
 

@@ -9,6 +9,7 @@ from .fornma_blueprints import (
     get_fornma_text_options,
     get_fornma_tooltip,
     get_fornma_value,
+    get_fornma_wtype,
     get_threshold_names,
     threshold_has_offset,
     validate_fornma_id,

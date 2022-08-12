@@ -42,6 +42,19 @@ _DEFAULT_TEXT_OPTIONS = {
 
 
 _GLOBAL_BLUEPRINT = {
+    'output_folder': {
+        'text': {
+            'name': "Output folder",
+            'label': "forNMA output folder",
+            'tooltip': "FIXME",
+            'help': "FIXME",
+        },
+        'data': {
+            'dtype': str,
+            'wtype': 'folder_button',
+            'value': "./output",  # default output folder
+        }
+    },
     'channel_with_nuclei': {
         'text': {
             'name': "Channel with Nuclei",
@@ -785,6 +798,11 @@ def get_fornma_value(fornma_id: str) -> dict[str, int | float]:
 def get_fornma_dtype(fornma_id: str) -> Type[int] | Type[float] | Type[str] | Type[bool]:
     """Returns the data type of the value for the given forNMA ID."""
     return _get_from_data_dict(fornma_id=fornma_id, key='dtype', default=None)
+
+
+def get_fornma_wtype(fornma_id: str) -> str:
+    """Returns the widget type of the value for the given forNMA ID."""
+    return _get_from_data_dict(fornma_id=fornma_id, key='wtype', default=None)
 
 
 # THRESHOLDS ------------------------------------------------------------------
