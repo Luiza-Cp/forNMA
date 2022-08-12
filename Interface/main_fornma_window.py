@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import pprint
 import sys
-from typing import Any, Type
+from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
+from Interface import ForNMAEmitDict, ForNMAReturnDict
 from Interface.custom_widgets import SlidingStackedWidget
 from Interface.runner import Runner, fornma_mock_function
 from Interface.tabs import AnalysisAreaWidget, AnalysisParametersWidget, DataAreaWidget, DataParametersWidget
@@ -100,19 +101,23 @@ class ForNMAMainWindow(qtw.QMainWindow):
 
     def on_fornma_callback_received(
             self,
-            callback: dict,
+            callback: ForNMAEmitDict,
     ) -> None:
         """Handles the callback received by forNMA's runner."""
-        _type = callback.get('type')
+        _type = callback['type']
         if _type == 'progress':
-            progress = callback.get('data')
+            progress = callback['data'].pop()
             self.analysis_tab.update_progress_bar(progress)
         elif _type == 'log':
-            message = callback.get('message')
-            self.analysis_tab.write_message(message=message)
+            self.analysis_tab.write_message(message=callback['message'])
+            for thing in callback['data']:
+                self.analysis_tab.write_message(message=thing)
         elif _type == 'warning':
-            message = callback.get('message')
-            self.analysis_tab.write_warning(message=message)
+            self.analysis_tab.write_warning(message=callback['message'])
+            for thing in callback['data']:
+                self.analysis_tab.write_warning(message=thing)
+        else:
+            print(f'Unhandled callback: {callback}')
 
     def on_fornma_error_signal(
             self,
@@ -125,10 +130,10 @@ class ForNMAMainWindow(qtw.QMainWindow):
 
     def on_fornma_success_signal(
             self,
-            return_value: Any,
+            return_value: ForNMAReturnDict,
     ) -> None:
-        """Handles the success signal emitted by forNMA's runner."""
-        message = f'forNMA finished execution successfully!\n\nReturned data:\n{return_value}'
+        """Handles the success signal emitted by forNMA's runner (containing the return value)."""
+        message = return_value["message"] + '\n\n' + '\n'.join(str(thing) for thing in return_value['data'])
         qtw.QMessageBox.information(self, 'Success!', message, qtw.QMessageBox.Ok)
 
     def on_fornma_finished_signal(self) -> None:
