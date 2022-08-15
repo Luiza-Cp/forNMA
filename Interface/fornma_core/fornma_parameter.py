@@ -1,7 +1,7 @@
-"""fornma_parameters/fornma_parameter.py - module defining the ForNMAParameter interface."""
+"""Interface/fornma_core/fornma_parameter.py - module defining the ForNMAParameter interface."""
 from __future__ import annotations
 
-from Interface.fornma_parameters import (
+from .fornma_blueprints import (
     get_fornma_dtype,
     get_fornma_help_message,
     get_fornma_numeric_limits,

@@ -1,10 +1,11 @@
-"""tabs/analysis.py - contains the main widget used in forNMA's "analysis" tab."""
+"""Interface/tabs/analysis/analysis_tab.py - contains the top-level widgets used in forNMA's "Analysis" tab."""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import RowLayout, SlidingStackedWidget
-from Interface.tabs import SegmentationParametersPage, DetectionParametersPage
+from Interface.custom_widgets import LogAreaWidget, RowLayout, SlidingStackedWidget
+from .detection_page import DetectionParametersPage
+from .segmentation_page import SegmentationParametersPage
 
 
 class AnalysisParametersWidget(qtw.QWidget):
@@ -41,16 +42,10 @@ class AnalysisParametersWidget(qtw.QWidget):
         self.channelsSet.connect(self.detection_parameters_page.channelsSet)
         self.stack.addWidget(self.detection_parameters_page)
 
-        # ### Button row
-        button_row_layout = RowLayout()
-        layout.addLayout(button_row_layout)
-        # Preview button
-        self.preview_button = qtw.QPushButton('Preview')
-        # Run button
-        self.run_button = qtw.QPushButton('Run')
-        # Add buttons to row
-        button_row_layout.addWidgets([self.preview_button, self.run_button])
-        button_row_layout.addStretch()
+        # Run button in a row layout
+        self.run_button = qtw.QPushButton('Run forNMA Analysis')
+        row_layout = RowLayout(widgets=['stretch', self.run_button])
+        layout.addLayout(row_layout)
 
         # Method aliases
         self.setText = self.analysis_main_page.setText
@@ -133,45 +128,18 @@ class AnalysisAreaWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Log Area
-        self.log_area = qtw.QTextEdit()
-        self.log_area.setReadOnly(True)
-        self.write_default_text()
+        self.log_area = LogAreaWidget(default_text='Select forNMA parameters on the left')
         layout.addWidget(self.log_area)
 
         # Progress bar
         self.progress_bar = qtw.QProgressBar()
         layout.addWidget(self.progress_bar)
 
-        # aliases
+        # Aliases
         self.update_progress_bar = self.progress_bar.setValue
         self.reset_progress_bar = self.progress_bar.reset
-
-    def reset_log(self) -> None:
-        """Resets the log area."""
-        self.log_area.setText("")
-
-    def write_default_text(self) -> None:
-        """Resets the log area and writes the default text into it."""
-        self.reset_log()
-        self.write_title('Select the analysis parameters on the left')
-
-    def write_title(
-            self,
-            message: str,
-    ) -> None:
-        """Writes the message as a title."""
-        self.log_area.append(f'<span style="font-size:18pt; font-weight:600; color:#232323;">{message}</span>')
-
-    def write_message(
-            self,
-            message: str,
-    ) -> None:
-        """Writes the message as a regular message."""
-        self.log_area.append(f'<span style="font-size:10pt; font-weight:400; color:#232323;">{message}</span>')
-
-    def write_warning(
-            self,
-            message: str,
-    ) -> None:
-        """Writes the message as a warning."""
-        self.log_area.append(f'<span style="font-size:10pt; font-weight:600; color:#ff3333;">{message}</span>')
+        self.reset_log = self.log_area.reset_log
+        self.write_default_text = self.log_area.write_default_text
+        self.write_message = self.log_area.write_message
+        self.write_warning = self.log_area.write_warning
+        self.write_title = self.log_area.write_title

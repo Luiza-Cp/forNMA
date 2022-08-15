@@ -1,14 +1,13 @@
-"""tabs/analysis.py - contains all widgets used in forNMA's "analysis" tab."""
-
+"""Interface/tabs/analysis/detection_page - contains the widgets used in forNMA's detection parameters page."""
 from __future__ import annotations
 
 from typing import Any
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface import ForNMAWidget
-from Interface.custom_widgets import CollapsableButton
-from Interface.tabs import BaseParametersPage
+from Interface.custom_widgets import CollapsableWidget
+from Interface.fornma_core import ForNMAWidget
+from .base_parameters_page import BaseParametersPage
 
 
 class DetectionParametersPage(BaseParametersPage):
@@ -59,7 +58,7 @@ class DetectionParametersWidget(qtw.QWidget):
         for channel in channels:
             channel_widget = ChannelWidget(channel_name=channel)
             channel_widget.paramsChanged.connect(self.on_params_changed)
-            layout.addWidget(CollapsableButton(f'Channel: {channel}', widget_to_hide=channel_widget))
+            layout.addWidget(CollapsableWidget(f'Channel: {channel}', widget_to_hide=channel_widget))
             self._channels[channel] = channel_widget
         layout.addStretch()
         self.on_params_changed()  # Emit signal as soon as new channels are set

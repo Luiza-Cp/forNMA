@@ -1,6 +1,6 @@
 """
-widgets/auto_spinbox.py - contains a function that can returns the proper spinbox type
-(meant to look like a class when using).
+Interface/custom_widgets/auto_widgets/auto_spinbox.py - contains a function that returns
+the proper spinbox type (meant to look like a class when using).
 """
 from __future__ import annotations
 

@@ -1,5 +1,7 @@
-"""helpers/folder_select_button.py - module containing a widget used to select a folder by clicking a button."""
-
+"""
+Interface/custom_widgets/buttons/folder_select_button.py - module containing a widget
+used to select and set a folder by clicking a button.
+"""
 from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
@@ -24,13 +26,27 @@ class FolderSelectButton(qtw.QPushButton):
         self.set_icon(checked=False)
         self.set_tooltip(path='')
         self.clicked.connect(self.select_folder)  # noqa
+        self._last_selected_folder = ''
 
     def select_folder(self) -> None:
         """Opens a FileDialog and emits a Signal containing the file path."""
         folder_path = qtw.QFileDialog.getExistingDirectory(self.parent(), "Select folder", "..") or ''
-        self.set_icon(checked=bool(folder_path))
-        self.set_tooltip(path=folder_path)
-        self.folderSelected.emit(self.index, folder_path)
+        if folder_path:  # only update if user actually selected a folder
+            self.folderSelected.emit(self.index, folder_path)
+            self.set_path(path=folder_path)
+
+    def set_path(
+            self,
+            path: str,
+    ) -> None:
+        """Sets the folder path contained by the button, then emits a signal."""
+        self._last_selected_folder = path
+        self.set_icon(checked=bool(path))
+        self.set_tooltip(path=path)
+
+    def get_last_folder(self) -> str:
+        """Returns the last selected folder."""
+        return self._last_selected_folder
 
     def set_icon(
             self,

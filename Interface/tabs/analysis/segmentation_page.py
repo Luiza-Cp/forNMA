@@ -1,14 +1,13 @@
-"""tabs/analysis.py - contains all widgets used in forNMA's "analysis" tab."""
+"""Interface/tabs/analysis/segmentation_page - contains the widgets used in forNMA's segmentation parameters page."""
 from __future__ import annotations
 
 from typing import Any
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface import ForNMAWidget
-from Interface.custom_widgets import CollapsableButton
-from Interface.fornma_parameters import threshold_has_offset, get_default_threshold
-from Interface.tabs import BaseParametersPage
+from Interface.custom_widgets import CollapsableWidget
+from Interface.fornma_core import ForNMAWidget, threshold_has_offset, get_default_threshold
+from .base_parameters_page import BaseParametersPage
 
 
 class SegmentationParametersPage(BaseParametersPage):
@@ -46,6 +45,8 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.setLayout(layout)
 
         # Header
+        self.output_folder_widget = ForNMAWidget(fornma_id='output_folder', add_slider=False, add_help=True)
+        layout.addWidget(self.output_folder_widget)
         self.nuclear_detection_channel_widget = ForNMAWidget(
             fornma_id='channel_with_nuclei',
             add_slider=False,
@@ -55,7 +56,7 @@ class SegmentationParametersWidget(qtw.QWidget):
 
         # Global Parameters
         self.global_params_widget = GlobalParamsWidget()
-        self.global_collapsable_button = CollapsableButton(
+        self.global_collapsable_button = CollapsableWidget(
             "Global parameters",
             widget_to_hide=self.global_params_widget,
         )
@@ -65,7 +66,7 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.fornma_checkbox = ForNMAWidget(fornma_id='use_fornma', add_slider=False, add_help=False)
         layout.addWidget(self.fornma_checkbox)
         self.fornma_params_widget = ForNMAParamsWidget()
-        self.fornma_collapsable_button = CollapsableButton(
+        self.fornma_collapsable_button = CollapsableWidget(
             "forNMA parameters",
             widget_to_hide=self.fornma_params_widget,
         )
@@ -75,21 +76,22 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.cellpose_checkbox = ForNMAWidget(fornma_id='use_cellpose', add_slider=False, add_help=False)
         layout.addWidget(self.cellpose_checkbox)
         self.cellpose_params_widget = CellposeParamsWidget()
-        self.cellpose_collapsable_button = CollapsableButton(
+        self.cellpose_collapsable_button = CollapsableWidget(
             "Cellpose parameters",
             widget_to_hide=self.cellpose_params_widget,
         )
-        layout.addWidget(self.cellpose_collapsable_button)
         layout.addWidget(self.cellpose_collapsable_button)
 
         # Keep widgets at the top
         layout.addStretch()
 
-        # Start with cellpose_collapsable_button disabled
+        # Start with fornma_checkbox checked
         self.fornma_checkbox.setChecked(True)
+        # Start with cellpose_collapsable_button disabled
         self.cellpose_collapsable_button.setEnabled(False)
 
-        # Connection
+        # Connections
+        self.output_folder_widget.valueChanged.connect(self.on_params_changed)
         self.nuclear_detection_channel_widget.valueChanged.connect(self.on_params_changed)
         self.global_params_widget.paramsChanged.connect(self.on_params_changed)
         self.fornma_params_widget.paramsChanged.connect(self.on_params_changed)
@@ -127,7 +129,7 @@ class SegmentationParametersWidget(qtw.QWidget):
     ) -> None:
         """Emits all segmentation parameters at once."""
         params = {
-            'global': self.global_params_widget.get_values(),
+            'global': self.get_global_params(),
             'fornma': self.get_fornma_params(),
             'cellpose': self.get_cellpose_params(),
         }
@@ -135,7 +137,10 @@ class SegmentationParametersWidget(qtw.QWidget):
 
     def get_global_params(self) -> dict[str, Any]:
         """Returns the global segmentation parameters."""
-        params = {self.nuclear_detection_channel_widget.objectName(): self.nuclear_detection_channel_widget.value()}
+        params = {
+            self.nuclear_detection_channel_widget.objectName(): self.nuclear_detection_channel_widget.value(),
+            self.output_folder_widget.objectName(): self.output_folder_widget.value(),
+        }
         params.update(self.global_params_widget.get_values())
         return params
 
