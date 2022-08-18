@@ -155,7 +155,7 @@ class SegmentationParametersWidget(qtw.QWidget):
 
 class GlobalParamsWidget(qtw.QWidget):
     """Widget containing all global parameters in it."""
-    paramsChanged = qtc.pyqtSignal(object)  # type does not matter  # TODO: CHECK HERE!!!!!
+    paramsChanged = qtc.pyqtSignal(object)  # type does not matter
     _blueprint = (
         # Format: ( forNMA ID, add_slider, add_help )
         ('magnification', False, True),
@@ -244,7 +244,7 @@ class GlobalParamsWidget(qtw.QWidget):
 
 class ForNMAParamsWidget(qtw.QWidget):
     """Widget containing all of forNMA's parameters in it."""
-    paramsChanged = qtc.pyqtSignal(object)  # type does not matter  # TODO: CHECK HERE!!!!!
+    paramsChanged = qtc.pyqtSignal(object)  # type does not matter
     _blueprint = (
         # Format: ( forNMA ID, add_slider, add_help )
         ('threshold', False, True),
@@ -302,7 +302,7 @@ class ForNMAParamsWidget(qtw.QWidget):
 
 class CellposeParamsWidget(qtw.QWidget):
     """Widget containing all of Cellpose's parameters in it."""
-    paramsChanged = qtc.pyqtSignal(object)  # type does not matter  # TODO: CHECK HERE!!!!!
+    paramsChanged = qtc.pyqtSignal(object)  # type does not matter
     _blueprint = (
         # Format: ( forNMA ID, add_slider, add_help )
         ('diameter', True, True),

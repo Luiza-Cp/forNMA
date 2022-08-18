@@ -69,8 +69,8 @@ class AnalysisParametersWidget(qtw.QWidget):
 
 class AnalysisMainPage(qtw.QWidget):
     """Class defining the main page layout of the AnalysisParametersWidget."""
-    segmentationButtonClicked = qtc.pyqtSignal()  # TODO: CHECK HERE!!!!!
-    detectionButtonClicked = qtc.pyqtSignal()  # TODO: CHECK HERE!!!!!
+    segmentationButtonClicked = qtc.pyqtSignal()
+    detectionButtonClicked = qtc.pyqtSignal()
 
     def __init__(
             self,
