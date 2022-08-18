@@ -4,9 +4,7 @@ used to set the experiment table's layout.
 """
 from __future__ import annotations
 
-from functools import partial
-
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 
 class ExperimentWizard(qtw.QWizard):
@@ -57,7 +55,7 @@ class ExperimentPage(qtw.QWizardPage):
         self.setLayout(layout)
 
         self.add_button = qtw.QPushButton(f'Add {name}')
-        self.add_button.clicked.connect(self.add)  # noqa
+        self.add_button.clicked.connect(self.add)
         layout.addWidget(self.add_button)
 
         layout.addStretch()
@@ -73,31 +71,35 @@ class ExperimentPage(qtw.QWizardPage):
 
     def add(self) -> None:
         """Adds a DeletableLabel to the ExperimentPage."""
-        label = DeletableLabel()
-        self.layout().insertWidget(len(self.line_edits), label)
+        index = len(self.line_edits)
+        label = DeletableLabel(index=index)
+        self.layout().insertWidget(index, label)
         self.line_edits.append(label.line_edit)
-        label.deleted.connect(partial(self.remove, label))
+        label.deleteClicked.connect(self.remove)
 
     def remove(
             self,
-            label: DeletableLabel,
+            index: int,
     ) -> None:
         """Removes the DeletableLabel from the ExperimentPage."""
+        label = self.line_edits[index]
         self.line_edits.remove(label.line_edit)
         self.layout().removeWidget(label)
-        label.setParent(None)  # noqa
+        label.setParent(None)
 
 
 class DeletableLabel(qtw.QWidget):
     """Class representing a QLineEdit with a QPushButton responsible for deleting it."""
-    deleted = qtc.Signal(name='lineEditDeleted')
+    deleteClicked = qtc.pyqtSignal(int)
 
     def __init__(
             self,
+            index: int,
             parent: qtw.QWidget = None,
     ) -> None:
         """Initializes a DeletableLineEdit instance."""
         super().__init__(parent=parent)
+        self.index = index
 
         layout = qtw.QHBoxLayout()
         self.setLayout(layout)
@@ -108,4 +110,10 @@ class DeletableLabel(qtw.QWidget):
         self.delete_button = qtw.QPushButton()
         self.delete_button.setIcon(self.style().standardIcon(getattr(qtw.QStyle, "SP_DialogDiscardButton")))
         layout.addWidget(self.delete_button)
-        self.delete_button.clicked.connect(self.deleted.emit)  # noqa
+
+        # Alias
+        self.delete_button.clicked.connect(self.on_delete_clicked)
+
+    def on_delete_clicked(self) -> None:
+        """Emits the DeletableLabel's index, so that the listener widget can delete it."""
+        self.deleteClicked.emit(self.index)

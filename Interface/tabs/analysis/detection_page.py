@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import CollapsableWidget
 from Interface.fornma_core import ForNMAWidget
@@ -12,8 +12,7 @@ from .base_parameters_page import BaseParametersPage
 
 class DetectionParametersPage(BaseParametersPage):
     """Subclass of ParametersPage responsible for displaying the segmentation parameters."""
-    channelsSet = qtc.Signal(list)
-    detectionDataChanged = qtc.Signal(dict)
+    channelsSet = qtc.pyqtSignal(list)
 
     def __init__(
             self,
@@ -32,7 +31,7 @@ class DetectionParametersPage(BaseParametersPage):
 
 class DetectionParametersWidget(qtw.QWidget):
     """Class defining the layout and widgets for the detection parameters."""
-    detectionParamsChanged = qtc.Signal(dict)
+    detectionParamsChanged = qtc.pyqtSignal(dict)
 
     def __init__(
             self,
@@ -46,7 +45,6 @@ class DetectionParametersWidget(qtw.QWidget):
 
         self._channels = {}
 
-    @qtc.Slot(list)
     def set_channel_values(
             self,
             channels: list[str],
@@ -94,7 +92,7 @@ class DetectionParametersWidget(qtw.QWidget):
 
 class ChannelWidget(qtw.QWidget):
     """Widget containing a channel's parameters in it."""
-    paramsChanged = qtc.Signal(object)  # type does not matter
+    paramsChanged = qtc.pyqtSignal(object)  # type does not matter  # TODO: CHECK HERE!!!!!
     _blueprint = (
         # Format: ( forNMA ID, add_slider, add_help)
         ('channel_rescale_intensity', False, True),
@@ -160,7 +158,6 @@ class ChannelWidget(qtw.QWidget):
             for _, widget in self._fornma_params.items()
         }
 
-    @qtc.Slot(bool)
     def on_remove_background_checkbox_clicked(
             self,
             checked: bool,
@@ -170,7 +167,6 @@ class ChannelWidget(qtw.QWidget):
         offset_widget.setEnabled(checked)
         self.paramsChanged.emit(checked)
 
-    @qtc.Slot(bool)
     def on_wants_ktr_checkbox_clicked(
             self,
             checked: bool,
@@ -181,7 +177,6 @@ class ChannelWidget(qtw.QWidget):
             widget.setEnabled(checked)
         self.paramsChanged.emit(checked)
 
-    @qtc.Slot(bool)
     def on_wants_foci_checkbox_clicked(
             self,
             checked: bool,
@@ -198,7 +193,6 @@ class ChannelWidget(qtw.QWidget):
             widget.setEnabled(checked)
         self.paramsChanged.emit(checked)
 
-    @qtc.Slot(float)
     def on_min_value_changed(
             self,
             new_value: float,
@@ -211,7 +205,6 @@ class ChannelWidget(qtw.QWidget):
             max_size_widget.setValue(new_value)
         self.paramsChanged.emit(new_value)
 
-    @qtc.Slot(float)
     def on_max_value_changed(
             self,
             new_value: float,

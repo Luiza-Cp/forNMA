@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Iterator, Literal
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 
 class RowLayout(qtw.QHBoxLayout):
@@ -20,7 +20,7 @@ class RowLayout(qtw.QHBoxLayout):
         """Initializes a RowLayout instance."""
         self._contained_widgets = []
         widgets = widgets or []
-        super().__init__(parent=parent)
+        super().__init__(parent)
         if stretch == 'before':
             self.addStretch()
         for widget in widgets:
@@ -48,6 +48,10 @@ class RowLayout(qtw.QHBoxLayout):
             widget: qtw.QWidget,
             stretch: int = 0,
             alignment: qtc.Qt.Alignment = qtc.Qt.Alignment(),
+            Qt_Alignment=None,
+            Qt_AlignmentFlags=None,
+            *args,
+            **kwargs,
     ) -> None:
         """Adds a Widget to the layout."""
         self._contained_widgets.append(widget)

@@ -7,7 +7,7 @@ from __future__ import annotations
 import sys
 from typing import Type
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import DraggableCanvasWidget, SlidingStackedWidget
 from Interface.runner import Runner, fornma_mock_function
@@ -72,8 +72,8 @@ class ForNMAMainWindow(qtw.QMainWindow):
         self.tabs.addTab(self.nma_area, "NMA")
 
         # Establishes connections across widgets
-        self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)  # noqa
-        self.tabs.currentChanged.connect(self.stack.slideInIndex)  # noqa
+        self.tabs.tabBarClicked.connect(self.on_tab_bar_clicked)
+        self.tabs.currentChanged.connect(self.stack.slideInIndex)
         # Data connections
         self.data_area.pathsChanged.connect(self.data_params.setPaths)
         self.data_area.dataChanged.connect(self.on_data_tab_changed)
@@ -172,7 +172,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         """Handles the error signal emitted by forNMA's runner."""
         exception, trace = exception_tuple
         message = f'forNMA reached an error during execution:\n{exception}\n\nFullTraceback:\n{trace}'
-        qtw.QMessageBox.critical(self, 'Error!', message, qtw.QMessageBox.Ok)  # noqa
+        qtw.QMessageBox.critical(self, 'Error!', message, qtw.QMessageBox.Ok)
 
     def on_fornma_success_signal(
             self,
@@ -191,7 +191,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         """Handles the finished signal emitted by forNMA's runner."""
         self.analysis_area.write_title('forNMA finished Executing!')
         self.analysis_area.reset_progress_bar()
-        qtc.QTimer.singleShot(5_000, self.analysis_area.write_default_text)
+        qtc.QTimer.singleShot(qtc.QTimer(5_000), self.analysis_area.write_default_text)
 
     # NMA RUN ------------------------------------------------------------------
     def on_nma_run_button_clicked(self) -> None:
@@ -199,7 +199,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
         params = self._current_nma_params.copy()
         message = f'Selected files: {params}'
         self.nma_area.write_message(message=message)
-        qtc.QTimer.singleShot(5_000, self.nma_area.write_default_text)
+        qtc.QTimer.singleShot(qtc.QTimer(5_000), self.nma_area.write_default_text)
 
     # DEBUG --------------------------------------------------------------------
     def debug(self) -> None:

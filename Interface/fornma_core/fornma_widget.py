@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Type
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import AutoSpinBox, HelpButton, FolderSelectButton, SliderSpinBoxWidget
 from .fornma_blueprints import get_fornma_dtype, get_fornma_wtype
@@ -73,7 +73,7 @@ def ForNMAWidget(
 
 class _BaseForNMAWidget(qtw.QWidget):
     """Base class for forNMA parameter."""
-    valueChanged = qtc.Signal(object)  # int | float | str | bool
+    valueChanged = qtc.pyqtSignal(object)  # int | float | str | bool
 
     def __init__(
             self,
@@ -176,7 +176,7 @@ class _ForNMAStringWidget(_BaseForNMAWidget):
         self.widget = qtw.QComboBox()
         for option in options:
             self.widget.addItem(option)
-        self.widget.currentTextChanged.connect(self._on_widget_value_changed)  # noqa
+        self.widget.currentTextChanged.connect(self._on_widget_value_changed)
         layout.addWidget(self.widget, self._current_row, 1, 1, 1)
 
         # Method aliases
@@ -203,7 +203,7 @@ class _ForNMABoolWidget(_BaseForNMAWidget):
 
         self.widget = qtw.QCheckBox(checkbox_text)
         layout.addWidget(self.widget, self._current_row, 1, 1, 1)
-        self.widget.stateChanged.connect(self._on_widget_value_changed)  # noqa
+        self.widget.stateChanged.connect(self._on_widget_value_changed)
 
         # Method aliases
         self.value = self.widget.isChecked

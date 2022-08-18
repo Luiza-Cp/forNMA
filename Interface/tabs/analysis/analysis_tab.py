@@ -1,7 +1,7 @@
 """Interface/tabs/analysis/analysis_tab.py - contains the top-level widgets used in forNMA's "Analysis" tab."""
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import LogAreaWidget, RowLayout, SlidingStackedWidget
 from .detection_page import DetectionParametersPage
@@ -10,7 +10,7 @@ from .segmentation_page import SegmentationParametersPage
 
 class AnalysisParametersWidget(qtw.QWidget):
     """Class representing the widget on the left-hand side of the "analysis" tab."""
-    channelsSet = qtc.Signal(list)
+    channelsSet = qtc.pyqtSignal(list)
 
     def __init__(
             self,
@@ -69,8 +69,8 @@ class AnalysisParametersWidget(qtw.QWidget):
 
 class AnalysisMainPage(qtw.QWidget):
     """Class defining the main page layout of the AnalysisParametersWidget."""
-    segmentationButtonClicked = qtc.Signal()
-    detectionButtonClicked = qtc.Signal()
+    segmentationButtonClicked = qtc.pyqtSignal()  # TODO: CHECK HERE!!!!!
+    detectionButtonClicked = qtc.pyqtSignal()  # TODO: CHECK HERE!!!!!
 
     def __init__(
             self,
@@ -85,18 +85,18 @@ class AnalysisMainPage(qtw.QWidget):
 
         # Segmentation button
         self.segmentation_parameters_button = qtw.QPushButton('Segmentation parameters')
-        self.segmentation_parameters_button.clicked.connect(self.segmentationButtonClicked)  # noqa
+        self.segmentation_parameters_button.clicked.connect(self.segmentationButtonClicked)
         layout.addWidget(self.segmentation_parameters_button)
 
         # Detection button
         self.detection_parameters_button = qtw.QPushButton('Detection parameters')
-        self.detection_parameters_button.clicked.connect(self.detectionButtonClicked)  # noqa
+        self.detection_parameters_button.clicked.connect(self.detectionButtonClicked)
         layout.addWidget(self.detection_parameters_button)
 
         # Parameters label
         self.parameters_label = qtw.QTextEdit()
         self.parameters_label.setStyleSheet('QTextEdit {font-size: 14px}')
-        self.parameters_label.setAlignment(qtc.Qt.AlignLeft)  # noqa
+        self.parameters_label.setAlignment(qtc.Qt.AlignLeft)
         self.parameters_label.setReadOnly(True)
         layout.addWidget(self.parameters_label)
 

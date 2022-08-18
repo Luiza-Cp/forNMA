@@ -7,15 +7,15 @@ from __future__ import annotations
 from typing import Any
 
 import pandas as pd
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import FolderSelectButton
 
 
 class ExperimentTableWidget(qtw.QTableView):
     """Class representing a table where the experiment is described (channels/groups and their respective paths)."""
-    pathsChanged = qtc.Signal(str)
-    dataChanged = qtc.Signal()
+    pathsChanged = qtc.pyqtSignal(str)
+    dataChanged = qtc.pyqtSignal()
 
     def __init__(
             self,
@@ -28,7 +28,7 @@ class ExperimentTableWidget(qtw.QTableView):
         self._channels = None
         self._groups = None
         self.setModel(self._model)
-        self._model.dataChanged.connect(self.on_model_data_changed)  # noqa
+        self._model.dataChanged.connect(self.on_model_data_changed)
 
     def set_experiment(
             self,
@@ -90,12 +90,11 @@ class ExperimentTableWidget(qtw.QTableView):
             return False
         return all(paths)
 
-    @qtc.Slot(qtc.QModelIndex, qtc.QModelIndex, list)
     def on_model_data_changed(
             self,
-            top_left: qtc.QModelIndex,      # These parameters are not used in the method,       # noqa
-            bottom_right: qtc.QModelIndex,  # but are present in the model's dataChanged signal  # noqa
-            roles: list[int],               # so we must add them here                           # noqa
+            top_left: qtc.QModelIndex,      # These parameters are not used in the method,
+            bottom_right: qtc.QModelIndex,  # but are present in the model's dataChanged signal
+            roles: list[int],               # so we must add them here
     ) -> None:
         """Emits a signal containing a formatted string whenever the underlying model's data changes."""
         text = self._model.as_textbox()
@@ -149,16 +148,20 @@ class ExperimentTableModel(qtc.QAbstractTableModel):
         else:
             return qtc.Qt.ItemIsEnabled | qtc.Qt.ItemIsSelectable | qtc.Qt.ItemIsEditable
 
-    def rowCount(  # noqa
+    def rowCount(
             self,
             parent: qtc.QModelIndex = None,
+            *args,
+            **kwargs,
     ) -> int:
         """Returns the number of rows in the model."""
         return self._data.shape[0]
 
-    def columnCount(  # noqa
+    def columnCount(
             self,
             parent: qtc.QModelIndex = None,
+            *args,
+            **kwargs,
     ) -> int:
         """Returns the number of columns in the model."""
         return self._data.shape[1]
@@ -189,7 +192,7 @@ class ExperimentTableModel(qtc.QAbstractTableModel):
                 self._data.iloc[index.row(), index.column()] = value
             elif role == qtc.Qt.EditRole:
                 self._data.iloc[index.row(), index.column()] = value
-            self.dataChanged.emit(index, index, [qtc.Qt.DisplayRole, qtc.Qt.EditRole])  # noqa
+            self.dataChanged.emit(index, index, [qtc.Qt.DisplayRole, qtc.Qt.EditRole])
             return True
         return False
 

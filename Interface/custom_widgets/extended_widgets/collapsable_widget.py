@@ -6,7 +6,7 @@ Source:
 """
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 
 class CollapsableWidget(qtw.QWidget):

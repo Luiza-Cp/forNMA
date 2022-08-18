@@ -4,7 +4,7 @@ Interface/custom_widgets/buttons/help_button.py - module containing a button tha
 """
 from __future__ import annotations
 
-from PySide6 import QtWidgets as qtw
+from PyQt5 import QtWidgets as qtw
 
 
 class HelpButton(qtw.QToolButton):
@@ -25,7 +25,7 @@ class HelpButton(qtw.QToolButton):
         self.setIcon(self.style().standardIcon(getattr(qtw.QStyle, "SP_TitleBarContextHelpButton")))
         self.setToolTip(self._tooltip_text)
 
-        self.clicked.connect(self.display_help_message)  # noqa
+        self.clicked.connect(self.display_help_message)
 
     def display_help_message(self) -> None:
         """Displays the help message in a textbox."""

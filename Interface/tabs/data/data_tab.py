@@ -1,7 +1,7 @@
 """Interface/tabs/data/data_tab.py - contains the top-level widgets used in forNMA's "Data" tab."""
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from .experiment_table import ExperimentTableWidget
 from .experiment_wizard import ExperimentWizard
@@ -23,7 +23,7 @@ class DataParametersWidget(qtw.QWidget):
 
         self.welcome_label = qtw.QLabel('Welcome to forNMA!')
         self.welcome_label.setStyleSheet('QLabel {font-size: 24px}')
-        self.welcome_label.setAlignment(qtc.Qt.AlignCenter)  # noqa
+        self.welcome_label.setAlignment(qtc.Qt.AlignCenter)
         layout.addWidget(self.welcome_label)
 
         self.paths_label = qtw.QLabel("")
@@ -33,7 +33,6 @@ class DataParametersWidget(qtw.QWidget):
 
         layout.addStretch()
 
-    @qtc.Slot(str)
     def setPaths(
             self,
             paths: str,
@@ -63,7 +62,7 @@ class DataAreaWidget(qtw.QWidget):
         layout.addWidget(self.experiment_table)
 
         self.set_experiment_button = qtw.QPushButton("Set experiment data ...")
-        self.set_experiment_button.clicked.connect(self.set_experiment)  # noqa
+        self.set_experiment_button.clicked.connect(self.set_experiment)
         layout.addWidget(self.set_experiment_button)
 
         # aliases

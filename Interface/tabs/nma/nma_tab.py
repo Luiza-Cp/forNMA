@@ -1,7 +1,7 @@
 """Interface/tabs/nma/nma_tab.py - contains the top-level widgets used in forNMA's "NMA" tab."""
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import LogAreaWidget, RowLayout
 
@@ -11,7 +11,7 @@ class NMAParametersWidget(qtw.QWidget):
     Class representing the widget on the left-hand side of the "NMA" tab,
     where the settings for the NMA analysis are set.
     """
-    fileListChanged = qtc.Signal(object)  # List of file names
+    fileListChanged = qtc.pyqtSignal(object)  # List of file names
 
     def __init__(
             self,
@@ -24,7 +24,7 @@ class NMAParametersWidget(qtw.QWidget):
 
         self.title = qtw.QLabel('Welcome to NMA!')
         self.title.setStyleSheet('QLabel {font-size: 24px}')
-        self.title.setAlignment(qtc.Qt.AlignCenter)  # noqa
+        self.title.setAlignment(qtc.Qt.AlignCenter)
         layout.addWidget(self.title)
 
         self.label = qtw.QLabel('In order to perform NMA, please select the forNMA output files:')
@@ -37,9 +37,9 @@ class NMAParametersWidget(qtw.QWidget):
 
         # Buttons
         self.remove_button = qtw.QPushButton('Remove highlighted files')
-        self.remove_button.clicked.connect(self.remove_highlighted_files)  # noqa
+        self.remove_button.clicked.connect(self.remove_highlighted_files)
         self.add_button = qtw.QPushButton('Add files...')
-        self.add_button.clicked.connect(self.add_files)  # noqa
+        self.add_button.clicked.connect(self.add_files)
         self.run_button = qtw.QPushButton('Run NMA')
         # Button row
         button_row = RowLayout(widgets=[self.remove_button, self.add_button, 'stretch', self.run_button])
@@ -60,7 +60,7 @@ class NMAParametersWidget(qtw.QWidget):
             if self.file_list.item(i).isSelected()
         ]
         for i in reversed(indices_to_remove):
-            item = self.file_list.takeItem(i)  # noqa
+            item = self.file_list.takeItem(i)
             del item
         self.fileListChanged.emit(self.get_file_names())
 

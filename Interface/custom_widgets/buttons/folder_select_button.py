@@ -4,7 +4,7 @@ used to select and set a folder by clicking a button.
 """
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 
 class FolderSelectButton(qtw.QPushButton):
@@ -13,7 +13,7 @@ class FolderSelectButton(qtw.QPushButton):
     Upon clicking the button, a folder selection dialog appears, and the selected folder is emitted.
     Additionally, it is able to store and emit a model's index.
     """
-    folderSelected = qtc.Signal(qtc.QModelIndex, str)
+    folderSelected = qtc.pyqtSignal(qtc.QModelIndex, str)
 
     def __init__(
             self,
@@ -21,11 +21,11 @@ class FolderSelectButton(qtw.QPushButton):
             index: qtc.QModelIndex = None,
     ) -> None:
         """Initializes a FolderSelectButton."""
-        super().__init__(parent=parent)
+        super().__init__(parent)
         self.index = index
         self.set_icon(checked=False)
         self.set_tooltip(path='')
-        self.clicked.connect(self.select_folder)  # noqa
+        self.clicked.connect(self.select_folder)
         self._last_selected_folder = ''
 
     def select_folder(self) -> None:

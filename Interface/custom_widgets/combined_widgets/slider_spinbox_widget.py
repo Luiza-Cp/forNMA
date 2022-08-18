@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Type
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import DoubleSlider, AutoSlider, AutoSpinBox
 
@@ -17,7 +17,7 @@ class SliderSpinBoxWidget(qtw.QWidget):
     which both displays and selects the current widget value. The dtype parameter determines
     if the SliderSpinBox holds an integer or float value.
     """
-    valueChanged = qtc.Signal(object)  # int | float
+    valueChanged = qtc.pyqtSignal(object)  # int | float
 
     def __init__(
             self,
@@ -67,8 +67,8 @@ class SliderSpinBoxWidget(qtw.QWidget):
         if isinstance(self.slider, DoubleSlider):
             self.slider.doubleValueChanged.connect(self.on_value_changed)
         else:  # qtw.QSlider instance
-            self.slider.valueChanged.connect(self.on_value_changed)  # noqa
-        self.spinbox.valueChanged.connect(self.on_value_changed)  # noqa
+            self.slider.valueChanged.connect(self.on_value_changed)
+        self.spinbox.valueChanged.connect(self.on_value_changed)
 
     def on_value_changed(
             self,

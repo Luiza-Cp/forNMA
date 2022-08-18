@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import CollapsableWidget
 from Interface.fornma_core import ForNMAWidget, threshold_has_offset, get_default_threshold
@@ -12,8 +12,7 @@ from .base_parameters_page import BaseParametersPage
 
 class SegmentationParametersPage(BaseParametersPage):
     """Subclass of ParametersPage responsible for displaying the segmentation parameters."""
-    channelsSet = qtc.Signal(list)
-    segmentationDataChanged = qtc.Signal(dict)
+    channelsSet = qtc.pyqtSignal(list)
 
     def __init__(
             self,
@@ -32,7 +31,7 @@ class SegmentationParametersPage(BaseParametersPage):
 
 class SegmentationParametersWidget(qtw.QWidget):
     """Class defining the layout and widgets for the segmentation parameters."""
-    segmentationParamsChanged = qtc.Signal(dict)
+    segmentationParamsChanged = qtc.pyqtSignal(dict)
 
     def __init__(
             self,
@@ -96,10 +95,9 @@ class SegmentationParametersWidget(qtw.QWidget):
         self.global_params_widget.paramsChanged.connect(self.on_params_changed)
         self.fornma_params_widget.paramsChanged.connect(self.on_params_changed)
         self.cellpose_params_widget.paramsChanged.connect(self.on_params_changed)
-        self.fornma_checkbox.valueChanged.connect(self.on_fornma_checkbox_state_changed)  # noqa
-        self.cellpose_checkbox.valueChanged.connect(self.on_cellpose_checkbox_state_changed)  # noqa
+        self.fornma_checkbox.valueChanged.connect(self.on_fornma_checkbox_state_changed)
+        self.cellpose_checkbox.valueChanged.connect(self.on_cellpose_checkbox_state_changed)
 
-    @qtc.Slot(list)
     def set_channel_values(
             self,
             channels: list[str],
@@ -111,13 +109,11 @@ class SegmentationParametersWidget(qtw.QWidget):
             self.nuclear_detection_channel_widget.addItem(channel)
         self.on_params_changed()  # Emit signal as soon as new channels are set
 
-    @qtc.Slot()
     def on_fornma_checkbox_state_changed(self) -> None:
         """Sets the fornma_params_widget on/off, whenever the fornma_checkbox is clicked."""
         self.fornma_collapsable_button.setEnabled(self.fornma_checkbox.value())
         self.on_params_changed()  # Emit signal as soon as checkbox is clicked
 
-    @qtc.Slot()
     def on_cellpose_checkbox_state_changed(self) -> None:
         """Sets the cellpose_params_widget on/off, whenever the cellpose_checkbox is clicked."""
         self.cellpose_collapsable_button.setEnabled(self.cellpose_checkbox.value())
@@ -159,7 +155,7 @@ class SegmentationParametersWidget(qtw.QWidget):
 
 class GlobalParamsWidget(qtw.QWidget):
     """Widget containing all global parameters in it."""
-    paramsChanged = qtc.Signal(object)  # type does not matter
+    paramsChanged = qtc.pyqtSignal(object)  # type does not matter  # TODO: CHECK HERE!!!!!
     _blueprint = (
         # Format: ( forNMA ID, add_slider, add_help )
         ('magnification', False, True),
@@ -212,7 +208,6 @@ class GlobalParamsWidget(qtw.QWidget):
             for _, widget in self._fornma_params.items()
         }
 
-    @qtc.Slot(bool)
     def on_remove_background_checkbox_clicked(
             self,
             checked: bool,
@@ -222,7 +217,6 @@ class GlobalParamsWidget(qtw.QWidget):
         offset_widget.setEnabled(checked)
         self.paramsChanged.emit(checked)
 
-    @qtc.Slot(float)
     def on_min_value_changed(
             self,
             new_value: float,
@@ -235,7 +229,6 @@ class GlobalParamsWidget(qtw.QWidget):
             max_size_widget.setValue(new_value)
         self.paramsChanged.emit(new_value)
 
-    @qtc.Slot(float)
     def on_max_value_changed(
             self,
             new_value: float,
@@ -251,7 +244,7 @@ class GlobalParamsWidget(qtw.QWidget):
 
 class ForNMAParamsWidget(qtw.QWidget):
     """Widget containing all of forNMA's parameters in it."""
-    paramsChanged = qtc.Signal(object)  # type does not matter
+    paramsChanged = qtc.pyqtSignal(object)  # type does not matter  # TODO: CHECK HERE!!!!!
     _blueprint = (
         # Format: ( forNMA ID, add_slider, add_help )
         ('threshold', False, True),
@@ -296,7 +289,6 @@ class ForNMAParamsWidget(qtw.QWidget):
             for _, widget in self._fornma_params.items()
         }
 
-    @qtc.Slot(str)
     def on_threshold_combobox_changed(
             self,
             selected: str,
@@ -310,7 +302,7 @@ class ForNMAParamsWidget(qtw.QWidget):
 
 class CellposeParamsWidget(qtw.QWidget):
     """Widget containing all of Cellpose's parameters in it."""
-    paramsChanged = qtc.Signal(object)  # type does not matter
+    paramsChanged = qtc.pyqtSignal(object)  # type does not matter  # TODO: CHECK HERE!!!!!
     _blueprint = (
         # Format: ( forNMA ID, add_slider, add_help )
         ('diameter', True, True),

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Type
 
-from PySide6 import QtWidgets as qtw
+from PyQt5 import QtWidgets as qtw
 
 
 def AutoSpinBox(

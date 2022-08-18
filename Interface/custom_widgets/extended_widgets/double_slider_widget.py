@@ -4,7 +4,7 @@ that accepts floating point values.
 """
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 
 class DoubleSlider(qtw.QSlider):
@@ -12,7 +12,7 @@ class DoubleSlider(qtw.QSlider):
     A QSlider that works with float values, instead of integers.
     source: https://stackoverflow.com/questions/42820380/use-float-for-qslider
     """
-    doubleValueChanged = qtc.Signal(float)
+    doubleValueChanged = qtc.pyqtSignal(float)
 
     def __init__(
             self,
@@ -24,9 +24,9 @@ class DoubleSlider(qtw.QSlider):
             value: float = None,
     ) -> None:
         """Initializes a DoubleSlider instance."""
-        super().__init__(orientation=orientation)
+        super().__init__(orientation)
         self._multi = 10 ** decimals
-        self.valueChanged.connect(self.emitDoubleValueChanged)  # noqa
+        self.valueChanged.connect(self.emitDoubleValueChanged)
         if minimum is not None:
             self.setMinimum(minimum)
         if maximum is not None:
@@ -58,14 +58,14 @@ class DoubleSlider(qtw.QSlider):
             value: float,
     ) -> None:
         """Sets the minimum value on the slider."""
-        return super().setMinimum(value * self._multi)
+        return super().setMinimum(int(value * self._multi))
 
     def setMaximum(
             self,
             value: float,
     ) -> None:
         """Sets the maximum value on the slider."""
-        return super().setMaximum(value * self._multi)
+        return super().setMaximum(int(value * self._multi))
 
     def singleStep(self) -> float:
         """Returns the single step value on the slider."""
@@ -76,4 +76,4 @@ class DoubleSlider(qtw.QSlider):
             value: float,
     ) -> None:
         """Sets the single step value on the slider."""
-        return super().setSingleStep(value * self._multi)
+        return super().setSingleStep(int(value * self._multi))

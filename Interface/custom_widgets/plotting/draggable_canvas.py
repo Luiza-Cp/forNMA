@@ -3,7 +3,7 @@ from __future__ import annotations
 import matplotlib.backend_bases
 import pandas as pd
 import seaborn as sns
-from PySide6 import QtWidgets as qtw
+from PyQt5 import QtWidgets as qtw
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
     NavigationToolbar2QT as NavigationToolbar
@@ -36,10 +36,10 @@ class DraggableCanvasWidget(qtw.QDialog):
         button_layout = qtw.QHBoxLayout()
         button_layout.addStretch()
         self.cancel_button = qtw.QPushButton('cancel')
-        self.cancel_button.clicked.connect(self.reject)  # noqa
+        self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
         self.ok_button = qtw.QPushButton('ok')
-        self.ok_button.clicked.connect(self.accept)  # noqa
+        self.ok_button.clicked.connect(self.accept)
         button_layout.addWidget(self.ok_button)
 
         # Add buttons to main layout
@@ -128,9 +128,9 @@ class DraggableLine(Line2D):
     ) -> None:
         """Determines what happens when a line is dragged."""
         if self.orientation == 'h':
-            self.set_ydata([event.ydata, event.ydata])  # noqa
+            self.set_ydata([event.ydata, event.ydata])
         else:
-            self.set_xdata([event.xdata, event.xdata])  # noqa
+            self.set_xdata([event.xdata, event.xdata])
         event.canvas.draw_idle()
 
     def on_released(

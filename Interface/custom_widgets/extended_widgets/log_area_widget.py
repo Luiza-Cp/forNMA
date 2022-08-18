@@ -1,7 +1,7 @@
 """Interface/custom_widgets/extended_widgets/log_area_widget.py - widget with an area used for logging messages."""
 from __future__ import annotations
 
-from PySide6 import QtWidgets as qtw
+from PyQt5 import QtWidgets as qtw
 
 
 class LogAreaWidget(qtw.QTextEdit):
@@ -12,7 +12,7 @@ class LogAreaWidget(qtw.QTextEdit):
             parent: qtw.QWidget = None,
     ) -> None:
         """Initializes a LogAreaWidget."""
-        super().__init__(parent=parent)
+        super().__init__(parent)
         self.default_text = default_text
         self.setReadOnly(True)
         self.write_default_text()

@@ -4,14 +4,14 @@ used in forNMA's "Analysis" tab, left-hand side.
 """
 from __future__ import annotations
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import RowLayout
 
 
 class BaseParametersPage(qtw.QWidget):
     """Class defining the base layout shared by the segmentation/detection parameters pages."""
-    backButtonClicked = qtc.Signal()
+    backButtonClicked = qtc.pyqtSignal()  # TODO: CHECK HERE!!!!!
 
     def __init__(
             self,
@@ -32,7 +32,7 @@ class BaseParametersPage(qtw.QWidget):
         layout.addLayout(top_row_layout)
         # Back button
         self.back_button = qtw.QPushButton("Back")
-        self.back_button.clicked.connect(self.backButtonClicked)  # noqa
+        self.back_button.clicked.connect(self.backButtonClicked)
         # Title label
         self.title_label = qtw.QLabel(title)
         top_row_layout.addWidget(self.title_label)

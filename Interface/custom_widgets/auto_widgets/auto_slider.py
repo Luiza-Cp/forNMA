@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Type
 
-from PySide6 import QtCore as qtc, QtWidgets as qtw
+from PyQt5 import QtCore as qtc, QtWidgets as qtw
 
 from ..extended_widgets.double_slider_widget import DoubleSlider
 
