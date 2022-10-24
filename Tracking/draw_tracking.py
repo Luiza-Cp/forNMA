@@ -110,4 +110,7 @@ draw_tracking('/media/luiza/DATA/Doutorado/forNMA/video tracking/Results/trackin
              '/media/luiza/DATA/Doutorado/forNMA/video tracking/Results/Expt populacional karine 1 - poço c8-2/red',
               '/media/luiza/DATA/Doutorado/forNMA/video tracking/Results/tracking/all/Tracked',
                   )
-                 
+
+path_to_tracked_df: str,
+                  images_folder: str,
+                  path_to_save: str,
