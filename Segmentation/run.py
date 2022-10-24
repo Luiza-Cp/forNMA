@@ -50,7 +50,7 @@ def rename_channel_parameters(channel_parameters: dict) -> dict:
 
 def adjust_parameters(parameters_dict) -> Tuple[bool, str, List[str], List[str], str, dict]:
     """
-    Adjusts dictionary from interface or parameters.toml to establish new variable names.
+    Adjusts dictionary from parameters.toml to establish new variable names.
     """
     path_to_save = parameters_dict['path_to_save']
     ch_name_list = parameters_dict['names']
