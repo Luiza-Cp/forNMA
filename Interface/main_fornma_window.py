@@ -10,7 +10,7 @@ from typing import Type
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import DraggableCanvasWidget, SlidingStackedWidget
-from Interface.runner import Runner, fornma_mock_function
+from Interface.runner import Runner, fornma_mock_function, fornma_test_funcion
 from Interface.tabs import (
     DataAreaWidget, DataParametersWidget,  # Data Tab
     AnalysisAreaWidget, AnalysisParametersWidget,  # Analysis Tab
@@ -132,7 +132,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
     def on_fornma_run_button_clicked(self) -> None:
         """Runs forNMA."""
         params = self._current_fornma_params.copy()
-        runner = Runner(func=fornma_mock_function, kwargs=params)
+        runner = Runner(func=fornma_test_funcion, kwargs=params)
         runner.signals.started.connect(self.on_fornma_started_signal)
         runner.signals.callback.connect(self.on_fornma_callback_received)
         runner.signals.error.connect(self.on_fornma_error_signal)

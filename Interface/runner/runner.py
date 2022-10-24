@@ -10,7 +10,9 @@ from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
 from Interface.types import ForNMAReturnDict
 
-
+def fornma_test_funcion(callback, kwargs):
+    print(callback)
+    print(kwargs)
 def fornma_mock_function(
         callback: Signal,
         *args,
