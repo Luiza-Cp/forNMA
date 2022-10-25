@@ -48,7 +48,8 @@ def rename_channel_parameters(channel_parameters: dict) -> dict:
     return new_dict
 
 
-def adjust_parameters(parameters_dict) -> Tuple[bool, str, List[str], List[str], str, dict]:
+def adjust_parameters(parameters_dict) -> tuple[
+    Any, Any, Any, Any, Any, Any, list[dict], Any, dict[Union[str, Any], Any]]:
     """
     Adjusts dictionary from parameters.toml to establish new variable names.
     """
@@ -103,7 +104,52 @@ def adjust_parameters(parameters_dict) -> Tuple[bool, str, List[str], List[str],
                     'use_gpu': parameters_dict['segmentation']['cellpose']['use_gpu'],
                     }
 
-    return save_images, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict
+    return save_images, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \
+           segment_dict
+
+
+def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], List[str], str, dict]:
+    """
+       Adjusts dictionary from interface parameter dictionary  to establish new variable names.
+       """
+    save_images = True  # TODO change forinterface outut
+    path_to_save = parameters_dict['global']['output_folder']
+    ch_name_list = [f.replace('Channel ', '') for f in parameters_dict.keys() if 'Channel' in f]
+    ch_with_nuc = parameters_dict['global']['channel_with_nuclei']
+    # overtime = parameters_dict['global']['overtime']
+    overtime = False
+    parameter_list = [parameters_dict['Channel ' + f] for f in ch_name_list]
+    conditions = list(parameters_dict['Channel ' + ch_name_list[0]]['paths'].keys())
+    segment_dict = {'magnification': parameters_dict['global']['magnification'],
+                    'pixel_size': parameters_dict['global']['pixel_size'],
+                    'rescale_intensity': parameters_dict['global']['rescale_intensity'],
+                    'remove_bg': parameters_dict['global']['remove_background'],
+                    'radius_bg': parameters_dict['global']['rolling_ball_radius'],
+                    'threshold': parameters_dict['fornma']['threshold'],
+                    'offset': parameters_dict['fornma']['offset'],
+                    'blur': parameters_dict['fornma']['smooth'],
+                    'adjust_size': parameters_dict['fornma']['adjust_size'],
+                    'cut_edges': parameters_dict['fornma']['cut_edges'],
+                    'shape': parameters_dict['global']['shape'],
+                    'eccentricity': parameters_dict['global']['eccentricity'],
+                    'min_size': parameters_dict['global']['min_size'],
+                    'max_size': parameters_dict['global']['max_size'],
+                    'min_radius': parameters_dict['global']['min_radius'],
+                    'max_radius': parameters_dict['global']['max_radius'],
+                    'fast_detection': parameters_dict['fornma']['find_low_intensity_nucleus'],
+                    'weakly_labeled': parameters_dict['fornma']['weakly_labeled'],
+                    'use_cellpose': parameters_dict['cellpose']['use_cellpose'],
+                    'invert': False,
+                    'normalize': True,
+                    'diameter': parameters_dict['cellpose']['diameter'],
+                    'net_avg': True,
+                    'resample': True,
+                    'flow_threshold': parameters_dict['cellpose']['flow_threshold'],
+                    'mask_threshold': parameters_dict['cellpose']['mask_threshold'],
+                    'use_gpu': parameters_dict['cellpose']['use_gpu'],
+                    }
+
+    return save_images, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict
 
 
 def create_folder_dict(
@@ -277,13 +323,22 @@ def run(parameters_dict: dict,
     if callback is None:
         callback = MockSignal()
 
-    wants_to_save, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict = adjust_parameters(
-        parameters_dict)
-    subfolders, folder_dict = create_folder_dict(ch_name_list, ch_path_list,
-                                                 ch_with_nuc, parameter_list)
-    # tests whether number of conditions match the number os subfolders
-    if len(conditions) != len(subfolders):
-        conditions = [False] * len(subfolders)
+    if list(parameters_dict).keys()[0] == 'global':
+        wants_to_save, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict = \
+            adjust_parameters_interface(parameters_dict)
+        subfolders = list(parameter_list[0]['paths'].keys())  # names of treatments/conditions
+        folder_dict = {}
+        for channel in ch_name_list:
+            folder_dict[channel] = [conditions, parameters_dict['Channel ' + channel],
+                                    parameters_dict['global']['channel_with_nuclei'] == channel]
+    else:
+        wants_to_save, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \
+        segment_dict = adjust_parameters(parameters_dict)
+        subfolders, folder_dict = create_folder_dict(ch_name_list, ch_path_list,
+                                                     ch_with_nuc, parameter_list)
+        # tests whether number of conditions match the number os subfolders/treatments
+        if len(conditions) != len(subfolders):
+            conditions = [False] * len(subfolders)
 
     temp_dir = tempfile.TemporaryDirectory()
 
@@ -297,8 +352,8 @@ def run(parameters_dict: dict,
             message = 'The following files are not supported by forNMA. Remove them from your folders an try again.'
             return {'status': 'bad', 'message': message, 'data': not_supported}
 
-        total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i],
-                                preview, callback)  # ju usa esse pra remover outliers
+        total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview,
+                                callback)  # ju usa esse pra remover outliers
         if total_df is None:
             continue
 
@@ -306,9 +361,9 @@ def run(parameters_dict: dict,
         # adds files to temporary directory
         total_df.to_pickle(os.path.join(temp_dir.name, filename))
 
-    complete_df = filter_dataframe(temp_dir, headless) #TODO AQUI QUE FILTRA, EU DIVIDIRIA EM 2 FUNÇÔES
+    complete_df = filter_dataframe(temp_dir, headless)  # TODO AQUI QUE FILTRA, EU DIVIDIRIA EM 2 FUNÇÔES
     if complete_df.empty:
-        raise Exception('No nucleus could be found at your images, adjust parameters and try again')
+        raise Exception('No nucleus could be found on your images, adjust parameters and try again')
 
     # now the complete df is splitted in smaller ones and saved
     df_results, df_draw = split_dfs(complete_df, ch_name_list)
