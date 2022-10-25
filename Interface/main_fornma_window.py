@@ -10,7 +10,7 @@ from typing import Type
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
 from Interface.custom_widgets import DraggableCanvasWidget, SlidingStackedWidget
-from Interface.runner import Runner, fornma_mock_function, fornma_test_funcion
+from Interface.runner import Runner, fornma_mock_function
 from Interface.tabs import (
     DataAreaWidget, DataParametersWidget,  # Data Tab
     AnalysisAreaWidget, AnalysisParametersWidget,  # Analysis Tab
@@ -32,7 +32,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
     ) -> None:
         """Initializes a ForNMAMainWindow instance."""
         super().__init__(parent=parent)
-        self.setMinimumSize(1200, 800)
+        # self.setMinimumSize(1200, 800)
 
         self.threadpool = qtc.QThreadPool(self)
         self._canvas_window = None  # Placeholder
@@ -132,7 +132,15 @@ class ForNMAMainWindow(qtw.QMainWindow):
     def on_fornma_run_button_clicked(self) -> None:
         """Runs forNMA."""
         params = self._current_fornma_params.copy()
-        runner = Runner(func=fornma_test_funcion, kwargs=params)
+        experiment_table_data = self.data_area.experiment_table.model()._data
+        groups = experiment_table_data['Group']
+        channels = experiment_table_data.columns[1:]
+        for channel in channels:
+            params[f'Channel {channel}']['paths'] = {
+                group: experiment_table_data.at[idx, channel]
+                for idx, group in enumerate(groups)
+            }
+        runner = Runner(func=fornma_mock_function, kwargs=params)
         runner.signals.started.connect(self.on_fornma_started_signal)
         runner.signals.callback.connect(self.on_fornma_callback_received)
         runner.signals.error.connect(self.on_fornma_error_signal)
