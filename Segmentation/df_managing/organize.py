@@ -12,7 +12,7 @@ import os
 from typing import List, Tuple, Optional
 import pandas as pd 
 pd.options.mode.chained_assignment = None  # default='warn'
-from df_managing.clean_dataframe import plot_and_clean, erase_df
+from Segmentation.df_managing.clean_dataframe import plot_and_clean, erase_df
 
     
 def filter_dataframe(temp_dir: str,

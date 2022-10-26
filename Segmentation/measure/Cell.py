@@ -13,7 +13,7 @@ from scipy import signal
 from skimage.feature import local_binary_pattern
 from skimage.segmentation import clear_border
 from typing import List
-from measure.Foci import Foci
+from .Foci import Foci
 
 
 class Cell:

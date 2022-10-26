@@ -9,14 +9,14 @@ File that puts all functions together
 
 import os
 import tempfile
-from typing import List, Tuple, Any, Union, Dict
+from typing import List, Tuple, Any, Union
 from PySide6.QtCore import Signal
 
 import cv2 as cv
 import pandas as pd
 
-from analyze import analyze_dict
-from df_managing.organize import filter_dataframe, get_foci_df, split_dfs
+from Segmentation.analyze import analyze_dict
+from Segmentation.df_managing.organize import filter_dataframe, get_foci_df, split_dfs
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -124,10 +124,10 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
                     'pixel_size': parameters_dict['global']['pixel_size'],
                     'rescale_intensity': parameters_dict['global']['rescale_intensity'],
                     'remove_bg': parameters_dict['global']['remove_background'],
-                    'radius_bg': parameters_dict['global']['rolling_ball_radius'],
+                    'radius_bg': parameters_dict['global']['radius_bg'],
                     'threshold': parameters_dict['fornma']['threshold'],
                     'offset': parameters_dict['fornma']['offset'],
-                    'blur': parameters_dict['fornma']['smooth'],
+                    'blur': parameters_dict['fornma']['blur'],
                     'adjust_size': parameters_dict['fornma']['adjust_size'],
                     'cut_edges': parameters_dict['fornma']['cut_edges'],
                     'shape': parameters_dict['global']['shape'],
@@ -146,7 +146,7 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
                     'resample': True,
                     'flow_threshold': parameters_dict['cellpose']['flow_threshold'],
                     'mask_threshold': parameters_dict['cellpose']['mask_threshold'],
-                    'use_gpu': parameters_dict['cellpose']['use_gpu'],
+                    'use_gpu': False,
                     }
 
     return save_images, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict
@@ -162,7 +162,8 @@ def create_folder_dict(
     Returns the subfolders and a dictionary for a folder where:
         key = channel name 
         values = [ list, dict, bool] 
-            values[0]: a list with all folders in a given channel (each folder can be a field or a treatment condition, for example)
+            values[0]: a list with all folders in a given channel (each folder can be a field or a treatment condition,
+            for example)
             values[1]: the param_dict for this channel
             values[2]: boolean indicating if user wants to perform segmentation in this chanel
     """
@@ -239,9 +240,9 @@ def draw_and_save(df: pd.DataFrame,
                     and 'Y_draw' not in f and 'Image_' not in f]
 
     df = df.filter(regex=ch + "|Cell|X")
-    cnt_groupped = df.groupby(['Image_name_' + ch])
+    cnt_grouped = df.groupby(['Image_name_' + ch])
     fs = cv.getFontScaleFromHeight(2, 15, 2)
-    for name, group in cnt_groupped:
+    for name, group in cnt_grouped:
         img = group['Image_' + ch].iloc[0]
         img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
         cnt_nuc = list(group['Nuc_cnt_' + ch])
@@ -323,13 +324,13 @@ def run(parameters_dict: dict,
     if callback is None:
         callback = MockSignal()
 
-    if list(parameters_dict).keys()[0] == 'global':
+    if list(parameters_dict.keys())[0] == 'global':
         wants_to_save, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict = \
             adjust_parameters_interface(parameters_dict)
         subfolders = list(parameter_list[0]['paths'].keys())  # names of treatments/conditions
         folder_dict = {}
         for channel in ch_name_list:
-            folder_dict[channel] = [conditions, parameters_dict['Channel ' + channel],
+            folder_dict[channel] = [list(parameters_dict['Channel ' + channel]['paths'].values()), parameters_dict['Channel ' + channel],
                                     parameters_dict['global']['channel_with_nuclei'] == channel]
     else:
         wants_to_save, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \

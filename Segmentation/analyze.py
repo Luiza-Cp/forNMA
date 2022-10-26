@@ -12,10 +12,10 @@ from PySide6.QtCore import Signal
 
 from pandas import DataFrame
 
-from measure.Morphology import Morphology
-from measure.Cell import Cell
-from segmentation.find_contours import fornma_contour_finding, load_image
-from segmentation.cellpose_integration import run_cellpose
+from .measure.Morphology import Morphology
+from .measure.Cell import Cell
+from .segmentation.find_contours import fornma_contour_finding, load_image
+from .segmentation.cellpose_integration import run_cellpose
 
 pd.options.mode.chained_assignment = None  # default='warn'
 

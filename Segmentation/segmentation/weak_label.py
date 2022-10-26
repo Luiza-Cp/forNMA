@@ -13,7 +13,7 @@ provided based on intensity adjacent to nucleus.
 from skimage.segmentation import clear_border
 import cv2 as cv
 import numpy as np
-from segmentation.thresholding import threshold_dict
+from .thresholding import threshold_dict
 from typing import  List, Tuple
 
 

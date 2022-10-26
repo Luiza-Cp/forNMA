@@ -6,7 +6,7 @@ Created on Sun Aug  1 20:46:57 2021
 """
 
 import matplotlib.pyplot as plt
-from df_managing.Draggable_line import draggable_lines
+from Segmentation.df_managing.Draggable_line import draggable_lines
 import pandas as pd
 import seaborn as sns
 

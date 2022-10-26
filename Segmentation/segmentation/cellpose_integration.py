@@ -9,8 +9,8 @@ Created on Fri Feb 11 15:35:41 2022
 import numpy as np
 from cellpose import models, utils
 from typing import Optional, List
-from segmentation.find_contours import load_image
-from segmentation.filters import filter_contours
+from .find_contours import load_image
+from .filters import filter_contours
 
 
 def remove_edge_cnt(outlines_cnt, shape):

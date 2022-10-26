@@ -12,10 +12,10 @@ import numpy as np
 from skimage import img_as_ubyte, exposure, restoration
 from skimage.exposure import match_histograms
 from typing import Optional, List, Tuple
-from segmentation.thresholding import threshold_dict
-from segmentation.Divide_contours import Segmenting, select_right_contour
-from segmentation.weak_label import fluorescence_of_rings, adjust_binary_image
-from segmentation.filters import filter_debree, filter_contours
+from .thresholding import threshold_dict
+from .Divide_contours import Segmenting, select_right_contour
+from .weak_label import fluorescence_of_rings, adjust_binary_image
+from .filters import filter_debree, filter_contours
 
 not_processed = []  # images that were not analyzed
 
