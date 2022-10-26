@@ -60,7 +60,9 @@ _GLOBAL_BLUEPRINT = {
             'name': "Channel with Nuclei",
             'label': "Select the channel with nuclei:",
             'tooltip': "Path to the folder of the chanel where nuclei will be segmented",
-            'help': " Is the path to the folder of the chanel where nuclei will be segmented. forNMA uses this path to identify images with stained nuclei. For example in an experiment with DAPI staining, this folder will contain blue channel images.",
+            'help': " Is the path to the folder of the chanel where nuclei will be segmented. forNMA uses this path to "
+                    "identify images with stained nuclei. For example in an experiment with DAPI staining, this folder "
+                    "will contain blue channel images.",
         },
         'data': {
             'dtype': str,
@@ -94,7 +96,9 @@ _GLOBAL_BLUEPRINT = {
             'name': "Pixel Size",
             'label': "Select the pixel size (µm):",
             'tooltip': "Size of one pixel, in micrometers, at the image",
-            'help': "Corresponding size of one pixel, in micrometers, at the image. You can obtain this information within your microscope specifications. Although it is not mandatory to add a value here, the pixel size helps forNMA a lot in its measurements.",
+            'help': "Corresponding size of one pixel, in micrometers, at the image. You can obtain this information "
+                    "within your microscope specifications. Although it is not mandatory to add a value here, the pixel"
+                    " size helps forNMA a lot in its measurements.",
         },
         'data': {
             'dtype': float,
@@ -351,9 +355,10 @@ _FORNMA_BLUEPRINT = {
     'adjust_size': {
         'text': {
             'name': "Adjust Size",
-            'label': "Set the adjust size value:",
+            'label': "Adjust nuclear mask size (pixels):",
             'tooltip': "Reduces or enlarges nucleus contour",
-            'help': "Value used to adjust contours to the nucleus edge. Positive values will enlarge the contour in the specified number of pixels and negative values will reduce it.",
+            'help': "Value used to reduce or enlarge nucleus contours, in pixels. Positive values will enlarge the "
+                    "contour in the specified number of pixels and negative values will reduce it.",
         },
         'data': {
             'dtype': float,
@@ -391,7 +396,10 @@ _FORNMA_BLUEPRINT = {
             'name': "Find Low Intensity Nuclei",
             'label': "Find low intensity nuclei?",
             'tooltip': "Activate this function if some nuclei are less brighter than others.",
-            'help': "This parameter is responsible for executing a loop at images where previous found nucleus are covered and then forNMA tries to find new nucleus at image. It is recommended if some nuclei are way less brighter than others. This function can generate detection errors with squares being drawn around nucleus.",
+            'help': "This parameter is responsible for executing a loop at images where previous found nucleus "
+                    "are covered and then forNMA tries to find new nucleus at image. It is recommended if some nuclei"
+                    " are way less brighter than others. This function can generate detection errors with squares being"
+                    " drawn around nucleus.",
         },
         'data': {
             'dtype': bool,
