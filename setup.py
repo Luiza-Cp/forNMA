@@ -9,4 +9,5 @@ setup(
     author_email='',
     license='',
     packages=find_packages(),
+    requires=[]
 )
