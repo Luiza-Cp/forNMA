@@ -9,17 +9,17 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import DraggableCanvasWidget, SlidingStackedWidget
-from Interface.runner import Runner, fornma_mock_function, fornma_test_funcion
-from Interface.tabs import (
+from src.Interface.custom_widgets import DraggableCanvasWidget, SlidingStackedWidget
+from src.Interface.runner import Runner, fornma_mock_function, fornma_test_funcion
+from src.Interface.tabs import (
     DataAreaWidget, DataParametersWidget,  # Data Tab
     AnalysisAreaWidget, AnalysisParametersWidget,  # Analysis Tab
     NMAAreaWidget, NMAParametersWidget,  # NMA Tab
 )
-from Interface.types import ForNMAEmitDict, ForNMAReturnDict
-from Segmentation.run import run as run_fornma
+from src.Interface.types import ForNMAEmitDict, ForNMAReturnDict
+from src.Segmentation.run import run as run_fornma
 
-_DEBUG = False
+_DEBUG = True
 
 
 class ForNMAMainWindow(qtw.QMainWindow):

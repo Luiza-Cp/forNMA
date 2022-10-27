@@ -5,7 +5,7 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import AutoSpinBox, HelpButton, FolderSelectButton, SliderSpinBoxWidget
+from src.Interface.custom_widgets import AutoSpinBox, HelpButton, FolderSelectButton, SliderSpinBoxWidget
 from .fornma_blueprints import get_fornma_dtype, get_fornma_wtype
 from .fornma_parameter import ForNMAParameter
 

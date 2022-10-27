@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import LogAreaWidget, RowLayout
+from src.Interface.custom_widgets import LogAreaWidget, RowLayout
 
 
 class NMAParametersWidget(qtw.QWidget):

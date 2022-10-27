@@ -8,7 +8,7 @@ from typing import Callable
 import pandas as pd
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
-from Interface.types import ForNMAReturnDict
+from src.Interface.types import ForNMAReturnDict
 
 
 def fornma_test_funcion(callback, kwargs):

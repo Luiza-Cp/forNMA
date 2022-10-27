@@ -8,7 +8,7 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import DoubleSlider, AutoSlider, AutoSpinBox
+from src.Interface.custom_widgets import DoubleSlider, AutoSlider, AutoSpinBox
 
 
 class SliderSpinBoxWidget(qtw.QWidget):
