@@ -84,6 +84,21 @@ _GLOBAL_BLUEPRINT = {
             'wtype': 'checkbox',
             'value': True,
         },
+
+    },
+    'is_overtime': {
+        'text': {
+            'name': "Overtime",
+            'label': "Are images a time sequence?",
+            'tooltip': "FIXME",
+            'help': "HELP SAVE",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': False,
+        },
+
     },
     'magnification': {
         'text': {
@@ -130,7 +145,9 @@ _GLOBAL_BLUEPRINT = {
             'name': "Rescale Intensity",
             'label': "Rescale intensity?",
             'tooltip': "Creates new intensity scale to images",
-            'help': "Re-distributes image intensity so the brightest image pixel will be equivalent to the biggest intensity value and the less bright pixel will correspond to the minimum value. This enhances image contrast and is highly recommended for high background images.",
+            'help': "Re-distributes image intensity so the brightest image pixel will be equivalent to the biggest "
+                    "intensity value and the less bright pixel will correspond to the minimum value. This enhances "
+                    "image contrast and is highly recommended for high background images.",
         },
         'data': {
             'dtype': bool,
@@ -143,7 +160,9 @@ _GLOBAL_BLUEPRINT = {
             'name': "Remove Background",
             'label': "Remove background?",
             'tooltip': "Background subtraction with rolling-ball algorithm",
-            'help': "Applies rolling-ball algorithm for background subtraction. This parameter also requires a rolling-ball radius, that should be set to at least the size of the largest object that is not part of the background.",
+            'help': "Applies rolling-ball algorithm for background subtraction. This parameter also requires a "
+                    "rolling-ball radius, that should be set to at least the size of the largest object that is not"
+                    " part of the background.",
         },
         'data': {
             'dtype': bool,
@@ -156,7 +175,8 @@ _GLOBAL_BLUEPRINT = {
             'name': "Rolling Ball Radius",
             'label': "Radius rolling-ball",
             'tooltip': "Is the rolling-ball radius used for background subtraction.",
-            'help': "Is the rolling-ball radius used for background subtraction. Larger radius takes longer times to process.",
+            'help': "Is the rolling-ball radius used for background subtraction. Larger radius takes longer times "
+                    "to process.",
         },
         'data': {
             'dtype': int,
@@ -175,7 +195,9 @@ _GLOBAL_BLUEPRINT = {
             'name': "Shape",
             'label': "Set the shape value:",
             'tooltip': "Filters nucleus by its irregularity.",
-            'help': "Removes from analysis all nucleus that has irregular shapes. Higher values will be restrictive for more regular nucleus. Try to set lower values if you are working with treatments that affect nuclei shape.",
+            'help': "Removes from analysis all nucleus that has irregular shapes. Higher values will be restrictive "
+                    "for more regular nucleus. Try to set lower values if you are working with treatments that affect "
+                    "nuclei shape.",
         },
         'data': {
             'dtype': float,
@@ -194,7 +216,9 @@ _GLOBAL_BLUEPRINT = {
             'name': "Eccentricity",
             'label': "Set the eccentricity value:",
             'tooltip': "Filters nucleus by its eccentricity",
-            'help': "Filters nuclei by their eccentricity, which is a value that shows you how 'un-circular' the curve is. Bigger eccentricities are less curved. A circle has an eccentricity of 0, and a ellipse will have an eccentricity of 1.",
+            'help': "Filters nuclei by their eccentricity, which is a value that shows you how 'un-circular' the curve"
+                    " is. Bigger eccentricities are less curved. A circle has an eccentricity of 0, and a ellipse will "
+                    "have an eccentricity of 1.",
         },
         'data': {
             'dtype': float,
@@ -216,13 +240,13 @@ _GLOBAL_BLUEPRINT = {
             'help': "Minimum area, in pixels, of a nucleus.",
         },
         'data': {
-            'dtype': float,
+            'dtype': int,
             'wtype': 'spinbox',
             'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.2),
+                'minimum': 0,
+                'maximum': 1000000,
+                'singleStep': 1,
+                'value': (value := 0),
             },
             'value': value,
         },
@@ -235,13 +259,13 @@ _GLOBAL_BLUEPRINT = {
             'help': "Maximum area, in pixels, of a nucleus.",
         },
         'data': {
-            'dtype': float,
+            'dtype': int,
             'wtype': 'spinbox',
             'limits': {
-                'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.8),
+                'minimum': 0,
+                'maximum': 1000000,
+                'singleStep':1,
+                'value': (value := 1000000),
             },
             'value': value,
         },
@@ -258,9 +282,9 @@ _GLOBAL_BLUEPRINT = {
             'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.2),
+                'maximum': 1000000.0,
+                'singleStep': 0.1,
+                'value': (value := 0.0),
             },
             'value': value,
         },
@@ -277,9 +301,9 @@ _GLOBAL_BLUEPRINT = {
             'wtype': 'spinbox',
             'limits': {
                 'minimum': 0.0,
-                'maximum': 1.0,
-                'singleStep': 0.01,
-                'value': (value := 0.8),
+                'maximum': 1000000,
+                'singleStep': 0.1,
+                'value': (value := 1000000.0),
             },
             'value': value,
         },

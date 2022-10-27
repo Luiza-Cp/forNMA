@@ -169,11 +169,12 @@ class GlobalParamsWidget(qtw.QWidget):
         ('radius_bg', True, True),
         ('shape', True, True),
         ('eccentricity', True, True),
-        ('min_size', True, True),
-        ('max_size', True, True),
-        ('min_radius', True, True),
-        ('max_radius', True, True),
-        ('save_images', False, True)
+        ('min_size', False, True),
+        ('max_size', False, True),
+        ('min_radius', False, True),
+        ('max_radius', False, True),
+        ('save_images', False, True),
+        ('is_overtime', False, True)
     )
 
     def __init__(
