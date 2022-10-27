@@ -173,6 +173,7 @@ class GlobalParamsWidget(qtw.QWidget):
         ('max_size', True, True),
         ('min_radius', True, True),
         ('max_radius', True, True),
+        ('save_images', False, True)
     )
 
     def __init__(

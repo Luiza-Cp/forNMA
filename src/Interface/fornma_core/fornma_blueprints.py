@@ -72,6 +72,19 @@ _GLOBAL_BLUEPRINT = {
             'value': "",
         }
     },
+    'save_images': {
+        'text': {
+            'name': "Save Images",
+            'label': "Save Images?",
+            'tooltip': "Save???",
+            'help': "HELP SAVE",
+        },
+        'data': {
+            'dtype': bool,
+            'wtype': 'checkbox',
+            'value': True,
+        },
+    },
     'magnification': {
         'text': {
             'name': "Magnification",
