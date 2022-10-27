@@ -9,7 +9,7 @@ from typing import Any
 import pandas as pd
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import FolderSelectButton
+from src.Interface.custom_widgets import FolderSelectButton
 
 
 class ExperimentTableWidget(qtw.QTableView):

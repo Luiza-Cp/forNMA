@@ -5,8 +5,8 @@ from typing import Any
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import CollapsableWidget
-from Interface.fornma_core import ForNMAWidget, threshold_has_offset, get_default_threshold
+from src.Interface.custom_widgets import CollapsableWidget
+from src.Interface.fornma_core import ForNMAWidget, threshold_has_offset, get_default_threshold
 from .base_parameters_page import BaseParametersPage
 
 
@@ -173,6 +173,7 @@ class GlobalParamsWidget(qtw.QWidget):
         ('max_size', True, True),
         ('min_radius', True, True),
         ('max_radius', True, True),
+        ('save_images', False, True)
     )
 
     def __init__(

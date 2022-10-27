@@ -6,6 +6,8 @@ from PySide6 import QtCore as qtc, QtWidgets as qtw
 from .experiment_table import ExperimentTableWidget
 from .experiment_wizard import ExperimentWizard
 
+from src.Interface.custom_widgets.buttons.help_button import HelpButton
+
 
 class DataParametersWidget(qtw.QWidget):
     """
@@ -32,6 +34,9 @@ class DataParametersWidget(qtw.QWidget):
         layout.addWidget(self.paths_label)
 
         layout.addStretch()
+
+        self.help_button = HelpButton(tooltip_text='Click Me', help_title='HELP TITLE', help_message='HELP MESSAGE')
+        layout.addWidget(self.help_button)
 
     @qtc.Slot(str)
     def setPaths(

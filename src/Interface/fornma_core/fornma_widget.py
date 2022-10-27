@@ -5,7 +5,7 @@ from typing import Type
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
-from Interface.custom_widgets import AutoSpinBox, HelpButton, FolderSelectButton, SliderSpinBoxWidget
+from src.Interface.custom_widgets import AutoSpinBox, HelpButton, FolderSelectButton, SliderSpinBoxWidget
 from .fornma_blueprints import get_fornma_dtype, get_fornma_wtype
 from .fornma_parameter import ForNMAParameter
 
@@ -65,6 +65,7 @@ def ForNMAWidget(
             checkbox_text=fornma_parameter.label,
             help_button=fornma_help_button,
         )
+        widget.setChecked(fornma_parameter.value)
     else:
         raise ValueError(f'Invalid dtype: {dtype}')
     widget.setToolTip(fornma_parameter.tooltip_text)

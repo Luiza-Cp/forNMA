@@ -15,8 +15,8 @@ from PySide6.QtCore import Signal
 import cv2 as cv
 import pandas as pd
 
-from Segmentation.analyze import analyze_dict
-from Segmentation.df_managing.organize import filter_dataframe, get_foci_df, split_dfs
+from src.Segmentation.analyze import analyze_dict
+from src.Segmentation.df_managing.organize import filter_dataframe, get_foci_df, split_dfs
 
 pd.options.mode.chained_assignment = None  # default='warn'
 

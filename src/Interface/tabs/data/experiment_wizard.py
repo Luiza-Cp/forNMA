@@ -8,6 +8,8 @@ from functools import partial
 
 from PySide6 import QtCore as qtc, QtWidgets as qtw
 
+from src.Interface.custom_widgets.buttons.help_button import HelpButton
+
 
 class ExperimentWizard(qtw.QWizard):
     """Class representing a wizard used to set the current experiment value."""
@@ -20,11 +22,11 @@ class ExperimentWizard(qtw.QWizard):
         self.data = None
 
         # ### PAGE ONE
-        self.channel_page = ExperimentPage(name='Channel')
+        self.channel_page = ExperimentPage(name='Channel', help_title='PAGE ONE HELP', help_message='PAGE ONE MESSAGE')
         self.addPage(self.channel_page)
 
         # ### PAGE TWO
-        self.group_page = ExperimentPage(name='Group')
+        self.group_page = ExperimentPage(name='Group', help_title='PAGE TWO HELP', help_message='PAGE TWO MESSAGE')
         self.addPage(self.group_page)
 
     @property
@@ -45,6 +47,9 @@ class ExperimentPage(qtw.QWizardPage):
     """
     def __init__(
             self,
+            tooltip_text: str = "",
+            help_title: str = "",
+            help_message: str = "",
             parent: qtw.QWidget = None,
             name: str = '',
     ) -> None:
@@ -61,6 +66,9 @@ class ExperimentPage(qtw.QWizardPage):
         layout.addWidget(self.add_button)
 
         layout.addStretch()
+
+        self.help_button = HelpButton(tooltip_text=tooltip_text, help_title=help_title, help_message=help_message)
+        layout.addWidget(self.help_button)
 
     def get_labels(self) -> list[str]:
         """Returns the labels currently in the ExperimentPage. Ignores line edits with empty strings in them."""
