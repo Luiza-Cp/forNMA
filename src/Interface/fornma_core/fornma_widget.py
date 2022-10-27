@@ -65,6 +65,7 @@ def ForNMAWidget(
             checkbox_text=fornma_parameter.label,
             help_button=fornma_help_button,
         )
+        widget.setChecked(fornma_parameter.value)
     else:
         raise ValueError(f'Invalid dtype: {dtype}')
     widget.setToolTip(fornma_parameter.tooltip_text)
