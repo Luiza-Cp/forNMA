@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forNMA"
-description = "My package description"
+description = "A tool for single cell image analysis and phenotype integration"
 readme = "README.rst"
 requires-python = ">=3.7"
-keywords = ["one", "two"]
+keywords = ["forNMA", "NMA", 'single cell', 'KTR', 'phenotype']
 license = {text = "BSD 3-Clause License"}
 classifiers = [
     "Framework :: Django",
@@ -16,6 +16,20 @@ classifiers = [
 dependencies = [
     "requests",
     'importlib-metadata; python_version<"3.8"',
+    'pandas==1.4.0',
+    'scipy==1.7.3',
+    'seaborn==0.11.2',
+    'numpy==1.21.5',
+    'networkx==2.8.4',
+    'progress==1.5',
+    'scikit-image==0.19.1',
+    'scikit-learn==1.1.1',
+    'pyside6==6.3.1',
+    'toml==0.10.2',
+    'cellpose==1.0.0',
+    'setuptools==63.4.1',
+    'pystackreg',
+    'shapely'
 ]
 dynamic = ["version"]
 
