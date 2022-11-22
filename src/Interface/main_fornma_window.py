@@ -141,7 +141,7 @@ class ForNMAMainWindow(qtw.QMainWindow):
                 group: experiment_table_data.at[idx, channel]
                 for idx, group in enumerate(groups)
             }
-        runner = Runner(func=run_fornma, parameters_dict=params,)
+        runner = Runner(func=run_fornma, parameters_dict=params, headless=True)
         #runner = Runner(func=fornma_test_funcion, kwargs = params)
         runner.signals.started.connect(self.on_fornma_started_signal)
         runner.signals.callback.connect(self.on_fornma_callback_received)
@@ -215,8 +215,8 @@ class ForNMAMainWindow(qtw.QMainWindow):
     def debug(self) -> None:
         """Starts up forNMA's interface in debug mode."""
         # Simulates selecting the channels and groups names from the "Set experiment..." button
-        channels = ['Red', 'Green', 'Phase']
-        groups = ['Control', 'TMZ']
+        channels = ['Red', 'Green']
+        groups = ['Control', 'Treated']
         self.data_area.experiment_table.set_experiment(channels=channels, groups=groups)
         # Simulates selecting the channel/group paths on the ExperimentTable by clicking in each button
         for column_idx, channel_name in enumerate(channels, 1):
