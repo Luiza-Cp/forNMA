@@ -19,7 +19,7 @@ from src.Interface.tabs import (
 from src.Interface.types import ForNMAEmitDict, ForNMAReturnDict
 from src.Segmentation.run import run as run_fornma
 
-_DEBUG = True
+_DEBUG = False
 
 
 class ForNMAMainWindow(qtw.QMainWindow):

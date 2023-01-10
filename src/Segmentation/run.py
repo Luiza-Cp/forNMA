@@ -265,6 +265,7 @@ def draw_and_save(df: pd.DataFrame,
 
         cv.imwrite(os.path.join(saving_dir, name), img)
 
+    return None
 
 def saving_images(df_draw: pd.DataFrame,
                   path_to_save: str,
@@ -290,7 +291,7 @@ def saving_images(df_draw: pd.DataFrame,
             saving_dir_ch = os.path.join(saving_dir, ch)
             os.mkdir(saving_dir_ch)
             draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
-
+    return "Files saved"
 
 def is_file_supported(subfolder_dict: dict,
                       preview: bool,
@@ -337,12 +338,13 @@ def run(parameters_dict: dict,
         segment_dict = adjust_parameters(parameters_dict)
         subfolders, folder_dict = create_folder_dict(ch_name_list, ch_path_list,
                                                      ch_with_nuc, parameter_list)
+        print('criou os dict')
         # tests whether number of conditions match the number os subfolders/treatments
         if len(conditions) != len(subfolders):
             conditions = [False] * len(subfolders)
 
     temp_dir = tempfile.TemporaryDirectory()
-
+    print(len(subfolders))
     for i in range(len(subfolders)):
         subfolder_dict = create_subfolder_dict(folder_dict, i)
         if not check_size(subfolder_dict):
@@ -350,23 +352,28 @@ def run(parameters_dict: dict,
 
         not_supported = is_file_supported(subfolder_dict, preview)
         if len(not_supported) != 0:
+            print('not supported')
             message = 'The following files are not supported by forNMA. Remove them from your folders an try again.'
             return {'status': 'bad', 'message': message, 'data': not_supported}
-
+        # função que pega esse dicionŕio e manda pra interface ou printa de acordo com a ocasião
+        print('antes analyze')
         total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview,
                                 callback)  # ju usa esse pra remover outliers
+        print('analyzed')
         if total_df is None:
+            print('vazio')
             continue
 
         filename = os.path.basename(subfolders[i]) + '.zip'
         # adds files to temporary directory
         total_df.to_pickle(os.path.join(temp_dir.name, filename))
 
-    complete_df = filter_dataframe(temp_dir, headless)  # TODO AQUI QUE FILTRA, EU DIVIDIRIA EM 2 FUNÇÔES
+    complete_df = filter_dataframe(temp_dir, headless)  # TODO AQUI QUE FILTRA, eu add o filtro pelo NII automatico via interface
+    # só preciso conferir se esse NII não afeta as imagens do Eduardo de taxol e tal
     if complete_df.empty:
         raise Exception('No nucleus could be found on your images, adjust parameters and try again')
 
-    # now the complete df is splitted in smaller ones and saved
+    # now the complete df is split in smaller ones and saved
     df_results, df_draw = split_dfs(complete_df, ch_name_list)
     save_dfs(df_results, path_to_save)
     if wants_to_save:  # save images

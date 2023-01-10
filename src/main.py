@@ -13,10 +13,11 @@ def main():
     # parser for the "registration" command
     parser_registration = subparsers.add_parser('registration', description='Register images in a folder',
                                                 help='hhh')
-    parser_registration.add_argument('path', type=str, nargs='+',
+    parser_registration.add_argument('--path', '-p', required=True, type=str, nargs='+', action='store',
                                      help='path to folder to register. If there are more than one image channel,'
                                           ' each must be in a separate folder and passed to the parser.')
-    parser_registration.add_argument('path_to_save', type=str, help='path to save registered images')
+    parser_registration.add_argument('--path_to_save', '-ps', required=True, type=str,
+                                     help='path to save registered images')
     parser.add_argument('--crop', nargs='?', type=bool, default=True,
                         help='Crop images to keep only portions that are always in the field of view')
 
@@ -52,7 +53,7 @@ def main():
     args = parser.parse_args()
 
     if args.subparser_name == 'registration':
-        registration(args.paths, args.path_to_save, args.crop)
+        registration(args.path, args.path_to_save, args.crop)
     elif args.subparser_name == 'segmentation':
         run(toml.load(args.parameters), args.headless)
     elif args.subparser_name == 'tracking':
@@ -60,7 +61,8 @@ def main():
                  args.max_gap_closing_distance, args.allow_merging)
     elif args.subparser_name == 'draw_tracking':
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
-
+    else:
+        print('nenhum')
     return
 
 

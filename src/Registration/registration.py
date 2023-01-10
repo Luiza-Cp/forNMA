@@ -198,9 +198,9 @@ def save(stack: np.ndarray,
          
 
 # interface must call it in loops if there are more than one fied to be registered
-def registration (folders_to_register: List[str],
-                  path_to_save: str,
-                  crop: bool = True
+def registration(folders_to_register: List[str],
+                 path_to_save: str,
+                 crop: bool = True
 ) -> bool:
     """
     Iterates over a list of paths performing registration of itens within 
@@ -209,6 +209,7 @@ def registration (folders_to_register: List[str],
     If crop is True, crops images to keep just parts that remains in field of
     view through all experiment.
     """
+
     stack, names = open_images(folders_to_register[0])
     new_stack, sr, tmat = registrate_stack(stack)   
     crop_coordinates = coord_to_crop(stack.shape, tmat) if crop == True else None
@@ -219,4 +220,4 @@ def registration (folders_to_register: List[str],
             stack2_from_stack = sr.transform_stack(stack2)
             save(stack2_from_stack, names2, path_to_save, folders_to_register[i], crop_coordinates)
   
-    return None 
+    return print('Files were registered! Check your saving path for the results.')

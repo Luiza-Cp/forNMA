@@ -5,7 +5,4 @@ Created on Mon Sep 23 13:12:23 2019
 
 @author: atschan
 """
-
-
-
-
+from .LapTracker import LapTracker
