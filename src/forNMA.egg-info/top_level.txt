@@ -1,4 +1,2 @@
-Interface
-Registration
-Segmentation
-Tracking
+src
+tests
