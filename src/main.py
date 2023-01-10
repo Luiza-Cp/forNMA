@@ -18,7 +18,7 @@ def main():
                                           ' each must be in a separate folder and passed to the parser.')
     parser_registration.add_argument('--path_to_save', '-ps', required=True, type=str,
                                      help='path to save registered images')
-    parser.add_argument('--crop', nargs='?', type=bool, default=True,
+    parser_registration.add_argument('--crop', nargs='?', type=bool, default=True,
                         help='Crop images to keep only portions that are always in the field of view')
 
     # parser for the "segmentation" command
