@@ -19,7 +19,7 @@ def main():
     parser_registration.add_argument('--path_to_save', '-ps', required=True, type=str,
                                      help='path to save registered images')
     parser_registration.add_argument('--crop', nargs='?', type=bool, default=True,
-                        help='Crop images to keep only portions that are always in the field of view')
+                                     help='Crop images to keep only portions that are always in the field of view')
 
     # parser for the "segmentation" command
     parser_segmentation = subparsers.add_parser('segmentation', description='Runs segmentation and feature extraction',
@@ -55,7 +55,7 @@ def main():
     if args.subparser_name == 'registration':
         registration(args.path, args.path_to_save, args.crop)
     elif args.subparser_name == 'segmentation':
-        run(toml.load(args.parameters), args.headless)
+        run(toml.load(args.parameters), headless=args.headless)
     elif args.subparser_name == 'tracking':
         tracking(args.path_to_table, args.path_to_save, args.max_distance, args.time_window, args.max_split_distance,
                  args.max_gap_closing_distance, args.allow_merging)

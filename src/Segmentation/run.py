@@ -338,13 +338,11 @@ def run(parameters_dict: dict,
         segment_dict = adjust_parameters(parameters_dict)
         subfolders, folder_dict = create_folder_dict(ch_name_list, ch_path_list,
                                                      ch_with_nuc, parameter_list)
-        print('criou os dict')
         # tests whether number of conditions match the number os subfolders/treatments
         if len(conditions) != len(subfolders):
             conditions = [False] * len(subfolders)
 
     temp_dir = tempfile.TemporaryDirectory()
-    print(len(subfolders))
     for i in range(len(subfolders)):
         subfolder_dict = create_subfolder_dict(folder_dict, i)
         if not check_size(subfolder_dict):
@@ -352,16 +350,14 @@ def run(parameters_dict: dict,
 
         not_supported = is_file_supported(subfolder_dict, preview)
         if len(not_supported) != 0:
-            print('not supported')
             message = 'The following files are not supported by forNMA. Remove them from your folders an try again.'
             return {'status': 'bad', 'message': message, 'data': not_supported}
+
         # função que pega esse dicionŕio e manda pra interface ou printa de acordo com a ocasião
-        print('antes analyze')
         total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview,
                                 callback)  # ju usa esse pra remover outliers
-        print('analyzed')
+
         if total_df is None:
-            print('vazio')
             continue
 
         filename = os.path.basename(subfolders[i]) + '.zip'
