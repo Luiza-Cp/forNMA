@@ -131,10 +131,8 @@ def analyze_dict(
 
     all_df_list = []  # all dataframes to be concatenated
     total_images = len((list(subfolder_dict.values())[0][0]))  # number of images in the folder
-    print('entrou no analyze')
     # if running on preview mode, analyzes just the first 5 images of each folder
     total_images = 5 if preview and total_images > 10 else total_images
-    print(total_images, 'total_images')  # esse print ta aqui pra conferencia só, depois apagar
 
     for img_n in range(total_images):
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
