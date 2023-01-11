@@ -260,7 +260,7 @@ def draw_and_save(df: pd.DataFrame,
 
             else:
                 cnt = list(group[col])
-                cnt = [f[0] for f in cnt if len(f) > 0] if use_cellpose else cnt
+                cnt = [f[0] for f in cnt if len(f) > 0] if use_cellpose or 'Cyto' in col else cnt
                 img = cv.drawContours(img, cnt, -1, (122, 144, 248), 1)
 
         cv.imwrite(os.path.join(saving_dir, name), img)
@@ -303,7 +303,7 @@ def is_file_supported(subfolder_dict: dict,
     not_supported = []
     for key, value in subfolder_dict.items():
         wrong_file_formats = [f for f in value[0] if not f.lower().endswith(tuple(supported_files))]
-        not_supported.append(wrong_file_formats)
+        not_supported.extend(wrong_file_formats)
 
     return not_supported
 
@@ -322,6 +322,7 @@ def run(parameters_dict: dict,
     Gets all user inputs and applies them to analyze all folders and subfolders.
     Then filters results, draws images (if requested) and saves all results.
     """
+
     if callback is None:
         callback = MockSignal()
 
@@ -350,6 +351,7 @@ def run(parameters_dict: dict,
 
         not_supported = is_file_supported(subfolder_dict, preview)
         if len(not_supported) != 0:
+            print('message')
             message = 'The following files are not supported by forNMA. Remove them from your folders an try again.'
             return {'status': 'bad', 'message': message, 'data': not_supported}
 
@@ -379,3 +381,4 @@ def run(parameters_dict: dict,
     temp_dir.cleanup()
 
     return {'status': 'ok', 'message': 'Completed Successfully!', 'data': []}
+
