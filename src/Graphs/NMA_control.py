@@ -14,10 +14,13 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from matplotlib.widgets import Slider
+import matplotlib
+matplotlib.use('TkAgg')
 # as infos disso estção anotadas no caderno, conferir ali
 from scipy import stats
 
-from NMA_draggable_line import draggable_lines
+from.NMA_draggable_line import draggable_lines
+
 
 
 class NMA:
@@ -52,6 +55,7 @@ class NMA:
         self.headless = headless
         self.mean_NII, self.mean_a, self.std_NII, self.std_a, self.circle = self.calc_threshold_NMA()
         self.graph_limits = self.calc_area_NII_lims()
+        self.ellipse = self.get_ellipse()
         self.adjust_ellipse() if self.headless is False else None
         self.h_x, self.h_y_up, self.h_y_down = self.calc_lines()
         self.graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7, ec="#bdbbbb", lw=1)
@@ -121,6 +125,13 @@ class NMA:
 
         return min_a, max_a, min_NII, max_NII
 
+    def get_ellipse(self):
+        ellipse = mp.Ellipse((self.mean_NII, self.mean_a),
+                             2 * self.sd * self.std_NII,
+                             2 * self.sd * self.std_a,
+                             ec='black', fc=None, fill=False)
+        return ellipse
+
     def adjust_ellipse(self):
         """
         Plots a control sample of 500 units (or all control if smaller) with the
@@ -141,10 +152,7 @@ class NMA:
         fig, ax = plt.subplots()
         sns.scatterplot(data=df_sample, x="NII", y="Area", ax=ax)
 
-        ellipse = mp.Ellipse((self.mean_NII, self.mean_a),
-                             2 * self.sd * self.std_NII,
-                             2 * self.sd * self.std_a,
-                             ec='black', fc=None, fill=False)
+        ellipse = self.ellipse
         ax.add_patch(ellipse)
         ax.set_title('Adjust here the threshold ellipse')
         plt.subplots_adjust(left=0.25, bottom=0.25)
@@ -220,9 +228,9 @@ class NMA:
         ax.set_title('Click to move the blue lines. Click again to release.')
 
         # ax.text(x, y, text, size, bbox)
-        ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.3 * self.sd * self.mean_a, 'LR',
+        ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.1 * self.sd * self.mean_a, 'LR',
                 size=10, bbox=self.graph_box)
-        ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.3 * self.sd * self.mean_a, 'LI',
+        ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.1 * self.sd * self.mean_a, 'LI',
                 size=10, bbox=self.graph_box)
         ax.text(self.mean_NII, self.mean_a, 'N', size=10, bbox=self.graph_box)
         ax.text(self.v_midx[0] + 1, self.mean_a, 'I', size=10, bbox=self.graph_box)
@@ -246,7 +254,7 @@ class NMA:
         v_upx = [upper_line.x, upper_line.x]
         v_midx = [middle_line.x, middle_line.x]
         v_downx = [bottom_line.x, bottom_line.x]
-        v_downx2 = [bottom_line2.x, bottom_line.x]
+        v_downx2 = [bottom_line2.x, bottom_line2.x]
 
         plt.close('all')
 
@@ -319,8 +327,8 @@ def check_column_names(df: pd.DataFrame,
 
     if not all(item in df.columns for item in columns):
         raise ValueError(
-            'The table ' + name + 'does not have forNMA output column names. Rename your columns according to forNMA '
-                                  'standard outputs and try again.')
+            f'The table {name} does not have forNMA output column names. Rename your columns according to forNMA '
+            f'standard outputs and try again.')
 
     return None
 
@@ -339,8 +347,10 @@ def NMA_control(path: str,
                       "mean_NII": nma.mean_NII,
                       "std_NII": nma.std_NII,
                       "mean_a": nma.mean_a,
+                      "std_a": nma.std_a,
                       "circle": nma.circle,
                       "graph_limits": nma.graph_limits,
+                      "ellipse": nma.ellipse,
                       "h_x": nma.h_x,
                       "h_y_up": nma.h_y_up,
                       "h_y_down": nma.h_y_down,
@@ -359,5 +369,5 @@ def NMA_control(path: str,
 
     return print("NMA control setting complete")
 
-NMA_control('/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv')
 
+#NMA_control('/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv')

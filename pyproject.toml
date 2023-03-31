@@ -28,7 +28,8 @@ dependencies = [
     'cellpose==1.0.0',
     'setuptools==63.4.1',
     'pystackreg',
-    'shapely'
+    'shapely',
+    "PyQt5"
 ]
 dynamic = ["version"]
 

@@ -23,34 +23,23 @@ from NMA_draggable_line import draggable_lines
 import matplotlib.patches as mp
 from matplotlib.widgets import Slider, Button, RadioButtons
 
-# no graph init a pessoa já meio que colocou todas as tabelas do experiemntos e indicou os controles
-# Se o experimento é overtime, os controles serão uma amostra de todos os tempos 
-
-# na interface: usar um código que fornece uma caixinha pra digitar o sd ou opções de linhagens celulares
-# em ordem alfabética. Essa lista de linhagens pode ser atualizada pelo user ???
-# os valores devem ser puxados de um csv (que abre em forma de dataFrame). 
-#ALÉM DE CADA USUÁRIO PODER ADD SUAS LINHAGENS, A GENTE PODE DISPONIBILIZAR TABELAS ATUALIZADAS NO SITE
-
-
-# se nenhuma do is control for true, ele avisa que é necessário ter uma condição controle (caixa de erro mesmo)
-
 class NMA:
     """ Class for NMA graph plotting"""
                                                               
-    def __init__(self, df, sd): 
+    def __init__(self, df, sd):
         """                                     
         Atributes:
         
         self.df: pandas DataFrame with all value information
         self.sd: float representing the standard deviation from mean to use for NMA threshold
-        self.mean_NII: mean NII value of control gorup
-        self.mean_a: mean area value of control gorup
+        self.mean_NII: mean NII value of control group
+        self.mean_a: mean area value of control group
         self.std_NII: distance from mean NII of the max or min value (the smallest is chosen)
         self.std_a: distance from mean area of the max or min value (the smallest is chosen)
         self.circle: numpy linespace for ellipse 
         self.h_x: horizontal line x value
-        self.h_y_up: horixontal upper line y coordinates
-        self.h_y_down: horixontal lower line y coordinates
+        self.h_y_up: horizontal upper line y coordinates
+        self.h_y_down: horizontal lower line y coordinates
         self.v_upx: vertical upper line X coordinates
         self.v_upy: vertical upper line y coordinates
         self.v_midx: vertical middle line x coordinates
@@ -76,12 +65,12 @@ class NMA:
     def get_control_df(self):
         """ Checks if table has control gourps. If not, raise an error."""
         
-        if 'is_control' not in self.df.columns: #    is the column there?
+        if 'is_control' not in self.df.columns: # is the column there?
             raise ValueError ('There is no column indicating controls.')
-        elif 'y' not in list(self.df['is_control']): #    are there any controls?
+        elif 'y' not in list(self.df['is_control']): # are there any controls?
             raise ValueError ("There are no controls indicated in yor table.")
         else:
-            return self.df.loc[self.df['is_control']== 'y']
+            return self.df.loc[self.df['is_control'] == 'y']
             
         
     def subset_df(self, condition_time_tuple):
@@ -519,10 +508,8 @@ class NMA:
                         str(round(percentages['SI'].iloc[0],2)), size=10, bbox=self.graph_box)
                 
         ax.set_title(title)   
-      
-        
-        return fig    
 
+        return fig    
 
     def calc_gates(self):
         """
