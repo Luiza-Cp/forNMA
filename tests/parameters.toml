@@ -1,0 +1,165 @@
+# This is where we set all forNMA parameters. The commented lines will help
+# you to understand each parameter.
+
+
+# First, add the paths o folders you want to analyze. Each folder should represent
+# a microscopy channel and it has to contain subfolders. You can have as many
+# channels you want. 
+# If you have just one channel, create a folder and a subfolder anyway.
+channel_path_list = [ '/media/luiza/DATA/Doutorado/53BP1/tests/Green', '/media/luiza/DATA/Doutorado/53BP1/tests/Red']
+
+# you can name each folder
+names = [ 'green','red']
+
+# you can also name your subfolders if you want.
+subfolder_names = [ 'Control', 'Treatment']
+
+# add path to channel containing nucleus to be segmented
+channel_with_nuclei = '/media/luiza/DATA/Doutorado/53BP1/tests/Red'
+
+# Are your data a time sequence?
+overtime = true
+
+
+# Here you add the path to a folder where you want to save the results.
+path_to_save = '/media/luiza/DATA/Doutorado/53BP1/tests/Results'
+
+
+# Do you want to save images?
+save_images = true
+ 
+# now, let's set parameters. You can learn about them at www.ufrgs/labsinal/fornma
+[segmentation]
+magnification = 20   
+pixel_size = 0.6    
+rescale_intensity = true
+remove_background = false
+rolling_ball_radius = 40
+
+# forNMA and cellpose thresholds
+shape = 0.88               
+eccentricity = false        
+minimum_size =  false
+maximum_size =  false
+minimum_radius =  false
+maximum_radius = false
+
+
+#parameters for running with forNMA pipeline
+[segmentation.forNMA]    
+use_fornma = true          
+threshold = 'triangle'
+offset = 5                 
+smooth  = 13                    
+adjust_size = -1      
+cut_edges = 0.9
+find_low_intensity_nucleus = false
+weakly_labeled = false
+
+
+#parameters for running with cellpose 
+[segmentation.cellpose]   
+use_cellpose =  false
+diameter = 25
+flow_threshold = 0.4
+mask_threshold = 0.0
+use_gpu = false
+
+
+# Now let's set each channel parameter. You can add channels if needded.
+# Each channel can have its own fluorescence normaliztion and features to be
+# extracted. 
+# if you have less channels than those listed here, just let them the way they are
+[channel_parameters]
+
+[channel_parameters.channel1]
+rescale_intensity =  true  
+remove_background = true
+rolling_ball_radius = 40
+match_histograms = false
+measure_translocation = true
+ring_size = 3 
+use_ellipse = true
+measure_foci = false
+foci_min_size = 7
+foci_max_size = false
+foci_min_int = false
+foci_max_int = false
+foci_prominence =  1.2
+
+
+[channel_parameters.channel2]
+rescale_intensity =  true   
+remove_background = true
+rolling_ball_radius = 40
+match_histograms =false
+measure_translocation = false
+ring_size = false
+use_ellipse = false
+measure_foci = true
+foci_min_size = 5
+foci_max_size = false
+foci_min_int = false
+foci_max_int = false
+foci_prominence =  1.2
+
+[channel_parameters.channel3]
+rescale_intensity =  true   
+remove_background = true
+rolling_ball_radius = 40
+match_histograms =false
+measure_translocation = false
+ring_size = false
+use_ellipse = false
+measure_foci = true
+foci_min_size = 7
+foci_max_size = false
+foci_min_int = false
+foci_max_int = false
+foci_prominence =  1.2
+
+[channel_parameters.channel4]
+rescale_intensity =  true 
+remove_background = true
+rolling_ball_radius = 40
+match_histograms =false
+measure_translocation = false
+ring_size = false
+use_ellipse = false
+measure_foci = true
+foci_min_size = 7
+foci_max_size = false
+foci_min_int = false
+foci_max_int = false
+foci_prominence =  1.2
+
+[channel_parameters.channel5]
+rescale_intensity =  true
+remove_background = true
+rolling_ball_radius = 40
+match_histograms =false
+measure_translocation = false
+ring_size = false
+use_ellipse = false
+measure_foci = true
+foci_min_size = 7
+foci_max_size = false
+foci_min_int = false
+foci_max_int = false
+foci_prominence =  1.2
+
+[channel_parameters.channel6]
+rescale_intensity =  true    
+remove_background = true
+rolling_ball_radius = 40
+match_histograms =false
+measure_translocation = false
+ring_size = false
+use_ellipse = false
+measure_foci = true
+foci_min_size = 7
+foci_max_size = false
+foci_min_int = false
+foci_max_int = false
+foci_prominence =  1.2
+
