@@ -3,3 +3,10 @@ venv/
 
 # PyCharm stuff
 /.idea
+
+# forNMA analysis data
+src/Graphs/control_parameters.pickle
+
+# Generated data
+forNMA.egg-info
+build
