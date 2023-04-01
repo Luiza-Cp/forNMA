@@ -71,8 +71,8 @@ def main():
 
     # NMA dot_plot
     parser_dot = subparser_one.add_parser('dot_plot')
-    parser_dot.add_argument('path', type=str, nargs='+', action='store', help='option 2')
-    parser_dot.add_argument('saving_path', action='store', help='option 2')
+    parser_dot.add_argument('paths',  type=str, nargs='+', action='store', help='option 2')
+    parser_dot.add_argument('--saving_path', '-sp', action='store', help='option 2')
     parser_dot.add_argument('--column1', '-c1', type=str, default=None, help='option 2')
     parser_dot.add_argument('--column2', '-c2', type=str, default=None, help='option 2')
     parser_dot.add_argument('--sample_size', '-sz', type=int, default=None, help='option 2')
@@ -80,7 +80,7 @@ def main():
     parser_dot.add_argument('--overtime', '-o', type=bool, default=False, help='option 2')
 
     args = parser.parse_args()
-   # print(args)
+    print(args)
 
     if args.subparser_name == 'registration':
         registration(args.path, args.path_to_save, args.crop)
@@ -93,10 +93,9 @@ def main():
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
     elif args.subparser_name == 'NMA':
         if hasattr(args, 'standard_deviation'):
-            print(args)
             NMA_control(args.path, args.standard_deviation, args.headless)
         elif hasattr(args, 'column1'):
-            plot_NMA(args.path, args.saving_path, "dot", args.column1, args.column2, args.sample_size, args.single,
+            plot_NMA(args.paths, args.saving_path, "dot", args.column1, args.column2, args.sample_size, args.single,
                      args.overtime)
         else:
             plot_NMA(args.path, args.saving_path, "heatmap", None, None, None, args.single, args.overtime)
