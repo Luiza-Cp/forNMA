@@ -10,3 +10,7 @@ src/Graphs/control_parameters.pickle
 # Generated data
 forNMA.egg-info
 build
+
+# registered images
+tests/Results/Control green Registered/
+tests/Results/Control red Registered/
