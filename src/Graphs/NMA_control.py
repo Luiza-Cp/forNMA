@@ -18,7 +18,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 # as infos disso estção anotadas no caderno, conferir ali
 from scipy import stats
-from NMA_draggable_line import draggable_lines
+from .NMA_draggable_line import draggable_lines
 
 
 class NMA:
@@ -388,4 +388,4 @@ def NMA_control(path: str,
     return print("NMA control setting complete")
 
 
-NMA_control('/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv')
+#NMA_control('/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv')
