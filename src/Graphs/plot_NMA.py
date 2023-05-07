@@ -407,7 +407,7 @@ def plot_NMA(path_list: List[str],
     """ From a list of paths corresponding to csv files, plots NMA graphs"""
     try:
         os.path.isfile('control_parameters.pickle')
-    except:
+    except Exception:
         print("The NMA controls were not set. Run 'NMA control' command before plotting")
 
     with open('control_parameters.pickle', 'rb') as f:
@@ -430,11 +430,4 @@ def plot_NMA(path_list: List[str],
     NMA(df, parameters, graph_type, single, overtime, saving_path, sample, sample_size, col1, col2)
 
     return print("Complete")
-
-
-#path_list = [ '/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv',
-#              '/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras2 Results.csv' ,
- #             '/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras4 Results.csv',
- #             '/media/luiza/DATA/Doutorado/Dani/results/24h/lnc2 Results.csv' ]
-#plot_NMA(path_list, '/home/luiza/Área de Trabalho/teste NMA', 'dot', "Mean_Nucleus/Ring_LNC", "Perimeter",)
 

@@ -12,7 +12,6 @@ from matplotlib import pyplot as plt
 from typing import List, Optional
 from NMA_draggable_line import draggable_lines
 
-
 def gating(df: pd.DataFrame,
            conditions: List[str],
            x: str,
@@ -28,11 +27,10 @@ def gating(df: pd.DataFrame,
     
     if len(conditions) > 0:
         df = df[df['Condition'].isin(conditions)]
-    if frames !=  None and len(frames) > 0:
+    if frames is not None and len(frames) > 0:
         df = df[df['Frame'].isin(frames)]
-    
-    %matplotlib qt
-    #sns.set_theme()
+
+    sns.set_theme()
    
     x0 = df[x].quantile(.05)
     xf = df[x].quantile(.95)
@@ -64,5 +62,6 @@ def gating(df: pd.DataFrame,
     df2 = df.loc[(df[y] < upper) & (df[y] > bottom)]
     df2 = df2.loc[(df2[x] < right) & (df2[x] > left)]
 
-    return df2
+
+    return print()
 

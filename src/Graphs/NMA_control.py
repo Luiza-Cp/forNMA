@@ -19,7 +19,7 @@ matplotlib.use('TkAgg')
 # as infos disso estção anotadas no caderno, conferir ali
 from scipy import stats
 
-from.NMA_draggable_line import draggable_lines
+from .NMA_draggable_line import draggable_lines
 
 
 
