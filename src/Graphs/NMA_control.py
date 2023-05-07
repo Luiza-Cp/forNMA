@@ -18,7 +18,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 # as infos disso estção anotadas no caderno, conferir ali
 from scipy import stats
-from .NMA_draggable_line import draggable_lines
+from NMA_draggable_line import draggable_lines
 
 
 class NMA:
@@ -60,7 +60,7 @@ class NMA:
         self.h_x, self.h_y_up, self.h_y_down = self.calc_lines()
         self.graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7, ec="#bdbbbb", lw=1)
         self.v_upx, self.v_upy, self.v_midx, self.v_midy, self.v_downx, self.v_downy, self.v_downx2 = self.get_vertical_lines()
-        self.v_upx, self.v_midx, self.v_downx, self.v_downx2 = self.adjust_vertical_lines() if self.headless is False else None
+        self.v_upx, self.v_midx, self.v_downx, self.v_downx2, self.fig = self.adjust_vertical_lines() if self.headless is False else None
 
     def subset_df(self, condition_time_tuple):
 
@@ -271,8 +271,9 @@ class NMA:
         v_downx2 = [bottom_line2.x, bottom_line2.x]
 
         plt.close('all')
+        ax.set_title('NMA stored settings')
 
-        return v_upx, v_midx, v_downx, v_downx2
+        return v_upx, v_midx, v_downx, v_downx2, fig
 
     def f_test(self,
                x: List[float],
@@ -377,7 +378,8 @@ def NMA_control(path: str,
                       "v_midy": nma.v_midy,
                       "v_downx": nma.v_downx,
                       "v_downy": nma.v_downy,
-                      "v_downx2": nma.v_downx2
+                      "v_downx2": nma.v_downx2,
+                      'fig': nma.fig,
                       }
 
     with open('control_parameters.pickle', 'wb') as handle:
@@ -386,4 +388,4 @@ def NMA_control(path: str,
     return print("NMA control setting complete")
 
 
-#NMA_control('/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv')
+NMA_control('/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv')

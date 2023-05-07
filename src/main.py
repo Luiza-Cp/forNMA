@@ -3,9 +3,7 @@ import toml
 from src.Registration import registration
 from src.Segmentation import run
 from src.Tracking import tracking, draw_tracking
-from src.Graphs import NMA_control, plot_NMA
-from src.Graphs import plot
-
+from src.Graphs import NMA_control, plot_NMA, show_NMA_settings, plot
 
 def main():
     # top-level parser
@@ -57,13 +55,16 @@ def main():
                                                    '"fonrma NMA control".')
     subparser_one = parser_NMA.add_subparsers()
 
-    # NMA control
-    parser_control = subparser_one.add_parser('control', help='Sets the control parameters for NMA plots.')
+    # NMA settings
+    parser_control = subparser_one.add_parser('settings', help='Creates the settings parameters for NMA plots.')
     parser_control.add_argument('path', type=str, help='Path to control group table.')
     parser_control.add_argument('--standard_deviation', '-sd', type=float, default=2.0,
                                 help='The standard deviation to select control populations.')
     parser_control.add_argument('--headless', '-hd', type=bool, default=False,
                                 help="Run in headless mode")
+
+    # NMA show settings
+    parser_show_settings = subparser_one.add_parser('show_settings', help='Displays the current NMA settings')
 
     # NMA heatmap_plot
     parser_heatmap = subparser_one.add_parser('heatmap_plot', help="Plots a NMA heatmap")
@@ -214,6 +215,8 @@ def main():
     elif args.subparser_name == 'NMA':
         if hasattr(args, 'standard_deviation'):
             NMA_control(args.path, args.standard_deviation, args.headless)
+        elif args.subparser_name == 'show_settings':
+            show_NMA_settings()
         elif hasattr(args, 'column1'):
             plot_NMA(args.paths, args.saving_path, "dot", args.column1, args.column2, args.sample_size, args.single,
                      args.overtime)
@@ -235,8 +238,6 @@ def main():
         print('No option was found')
     return
 
-
-# TODO: parser pra a plotagem de gráficos e checar o tracking maybe
 
 if __name__ == '__main__':
     main()
