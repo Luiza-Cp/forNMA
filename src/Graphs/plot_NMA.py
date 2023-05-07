@@ -19,7 +19,8 @@ class NMA:
         Atributes:
 
         self.df: pandas DataFrame with all value information
-        self.sd: float representing the standard deviation from mean to use for NMA threshold
+        self.sd_area: float representing the number of standard deviations from the mean to use for NMA area threshold
+        self.sd_NII: float representing the number of standard deviations from the mean to use for NMA NII threshold
         self.mean_NII: mean NII value of control group
         self.mean_a: mean area value of control group
         self.std_NII: distance from mean NII of the max or min value (the smallest is chosen)
@@ -42,7 +43,8 @@ class NMA:
         self.sample_size = sample_size
         self.hue = hue
         self.size = size
-        self.sd = parameters['sd']
+        self.sd_area = parameters['sd_area']
+        self.sd_NII = parameters['sd_NII']
         self.mean_NII = parameters['mean_NII']
         self.mean_a = parameters["mean_a"]
         self.std_NII = parameters['std_NII']
@@ -292,8 +294,8 @@ class NMA:
 
         sns.scatterplot(data=subset_of_df, x="NII", y="Area", size=size, hue=hue,
                         hue_norm=hue_norm, size_norm=size_norm, ax=ax, palette='rainbow')
-        ax.plot(self.mean_NII + (self.sd * self.std_NII) * np.cos(self.circle),
-                self.mean_a + (self.sd * self.std_a) * np.sin(self.circle), color='black')
+        ax.plot(self.mean_NII + (self.sd_NII * self.std_NII) * np.cos(self.circle),
+                self.mean_a + (self.sd_area * self.std_a) * np.sin(self.circle), color='black')
 
         ax.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
                 self.v_upx, self.v_upy, self.v_midx, self.v_midy,
@@ -310,19 +312,20 @@ class NMA:
                 percentages = (percentages.sum() / n).to_frame()
                 percentages = percentages.transpose()
 
-            ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.1 * self.sd * self.mean_a,
+            ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a,
                     str(round(percentages['LR'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
-            ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.1 * self.sd * self.mean_a,
+            ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a,
                     str(round(percentages['LI'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
             ax.text(self.mean_NII, self.mean_a, str(round(percentages['N'].iloc[0], 2)) + '%',
                     size=10, bbox=self.graph_box)
             ax.text(self.v_midx[0] + 1, self.mean_a, str(round(percentages['I'].iloc[0], 2)) + '%',
                     size=10, bbox=self.graph_box)
-            ax.text(self.v_downx[0] - 0.7, self.h_y_down[0] - 0.1 * self.sd * self.mean_a,
+            ax.text(self.v_downx[0] - 0.7, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
                     str(round(percentages['SR'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
-            ax.text(self.v_downx[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd * self.mean_a,
+            mid_point = self.v_downx[0] + (self.v_downx2[0] - self.v_downx[0]) / 2
+            ax.text(mid_point, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
                     str(round(percentages['S'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
-            ax.text(self.v_downx2[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd * self.mean_a,
+            ax.text(self.v_downx2[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
                     str(round(percentages['SI'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
 
         ax.set_title(title)
@@ -413,10 +416,12 @@ def plot_NMA(path_list: List[str],
     with open('control_parameters.pickle', 'rb') as f:
         parameters = pickle.load(f)
         control_name = parameters['name']
-        sd = parameters['sd']
+        sd_area = parameters['sd_area']
+        sd_NII = parameters['sd_NII']
         print(
-            f'Your current control configuration was defined with table named {control_name} with an standard deviation'
-            f'of {sd}.\nIf you need other control settings, run "NMA control" command again.')
+            f'Your current control configuration was defined with table named {control_name} with an area standard '
+            f'deviation of {sd_area} and NII standard deviation of {sd_NII}.\nIf you need other control settings, '
+            f'please run "NMA control" command again.')
 
     df_list = [pd.read_csv(f) for f in path_list]
     names = [os.path.basename(f).replace('Results.csv', '') for f in path_list]
