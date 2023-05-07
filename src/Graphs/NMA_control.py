@@ -18,20 +18,19 @@ import matplotlib
 matplotlib.use('TkAgg')
 # as infos disso estção anotadas no caderno, conferir ali
 from scipy import stats
-
 from .NMA_draggable_line import draggable_lines
-
 
 
 class NMA:
     """ Class for NMA graph plotting"""
 
-    def __init__(self, df, sd, headless):
+    def __init__(self, df, sd_area, sd_NII, headless):
         """
         Atributes:
 
         self.df: pandas DataFrame with all value information
-        self.sd: float representing the standard deviation from mean to use for NMA threshold
+        self.sd_area: float representing the number of standard deviations from the mean to use for NMA area threshold
+        self.sd_NII: float representing the number of standard deviations from the mean to use for NMA NII threshold
         self.headless: boolean indicating if execution muts use GUI or not. If True does not use it.
         self.mean_NII: mean NII value of control group
         self.mean_a: mean area value of control group
@@ -51,7 +50,8 @@ class NMA:
         self.graph_limits: tuple with min and maximum area and NII values within 3 standard deviations
         """
         self.df = df
-        self.sd = sd
+        self.sd_area = sd_area
+        self.sd_NII = sd_NII
         self.headless = headless
         self.mean_NII, self.mean_a, self.std_NII, self.std_a, self.circle = self.calc_threshold_NMA()
         self.graph_limits = self.calc_area_NII_lims()
@@ -104,8 +104,8 @@ class NMA:
         for thresholding.
         """
 
-        rx = self.sd * self.std_NII  # number of stantadard deviations * standard deviation
-        ry = self.sd * self.std_a
+        rx = self.sd_NII * self.std_NII  # number of stantadard deviations * standard deviation
+        ry = self.sd_area * self.std_a
         horizontal_x = [self.mean_NII - rx, self.mean_NII + 3 * rx]
         horizontal_y_up = [self.mean_a + ry, self.mean_a + ry]
         horizontal_y_down = [self.mean_a - ry, self.mean_a - ry]
@@ -127,8 +127,8 @@ class NMA:
 
     def get_ellipse(self):
         ellipse = mp.Ellipse((self.mean_NII, self.mean_a),
-                             2 * self.sd * self.std_NII,
-                             2 * self.sd * self.std_a,
+                             2 * self.sd_NII * self.std_NII,
+                             2 * self.sd_area * self.std_a,
                              ec='black', fc=None, fill=False)
         return ellipse
 
@@ -154,28 +154,41 @@ class NMA:
 
         ellipse = self.ellipse
         ax.add_patch(ellipse)
-        ax.set_title('Adjust here the threshold ellipse')
+        ax.set_title('Adjust here the threshold ellipse.\nClose the window when you are done.')
         plt.subplots_adjust(left=0.25, bottom=0.25)
 
-        axsd = plt.axes([0.1, 0.25, 0.0225, 0.63])
-        axsd_slider = Slider(
-            ax=axsd,
-            label="SD",
+        axsv = plt.axes([0.1, 0.25, 0.0225, 0.63])
+        axsv_slider = Slider(
+            ax=axsv,
+            label="Area SD",
             valmin=0,
             valmax=5,
-            valinit=self.sd,
+            valinit=self.sd_area,
             orientation="vertical"
         )
+
+        axsh = plt.axes([0.25, 0.1, 0.63, 0.0225])
+        axsh_slider = Slider(
+            ax=axsh,
+            label="NII SD",
+            valmin=0,
+            valmax=5,
+            valinit=self.sd_NII,
+            orientation="horizontal"
+        )
+
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
 
         def update(val):
-            self.sd = axsd_slider.val
-            ellipse.set_height(2 * self.sd * self.std_a)
-            ellipse.set_width(2 * self.sd * self.std_NII)
+            self.sd_area = axsv_slider.val
+            self.sd_NII = axsh_slider.val
+            ellipse.set_height(2 * self.sd_area * self.std_a)
+            ellipse.set_width(2 * self.sd_NII * self.std_NII)
             fig.canvas.draw_idle()
 
-        axsd_slider.on_changed(update)
+        axsv_slider.on_changed(update)
+        axsh_slider.on_changed(update)
         plt.show(block=True)
 
         return None
@@ -183,18 +196,18 @@ class NMA:
     def get_vertical_lines(self):
         """ Calculates vertical lines based on self.sd values"""
 
-        upper_line_x = self.mean_NII + 1.5 * self.sd * self.std_NII
-        # Vertical UPper line X coordinates:
+        upper_line_x = self.mean_NII + 1.5 * self.sd_NII * self.std_NII
+        # Vertical Upper line X coordinates:
         v_upx = [upper_line_x, upper_line_x]
 
-        # Vertical UPper line Y coordinates:
-        v_upy = [int(self.mean_a + self.sd * self.std_a), int(self.mean_a + (2 + self.sd) * self.std_a)]
+        # Vertical Upper line Y coordinates:
+        v_upy = [int(self.mean_a + self.sd_area * self.std_a), int(self.mean_a + (2 + self.sd_area) * self.std_a)]
 
         # Vertical MIDdle line X coordinates:
         v_midx = v_upx
 
         # Vertical MIDdle line Y coordinates:
-        v_midy = [int(self.mean_a - self.sd * self.std_a), v_upy[0]]
+        v_midy = [int(self.mean_a - self.sd_area * self.std_a), v_upy[0]]
 
         # Vertical BOTTOM line 1 X coordinates:
         v_downx = [self.mean_NII, self.mean_NII]
@@ -203,7 +216,7 @@ class NMA:
         v_downx2 = v_upx
 
         # Vertical BOTTOM lines Y coordinates (both bottom lines):
-        v_downy = [int(self.mean_a - (1 + self.sd) * self.std_a), v_midy[0]]
+        v_downy = [int(self.mean_a - (1 + self.sd_area) * self.std_a), v_midy[0]]
 
         return v_upx, v_upy, v_midx, v_midy, v_downx, v_downy, v_downx2
 
@@ -223,22 +236,23 @@ class NMA:
         ax = fig.add_subplot(sns.scatterplot(data=df_sample, x="NII", y="Area", ))
 
         ax.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down, color='black')
-        ax.plot(self.mean_NII + (self.sd * self.std_NII) * np.cos(self.circle),
-                self.mean_a + (self.sd * self.std_a) * np.sin(self.circle), color='black')
-        ax.set_title('Click to move the blue lines. Click again to release.')
+        ax.plot(self.mean_NII + (self.sd_NII * self.std_NII) * np.cos(self.circle),
+                self.mean_a + (self.sd_area * self.std_a) * np.sin(self.circle), color='black')
+        ax.set_title('Click to move the blue lines and click again to release.\nClose the window when you are done.')
 
         # ax.text(x, y, text, size, bbox)
-        ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.1 * self.sd * self.mean_a, 'LR',
+        ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a, 'LR',
                 size=10, bbox=self.graph_box)
-        ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.1 * self.sd * self.mean_a, 'LI',
+        ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a, 'LI',
                 size=10, bbox=self.graph_box)
         ax.text(self.mean_NII, self.mean_a, 'N', size=10, bbox=self.graph_box)
         ax.text(self.v_midx[0] + 1, self.mean_a, 'I', size=10, bbox=self.graph_box)
-        ax.text(self.v_downx[0] - 0.5, self.h_y_down[0] - 0.1 * self.sd * self.mean_a,
+        ax.text(self.v_downx[0] - 0.5, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
                 'SR', size=10, bbox=self.graph_box)
-        ax.text(self.v_downx[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd * self.mean_a, 'S',
+        mid_point = self.v_downx[0] + (self.v_downx2[0] - self.v_downx[0])/2
+        ax.text(mid_point, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a, 'S',
                 size=10, bbox=self.graph_box)
-        ax.text(self.v_downx2[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd * self.mean_a,
+        ax.text(self.v_downx2[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
                 'SI', size=10, bbox=self.graph_box)
 
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
@@ -334,16 +348,18 @@ def check_column_names(df: pd.DataFrame,
 
 
 def NMA_control(path: str,
-                sd: Optional[float] = 2.0,
+                sd_area: Optional[float] = 2.0,
+                sd_nii: Optional[float] = 2.0,
                 headless: bool = False):
-    """Adjust tables and controls for NMA plots. ...."""
+    """Create NMA settings for further plot"""
     df = pd.read_csv(path)
     name = os.path.basename(path)
     check_column_names(df, name)
-    nma = NMA(df, sd, headless)
+    nma = NMA(df, sd_area, sd_nii, headless)
 
     nma_parameters = {"name": name,
-                      "sd": nma.sd,
+                      "sd_area": nma.sd_area,
+                      "sd_NII": nma.sd_NII,
                       "mean_NII": nma.mean_NII,
                       "std_NII": nma.std_NII,
                       "mean_a": nma.mean_a,
