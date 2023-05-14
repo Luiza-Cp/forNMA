@@ -9,7 +9,7 @@ matplotlib.use('TkAgg')
 def show_nma_settings():
     """ Shows plot of stored NMA settings"""
     if not os.path.isfile('control_parameters.pickle'):
-        raise Exception("The NMA controls were not set. Run 'NMA control' command before proceeding.")
+        return print("The NMA settings were not defined. Run 'NMA settings' command before proceeding.")
 
     with open('control_parameters.pickle', 'rb') as f:
         parameters = pickle.load(f)
