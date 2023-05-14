@@ -411,7 +411,7 @@ def plot_NMA(path_list: List[str],
     try:
         os.path.isfile('control_parameters.pickle')
     except Exception:
-        print("The NMA controls were not set. Run 'NMA control' command before plotting")
+        print("The NMA settings were not defined. Run 'NMA settings' command before plotting")
 
     with open('control_parameters.pickle', 'rb') as f:
         parameters = pickle.load(f)
