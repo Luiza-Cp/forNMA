@@ -16,4 +16,5 @@ tests/Results/Control green Registered/
 tests/Results/Control red Registered/
 
 #NMA cache
-/media/luiza/DATA/Doutorado/53BP1
+control_parameters.pickle
+
