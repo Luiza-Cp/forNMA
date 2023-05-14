@@ -1,29 +1,31 @@
 import argparse
 import toml
 from src.Registration import registration
-from src.Segmentation import run
+from src.Segmentation import run, check_user_inputs
 from src.Tracking import tracking, draw_tracking
-from src.Graphs import NMA_control, plot_NMA, show_NMA_settings, plot
+from src.Graphs import NMA_control, plot_NMA, show_nma_settings, plot
+
+
 
 def main():
     # top-level parser
-    parser = argparse.ArgumentParser(prog='forNMA', description='----')
-    subparsers = parser.add_subparsers(help='sub-command help', dest="subparser_name")
+    parser = argparse.ArgumentParser(prog='forNMA', description='forNMA is a tool for single-cell analysis and '
+                                                                'phenotype integration.')
+    subparsers = parser.add_subparsers(help='sub-command help', dest="fornma")
 
     # parser for the "registration" command
     parser_registration = subparsers.add_parser('registration', description='Register images in a folder',
-                                                help='hhh')
-    parser_registration.add_argument('--path', '-p', required=True, type=str, nargs='+', action='store',
-                                     help='path to folder to register. If there are more than one image channel,'
+                                                help='Module to perform registration of images within a folder')
+    parser_registration.add_argument('paths', type=str, nargs='+', action='store',
+                                     help='paths to folders to register. If there are more than one image channels,'
                                           ' each must be in a separate folder and passed to the parser.')
-    parser_registration.add_argument('--path_to_save', '-ps', required=True, type=str,
-                                     help='path to save registered images')
+    parser_registration.add_argument('path_to_save', type=str, help='path to save registered images')
     parser_registration.add_argument('--crop', nargs='?', type=bool, default=True,
                                      help='Crop images to keep only portions that are always in the field of view')
 
     # parser for the "segmentation" command
     parser_segmentation = subparsers.add_parser('segmentation', description='Runs segmentation and feature extraction',
-                                                help='b help')
+                                                help='Module to perform image segmentation and feature extraction')
     parser_segmentation.add_argument('parameters', type=str, help='path to parameters.toml')
     parser_segmentation.add_argument('--headless', type=bool, default=False, help='path to save registered images')
 
@@ -58,13 +60,16 @@ def main():
     # NMA settings
     parser_control = subparser_one.add_parser('settings', help='Creates the settings parameters for NMA plots.')
     parser_control.add_argument('path', type=str, help='Path to control group table.')
-    parser_control.add_argument('--standard_deviation', '-sd', type=float, default=2.0,
-                                help='The standard deviation to select control populations.')
+    parser_control.add_argument('--area_standard_deviation', '-sda', type=float, default=2.0,
+                                help='The number of standard deviations from the Area mean to use for settings')
+    parser_control.add_argument('--NII_standard_deviation', '-sdn', type=float, default=2.0,
+                                help='The number of standard deviations from the NII mean to use for settings')
     parser_control.add_argument('--headless', '-hd', type=bool, default=False,
                                 help="Run in headless mode")
 
     # NMA show settings
     parser_show_settings = subparser_one.add_parser('show_settings', help='Displays the current NMA settings')
+    parser_show_settings.set_defaults(dest='show')
 
     # NMA heatmap_plot
     parser_heatmap = subparser_one.add_parser('heatmap_plot', help="Plots a NMA heatmap")
@@ -79,7 +84,7 @@ def main():
     # NMA dot_plot
     parser_dot = subparser_one.add_parser('dot_plot', help= 'plots a NMA dot plot')
     parser_dot.add_argument('paths', type=str, nargs='+', action='store',  help='Paths to tables to plot.')
-    parser_dot.add_argument('--saving_path', '-sp', action='store', help='Path to save results.')
+    parser_dot.add_argument('saving_path',  action='store', help='Path to save results.')
     parser_dot.add_argument('--column1', '-c1', type=str, default=None,
                             help='Grouping column that will produce different dot colors')
     parser_dot.add_argument('--column2', '-c2', type=str, default=None,
@@ -200,29 +205,34 @@ def main():
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
 
     args = parser.parse_args()
-    print(args)
+    print (args)
 
-    if args.subparser_name == 'registration':
+    if args.fornma == 'registration':
         registration(args.path, args.path_to_save, args.crop)
 
-    elif args.subparser_name == 'segmentation':
-        run(toml.load(args.parameters), headless=args.headless)
-    elif args.subparser_name == 'tracking':
+    elif args.fornma == 'segmentation':
+        dic = toml.load(args.parameters)
+        check_user_inputs(dic)
+        run(dic, headless=args.headless)
+
+    elif args.fornma == 'tracking':
         tracking(args.path_to_table, args.path_to_save, args.max_distance, args.time_window, args.max_split_distance,
                  args.max_gap_closing_distance, args.allow_merging)
-    elif args.subparser_name == 'draw_tracking':
+
+    elif args.fornma == 'draw_tracking':
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
-    elif args.subparser_name == 'NMA':
-        if hasattr(args, 'standard_deviation'):
-            NMA_control(args.path, args.standard_deviation, args.headless)
-        elif args.subparser_name == 'show_settings':
-            show_NMA_settings()
+
+    elif args.fornma == 'NMA':
+        if (hasattr(args, 'dest')) and args.dest == 'show':
+            show_nma_settings()
+        elif hasattr(args, 'area_standard_deviation'):
+            NMA_control(args.path, args.area_standard_deviation, args.NII_standard_deviation, args.headless)
         elif hasattr(args, 'column1'):
             plot_NMA(args.paths, args.saving_path, "dot", args.column1, args.column2, args.sample_size, args.single,
                      args.overtime)
         else:
             plot_NMA(args.path, args.saving_path, "heatmap", None, None, None, args.single, args.overtime)
-    elif args.subparser_name == 'plot':
+    elif args.fornma == 'plot':
         x = args.x if hasattr(args, 'x') else None
         y = args.y if hasattr(args, 'y') else None
         hue = args.hue if hasattr(args, 'hue') else None
@@ -232,12 +242,14 @@ def main():
         style = args.style if hasattr(args, 'style') else None
         ci = args.ci if hasattr(args, 'ci') else None
         dot = args.dot if hasattr(args, 'dot') else None
-        plot(args.path, args.path_to_save, args.conditions, args.frames, args.subparser_name, args.gate, x=x, y=y,
+        plot(args.path, args.path_to_save, args.conditions, args.frames, args.fornma, args.gate, x=x, y=y,
              hue=hue, size=size, control=control, n=n, style=style, ci=ci, dot=dot)
     else:
         print('No option was found')
     return
 
+
+# TODO: parser pra a plotagem de gráficos e checar o tracking maybe
 
 if __name__ == '__main__':
     main()
