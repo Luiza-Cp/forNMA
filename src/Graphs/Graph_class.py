@@ -8,13 +8,12 @@ Created on Thu Jan 27 09:04:52 2022
 import seaborn as sns
 from matplotlib import pyplot as plt
 import matplotlib
-
-matplotlib.use('TkAgg')
 import pandas as pd
 from typing import Optional, List
 import math
 import os
 from .NMA_draggable_line import draggable_lines
+matplotlib.use('TkAgg')
 
 
 # essa classe pode ser usada para plotar foci individual
@@ -109,6 +108,7 @@ class Graphs:
         df2 = self.subset.loc[(self.subset[y] < upper) & (self.subset[y] > bottom)]
         df2 = df2.loc[(df2[x] < right) & (df2[x] > left)]
         self.subset = df2
+        df2.to_csv(os.path.join(self.path_save, "Gated results.csv"))
 
         return None
 
@@ -295,7 +295,7 @@ class Graphs:
                  x: str = None,
                  control: str = None,
                  n: int = None,
-                 dot: bool = None): # plotar cada
+                 dot: bool = None):  # plotar cada
         # item (se tem tracking) como uma linha -> Usar segment_ID
 
         df = self.subset
@@ -353,7 +353,7 @@ class Graphs:
             frames = list(set(self.subset["Frame"]))
 
         df = self.subset[self.subset["Frame"].isin(frames)]
-#esse função temque ser ao contrario. Tem que ser oprimeiro frame e depois condição
+        # esse função temque ser ao contrario. Tem que ser oprimeiro frame e depois condição
         # ou tenhoq ue alterar alfo pra incluir uma contagem nos frames que não tem nada em uma dada condição
         for c in conditions:
             df_plot = df[df["Condition"] == c]  # subsets each condition
@@ -424,6 +424,7 @@ def plot(path: str,
          gate: bool,
          **kwargs):
     df = pd.read_csv(path)
+    print('aa')
     check_column_names(df, os.path.basename(path).replace('Results.csv', ''))
     ot = True if df['Overtime'].iloc[0] == True else False
     graphs = Graphs(df, ot, conditions, frames, path_save)
@@ -431,7 +432,7 @@ def plot(path: str,
     if gate:
         graphs.gate(kwargs.get('x'), kwargs.get('y'))
 
-    if graph_type == 'violin':
+    elif graph_type == 'violin':
         if kwargs.get('dot'):
             graphs.save_figs(graphs.violin_dot(kwargs.get('y'), kwargs.get('hue')), 'violin-dot-plot')
         else:
@@ -444,6 +445,7 @@ def plot(path: str,
             graphs.save_figs(graphs.boxplot(kwargs.get('y'), None), 'box-plot')
 
     elif graph_type == 'dot':
+        print('dot')
         graphs.save_figs(graphs.stripplot(kwargs.get('y'), kwargs.get('hue')), 'dot-plot')
 
     elif graph_type == 'bar':
@@ -496,4 +498,4 @@ def plot(path: str,
 # control = 'lnc1'
 # n = 3
 
-#plot(p, ps, cond, frames, gt, g, x=x, y=y, hue=hue, size=size, control=control, n=n, style=style, ci=ci, dot=dot)
+# plot(p, ps, cond, frames, gt, g, x=x, y=y, hue=hue, size=size, control=control, n=n, style=style, ci=ci, dot=dot)

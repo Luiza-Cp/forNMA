@@ -408,10 +408,8 @@ def plot_NMA(path_list: List[str],
              single: Optional[bool] = None,
              overtime: bool = False, ):
     """ From a list of paths corresponding to csv files, plots NMA graphs"""
-    try:
-        os.path.isfile('control_parameters.pickle')
-    except Exception:
-        print("The NMA settings were not defined. Run 'NMA settings' command before plotting")
+    if not os.path.isfile('control_parameters.pickle'):
+        raise Exception("The NMA settings were not defined. Run 'NMA settings' command before plotting")
 
     with open('control_parameters.pickle', 'rb') as f:
         parameters = pickle.load(f)
