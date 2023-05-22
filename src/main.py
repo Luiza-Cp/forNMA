@@ -3,8 +3,7 @@ import toml
 from src.Registration import registration
 from src.Segmentation import run, check_user_inputs
 from src.Tracking import tracking, draw_tracking
-from src.Graphs import NMA_control, plot_NMA, show_nma_settings, plot
-
+from src.Graphs import NMA_control, plot_NMA, show_nma_settings, plot, gating
 
 
 def main():
@@ -82,9 +81,9 @@ def main():
                                      '(equivalent to having one condition)')
 
     # NMA dot_plot
-    parser_dot = subparser_one.add_parser('dot_plot', help= 'plots a NMA dot plot')
-    parser_dot.add_argument('paths', type=str, nargs='+', action='store',  help='Paths to tables to plot.')
-    parser_dot.add_argument('saving_path',  action='store', help='Path to save results.')
+    parser_dot = subparser_one.add_parser('dot_plot', help='plots a NMA dot plot')
+    parser_dot.add_argument('paths', type=str, nargs='+', action='store', help='Paths to tables to plot.')
+    parser_dot.add_argument('saving_path', action='store', help='Path to save results.')
     parser_dot.add_argument('--column1', '-c1', type=str, default=None,
                             help='Grouping column that will produce different dot colors')
     parser_dot.add_argument('--column2', '-c2', type=str, default=None,
@@ -102,13 +101,7 @@ def main():
                                                       " following options: box, dot, violin, bar, scatter, line,"
                                                       "rolling-average or cpd. You can type 'forma plot box -h' to"
                                                       "obtain more specific tips on usage")
-    parser_plots.add_argument('--gate', type=bool, default=False,
-                              help='Set value for True if you want to gate your data before plotting')
-    parser_plots.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
-                                                    'arguments will override it')
-    parser_plots.add_argument('--y', type=str, help='Name of Y column to gate. Setting another Y column inside graphs '
-                                                    'arguments will override it')
-    subparser_plots = parser_plots.add_subparsers()
+    subparser_plots = parser_plots.add_subparsers(dest='graph_type')
 
     # plot box
     parser_box = subparser_plots.add_parser('box', help='Plots a box plot of your data')
@@ -119,6 +112,10 @@ def main():
     parser_box.add_argument('--dot', type=str, default=None, help='Plots a dot plot inside the box')
     parser_box.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_box.add_argument('--gate',  action='store_true',
+                            help='Set value for True if you want to gate your data before plotting')
+    parser_box.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
+                                                  'arguments will override it')
 
     # plot violin
     parser_violin = subparser_plots.add_parser('violin', help='Plots a violin plot of your data')
@@ -130,27 +127,39 @@ def main():
     parser_violin.add_argument('path_to_save', type=str, help='path to save the plots')
     parser_violin.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                                help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_violin.add_argument('--gate',  action='store_true',
+                               help='Set value for True if you want to gate your data before plotting')
+    parser_violin.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
+                                                     'arguments will override it')
 
     # plot dot
     parser_dot = subparser_plots.add_parser('dot', help='Plots a dot plot of your data')
     parser_dot.add_argument('path', type=str, help='Path to results table to plot data')
     parser_dot.add_argument('y', type=str, help='Column to use in Y axis')
+    parser_dot.add_argument('path_to_save', type=str, help='path to save the plots')
     parser_dot.add_argument('--hue', type=str, default=None,
                             help='Grouping column that will produce different dor colors')
-    parser_dot.add_argument('path_to_save', type=str, help='path to save the plots')
     parser_dot.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_dot.add_argument('--gate',  action='store_true',
+                            help='Set value for True if you want to gate your data before plotting')
+    parser_dot.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
+                                                  'arguments will override it')
 
     # plot bar
-    parser_bar = subparser_plots.add_parser('dot', help='Plots a bar plot of your data')
+    parser_bar = subparser_plots.add_parser('bar', help='Plots a bar plot of your data')
     parser_bar.add_argument('path', type=str, help='Path to results table to plot data')
     parser_bar.add_argument('y', type=str, help='Column to use in Y axis')
     parser_bar.add_argument('path_to_save', type=str, help='path to save the plots')
     parser_bar.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_bar.add_argument('--gate', action='store_true',
+                            help='Set value for True if you want to gate your data before plotting')
+    parser_bar.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
+                                                  'arguments will override it')
 
     # plot scatter
-    parser_scatter = subparser_plots.add_parser('dot', help='Plots a scatter plot of your data')
+    parser_scatter = subparser_plots.add_parser('scatter', help='Plots a scatter plot of your data')
     parser_scatter.add_argument('path', type=str, help='Path to results table to plot data')
     parser_scatter.add_argument('x', type=str, help='Column to use in X axis')
     parser_scatter.add_argument('y', type=str, help='Column to use in Y axis')
@@ -161,6 +170,8 @@ def main():
     parser_scatter.add_argument('path_to_save', type=str, help='path to save the plots')
     parser_scatter.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                                 help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_scatter.add_argument('--gate',  action='store_true',
+                                help='Set value for True if you want to gate your data before plotting')
 
     # plot line
     parser_line = subparser_plots.add_parser('line', help='Plots a line plot of your data. This only works with '
@@ -180,6 +191,10 @@ def main():
                              help='Grouping column that will produce different line sizes')
     parser_line.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                              help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_line.add_argument('--gate',  action='store_true',
+                             help='Set value for True if you want to gate your data before plotting')
+    parser_line.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
+                                                   'arguments will override it')
 
     # plot rolling_average
     parser_rolling_avg = subparser_plots.add_parser('rolling-average',
@@ -191,6 +206,11 @@ def main():
     parser_rolling_avg.add_argument('n', type=int, help='Number of frames to average')
     parser_rolling_avg.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                                     help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_rolling_avg.add_argument('--gate',  action='store_true',
+                                    help='Set value for True if you want to gate your data before plotting')
+    parser_rolling_avg.add_argument('--x', type=str,
+                                    help='Name of X column to gate. Setting another X column inside graphs '
+                                         'arguments will override it')
 
     # plot CPD
     parser_cpd = subparser_plots.add_parser('cpd',
@@ -203,9 +223,17 @@ def main():
     parser_cpd.add_argument('--control', type=str, help='oYur control group')
     parser_cpd.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
+    parser_cpd.add_argument('--gate',  action='store_true',
+                            help='Set value for True if you want to gate your data before plotting')
+    parser_cpd.add_argument('--x', type=str,
+                            help='Name of X column to gate. Setting another X column inside graphs '
+                                 'arguments will override it')
+    parser_cpd.add_argument('--y', type=str,
+                            help='Name of Y column to gate. Setting another Y column inside graphs '
+                                 'arguments will override it')
 
     args = parser.parse_args()
-    print (args)
+    print(args)
 
     if args.fornma == 'registration':
         registration(args.path, args.path_to_save, args.crop)
@@ -242,8 +270,11 @@ def main():
         style = args.style if hasattr(args, 'style') else None
         ci = args.ci if hasattr(args, 'ci') else None
         dot = args.dot if hasattr(args, 'dot') else None
-        plot(args.path, args.path_to_save, args.conditions, args.frames, args.fornma, args.gate, x=x, y=y,
-             hue=hue, size=size, control=control, n=n, style=style, ci=ci, dot=dot)
+        conditions = args.conditions if hasattr(args, 'conditions') else None
+        frames = args.frames if hasattr(args, 'frames') else None
+        plot(args.path, args.path_to_save, conditions, frames, args.graph_type, args.gate, x=x, y=y, hue=hue, size=size,
+             control=control, n=n, style=style, ci=ci, dot=dot)
+
     else:
         print('No option was found')
     return
