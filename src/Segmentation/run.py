@@ -105,7 +105,7 @@ def adjust_parameters(parameters_dict) -> tuple[
                     }
 
     return save_images, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \
-           segment_dict
+        segment_dict
 
 
 def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], List[str], str, dict]:
@@ -267,6 +267,7 @@ def draw_and_save(df: pd.DataFrame,
 
     return None
 
+
 def saving_images(df_draw: pd.DataFrame,
                   path_to_save: str,
                   ch_name_list: List[str],
@@ -293,6 +294,7 @@ def saving_images(df_draw: pd.DataFrame,
             draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
     return "Files saved"
 
+
 def is_file_supported(subfolder_dict: dict,
                       preview: bool,
                       ) -> tuple[list[list[Any]], Union[int, Any]]:
@@ -317,7 +319,8 @@ def run(parameters_dict: dict,
         preview: bool = False,
         headless: bool = False,
         callback: Signal = None,
-        ) -> Union[dict[str, Union[str, tuple[list[list[Any]], Union[int, Any]]]], dict[str, Union[str, list[Any]]]]:
+        save_memory: bool = False,  # AQUI: usado para salavar cada df após rodar. Não permite correção depois
+        ) -> None:
     """
     Gets all user inputs and applies them to analyze all folders and subfolders.
     Then filters results, draws images (if requested) and saves all results.
@@ -332,13 +335,13 @@ def run(parameters_dict: dict,
         subfolders = list(parameter_list[0]['paths'].keys())  # names of treatments/conditions
         folder_dict = {}
         for channel in ch_name_list:
-            folder_dict[channel] = [list(parameters_dict['Channel ' + channel]['paths'].values()), parameters_dict['Channel ' + channel],
+            folder_dict[channel] = [list(parameters_dict['Channel ' + channel]['paths'].values()),
+                                    parameters_dict['Channel ' + channel],
                                     parameters_dict['global']['channel_with_nuclei'] == channel]
     else:
         wants_to_save, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \
-        segment_dict = adjust_parameters(parameters_dict)
-        subfolders, folder_dict = create_folder_dict(ch_name_list, ch_path_list,
-                                                     ch_with_nuc, parameter_list)
+            segment_dict = adjust_parameters(parameters_dict)
+        subfolders, folder_dict = create_folder_dict(ch_name_list, ch_path_list, ch_with_nuc, parameter_list)
         # tests whether number of conditions match the number os subfolders/treatments
         if len(conditions) != len(subfolders):
             conditions = [False] * len(subfolders)
@@ -351,13 +354,12 @@ def run(parameters_dict: dict,
 
         not_supported = is_file_supported(subfolder_dict, preview)
         if len(not_supported) != 0:
-            print('message')
-            message = 'The following files are not supported by forNMA. Remove them from your folders an try again.'
-            return {'status': 'bad', 'message': message, 'data': not_supported}
+            message = f'The following files are not supported by forNMA. Remove them from your folders an try again.\n'\
+                      f'{not_supported}'
+            print(message)
+            return None
 
-        # função que pega esse dicionŕio e manda pra interface ou printa de acordo com a ocasião
-        total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview,
-                                callback)  # ju usa esse pra remover outliers
+        total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview, save_memory)  # ju usa esse pra remover outliers
 
         if total_df is None:
             continue
@@ -366,19 +368,23 @@ def run(parameters_dict: dict,
         # adds files to temporary directory
         total_df.to_pickle(os.path.join(temp_dir.name, filename))
 
-    complete_df = filter_dataframe(temp_dir, headless)  # TODO AQUI QUE FILTRA, eu add o filtro pelo NII automatico via interface
+    # AQUI: if save memory for true, ele pode acabar a função aqui. As etapas der salvamento e tal ficariam dentro
+    # do analyze dict.
+    complete_df = filter_dataframe(temp_dir,
+                                   headless)  # TODO AQUI QUE FILTRA, eu add o filtro pelo NII automatico via interface
     # só preciso conferir se esse NII não afeta as imagens do Eduardo de taxol e tal
     if complete_df.empty:
-        raise Exception('No nucleus could be found on your images, adjust parameters and try again')
+        raise Exception('No nucleus could be found at your images, adjust parameters and try again. Check the FAQ at '
+                        'ufrgs.br/labsinal for more help')
 
     # now the complete df is split in smaller ones and saved
     df_results, df_draw = split_dfs(complete_df, ch_name_list)
     save_dfs(df_results, path_to_save)
-    if wants_to_save:  # save images
-        saving_images(df_draw, path_to_save, ch_name_list,
-                      segment_dict['use_cellpose'])  # foci pkl object is generated here
+
+    # save images
+    saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) if wants_to_save else None
+    # foci pkl object is generated here
 
     temp_dir.cleanup()
 
     return {'status': 'ok', 'message': 'Completed Successfully!', 'data': []}
-

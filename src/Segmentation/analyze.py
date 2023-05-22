@@ -11,6 +11,7 @@ from typing import List, Optional, Union
 from PySide6.QtCore import Signal
 
 from pandas import DataFrame
+from rich.progress import track
 
 from .measure.Morphology import Morphology
 from .measure.Cell import Cell
@@ -114,13 +115,12 @@ def analyze_dict(
         is_overtime: bool,
         condition: Optional[str],
         preview: bool,
-        callback: Signal,
+        save_memory: bool, #AQUI: uso isso pra saber se segue juntando todos os dfs ou não
 
 ) -> Union[bool, DataFrame]:
     """
-    Given a dictionary containing information about each image channel analysis
-    and the parameters used to perform cell segmentation, returns a dataframe
-    containing the measurements and contours of each cell in every channel.
+    Given a dictionary containing information about each image channel analysis  and the parameters used to perform cell
+     segmentation, returns a dataframe containing the measurements and contours of each cell in every channel.
     This function is responsible for organizing all measuring functions.
     """
     ref_dict = {}  # reference images for matching histograms
@@ -134,7 +134,7 @@ def analyze_dict(
     # if running on preview mode, analyzes just the first 5 images of each folder
     total_images = 5 if preview and total_images > 10 else total_images
 
-    for img_n in range(total_images):
+    for img_n in track(range(total_images), description='Analyzing images...'):
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
 
         cellpose = segment_dict['use_cellpose']
@@ -167,17 +167,18 @@ def analyze_dict(
 
         contours = [f for f in contours if len(f) > 5]  # remove contours with less than 5 points
         if len(contours) == 0:  # skips execution if there are no contours
-            message = 'Image ' + os.path.basename(img_to_segment) + ' has no objects.'
-            callback.emit({'type': 'log', 'message': message, 'data': []})
+            message = f'Image {os.path.basename(img_to_segment)} has no objects.'
+            print(message)
             continue
 
-        callback.emit({'type': 'progress', 'message': '', 'data': [round((img_n * 100) / total_images)]})
         image_df = perform_measure(contours, img_n, subfolder_dict, ref_dict, segment_dict)
         all_df_list.append(image_df)
 
     if len(all_df_list) == 0:
-        return False
+        return None
 
+
+    # AQUI: essa parte abaixo pesa a memória. Vou fazer ele ir salvando antes disso
     all_df = pd.concat(all_df_list) if len(all_df_list) > 1 else all_df_list[0]  # all images dataframe
     all_df["Condition"] = condition
     all_df["Overtime"] = is_overtime
