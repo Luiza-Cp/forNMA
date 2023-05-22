@@ -74,7 +74,7 @@ def main():
     parser_heatmap = subparser_one.add_parser('heatmap_plot', help="Plots a NMA heatmap")
     parser_heatmap.add_argument('path', type=str, nargs='+', action='store', help='Paths to tables to plot.')
     parser_heatmap.add_argument('saving_path', action='store', help='Path to save results.')
-    parser_heatmap.add_argument('--overtime', '-o', type=bool, default=False,
+    parser_heatmap.add_argument('--overtime', '-o', action='store_true',
                                 help='Set True if your data is a time sequence')
     parser_heatmap.add_argument('--single', '-s', type=bool, default=False,
                                 help='Set True if you want a single plot with grouped data '
@@ -93,7 +93,7 @@ def main():
     parser_dot.add_argument('--single', '-s', type=bool, default=False,
                             help='Set True if you want a single plot with grouped data '
                                  '(equivalent to having one condition)')
-    parser_dot.add_argument('--overtime', '-o', type=bool, default=False,
+    parser_dot.add_argument('--overtime', '-o', action='store_true',
                             help='Set True if your data is a time sequence')
 
     # parser for "plot" command
