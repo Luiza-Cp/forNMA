@@ -10,16 +10,17 @@ import pandas as pd
 import seaborn as sns
 import matplotlib
 from matplotlib import pyplot as plt
-from .NMA_draggable_line import draggable_lines
+from src.Graphs.NMA_draggable_line import draggable_lines
 import os
+
 matplotlib.use('TkAgg')
 
 
-def gating(path: str,
-           x: str,
-           y: str,
-           path_save: str,
-           ) -> pd.DataFrame:
+def filter_table(path: str,
+                 x: str,
+                 y: str,
+                 path_save: str,
+                 ) -> pd.DataFrame:
     """
     Gets a dataframe and plots a scatterplot for region selection by user.
     Returns a dataframe with user-defined subset.
@@ -58,4 +59,11 @@ def gating(path: str,
     df2 = df2.loc[(df2[x] < right) & (df2[x] > left)]
     df2.to_csv(os.path.join(path_save, 'Gated results table.csv'))
 
-    return os.path.join(path_save, 'Gated results table.csv')
+    return os.path.join(path_save, 'Filtered results table.csv')
+
+
+def draw_images(path_to_table: str,
+                path_to_picke: str,
+                path_to_images: str,
+                ):
+    pass
