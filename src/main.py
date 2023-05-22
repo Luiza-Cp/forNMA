@@ -76,7 +76,7 @@ def main():
     parser_heatmap.add_argument('saving_path', action='store', help='Path to save results.')
     parser_heatmap.add_argument('--overtime', '-o', action='store_true',
                                 help='Set True if your data is a time sequence')
-    parser_heatmap.add_argument('--single', '-s', type=bool, default=False,
+    parser_heatmap.add_argument('--single', '-s', action='store_true',
                                 help='Set True if you want a single plot with grouped data '
                                      '(equivalent to having one condition)')
 
@@ -90,7 +90,7 @@ def main():
                             help='Grouping column that will produce different dot sizes')
     parser_dot.add_argument('--sample_size', '-sz', type=int, default=None,
                             help='If you want to plot only a sample of total data, set a smple size')
-    parser_dot.add_argument('--single', '-s', type=bool, default=False,
+    parser_dot.add_argument('--single', '-s', action='store_true',
                             help='Set True if you want a single plot with grouped data '
                                  '(equivalent to having one condition)')
     parser_dot.add_argument('--overtime', '-o', action='store_true',
