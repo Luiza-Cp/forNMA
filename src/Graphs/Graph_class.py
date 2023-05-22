@@ -424,16 +424,17 @@ def plot(path: str,
          gate: bool,
          **kwargs):
     df = pd.read_csv(path)
-    print('aa')
     check_column_names(df, os.path.basename(path).replace('Results.csv', ''))
     ot = True if df['Overtime'].iloc[0] == True else False
     graphs = Graphs(df, ot, conditions, frames, path_save)
     graphs.is_in_df([kwargs.get('x'), kwargs.get('y'), kwargs.get('hue'), kwargs.get('size')])
+    print(graph_type)
     if gate:
         graphs.gate(kwargs.get('x'), kwargs.get('y'))
 
-    elif graph_type == 'violin':
+    if graph_type == 'violin':
         if kwargs.get('dot'):
+            print('violin-if')
             graphs.save_figs(graphs.violin_dot(kwargs.get('y'), kwargs.get('hue')), 'violin-dot-plot')
         else:
             graphs.save_figs(graphs.violinplot(kwargs.get('y'), None), 'violin-plot')
