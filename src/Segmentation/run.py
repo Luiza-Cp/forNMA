@@ -209,92 +209,6 @@ def check_size(ch_dict: dict) -> bool:
     return True
 
 
-def save_dfs(df_results: pd.DataFrame,
-             path_save: str):
-    """ Saves dataframes"""
-    tables = list(set(df_results['origin_folder']))
-    for t in tables:
-        df_foci, df_results = get_foci_df(df_results)
-        df_save = df_results[df_results["origin_folder"] == t]
-        df_save = df_save.reindex(columns=(['Frame'] + list([a for a in df_save.columns if a != 'Frame'])))
-        df_save.drop(columns=(["origin_folder"]), inplace=True)
-        cols = [f for f in df_save.columns if 'foci_df' not in f]
-        df_save = df_save[cols]
-        df_save.to_csv(os.path.join(path_save, t[:-4]) + ' Results.csv')
-        if df_foci is not None:
-            df_foci.to_csv(os.path.join(path_save, t[:-4]) + ' Foci Results.csv')
-    return None  # print("files saved")
-
-
-def draw_and_save(df: pd.DataFrame,
-                  ch: str,
-                  saving_dir: str,
-                  use_cellpose: bool
-                  ):
-    """ 
-    Loop though a dataframe based on its channels and draws contours at the
-    specified images and then saves them.
-    """
-
-    cols_to_draw = [f for f in list(df.columns) if ch in f
-                    and 'Y_draw' not in f and 'Image_' not in f]
-
-    df = df.filter(regex=ch + "|Cell|X")
-    cnt_grouped = df.groupby(['Image_name_' + ch])
-    fs = cv.getFontScaleFromHeight(2, 15, 2)
-    for name, group in cnt_grouped:
-        img = group['Image_' + ch].iloc[0]
-        img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
-        cnt_nuc = list(group['Nuc_cnt_' + ch])
-        img = cv.drawContours(img, cnt_nuc, -1, (98, 59, 132), 1)
-        for i in range(len(group['Cell'])):
-            img = cv.putText(img, str(int(group['Cell'].iloc[i])),
-                             ((group['X'] + 5).iloc[i], group['Y_draw_' + ch].iloc[i]),
-                             2, fs, (122, 144, 248), 1)
-
-        for col in cols_to_draw:
-            if 'Foci' in col:
-                foci_cnt = list(group['Foci_cnt_' + ch])
-                foci_cnt = [i for f in foci_cnt for i in f if len(f) > 0]
-                img = cv.drawContours(img, foci_cnt, -1, (122, 144, 248), 1)
-
-            else:
-                cnt = list(group[col])
-                cnt = [f[0] for f in cnt if len(f) > 0] if use_cellpose or 'Cyto' in col else cnt
-                img = cv.drawContours(img, cnt, -1, (122, 144, 248), 1)
-
-        cv.imwrite(os.path.join(saving_dir, name), img)
-
-    return None
-
-
-def saving_images(df_draw: pd.DataFrame,
-                  path_to_save: str,
-                  ch_name_list: List[str],
-                  use_cellpose: bool
-                  ):
-    """
-   Splits dataframe according to their folders, creates directories
-   for saving and pass values to draw_and_save, that draws contours and saves
-   images.
-   """
-    dirs = list(set(df_draw.origin_folder.values))
-    df_draw.to_pickle(os.path.join(path_to_save, 'Results.pkl'))
-
-    #    iterates over each folder in the dataframe
-    for d in dirs:
-        df_dir = df_draw[df_draw["origin_folder"] == d]
-        saving_dir = os.path.join(path_to_save, d[:-4] + '-') if os.path.isdir(
-            os.path.join(path_to_save, d[:-4])) else os.path.join(path_to_save, d[:-4])
-        os.mkdir(saving_dir)
-        #    iterates over each image channel inside the folder
-        for ch in ch_name_list:
-            saving_dir_ch = os.path.join(saving_dir, ch)
-            os.mkdir(saving_dir_ch)
-            draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
-    return "Files saved"
-
-
 def is_file_supported(subfolder_dict: dict,
                       preview: bool,
                       ) -> tuple[list[list[Any]], Union[int, Any]]:
@@ -317,17 +231,11 @@ class MockSignal:
 
 def run(parameters_dict: dict,
         preview: bool = False,
-        headless: bool = False,
-        callback: Signal = None,
-        save_memory: bool = False,  # AQUI: usado para salavar cada df após rodar. Não permite correção depois
         ) -> None:
     """
     Gets all user inputs and applies them to analyze all folders and subfolders.
     Then filters results, draws images (if requested) and saves all results.
     """
-
-    if callback is None:
-        callback = MockSignal()
 
     if list(parameters_dict.keys())[0] == 'global':
         wants_to_save, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict = \
@@ -346,7 +254,6 @@ def run(parameters_dict: dict,
         if len(conditions) != len(subfolders):
             conditions = [False] * len(subfolders)
 
-    temp_dir = tempfile.TemporaryDirectory()
     for i in range(len(subfolders)):
         subfolder_dict = create_subfolder_dict(folder_dict, i)
         if not check_size(subfolder_dict):
@@ -354,37 +261,11 @@ def run(parameters_dict: dict,
 
         not_supported = is_file_supported(subfolder_dict, preview)
         if len(not_supported) != 0:
-            message = f'The following files are not supported by forNMA. Remove them from your folders an try again.\n'\
+            message = f'The following files are not supported by forNMA. Remove them from your folders an try again.\n' \
                       f'{not_supported}'
             print(message)
             return None
+        analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview, ch_name_list,
+                     path_to_save, wants_to_save, subfolders[i])  # ju usa esse pra remover outliers
 
-        total_df = analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview, save_memory)  # ju usa esse pra remover outliers
-
-        if total_df is None:
-            continue
-
-        filename = os.path.basename(subfolders[i]) + '.zip'
-        # adds files to temporary directory
-        total_df.to_pickle(os.path.join(temp_dir.name, filename))
-
-    # AQUI: if save memory for true, ele pode acabar a função aqui. As etapas der salvamento e tal ficariam dentro
-    # do analyze dict.
-    complete_df = filter_dataframe(temp_dir,
-                                   headless)  # TODO AQUI QUE FILTRA, eu add o filtro pelo NII automatico via interface
-    # só preciso conferir se esse NII não afeta as imagens do Eduardo de taxol e tal
-    if complete_df.empty:
-        raise Exception('No nucleus could be found at your images, adjust parameters and try again. Check the FAQ at '
-                        'ufrgs.br/labsinal for more help')
-
-    # now the complete df is split in smaller ones and saved
-    df_results, df_draw = split_dfs(complete_df, ch_name_list)
-    save_dfs(df_results, path_to_save)
-
-    # save images
-    saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) if wants_to_save else None
-    # foci pkl object is generated here
-
-    temp_dir.cleanup()
-
-    return {'status': 'ok', 'message': 'Completed Successfully!', 'data': []}
+    return print('finshed!')

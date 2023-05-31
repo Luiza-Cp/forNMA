@@ -8,6 +8,7 @@ import numpy as np
 import os
 import pandas as pd
 from typing import List, Optional, Union
+import cv2 as cv
 from PySide6.QtCore import Signal
 
 from pandas import DataFrame
@@ -17,6 +18,7 @@ from .measure.Morphology import Morphology
 from .measure.Cell import Cell
 from .segmentation.find_contours import fornma_contour_finding, load_image
 from .segmentation.cellpose_integration import run_cellpose
+from src.Segmentation.df_managing.organize import filter_dataframe, get_foci_df, split_dfs
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -109,13 +111,115 @@ def drop_cols(
     return complete_df
 
 
+def save_dfs(df_results: pd.DataFrame,
+             path_save: str,
+             df_draw: Optional[pd.DataFrame]):
+    """ Saves dataframes"""
+    tables = list(set(df_results['origin_folder']))
+
+    for t in tables:
+        df_foci, df_results = get_foci_df(df_results)
+        df_save = df_results[df_results["origin_folder"] == t]
+        df_save = df_save.reindex(columns=(['Frame'] + list([a for a in df_save.columns if a != 'Frame'])))
+        df_save.drop(columns=(["origin_folder"]), inplace=True)
+        cols = [f for f in df_save.columns if 'foci_df' not in f]
+        df_save = df_save[cols]
+        os.makedirs(os.path.join(path_save, t[:-4]), exist_ok=True)
+        image_name = os.path.splitext(df_results[[f for f in df_results.columns if f.startswith('Image_name')][0]].iloc[0])[0]
+        if not os.path.exists(os.path.join(path_save, t[:-4], f'Results.csv')):
+            df_save.to_csv(os.path.join(path_save, t[:-4], f'Results.csv'))
+        else:
+            df_save.to_csv(os.path.join(path_save, t[:-4], f'Results.csv'), mode='a', header=None)
+
+        if df_draw is not None:
+            path_pkl = os.path.join(path_save, t[:-4], 'pkl-data')
+            os.makedirs(path_pkl, exist_ok=True)
+            df_draw.to_pickle(os.path.join(path_pkl, f' {image_name} results.pkl'))
+
+        if df_foci is not None:
+            if not os.path.exists(os.path.join(path_save, t[:-4], f'Foci Results.csv')):
+                df_foci.to_csv(os.path.join(path_save, t[:-4], f'Foci Results.csv'))
+            else:
+                df_foci.to_csv(os.path.join(path_save, t[:-4], f'Foci Results.csv'), mode='a', header=None)
+    return None  # print("files saved")
+
+
+def draw_and_save(df: pd.DataFrame,
+                  ch: str,
+                  saving_dir: str,
+                  use_cellpose: bool
+                  ):
+    """
+    Loop though a dataframe based on its channels and draws contours at the
+    specified images and then saves them.
+    """
+
+    cols_to_draw = [f for f in list(df.columns) if ch in f
+                    and 'Y_draw' not in f and 'Image_' not in f]
+
+    df = df.filter(regex=ch + "|Cell|X")
+    cnt_grouped = df.groupby(['Image_name_' + ch])
+    fs = cv.getFontScaleFromHeight(2, 15, 2)
+    for name, group in cnt_grouped:
+        img = group['Image_' + ch].iloc[0]
+        img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
+        cnt_nuc = list(group['Nuc_cnt_' + ch])
+        img = cv.drawContours(img, cnt_nuc, -1, (98, 59, 132), 1)
+        for i in range(len(group['Cell'])):
+            img = cv.putText(img, str(int(group['Cell'].iloc[i])),
+                             ((group['X'] + 5).iloc[i], group['Y_draw_' + ch].iloc[i]),
+                             2, fs, (122, 144, 248), 1)
+
+        for col in cols_to_draw:
+            if 'Foci' in col:
+                foci_cnt = list(group['Foci_cnt_' + ch])
+                foci_cnt = [i for f in foci_cnt for i in f if len(f) > 0]
+                img = cv.drawContours(img, foci_cnt, -1, (122, 144, 248), 1)
+
+            else:
+                cnt = list(group[col])
+                cnt = [f[0] for f in cnt if len(f) > 0] if use_cellpose or 'Cyto' in col else cnt
+                img = cv.drawContours(img, cnt, -1, (122, 144, 248), 1)
+
+        cv.imwrite(os.path.join(saving_dir, name), img)
+
+    return None
+
+
+def saving_images(df_draw: pd.DataFrame,
+                  path_to_save: str,
+                  ch_name_list: List[str],
+                  use_cellpose: bool
+                  ):
+    """
+   Splits dataframe according to their folders, creates directories
+   for saving and pass values to draw_and_save, that draws contours and saves
+   images.
+   """
+    dirs = list(set(df_draw.origin_folder.values))
+    #    iterates over each folder in the dataframe
+    for d in dirs:
+        df_dir = df_draw[df_draw["origin_folder"] == d]
+        saving_dir = os.path.join(path_to_save, d[:-4])
+        os.makedirs(saving_dir, exist_ok=True)
+        #    iterates over each image channel inside the folder
+        for ch in ch_name_list:
+            saving_dir_ch = os.path.join(saving_dir, ch)
+            os.makedirs(saving_dir_ch, exist_ok=True)
+            draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
+    return None
+
+
 def analyze_dict(
         subfolder_dict: dict,  # dict of every channel
         segment_dict: dict,  # dict of global parameters
         is_overtime: bool,
         condition: Optional[str],
         preview: bool,
-        save_memory: bool, #AQUI: uso isso pra saber se segue juntando todos os dfs ou não
+        ch_name_list: List[str],
+        path_to_save: str,
+        wants_to_save: bool,
+        subfolder_images_in: str,
 
 ) -> Union[bool, DataFrame]:
     """
@@ -133,8 +237,7 @@ def analyze_dict(
     total_images = len((list(subfolder_dict.values())[0][0]))  # number of images in the folder
     # if running on preview mode, analyzes just the first 5 images of each folder
     total_images = 5 if preview and total_images > 10 else total_images
-
-    for img_n in track(range(total_images), description='Analyzing images...'):
+    for img_n in track(range(total_images), description=f'Analyzing {subfolder_images_in} images...'):
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
 
         cellpose = segment_dict['use_cellpose']
@@ -154,13 +257,18 @@ def analyze_dict(
                                               magnification=segment_dict['magnification'],
                                               pixel_size=segment_dict['pixel_size'],
                                               rescale_intensity=segment_dict['rescale_intensity'],
-                                              remove_bg=segment_dict['remove_bg'], radius_bg=segment_dict['radius_bg'],
-                                              threshold=segment_dict['threshold'], offset=segment_dict['offset'],
-                                              blur=segment_dict['blur'], adjust_size=segment_dict['adjust_size'],
-                                              cut_edges=segment_dict['cut_edges'], shape=segment_dict['shape'],
+                                              remove_bg=segment_dict['remove_bg'],
+                                              radius_bg=segment_dict['radius_bg'],
+                                              threshold=segment_dict['threshold'],
+                                              offset=segment_dict['offset'],
+                                              blur=segment_dict['blur'],
+                                              adjust_size=segment_dict['adjust_size'],
+                                              cut_edges=segment_dict['cut_edges'],
+                                              shape=segment_dict['shape'],
                                               eccentricity=segment_dict['eccentricity'],
                                               min_size=segment_dict['min_size'],
-                                              max_size=segment_dict['max_size'], min_radius=segment_dict['min_radius'],
+                                              max_size=segment_dict['max_size'],
+                                              min_radius=segment_dict['min_radius'],
                                               max_radius=segment_dict['max_radius'],
                                               fast_detection=segment_dict['fast_detection'],
                                               weakly_labeled=segment_dict['weakly_labeled'])
@@ -172,17 +280,19 @@ def analyze_dict(
             continue
 
         image_df = perform_measure(contours, img_n, subfolder_dict, ref_dict, segment_dict)
-        all_df_list.append(image_df)
+        image_df["Condition"] = condition
+        image_df["Overtime"] = is_overtime
+        image_df['origin_folder'] = subfolder_images_in
+        image_df = image_df.reset_index(drop=True)
+        image_df = drop_cols(image_df, subfolder_dict)  # drop columns
+        # now the complete df is split in smaller ones and saved
 
-    if len(all_df_list) == 0:
-        return None
+        df_results, df_draw = split_dfs(image_df, ch_name_list)
+        draw = df_draw if wants_to_save else None
+        save_dfs(df_results, path_to_save, draw)
 
+        # save images
+        saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) if wants_to_save else None
+        # foci pkl object is generated here
 
-    # AQUI: essa parte abaixo pesa a memória. Vou fazer ele ir salvando antes disso
-    all_df = pd.concat(all_df_list) if len(all_df_list) > 1 else all_df_list[0]  # all images dataframe
-    all_df["Condition"] = condition
-    all_df["Overtime"] = is_overtime
-    all_df = all_df.reset_index(drop=True)
-    all_df = drop_cols(all_df, subfolder_dict)  # drop columns 
-
-    return all_df
+    return None

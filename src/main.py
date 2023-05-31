@@ -3,8 +3,7 @@ import toml
 from src.Registration import registration
 from src.Segmentation import run, check_user_inputs
 from src.Tracking import tracking, draw_tracking
-from src.Graphs import NMA_control, plot_NMA, show_nma_settings, plot, gating
-
+from src.Graphs import NMA_control, plot_NMA, show_nma_settings, plot
 
 def main():
     # top-level parser
