@@ -288,6 +288,7 @@ def analyze_dict(
         # now the complete df is split in smaller ones and saved
 
         df_results, df_draw = split_dfs(image_df, ch_name_list)
+        df_draw['use_cellpose'] = cellpose
         draw = df_draw if wants_to_save else None
         save_dfs(df_results, path_to_save, draw)
 
