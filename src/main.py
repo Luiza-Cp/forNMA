@@ -4,6 +4,7 @@ from src.Registration import registration
 from src.Segmentation import run, check_user_inputs
 from src.Tracking import tracking, draw_tracking
 from src.Graphs import NMA_control, plot_NMA, show_nma_settings, plot
+from src.Filters import filters
 
 def main():
     # top-level parser
@@ -25,7 +26,7 @@ def main():
     parser_segmentation = subparsers.add_parser('segmentation', description='Runs segmentation and feature extraction',
                                                 help='Module to perform image segmentation and feature extraction')
     parser_segmentation.add_argument('parameters', type=str, help='path to parameters.toml')
-    parser_segmentation.add_argument('--headless', type=bool, default=False, help='path to save registered images')
+    parser_segmentation.add_argument('--preview', type=bool, action='store_false', help='Preview images before running')
 
     # parser for the "tracking" command
     parser_tracking = subparsers.add_parser('tracking', description='Track cells from table', help='hhh')
@@ -49,6 +50,16 @@ def main():
     parser_draw.add_argument('path_to_save', type=str, help='path to save images')
     parser_draw.add_argument('-rs', '--rescale_intensity', nargs='?', type=bool, default=False,
                              help='if True, adjusts image intensities. Recommended for low intensity images.')
+
+    # parser for the "filter" command
+    parser_filters = subparsers.add_parser('filter', help='Applies filters to your data.')
+    parser_filters.add_argument('path_to_table', type=str, help='pah to forNMA Results.csv')
+    parser_filters.add_argument('path_to_save', type=str, help='path to save results')
+    parser_filters.add_argument('column1', type=str, help='path to save results', default='NII')
+    parser_filters.add_argument('column2', type=str, help='path to save results', default="Area")
+    parser_filters.add_argument('--draw', '-d', type=bool, action='store_true',
+                                help="Draw nuclei contours again, removing nuclei that were filtered out")
+    parser_filters.add_argument('--path_to_pkl', '-pp', type=str, help='Path to results folder named pkl')
 
     # parser for the "NMA" command
     parser_NMA = subparsers.add_parser('NMA', help='To plot NMA, you first need to specify control settings, by calling'
@@ -111,7 +122,7 @@ def main():
     parser_box.add_argument('--dot', type=str, default=None, help='Plots a dot plot inside the box')
     parser_box.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
-    parser_box.add_argument('--gate',  action='store_true',
+    parser_box.add_argument('--gate', action='store_true',
                             help='Set value for True if you want to gate your data before plotting')
     parser_box.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
                                                   'arguments will override it')
@@ -126,7 +137,7 @@ def main():
     parser_violin.add_argument('path_to_save', type=str, help='path to save the plots')
     parser_violin.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                                help='Conditions to plot. If empty, will retrieve a plot with all conditions')
-    parser_violin.add_argument('--gate',  action='store_true',
+    parser_violin.add_argument('--gate', action='store_true',
                                help='Set value for True if you want to gate your data before plotting')
     parser_violin.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
                                                      'arguments will override it')
@@ -140,7 +151,7 @@ def main():
                             help='Grouping column that will produce different dor colors')
     parser_dot.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
-    parser_dot.add_argument('--gate',  action='store_true',
+    parser_dot.add_argument('--gate', action='store_true',
                             help='Set value for True if you want to gate your data before plotting')
     parser_dot.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
                                                   'arguments will override it')
@@ -169,7 +180,7 @@ def main():
     parser_scatter.add_argument('path_to_save', type=str, help='path to save the plots')
     parser_scatter.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                                 help='Conditions to plot. If empty, will retrieve a plot with all conditions')
-    parser_scatter.add_argument('--gate',  action='store_true',
+    parser_scatter.add_argument('--gate', action='store_true',
                                 help='Set value for True if you want to gate your data before plotting')
 
     # plot line
@@ -190,7 +201,7 @@ def main():
                              help='Grouping column that will produce different line sizes')
     parser_line.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                              help='Conditions to plot. If empty, will retrieve a plot with all conditions')
-    parser_line.add_argument('--gate',  action='store_true',
+    parser_line.add_argument('--gate', action='store_true',
                              help='Set value for True if you want to gate your data before plotting')
     parser_line.add_argument('--x', type=str, help='Name of X column to gate. Setting another X column inside graphs '
                                                    'arguments will override it')
@@ -205,7 +216,7 @@ def main():
     parser_rolling_avg.add_argument('n', type=int, help='Number of frames to average')
     parser_rolling_avg.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                                     help='Conditions to plot. If empty, will retrieve a plot with all conditions')
-    parser_rolling_avg.add_argument('--gate',  action='store_true',
+    parser_rolling_avg.add_argument('--gate', action='store_true',
                                     help='Set value for True if you want to gate your data before plotting')
     parser_rolling_avg.add_argument('--x', type=str,
                                     help='Name of X column to gate. Setting another X column inside graphs '
@@ -222,7 +233,7 @@ def main():
     parser_cpd.add_argument('--control', type=str, help='oYur control group')
     parser_cpd.add_argument('--conditions', '-c', type=str, action='store', nargs='+',
                             help='Conditions to plot. If empty, will retrieve a plot with all conditions')
-    parser_cpd.add_argument('--gate',  action='store_true',
+    parser_cpd.add_argument('--gate', action='store_true',
                             help='Set value for True if you want to gate your data before plotting')
     parser_cpd.add_argument('--x', type=str,
                             help='Name of X column to gate. Setting another X column inside graphs '
@@ -240,7 +251,7 @@ def main():
     elif args.fornma == 'segmentation':
         dic = toml.load(args.parameters)
         check_user_inputs(dic)
-        run(dic, headless=args.headless)
+        run(dic, preview=args.preview)
 
     elif args.fornma == 'tracking':
         tracking(args.path_to_table, args.path_to_save, args.max_distance, args.time_window, args.max_split_distance,
@@ -248,6 +259,9 @@ def main():
 
     elif args.fornma == 'draw_tracking':
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
+
+    elif args.fornma == 'filers':
+        filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'NMA':
         if (hasattr(args, 'dest')) and args.dest == 'show':
