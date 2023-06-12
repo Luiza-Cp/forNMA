@@ -105,10 +105,10 @@ def filters(path_to_table: str,
     dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     info = f'\n\n{dt} - Filter applied:\n' \
-           f'{column_x} minimum: {info_filter[0]}\n' \
-           f'{column_x} minimum: {info_filter[1]}\n' \
-           f'{column_y} minimum: {info_filter[2]}\n' \
-           f'{column_y} minimum: {info_filter[3]}\n'
+           f'{column_x} minimum: {info_filter[2]}\n' \
+           f'{column_x} minimum: {info_filter[3]}\n' \
+           f'{column_y} minimum: {info_filter[0]}\n' \
+           f'{column_y} minimum: {info_filter[1]}\n'
     with open(os.path.join(path_to_save, "logs-fornma.txt"), "a") as logs:
         logs.write(info)
 

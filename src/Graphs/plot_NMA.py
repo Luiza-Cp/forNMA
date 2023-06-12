@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
+from datetime import datetime
 from scipy import stats
 import warnings
 warnings.filterwarnings('ignore')
@@ -358,6 +359,9 @@ class NMA:
         try:
             fig.savefig(os.path.join(self.path_save, png))
             fig.savefig(os.path.join(self.path_save, svg))
+            dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            with open(os.path.join(self.path_save, "logs-fornma.txt"), "a") as logs:
+                logs.write(f'\n{dt} - Save {title} plot')
         except:
             print(f'Error while saving figure {title}. Check your saving path and try again.')
         return None
@@ -420,6 +424,12 @@ def plot_NMA(path_list: List[str],
             f'Your current control configuration was defined with table named {control_name} with an area standard '
             f'deviation of {sd_area} and NII standard deviation of {sd_NII}.\nIf you need other control settings, '
             f'please run "NMA control" command again.')
+
+        dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        with open(os.path.join(saving_path, "logs-fornma.txt"), "a") as logs:
+            logs.write(f'\n\n{dt} - NMA plot\nYour current control configuration was defined with table named '
+                       f'{control_name} with an area standard deviation of {sd_area} and NII standard deviation of '
+                       f'{sd_NII}.')
 
     df_list = [pd.read_csv(f) for f in path_list]
     names = [os.path.basename(f).replace('Results.csv', '') for f in path_list]

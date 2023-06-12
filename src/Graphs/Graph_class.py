@@ -12,6 +12,7 @@ import pandas as pd
 from typing import Optional, List
 import math
 import os
+from datetime import datetime
 from .NMA_draggable_line import draggable_lines
 matplotlib.use('TkAgg')
 
@@ -109,6 +110,17 @@ class Graphs:
         df2 = df2.loc[(df2[x] < right) & (df2[x] > left)]
         self.subset = df2
         df2.to_csv(os.path.join(self.path_save, "Gated results.csv"))
+
+        dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        info = f'\n\n{dt} - Gate applied:\n' \
+               f'{x} minimum: {left}\n' \
+               f'{x} minimum: {right}\n' \
+               f'{y} minimum: {bottom}\n' \
+               f'{y} minimum: {upper}\n'
+
+        with open(os.path.join(self.path_save, "logs-fornma.txt"), "a") as logs:
+            logs.write(info)
 
         return None
 
@@ -394,6 +406,9 @@ class Graphs:
         try:
             fig.savefig(os.path.join(self.path_save, png))
             fig.savefig(os.path.join(self.path_save, svg))
+            dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            with open(os.path.join(self.path_save, "logs-fornma.txt"), "a") as logs:
+                logs.write(f'\n{dt} - Save {title} plot')
         except Exception:
             print(f'Error while saving figure {title}. Check your saving path and try again.')
 
@@ -428,9 +443,13 @@ def plot(path: str,
     ot = True if df['Overtime'].iloc[0] == True else False
     graphs = Graphs(df, ot, conditions, frames, path_save)
     graphs.is_in_df([kwargs.get('x'), kwargs.get('y'), kwargs.get('hue'), kwargs.get('size')])
-    print(graph_type)
+
     if gate:
         graphs.gate(kwargs.get('x'), kwargs.get('y'))
+
+    dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    with open(os.path.join(path_save, "logs-fornma.txt"), "a") as logs:
+        logs.write(f'\n\n{dt} - {graph_type} plot')
 
     if graph_type == 'violin':
         if kwargs.get('dot'):

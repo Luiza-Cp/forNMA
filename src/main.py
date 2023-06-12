@@ -292,8 +292,5 @@ def main():
         print('No option was found')
     return
 
-
-# TODO: parser pra a plotagem de gráficos e checar o tracking maybe
-
 if __name__ == '__main__':
     main()
