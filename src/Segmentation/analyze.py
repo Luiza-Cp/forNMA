@@ -92,6 +92,7 @@ def drop_cols(
     """ Drops columns that store values not required by user."""
 
     for key, value in subfolder_dict.items():
+        print('foci?', value[1]['wants_foci'])
         if not value[1]['wants_foci']:
             drop_foci = ["Total_foci_" + key, "Total_foci_area_" + key,
                          "Total_foci_mean_" + key, "Foci_area_fraction_" + key,
@@ -200,7 +201,7 @@ def saving_images(df_draw: pd.DataFrame,
     #    iterates over each folder in the dataframe
     for d in dirs:
         df_dir = df_draw[df_draw["origin_folder"] == d]
-        saving_dir = os.path.join(path_to_save, d[:-4])
+        saving_dir = os.path.join(path_to_save, d)
         os.makedirs(saving_dir, exist_ok=True)
         #    iterates over each image channel inside the folder
         for ch in ch_name_list:
