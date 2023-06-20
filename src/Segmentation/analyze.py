@@ -92,7 +92,6 @@ def drop_cols(
     """ Drops columns that store values not required by user."""
 
     for key, value in subfolder_dict.items():
-        print('foci?', value[1]['wants_foci'])
         if not value[1]['wants_foci']:
             drop_foci = ["Total_foci_" + key, "Total_foci_area_" + key,
                          "Total_foci_mean_" + key, "Foci_area_fraction_" + key,
