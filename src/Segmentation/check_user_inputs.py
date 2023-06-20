@@ -179,6 +179,6 @@ def check_user_inputs(dic: dict):
         basic_float_check(ch_dict['foci_prominence'], f'foci_max_size at {channel} in channel_parameters') \
             if ch_dict['foci_prominence'] is not False else None
 
-    print('ok')
+    print('Inputs: ok')
 
     return None
