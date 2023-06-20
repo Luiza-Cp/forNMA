@@ -269,3 +269,4 @@ def run(parameters_dict: dict,
                      path_to_save, wants_to_save, subfolders[i])  # ju usa esse pra remover outliers
 
     return print('finshed!')
+

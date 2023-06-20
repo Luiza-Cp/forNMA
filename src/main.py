@@ -1,10 +1,4 @@
 import argparse
-import toml
-from src.Registration import registration
-from src.Segmentation import run, check_user_inputs
-from src.Tracking import tracking, draw_tracking
-from src.Graphs import NMA_control, plot_NMA, show_nma_settings, plot
-from src.Filters import filters
 
 def main():
     # top-level parser
@@ -26,7 +20,7 @@ def main():
     parser_segmentation = subparsers.add_parser('segmentation', description='Runs segmentation and feature extraction',
                                                 help='Module to perform image segmentation and feature extraction')
     parser_segmentation.add_argument('parameters', type=str, help='path to parameters.toml')
-    parser_segmentation.add_argument('--preview', type=bool, action='store_false', help='Preview images before running')
+    parser_segmentation.add_argument('--preview', action='store_false', help='Preview images before running')
 
     # parser for the "tracking" command
     parser_tracking = subparsers.add_parser('tracking', description='Track cells from table', help='hhh')
@@ -57,7 +51,7 @@ def main():
     parser_filters.add_argument('path_to_save', type=str, help='path to save results')
     parser_filters.add_argument('column1', type=str, help='path to save results', default='NII')
     parser_filters.add_argument('column2', type=str, help='path to save results', default="Area")
-    parser_filters.add_argument('--draw', '-d', type=bool, action='store_true',
+    parser_filters.add_argument('--draw', '-d',action='store_true',
                                 help="Draw nuclei contours again, removing nuclei that were filtered out")
     parser_filters.add_argument('--path_to_pkl', '-pp', type=str, help='Path to results folder named pkl')
 
@@ -242,28 +236,36 @@ def main():
                             help='Name of Y column to gate. Setting another Y column inside graphs '
                                  'arguments will override it')
 
+######################################################################################################
     args = parser.parse_args()
     print(args)
 
     if args.fornma == 'registration':
+        from src.Registration import registration
         registration(args.path, args.path_to_save, args.crop)
 
     elif args.fornma == 'segmentation':
+        import toml
+        from src.Segmentation import run, check_user_inputs
         dic = toml.load(args.parameters)
         check_user_inputs(dic)
         run(dic, preview=args.preview)
 
     elif args.fornma == 'tracking':
+        from src.Tracking import tracking
         tracking(args.path_to_table, args.path_to_save, args.max_distance, args.time_window, args.max_split_distance,
                  args.max_gap_closing_distance, args.allow_merging)
 
     elif args.fornma == 'draw_tracking':
+        from src.Tracking import  draw_tracking
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
 
     elif args.fornma == 'filers':
+        from src.Filters import filters
         filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'NMA':
+        from src.Graphs import NMA_control, plot_NMA, show_nma_settings
         if (hasattr(args, 'dest')) and args.dest == 'show':
             show_nma_settings()
         elif hasattr(args, 'area_standard_deviation'):
@@ -273,7 +275,9 @@ def main():
                      args.overtime)
         else:
             plot_NMA(args.path, args.saving_path, "heatmap", None, None, None, args.single, args.overtime)
+
     elif args.fornma == 'plot':
+        from src.Graphs import plot
         x = args.x if hasattr(args, 'x') else None
         y = args.y if hasattr(args, 'y') else None
         hue = args.hue if hasattr(args, 'hue') else None

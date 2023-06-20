@@ -125,23 +125,23 @@ def save_dfs(df_results: pd.DataFrame,
         df_save.drop(columns=(["origin_folder"]), inplace=True)
         cols = [f for f in df_save.columns if 'foci_df' not in f]
         df_save = df_save[cols]
-        os.makedirs(os.path.join(path_save, t[:-4]), exist_ok=True)
+        os.makedirs(os.path.join(path_save, t), exist_ok=True)
         image_name = os.path.splitext(df_results[[f for f in df_results.columns if f.startswith('Image_name')][0]].iloc[0])[0]
-        if not os.path.exists(os.path.join(path_save, t[:-4], f'Results.csv')):
-            df_save.to_csv(os.path.join(path_save, t[:-4], f'Results.csv'))
+        if not os.path.exists(os.path.join(path_save, t, f'Results.csv')):
+            df_save.to_csv(os.path.join(path_save, t, f'Results.csv'))
         else:
-            df_save.to_csv(os.path.join(path_save, t[:-4], f'Results.csv'), mode='a', header=None)
+            df_save.to_csv(os.path.join(path_save, t, f'Results.csv'), mode='a', header=None)
 
         if df_draw is not None:
-            path_pkl = os.path.join(path_save, t[:-4], 'pkl-data')
+            path_pkl = os.path.join(path_save, t, 'pkl-data')
             os.makedirs(path_pkl, exist_ok=True)
             df_draw.to_pickle(os.path.join(path_pkl, f' {image_name} results.pkl'))
 
         if df_foci is not None:
-            if not os.path.exists(os.path.join(path_save, t[:-4], f'Foci Results.csv')):
-                df_foci.to_csv(os.path.join(path_save, t[:-4], f'Foci Results.csv'))
+            if not os.path.exists(os.path.join(path_save, t, f'Foci Results.csv')):
+                df_foci.to_csv(os.path.join(path_save, t, f'Foci Results.csv'))
             else:
-                df_foci.to_csv(os.path.join(path_save, t[:-4], f'Foci Results.csv'), mode='a', header=None)
+                df_foci.to_csv(os.path.join(path_save, t, f'Foci Results.csv'), mode='a', header=None)
     return None  # print("files saved")
 
 
