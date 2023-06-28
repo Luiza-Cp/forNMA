@@ -5,7 +5,11 @@ Created on Tue Feb  8 17:49:36 2022
 
 @author: luiza
 """
+import warnings
+warnings.filterwarnings("ignore")
 
+import matplotlib
+matplotlib.use('TkAgg')
 import pandas as pd
 import cv2 as cv
 import numpy as np
@@ -14,7 +18,7 @@ import math
 import os
 from matplotlib import pyplot as plt
 import seaborn as sns
-
+from rich.progress import track
 
 def draw_foci_ch(group: pd.DataFrame,
                  channel_list: List[str],
@@ -31,11 +35,11 @@ def draw_foci_ch(group: pd.DataFrame,
     ch_image_dict = {}
     image_list = []
     for i in range(len(channel_list)):
-        image = np.zeros((shape[0], shape[1], 3)) if monocolor == False else np.zeros(shape)
+        image = np.zeros((shape[0], shape[1], 3)) if not monocolor else np.zeros(shape)
         cnt_list = list(group['Foci_cnt_' + channel_list[i]])
         cnt_list = [item for sublist in cnt_list for item in sublist]
-        image2 = cv.drawContours(image, cnt_list, -1, color_list[i], cv.FILLED) if monocolor == False else \
-            cv.drawContours(image, cnt_list, -1, (255, 255, 255), cv.FILLED)
+        image2 = cv.drawContours(image, cnt_list, -1, color_list[i], cv.FILLED) if not monocolor else \
+            cv.drawContours(image, cnt_list, -1, (255, 255,255), cv.FILLED)
         ch_image_dict[channel_list[i]] = image2
         image_list.append(image2)
 
@@ -97,15 +101,14 @@ def save_images_ch(group: pd.DataFrame,
                    cnt_col: str,
                    path_to_save: str,
                    frame: str):
-    ch_image_dict_color, image_list_color = draw_foci_ch(group, channel_list,
-                                                         shape, color_list, False)
+    ch_image_dict_color, image_list_color = draw_foci_ch(group, channel_list, shape, color_list, False)
     overlay = image_list_color[0]
     for f in image_list_color[1:]:
         overlay = overlay + f
     cv.drawContours(overlay, list(group[cnt_col]), -1, (170, 170, 170), 2)
     images_to_save = crop_image(overlay, list(group['bbox']))
-    direc = os.path.join(path_to_save, 'Overlay Images', 'Frame ' + str(frame))
-    os.makedirs(direc)
+    direc = os.path.join(path_to_save, 'Overlay Images')
+    os.makedirs(direc, exist_ok=True)
     image_names = [os.path.join(direc, 'Cell ' + str(f) + '.png') for f in list(group['Cell'])]
     if len(images_to_save) > 1:
         save = [cv.imwrite(f, j) for f, j in zip(image_names, images_to_save) if j.size != 0]
@@ -113,39 +116,32 @@ def save_images_ch(group: pd.DataFrame,
     return
 
 
-def foci_overlay(contour_df: pd.DataFrame,  # vem do pkl
+def foci_overlay(dfs: List[pd.DataFrame],
+                 df_names: List[str],
                  save_images: bool,
                  path_save: str,
-                 channel_list: List[str],
                  ):
-    contour_df.reset_index(inplace=True)
-
+    channel_list = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name_' in f]
     color_list = [(0, 0, 255), (255, 0, 0), (0, 255, 0), (0, 128, 255),
                   (0, 255, 255), (255, 255, 0), (255, 0, 255), (127, 0, 255),
                   (128, 128, 0), (0, 128, 128), (128, 0, 128)]
-
     color_list = color_list * int(math.ceil(len(channel_list) / len(color_list)))
 
-    cnt_col = [f for f in contour_df.columns if 'Nuc_cnt' in f][0]
-    col = [f for f in contour_df.columns if 'Image' in f][0]
-    shape = contour_df[col].loc[0].shape
-    contour_df['bbox'] = contour_df.apply(lambda x: cv.boundingRect(x[cnt_col]), axis=1)
-
-    groupped_contour_df = contour_df.groupby('Frame') # isso e o equivalente de um pickle
+    cnt_col = [f for f in dfs[0].columns if 'Nuc_cnt' in f][0]
+    shape = dfs[0]['Image_' + channel_list[0]].loc[0].shape
+    dfs[0]['bbox'] = dfs[0].apply(lambda x: cv.boundingRect(x[cnt_col]), axis=1)
 
     all_pixel_count_dfs = []
-    for name, group in groupped_contour_df:
-        ch_image_dict, image_list = draw_foci_ch(group, channel_list, shape, color_list, True)
-        df_pixel_count = measure_pixels(ch_image_dict, group)
-        df_pixel_count['Frame'] = name
+    for name, df in zip(df_names, dfs):
+        df.reset_index(inplace=True)
+        ch_image_dict, image_list = draw_foci_ch(df, channel_list, shape, color_list, True)
+        df_pixel_count = measure_pixels(ch_image_dict, df)
+        df_pixel_count['Image'] = name
         all_pixel_count_dfs.append(df_pixel_count)
-        if save_images == True:
-            save_images_ch(group, channel_list, shape, color_list, cnt_col,
-                           path_save, name)
+        save_images_ch(df, channel_list, shape, color_list, cnt_col, path_save, name) if save_images else None
     final_df = pd.concat(all_pixel_count_dfs)
-    final_df.to_csv(os.path.join(path_save, 'Pixel Counts.csv'))
+    final_df.to_csv(os.path.join(path_save, 'Overlay Pixel Counts.csv'))
     return
-
 
 
 def test_channel_list(df: pd.DataFrame,
@@ -173,9 +169,9 @@ def test_channel_list(df: pd.DataFrame,
 
 def overlapping_foci(pkl_results_folder_path: str,
                      path_to_save: str,
-                     channel: bool = True,
                      channel_list: Optional[List[str]] = None,
                      ):
+
     if not os.path.exists(pkl_results_folder_path):
         raise FileNotFoundError(f'The path "{pkl_results_folder_path}" does not exist. Did you type it right?')
     if not os.path.exists(path_to_save):
@@ -183,6 +179,7 @@ def overlapping_foci(pkl_results_folder_path: str,
 
     paths_to_dfs = [os.path.join(pkl_results_folder_path, f) for f in os.listdir(pkl_results_folder_path)]
     dfs = [pd.read_pickle(f) for f in paths_to_dfs if f.endswith('.pkl')]
+    df_names = [f.replace('.pkl', '') for f in os.listdir(pkl_results_folder_path)]
     channels_on_df = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name_' in f]
 
     if channel_list is not None:
@@ -199,37 +196,22 @@ def overlapping_foci(pkl_results_folder_path: str,
         ctr = [f for f in dfs[0].columns if ch in f]
         cols_to_remove.extend(ctr)
 
-    index_of_frames_to_keep = []
-
-    dfs = [dfs[f] for f in index_of_frames_to_keep]
     for col in cols_to_remove:
         [f.drop(col, axis=1, inplace=True) for f in dfs]
 
-    return
+    foci_overlay(dfs, df_names, True, path_to_save)
+
+    return print('complete!')
 
 
-
-
-
-def plot_proflie(frame: int,
-                 nuc: int,
-                 df: pd.DataFrame):
-    """
-         From a specific nucleus chosen by user (tuple frame_nuc specifies
-     the nucleus) it plots the profile of intensity in all channels.
-     The x  profile is given by mean of y pixels in an x line and the
-     y profile is the mean of x pixels in an y axis.
-     """
-    df_nuc = df.loc[(df['Frame'] == frame) & (df['Cell'] == nuc)]
-    channels = [f.replace('Image_name_', '') for f in df.columns if 'Image_name' in f]
-    shape = df_nuc['Image_' + channels[0]].iloc[0].shape
-
+def get_nuc_profile(channels, shape, df, i):
     y_dict = {}
     x_dict = {}
     for ch in channels:
         image = np.zeros(shape)
-        image2 = cv.drawContours(image, [df['Nuc_cnt_' + ch].iloc[0]], -1, (1, 1, 1), cv.FILLED)
-        masked = np.ma.masked_where(image2 < 1, df['Image_' + ch].iloc[0])
+        image2 = cv.drawContours(image, [df['Nuc_cnt_' + ch].iloc[i]], -1, (1, 1, 1), cv.FILLED)
+        masked = np.ma.masked_where(image2 < 1, df['Image_' + ch].iloc[i])
+
         mean_y = masked.mean(axis=0)
         mean_y = mean_y[~mean_y.mask]
         y_dict[ch] = mean_y
@@ -241,32 +223,114 @@ def plot_proflie(frame: int,
     x_profile = pd.DataFrame(x_dict)
     y_profile = pd.DataFrame(y_dict)
 
+    return x_profile, y_profile
+
+
+def plot_and_save_profile(x_df: List[pd.DataFrame],
+                          y_df: List[pd.DataFrame],
+                          name: str,
+                          path_save: str,
+                          list_number: int):
+
+    x_df = [f.reset_index(drop=True) for f in x_df]
+    y_df = [f.reset_index(drop=True) for f in y_df]
     sns.set_theme()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-    sns.lineplot(data=x_profile, ax=ax1)
-    ax1.set_title('X profile')
-    sns.lineplot(data=y_profile, ax=ax2)
-    ax2.set_title('Y profile')
+    sns.set_palette('Set2')
+    fig, axs = plt.subplots(8, 8, figsize=(24, 20))
+
+    idx = 0
+    # Iterates over subplots adding pair graphs
+    for i in range(8):
+        for j in range(8):
+            if idx == len(x_df): # no more graphs to plot
+                break
+            if i % 2 == 0:
+                ax = axs[j, i]
+
+                # First Graph (x profile)
+                nuc = x_df[idx]['nuc'].iloc[0]
+                sns.lineplot(data=x_df[idx].drop(columns=['nuc']), ax=ax)
+                ax.set_title(f'X profile of nucleus {nuc}')
+                ax.set(xticklabels=[])  # remove the tick labels
+                ax.tick_params(bottom=False)  # remove the ticks
+                ax.set(yticklabels=[])  # remove the tick labels
+                ax.tick_params(left=False)  # remove the ticks
+                plt.setp(ax.get_legend().get_texts(), fontsize='8')  # for legend text
+
+                # Second Graph (y profile)
+                ax2 = axs[j, i + 1]
+                sns.lineplot(data=y_df[idx].drop(columns=['nuc']), ax=ax2)
+                ax2.set_title(f'Y profile of nucleus {nuc}')
+                ax2.set(xticklabels=[])  # remove the tick labels
+                ax2.tick_params(bottom=False)  # remove the ticks
+                ax2.set(yticklabels=[])  # remove the tick labels
+                ax2.tick_params(left=False)  # remove the ticks
+
+                ax.legend_.remove()
+                ax2.legend_.remove()
+
+                idx += 1
+    if idx == len(x_df):  # no more graphs to plot
+        for i in range(8):
+            for j in range(8):
+                ax = axs[j, i]
+                ax.set(xticklabels=[])  # remove the tick labels
+                ax.tick_params(bottom=False)  # remove the ticks
+                ax.set(yticklabels=[])  # remove the tick labels
+                ax.tick_params(left=False)  # remove the ticks
+
+
+    # New axis for legend
+    legend_ax = fig.add_axes([0.92, .35, .075, 0.2])
+    legend_ax.set(xticklabels=[])  # remove the tick labels
+    legend_ax.tick_params(bottom=False)  # remove the ticks
+    legend_ax.set(yticklabels=[])  # remove the tick labels
+    legend_ax.tick_params(left=False)  # remove the ticks
+    legend_ax.grid(False)
+    handles, labels = axs[0,0].get_legend_handles_labels()
+    legend_ax.legend(handles, labels, loc='center', frameon=False)
+
+    plt.suptitle(f'X and Y intensity profiles of {name}')
+    plt.tight_layout(rect=[0, 0, .92, 0.98])
+
+    # save
+    plt.savefig(os.path.join(path_save, 'Profile-plots', f'{name} {list_number}.png'))
+    plt.savefig(os.path.join(path_save, 'Profile-plots', f'{name} {list_number}.svg'))
+    plt.close(fig)
 
     return
 
 
-# 1. Check if frames exist and blah
-# 2. find all dfs to the specified frames
-# drop othreh frames form list
+def plot_profile(path_pickle_data: str,
+                 path_save: str,
+                 ):
+    """
+    From a folder that contains pickle files, plots the profile of all nucleus intensity in all channels.
+     The x  profile is given by mean of y pixels in the x axis and the y profile is the mean of x pixels in the y axis.
+     """
 
-# the overlap will get a list of df and if is to use frame or channel. The function must operat by itself
+    paths = [os.path.join(path_pickle_data, f) for f in os.listdir(path_pickle_data)]
+    dfs = [pd.read_pickle(f) for f in paths]
+    names = [f.replace('.pkl', '')for f in os.listdir(path_pickle_data)]
 
+    channel_list = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name' in f]
+    shape = dfs[0]['Image_' + channel_list[0]].loc[0].shape
+    os.makedirs(os.path.join(path_save, 'Profile-plots'), exist_ok=True)
 
-#### COMO CHAMAR
+    for name, df in track(zip(names, dfs), description=f'This might take a while...'):
+        x_df_list = []
+        y_df_list = []
+        for i in range(df.shape[0]):
+            x_nuc_df, y_nuc_df = get_nuc_profile(channel_list, shape, df, i)
+            x_nuc_df['nuc'] = df['Cell'].iloc[i]
+            y_nuc_df['nuc'] = df['Cell'].iloc[i]
+            x_df_list.append(x_nuc_df)
+            y_df_list.append(y_nuc_df)
+        splitted_x_df_list = [x_df_list[f:f + 32] for f in range(0, len(x_df_list), 32)]
+        splitted_y_df_list = [y_df_list[f:f + 32] for f in range(0, len(y_df_list), 32)]
 
-path = '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imagens/forNMA results/results 11/Results.pkl'
-contour_df = pd.read_pickle(path)
-contour_df2 = contour_df.loc[contour_df['origin_folder'] == 'RPE WT ETOPOSIDE .zip']
+        for sublist in range(len(splitted_y_df_list)):
+            plot_and_save_profile(splitted_x_df_list[sublist], splitted_y_df_list[sublist], name, path_save, sublist)
 
-foci_overlay(contour_df2, True,
-             '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/imagens/forNMA results/results 11/overlapping',
-             ['53BP1', 'gH2AX'])
+    return
 
-# o overlay é de dois canais
-# o overlay pode ser de um memsmo canal em dois temos diferentes? Talvez

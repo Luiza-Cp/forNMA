@@ -236,6 +236,25 @@ def main():
                             help='Name of Y column to gate. Setting another Y column inside graphs '
                                  'arguments will override it')
 
+    # parser for the "foci" command
+    parser_foci = subparsers.add_parser('foci', help='Module for foci overlay functions. Choose between:\nfoci overlay'
+                                                     '\nfoci plot_profile')
+    subparser_foci = parser_foci.add_subparsers()
+
+    # foci overlay
+    parser_overlay = subparser_foci.add_parser('overlay', help='Creates foci overlay in two or more image channels.')
+    parser_overlay.add_argument('path', type=str, help='Path to folder named pkl-data')
+    parser_overlay.add_argument('path_to_save', type=str, help='path to save results')
+    parser_overlay.add_argument('--ch', type=str, nargs='+', action='store', help='Channels to overlay')
+
+    # foci plot profile
+    parser_plot_profile = subparser_foci.add_parser('plot_profile', help='Plots intensity profile of all nucleus in '
+                                                    'the pickle files of a folder. The x  profile is given by mean of y'
+                                                    ' pixels in the x axis and the y profile is the mean of x pixels '
+                                                     'in the y axis.')
+    parser_plot_profile.add_argument('path', type=str, help='Path to folder named pkl-data')
+    parser_plot_profile.add_argument('path_to_save', type=str, help='path to save the plots')
+
 ######################################################################################################
     args = parser.parse_args()
     print(args)
@@ -259,6 +278,10 @@ def main():
     elif args.fornma == 'draw_tracking':
         from src.Tracking import  draw_tracking
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
+
+    elif args.fornma == 'filers':
+        from src.Filters import filters
+        filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'filers':
         from src.Filters import filters
@@ -291,6 +314,13 @@ def main():
         frames = args.frames if hasattr(args, 'frames') else None
         plot(args.path, args.path_to_save, conditions, frames, args.graph_type, args.gate, x=x, y=y, hue=hue, size=size,
              control=control, n=n, style=style, ci=ci, dot=dot)
+
+    elif args.fornma == 'foci':
+        from src.Foci_overlap import overlapping_foci, plot_profile
+        if hasattr(args, 'ch'):
+            overlapping_foci(args.path, args.path_to_save, args.ch)
+        else:
+            plot_profile(args.path, args.path_to_save)
 
     else:
         print('No option was found')
