@@ -20,7 +20,7 @@ def main():
     parser_segmentation = subparsers.add_parser('segmentation', description='Runs segmentation and feature extraction',
                                                 help='Module to perform image segmentation and feature extraction')
     parser_segmentation.add_argument('parameters', type=str, help='path to parameters.toml')
-    parser_segmentation.add_argument('--preview', action='store_false', help='Preview images before running')
+    parser_segmentation.add_argument('--preview', action='store_true', help='Preview images before running')
 
     # parser for the "tracking" command
     parser_tracking = subparsers.add_parser('tracking', description='Track cells from table', help='hhh')

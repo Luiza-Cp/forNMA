@@ -100,7 +100,8 @@ def save_images_ch(group: pd.DataFrame,
                    color_list: List[Tuple[int]],
                    cnt_col: str,
                    path_to_save: str,
-                   frame: str):
+                   name: str
+                   ):
     ch_image_dict_color, image_list_color = draw_foci_ch(group, channel_list, shape, color_list, False)
     overlay = image_list_color[0]
     for f in image_list_color[1:]:
@@ -109,7 +110,7 @@ def save_images_ch(group: pd.DataFrame,
     images_to_save = crop_image(overlay, list(group['bbox']))
     direc = os.path.join(path_to_save, 'Overlay Images')
     os.makedirs(direc, exist_ok=True)
-    image_names = [os.path.join(direc, 'Cell ' + str(f) + '.png') for f in list(group['Cell'])]
+    image_names = [os.path.join(direc, name + ' - Cell ' + str(f) + '.png') for f in list(group['Cell'])]
     if len(images_to_save) > 1:
         save = [cv.imwrite(f, j) for f, j in zip(image_names, images_to_save) if j.size != 0]
 
@@ -128,11 +129,11 @@ def foci_overlay(dfs: List[pd.DataFrame],
     color_list = color_list * int(math.ceil(len(channel_list) / len(color_list)))
 
     cnt_col = [f for f in dfs[0].columns if 'Nuc_cnt' in f][0]
-    shape = dfs[0]['Image_' + channel_list[0]].loc[0].shape
-    dfs[0]['bbox'] = dfs[0].apply(lambda x: cv.boundingRect(x[cnt_col]), axis=1)
+    shape = dfs[0]['Image_' + channel_list[0]].iloc[0].shape
 
     all_pixel_count_dfs = []
     for name, df in zip(df_names, dfs):
+        df['bbox'] = df.apply(lambda x: cv.boundingRect(x[cnt_col]), axis=1)
         df.reset_index(inplace=True)
         ch_image_dict, image_list = draw_foci_ch(df, channel_list, shape, color_list, True)
         df_pixel_count = measure_pixels(ch_image_dict, df)
@@ -303,6 +304,7 @@ def plot_and_save_profile(x_df: List[pd.DataFrame],
 
 def plot_profile(path_pickle_data: str,
                  path_save: str,
+                 columns: List[str] = None,
                  ):
     """
     From a folder that contains pickle files, plots the profile of all nucleus intensity in all channels.
@@ -313,8 +315,13 @@ def plot_profile(path_pickle_data: str,
     dfs = [pd.read_pickle(f) for f in paths]
     names = [f.replace('.pkl', '')for f in os.listdir(path_pickle_data)]
 
-    channel_list = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name' in f]
-    shape = dfs[0]['Image_' + channel_list[0]].loc[0].shape
+    if columns is None:
+        channel_list = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name' in f]
+    else:
+        channel_list = columns
+    print(columns, dfs[0].columns, channel_list)
+    print('Image_' + channel_list[0])
+    shape = dfs[0]['Image_' + channel_list[0]].iloc[0].shape
     os.makedirs(os.path.join(path_save, 'Profile-plots'), exist_ok=True)
 
     for name, df in track(zip(names, dfs), description=f'This might take a while...'):
@@ -334,3 +341,6 @@ def plot_profile(path_pickle_data: str,
 
     return
 
+plot_profile('/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/2023/novas analises/5.Pkl individuais/pkl',
+                 '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/2023/novas analises/6. Foci overlay',
+                 ['53BP1', 'gH2AX'])

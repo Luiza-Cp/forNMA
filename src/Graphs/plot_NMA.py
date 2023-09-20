@@ -67,9 +67,10 @@ class NMA:
         self.single = single
         self.graph_type = graph_type
         self.overtime = overtime
-        self.percentages = self.calc_all_percentages()
+        self.percentages = self.calc_all_percentages(self.df)
         self.path_save = path_save
         self.sample = sample  # int or None
+        self.sample_percentages = None
         self.plot()
 
     def subset_df(self, condition_time_tuple):
@@ -118,16 +119,16 @@ class NMA:
 
         return lr * t, li * t, n * t, i * t, sr * t, s * t, si * t
 
-    def calc_all_percentages(self):
+    def calc_all_percentages(self, df):
         """ Generates a dataframe containing the percentage relation of all NMA groups. """
 
-        has_controls = self.df['Condition'].iloc[0] != False and len(set(list(self.df['Condition']))) != 1
+        has_controls = df['Condition'].iloc[0] != False and len(set(list(df['Condition']))) != 1
         # não é falso (logo, tem valores ali) e tiver mais d 1 condição have_controls ==True
 
         df_percent_rows = []
-        if has_controls and self.df['Overtime'].loc[0] == True:
+        if has_controls and df['Overtime'].loc[0] == True:
             # tem controles E tempo
-            conditions = self.df.groupby('Condition')
+            conditions = df.groupby('Condition')
             for name, group in conditions:
                 frames = group.groupby("Frame")
                 for frame_name, frame in frames:
@@ -137,15 +138,15 @@ class NMA:
 
         elif has_controls:
             # tem só controles?
-            conditions = self.df.groupby('Condition')
+            conditions = df.groupby('Condition')
             for name, group in conditions:
                 lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(group)
                 new_row = [name, False, group.shape[0], lr, li, n, i, sr, s, si]
                 df_percent_rows.append(new_row)
 
-        elif self.df['Overtime'].loc[0]:
+        elif df['Overtime'].iloc[0]:
             # tem sṕ tempos?
-            frames = self.df.groupby('Frame')
+            frames = df.groupby('Frame')
             for name, group in frames:
                 lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(group)
                 new_row = [False, name, group.shape[0], lr, li, n, i, sr, s, si]
@@ -153,8 +154,8 @@ class NMA:
 
         else:
             # nada destacado
-            lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(self.df)
-            new_row = [False, False, self.df.shape[0], lr, li, n, i, sr, s, si]
+            lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(df)
+            new_row = [df['Condition'].iloc[0], False, df.shape[0], lr, li, n, i, sr, s, si]
             df_percent_rows.append(new_row)
 
         percent_df = pd.DataFrame(df_percent_rows,
@@ -182,7 +183,7 @@ class NMA:
                    n: int = 500
                    ) -> Tuple[pd.DataFrame, bool]:
         """
-        Finds statistically significant samples from a population based on Area,
+        Finds statistically equal samples from a population based on Area,
         NII and other specified column values.
         """
 
@@ -255,26 +256,33 @@ class NMA:
         as the one defined by plot_NMA_200, but without performing sampling.
         When sample is enabled, it performs t test statistics to get representative
         means of the population and f test for variances, for each measure to be plotted.
-        It also doe not plot the percentages in each graph group.
+        It also does not plot the percentages in each graph group.
         """
 
         subset_of_df = self.subset_df(condition_time_tuple)
-
+        percent = self.percentages
         if sample:
             df_sample, boolean = self.get_sample(subset_of_df, hue, size, self.sample_size)
             while not boolean:
                 df_sample, boolean = self.get_sample(subset_of_df, hue, size, self.sample_size)
 
             subset_of_df = df_sample
+            sample_percentages = self.calc_all_percentages(df_sample)
+            percent = sample_percentages
+
+            if self.sample_percentages is None:
+                self.sample_percentages = sample_percentages
+            else:
+                self.sample_percentages = pd.concat([self.sample_percentages,sample_percentages])
 
         if all(item is None for item in condition_time_tuple):
             percentages = None
         if condition_time_tuple[0] is None:
-            percentages = self.percentages.loc[self.percentages['Frame'] == condition_time_tuple[1]]
+            percentages = percent.loc[percent['Frame'] == condition_time_tuple[1]]
         elif condition_time_tuple[1] is None:
-            percentages = self.percentages.loc[self.percentages['Condition'] == condition_time_tuple[0]]
+            percentages = percent.loc[percent['Condition'] == condition_time_tuple[0]]
         else:
-            percentages = self.percentages.loc[(self.percentages['Condition'] == condition_time_tuple[0])]
+            percentages = percent.loc[(percent['Condition'] == condition_time_tuple[0])]
             percentages = percentages.loc[percentages['Frame'] == condition_time_tuple[1]]
 
         # make the values out of graph limits group at the limit (cytometry-like)
@@ -357,10 +365,11 @@ class NMA:
         png = title + '.png'
         svg = title + ".svg"
         try:
+            print(self.path_save)
             fig.savefig(os.path.join(self.path_save, png))
             fig.savefig(os.path.join(self.path_save, svg))
             dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            with open(os.path.join(self.path_save, "logs-fornma.txt"), "a") as logs:
+            with open(os.path.join(self.path_save, "logs-fornma.txt"), "a+") as logs:
                 logs.write(f'\n{dt} - Save {title} plot')
         except:
             print(f'Error while saving figure {title}. Check your saving path and try again.')
@@ -383,6 +392,8 @@ class NMA:
                 self.save_figs(fig, title)
 
         self.percentages.to_csv(os.path.join(self.path_save, "Categories.csv"))
+        if self.sample:
+            self.sample_percentages.to_csv(os.path.join(self.path_save, "Sample Categories.csv"))
 
         return print(f'Files were saved at: {self.path_save}')
 

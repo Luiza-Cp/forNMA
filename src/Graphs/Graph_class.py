@@ -161,13 +161,15 @@ class Graphs:
 
     def boxplot(self,
                 y: str,
-                hue: Optional[str] = None):
+                hue: Optional[str] = None,
+                log: Optional[bool] = False):
 
         sns.set_theme()
         x = "Frame" if self.overtime else "Condition"
         fig = plt.figure(figsize=(self.fig_width, 6))
         ax = sns.boxplot(x=x, hue=hue, y=y, data=self.subset, palette="rainbow")
-
+        if log:
+            plt.yscale('log')
         return fig
 
     def stripplot(self,
@@ -414,21 +416,21 @@ class Graphs:
 
         return None
 
-
-def check_column_names(df: pd.DataFrame,
-                       name: str):
-    """ Checks if DataFrame columns are the ones expected by forNMA. If not, raises an error."""
-
-    columns = ['Frame', 'Cell', 'X', 'Y', 'Area', 'Perimeter', 'Aspect', 'Extent', 'Roundness', 'Radius_ratio', 'NII',
-               'FitEllipse_X', 'FitEllipse_Y', 'FitEllipse_a', 'FitEllipse_b', 'FitEllipse_angle', 'Condition',
-               'Overtime']
-
-    if not all(item in df.columns for item in columns):
-        raise ValueError(
-            f"The table {name} does not have forNMA output column names. Rename your columns according to forNMA's "
-            f"standard outputs and try again.")
-
-    return None
+#
+# def check_column_names(df: pd.DataFrame,
+#                        name: str):
+#     """ Checks if DataFrame columns are the ones expected by forNMA. If not, raises an error."""
+#
+#     columns = ['Frame', 'Cell', 'X', 'Y', 'Area', 'Perimeter', 'Aspect', 'Extent', 'Roundness', 'Radius_ratio', 'NII',
+#                'FitEllipse_X', 'FitEllipse_Y', 'FitEllipse_a', 'FitEllipse_b', 'FitEllipse_angle', 'Condition',
+#                'Overtime']
+#
+#     if not all(item in df.columns for item in columns):
+#         raise ValueError(
+#             f"The table {name} does not have forNMA output column names. Rename your columns according to forNMA's "
+#             f"standard outputs and try again.")
+#
+#     return None
 
 
 def plot(path: str,
@@ -439,8 +441,8 @@ def plot(path: str,
          gate: bool,
          **kwargs):
     df = pd.read_csv(path)
-    check_column_names(df, os.path.basename(path).replace('Results.csv', ''))
-    ot = True if df['Overtime'].iloc[0] == True else False
+    # check_column_names(df, os.path.basename(path).replace('Results.csv', ''))
+    ot = True if "Overtime" in df.columns and df['Overtime'].iloc[0] == True else False
     graphs = Graphs(df, ot, conditions, frames, path_save)
     graphs.is_in_df([kwargs.get('x'), kwargs.get('y'), kwargs.get('hue'), kwargs.get('size')])
 
@@ -456,13 +458,13 @@ def plot(path: str,
             print('violin-if')
             graphs.save_figs(graphs.violin_dot(kwargs.get('y'), kwargs.get('hue')), 'violin-dot-plot')
         else:
-            graphs.save_figs(graphs.violinplot(kwargs.get('y'), None), 'violin-plot')
+            graphs.save_figs(graphs.violinplot(kwargs.get('y'), kwargs.get('hue')), 'violin-plot')
 
     elif graph_type == 'box':
         if kwargs.get('dot'):
             graphs.save_figs(graphs.box_dot(kwargs.get('y'), kwargs.get('hue')), 'box-dot-plot')
         else:
-            graphs.save_figs(graphs.boxplot(kwargs.get('y'), None), 'box-plot')
+            graphs.save_figs(graphs.boxplot(kwargs.get('y'), kwargs.get('hue')), 'box-plot')
 
     elif graph_type == 'dot':
         print('dot')
