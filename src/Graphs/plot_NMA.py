@@ -3,6 +3,7 @@ from typing import Optional, List, Tuple
 import pickle
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 import seaborn as sns
 from matplotlib import pyplot as plt
 from datetime import datetime
@@ -122,7 +123,7 @@ class NMA:
     def calc_all_percentages(self, df):
         """ Generates a dataframe containing the percentage relation of all NMA groups. """
 
-        has_controls = df['Condition'].iloc[0] != False and len(set(list(df['Condition']))) != 1
+        has_controls = df['Condition'].iloc[0] != False and len(set(list(df['Condition']))) > 0
         # não é falso (logo, tem valores ali) e tiver mais d 1 condição have_controls ==True
 
         df_percent_rows = []
@@ -197,20 +198,18 @@ class NMA:
         p_NII_mean = stats.ttest_ind(df['NII'].values, df_sample['NII'].values)[1]
         p_a_mean = stats.ttest_ind(df['Area'].values, df_sample['Area'].values)[1]
 
-        if hue is not None:
-            p_hue_var = self.f_test(df[hue].values, df_sample[hue].values)
-            p_hue_mean = stats.ttest_ind(df[hue].values, df_sample[hue].values)[1]
-        if size is not None:
-            p_size_var = self.f_test(df[size].values, df_sample[size].values)
-            p_size_mean = stats.ttest_ind(df[size].values, df_sample[size].values)[1]
-        if hue is None and size is None:
-            p_hue_var = None
-            p_hue_mean = None
-            p_size_var = None
-            p_size_mean = None
+        p_hue_var = None if hue is None or not is_numeric_dtype(df_sample[hue]) \
+                     else self.f_test(df[hue].values, df_sample[hue].values)
+        p_hue_mean = None if hue is None or not is_numeric_dtype(df_sample[hue]) \
+                      else stats.ttest_ind(df[hue].values, df_sample[hue].values)[1]
+        p_size_var = None if size is None or not is_numeric_dtype(df_sample[size]) \
+            else self.f_test(df[size].values, df_sample[size].values)
+        p_size_mean = None if size is None or not is_numeric_dtype(df_sample[size]) \
+            else stats.ttest_ind(df[size].values, df_sample[size].values)[1]
 
         p_values = [p_NII_var, p_NII_mean, p_a_var, p_a_mean, p_hue_var, p_hue_mean,
                     p_size_var, p_size_mean]
+
         p_values = [f for f in p_values if f is not None]
 
         if np.any(np.array(p_values) < 0.05):
@@ -269,11 +268,10 @@ class NMA:
             subset_of_df = df_sample
             sample_percentages = self.calc_all_percentages(df_sample)
             percent = sample_percentages
-
             if self.sample_percentages is None:
                 self.sample_percentages = sample_percentages
             else:
-                self.sample_percentages = pd.concat([self.sample_percentages,sample_percentages])
+                self.sample_percentages = pd.concat([self.sample_percentages, sample_percentages])
 
         if all(item is None for item in condition_time_tuple):
             percentages = None
@@ -294,10 +292,10 @@ class NMA:
 
         hue_norm = None
         size_norm = None
-        if hue is not None:
+        if hue is not None and is_numeric_dtype(self.df[hue]):
             df_hue = self.df[(np.abs(stats.zscore(self.df[hue].fillna(self.df[hue].mean()))) < 3)]
             hue_norm = (df_hue[hue].min(), df_hue[hue].max())
-        if size is not None:
+        if size is not None and is_numeric_dtype(self.df[size]):
             df_size = self.df[(np.abs(stats.zscore(self.df[size].fillna(self.df[size].mean()))) < 3)]
             size_norm = (df_size[size].min(), df_size[size].max())
 
@@ -315,6 +313,7 @@ class NMA:
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
         # ax.set_title(title)
         if isinstance(percentages, pd.DataFrame) or isinstance(percentages, pd.DataFrame) and sample:
+            #checar se não e empty
             if percentages.shape[0] > 1:
                 percentages = percentages.drop(columns=['Condition', 'Frame', 'Total Cells'])
                 n = percentages.shape[0]
@@ -362,10 +361,10 @@ class NMA:
     def save_figs(self,
                   fig: plt.figure,
                   title: str):
-        png = title + '.png'
-        svg = title + ".svg"
+        png = title.lstrip() + '.png'
+        svg = title.lstrip() + ".svg"
+
         try:
-            print(self.path_save)
             fig.savefig(os.path.join(self.path_save, png))
             fig.savefig(os.path.join(self.path_save, svg))
             dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -379,10 +378,11 @@ class NMA:
 
         conditions = [None] if self.single else list(set(self.df["Condition"]))
         times = list(set(self.df["Frame"])) if self.overtime else [None]
+
         for c in conditions:
             for t in times:
                 title_c = '' if c is None else c
-                title_t = '' if t is None else f'Frame:{t}'
+                title_t = '' if t is None else f'Frame {t}'
                 title = f' {title_c} NMA plot {title_t}'
 
                 if self.graph_type == 'heatmap':
@@ -455,3 +455,19 @@ def plot_NMA(path_list: List[str],
 
     return print("Complete")
 
+
+def plot_area_vs_feat(df, col, path_save):
+    sns.set_theme()
+
+    grouped = df.groupby('Condition')
+    for name, group in grouped:
+        plt.figure()
+        sns.boxplot(data=group, y="Area", x=col, palette='rainbow')
+        plt.title(name)
+        plt.savefig(f'{path_save}/{col} {name}.png')
+        plt.figure()
+        sns.displot(data=df, x='Area', hue=col, kind='kde', fill='true', palette='rainbow')
+        plt.xlim(0, 10000)
+        plt.title(name)
+        plt.savefig(f'{path_save}/{col} {name} histogram.png')
+    return
