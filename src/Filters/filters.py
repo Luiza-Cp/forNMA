@@ -16,7 +16,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from src.Graphs.Graph_class import check_column_names
+#from src.Graphs.Graph_class import check_column_names
 from src.Graphs.NMA_draggable_line import draggable_lines
 from src.Segmentation.analyze import saving_images
 from rich.progress import track
@@ -34,7 +34,6 @@ def filter_table(path_to_table: str,
     Returns a dataframe with user-defined subset.
     """
     df = pd.read_csv(path_to_table)
-    check_column_names(df, os.path.basename(path_to_table))
 
     sns.set_theme()
 
@@ -77,6 +76,8 @@ def draw_images(df_results: pd.DataFrame,
                 ) -> None:
     pkls = os.listdir(path_to_pickle_folder)
     pkls = [os.path.join(path_to_pickle_folder, f) for f in pkls if f.endswith('.pkl')]
+    save_pickle_path = os.path.join(path_to_save, 'pkl-data-filtered')
+    os.mkdir(save_pickle_path)
 
     for pkl in track(pkls, description='Re-drawing images...'):
         with open(pkl, 'rb') as p:
@@ -84,12 +85,13 @@ def draw_images(df_results: pd.DataFrame,
 
         df_results_image = df_results.loc[df_results['Frame'] == df_draw['Frame'].iloc[0]]
         cells_to_keep = list(df_results_image['Cell'])
-        df_draw = df_draw[df_draw['Cell'].sin(cells_to_keep)]
+        df_draw = df_draw[df_draw['Cell'].isin(cells_to_keep)]
         channel_names = [f.replace('Image_name_', '') for f in df_results if f.startswith('Image_name')]
 
         saving_images(df_draw, path_to_save, channel_names, df_draw['use_cellpose'].iloc[0])
+        df_draw.to_pickle(os.path.join(save_pickle_path, os.path.basename(pkl)))
 
-        return
+    return
 
 
 def filters(path_to_table: str,

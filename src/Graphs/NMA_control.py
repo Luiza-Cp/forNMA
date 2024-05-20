@@ -355,7 +355,7 @@ def NMA_control(path: str,
     """Create NMA settings for further plot"""
     df = pd.read_csv(path)
     name = os.path.basename(path)
-    check_column_names(df, name)
+    #check_column_names(df, name)
     nma = NMA(df, sd_area, sd_nii, headless)
 
     nma_parameters = {"name": name,

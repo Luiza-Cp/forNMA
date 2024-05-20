@@ -9,9 +9,12 @@ from matplotlib import pyplot as plt
 from datetime import datetime
 from scipy import stats
 import warnings
+
 warnings.filterwarnings('ignore')
 import matplotlib
+
 matplotlib.use('TkAgg')
+
 
 class NMA:
     """ Class for NMA graph plotting"""
@@ -127,7 +130,8 @@ class NMA:
         # não é falso (logo, tem valores ali) e tiver mais d 1 condição have_controls ==True
 
         df_percent_rows = []
-        if has_controls and df['Overtime'].loc[0] == True:
+
+        if has_controls and df['Overtime'].iloc[0] == True:
             # tem controles E tempo
             conditions = df.groupby('Condition')
             for name, group in conditions:
@@ -199,9 +203,9 @@ class NMA:
         p_a_mean = stats.ttest_ind(df['Area'].values, df_sample['Area'].values)[1]
 
         p_hue_var = None if hue is None or not is_numeric_dtype(df_sample[hue]) \
-                     else self.f_test(df[hue].values, df_sample[hue].values)
+            else self.f_test(df[hue].values, df_sample[hue].values)
         p_hue_mean = None if hue is None or not is_numeric_dtype(df_sample[hue]) \
-                      else stats.ttest_ind(df[hue].values, df_sample[hue].values)[1]
+            else stats.ttest_ind(df[hue].values, df_sample[hue].values)[1]
         p_size_var = None if size is None or not is_numeric_dtype(df_sample[size]) \
             else self.f_test(df[size].values, df_sample[size].values)
         p_size_mean = None if size is None or not is_numeric_dtype(df_sample[size]) \
@@ -260,6 +264,7 @@ class NMA:
 
         subset_of_df = self.subset_df(condition_time_tuple)
         percent = self.percentages
+        df_sample = None
         if sample:
             df_sample, boolean = self.get_sample(subset_of_df, hue, size, self.sample_size)
             while not boolean:
@@ -288,7 +293,7 @@ class NMA:
         subset_of_df.loc[subset_of_df['Area'] == self.graph_limits[1], 'Area'] = self.graph_limits[1] - 10
         plt.rcParams['axes.facecolor'] = 'white'
 
-        fig, ax = plt.subplots(1)
+        fig, ax = plt.subplots(1,figsize=(10, 6))
 
         hue_norm = None
         size_norm = None
@@ -311,9 +316,16 @@ class NMA:
 
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
+
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+        plt.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.)
+
+
         # ax.set_title(title)
         if isinstance(percentages, pd.DataFrame) or isinstance(percentages, pd.DataFrame) and sample:
-            #checar se não e empty
+            # checar se não e empty
             if percentages.shape[0] > 1:
                 percentages = percentages.drop(columns=['Condition', 'Frame', 'Total Cells'])
                 n = percentages.shape[0]
@@ -338,7 +350,7 @@ class NMA:
 
         ax.set_title(title)
 
-        return fig
+        return fig, df_sample
 
     def percentages_overtime(self,
                              group: str,
@@ -378,7 +390,7 @@ class NMA:
 
         conditions = [None] if self.single else list(set(self.df["Condition"]))
         times = list(set(self.df["Frame"])) if self.overtime else [None]
-
+        sample_dfs = []
         for c in conditions:
             for t in times:
                 title_c = '' if c is None else c
@@ -388,12 +400,15 @@ class NMA:
                 if self.graph_type == 'heatmap':
                     fig = self.plot_NMA_heatmap((c, t), title)
                 else:
-                    fig = self.plot_NMA_dot((c, t), self.hue, self.size, self.sample, title)
+                    fig, df_sample = self.plot_NMA_dot((c, t), self.hue, self.size, self.sample, title)
+                    sample_dfs.append(df_sample)
                 self.save_figs(fig, title)
 
         self.percentages.to_csv(os.path.join(self.path_save, "Categories.csv"))
         if self.sample:
             self.sample_percentages.to_csv(os.path.join(self.path_save, "Sample Categories.csv"))
+            sample_df = pd.concat(sample_dfs)
+            sample_df.to_csv(os.path.join(self.path_save, "Sampled Cells.csv"))
 
         return print(f'Files were saved at: {self.path_save}')
 
@@ -444,7 +459,7 @@ def plot_NMA(path_list: List[str],
 
     df_list = [pd.read_csv(f) for f in path_list]
     names = [os.path.basename(f).replace('Results.csv', '') for f in path_list]
-    [check_column_names(df, name) for df, name in zip(df_list, names)]
+    # [check_column_names(df, name) for df, name in zip(df_list, names)]
     for i in range(len(df_list)):
         if not df_list[i]['Condition'].iloc[0]:
             df_list['Condition'] = names[i]
