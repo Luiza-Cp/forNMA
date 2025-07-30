@@ -229,7 +229,7 @@ class NMA:
         # plota pra uma condição sṕ. Cada condição adicional
         # tem que chamar separado de novo. Isso é para UM plot
 
-        """  Plots a heatmap NMA with ignoring values passed as hue and size."""
+        """  Plots a heatmap NMA ignoring values passed as hue and size."""
 
         subset_of_df = self.subset_df(condition_time_tuple)
         plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
@@ -247,12 +247,39 @@ class NMA:
 
         return fig
 
+    def plot_NMA_jointplot(self,
+                           condition_time_tuple: Tuple[Optional[str], Optional[int]],
+                           title: str):
+        # plota pra uma condição sṕ. Cada condição adicional
+        # tem que chamar separado de novo. Isso é para UM plot
+
+        """  Plots a heatmap NMA ignoring values passed as hue and size."""
+
+        subset_of_df = self.subset_df(condition_time_tuple)
+        #plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
+
+        fig = sns.jointplot(data=subset_of_df, x="NII", y="Area", kind='kde', space=0, fill=True, thresh=0,
+                            cmap='rainbow')
+        fig.ax_marg_x.set_xlim(self.graph_limits[2], self.graph_limits[3])
+        fig.ax_marg_y.set_ylim(self.graph_limits[0], self.graph_limits[1])
+        #.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
+        #        self.v_upx, self.v_upy, self.v_midx, self.v_midy,
+        #        self.v_downx, self.v_downy, self.v_downx2, self.v_downy,
+        #        color='white', linewidth=0.75)
+
+        # ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
+        # ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
+        # ax.set_title(title)
+
+        return fig
+
     def plot_NMA_dot(self,
                      condition_time_tuple: Tuple[Optional[str], Optional[int]],
                      hue: Optional[str] = None,
                      size: Optional[str] = None,
                      sample: bool = False,
                      title: str = 'NMA plot',
+                     palette='rainbow',
                      ):
         """
         Plots the NMA graph(scatterplot) with hue and size chosen by user. Same graph
@@ -293,19 +320,25 @@ class NMA:
         subset_of_df.loc[subset_of_df['Area'] == self.graph_limits[1], 'Area'] = self.graph_limits[1] - 10
         plt.rcParams['axes.facecolor'] = 'white'
 
-        fig, ax = plt.subplots(1,figsize=(10, 6))
+        fig, ax = plt.subplots(1, figsize=(10, 6))
 
         hue_norm = None
         size_norm = None
+
         if hue is not None and is_numeric_dtype(self.df[hue]):
             df_hue = self.df[(np.abs(stats.zscore(self.df[hue].fillna(self.df[hue].mean()))) < 3)]
             hue_norm = (df_hue[hue].min(), df_hue[hue].max())
+
         if size is not None and is_numeric_dtype(self.df[size]):
             df_size = self.df[(np.abs(stats.zscore(self.df[size].fillna(self.df[size].mean()))) < 3)]
             size_norm = (df_size[size].min(), df_size[size].max())
 
+        ###### forçamento de mais cores, mudar aqui
+        cores = sns.color_palette('crest', n_colors=15)
+
+        ##########
         sns.scatterplot(data=subset_of_df, x="NII", y="Area", size=size, hue=hue,
-                        hue_norm=hue_norm, size_norm=size_norm, ax=ax, palette='rainbow')
+                        hue_norm=hue_norm, size_norm=size_norm, ax=ax, palette=cores )# devoler a paleta original
         ax.plot(self.mean_NII + (self.sd_NII * self.std_NII) * np.cos(self.circle),
                 self.mean_a + (self.sd_area * self.std_a) * np.sin(self.circle), color='black')
 
@@ -314,6 +347,39 @@ class NMA:
                 self.v_downx, self.v_downy,
                 self.v_downx2, self.v_downy, color='black')
 
+        ### add linha entre 2 frames  ####
+        #for name, group in subset_of_df.groupby("Condition"):
+        #    group = group.sort_values(by="Frame")
+
+        #   if len(group) < 2:
+        #      continue
+
+        #    x0, y0 = group['NII'].values[0], group['Area'].values[0]  # Primeiro ponto
+        #    x1, y1 = group['NII'].values[1], group['Area'].values[1]  # Segundo ponto
+
+        #    dx, dy = x1 - x0, y1 - y0  # Direção da seta
+
+        #    ax.quiver(x0, y0, dx, dy, angles="xy", scale_units="xy", scale=1, color='#D3D3D3',  width=0.005, alpha=0.5)
+
+        #ax.plot(subset_of_df['NII'], subset_of_df['Area'], color= '#D3D3D3', linewidth =1)
+
+        # ######## para desenhar track no NMA
+        #import ast
+        #subset_frame = subset_of_df['Frame'].iloc[0]
+        #to_draw = self.df[
+        #    (self.df['Frame'] <= subset_frame) &
+        #    (self.df['Frame'] >= subset_frame -4)
+        # ].sort_values(by='Frame')
+        #to_draw['family_color'] = to_draw['family_color'].apply(ast.literal_eval)
+        #for idx, row in to_draw.iterrows():
+        #    if row['family'] == 193:
+        #         ax.plot([row['previous_NII'],row['NII']],[row['previous_aresa'], row['Area']],
+        #         color=np.array(row['family_color'])/255, linewidth=1.0
+        #          )
+        #ax.set_ylim(6.0, 2000.5) # TODO trocar de volta pr normal
+       # ax.set_xlim(1.6261551860775891, 5.821612925456017)
+        ######
+
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
 
@@ -321,7 +387,6 @@ class NMA:
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
         plt.legend(bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.)
-
 
         # ax.set_title(title)
         if isinstance(percentages, pd.DataFrame) or isinstance(percentages, pd.DataFrame) and sample:
@@ -332,21 +397,21 @@ class NMA:
                 percentages = (percentages.sum() / n).to_frame()
                 percentages = percentages.transpose()
 
-            ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a,
-                    str(round(percentages['LR'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
-            ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a,
-                    str(round(percentages['LI'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
-            ax.text(self.mean_NII, self.mean_a, str(round(percentages['N'].iloc[0], 2)) + '%',
-                    size=10, bbox=self.graph_box)
-            ax.text(self.v_midx[0] + 1, self.mean_a, str(round(percentages['I'].iloc[0], 2)) + '%',
-                    size=10, bbox=self.graph_box)
-            ax.text(self.v_downx[0] - 0.7, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
-                    str(round(percentages['SR'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
-            mid_point = self.v_downx[0] + (self.v_downx2[0] - self.v_downx[0]) / 2
-            ax.text(mid_point, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
-                    str(round(percentages['S'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
-            ax.text(self.v_downx2[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
-                    str(round(percentages['SI'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
+                ax.text(self.v_upx[0] - 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a,
+                        str(round(percentages['LR'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
+                ax.text(self.v_upx[0] + 1, self.h_y_up[0] + 0.1 * self.sd_area * self.mean_a,
+                        str(round(percentages['LI'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
+                ax.text(self.mean_NII, self.mean_a, str(round(percentages['N'].iloc[0], 2)) + '%',
+                        size=10, bbox=self.graph_box)
+                ax.text(self.v_midx[0] + 1, self.mean_a, str(round(percentages['I'].iloc[0], 2)) + '%',
+                        size=10, bbox=self.graph_box)
+                ax.text(self.v_downx[0] - 0.7, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
+                        str(round(percentages['SR'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
+                mid_point = self.v_downx[0] + (self.v_downx2[0] - self.v_downx[0]) / 2
+                ax.text(mid_point, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
+                        str(round(percentages['S'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
+                ax.text(self.v_downx2[0] + 0.5, self.h_y_down[0] - 0.1 * self.sd_area * self.mean_a,
+                        str(round(percentages['SI'].iloc[0], 2)) + '%', size=10, bbox=self.graph_box)
 
         ax.set_title(title)
 
@@ -391,6 +456,14 @@ class NMA:
         conditions = [None] if self.single else list(set(self.df["Condition"]))
         times = list(set(self.df["Frame"])) if self.overtime else [None]
         sample_dfs = []
+        palette = 'rainbow'
+        if self.hue is not None and not is_numeric_dtype(self.df[self.hue]):
+            all_hue_categories = list(set(self.df[self.hue]))
+            categories_colors = np.random.rand(len(all_hue_categories), 3)
+            categories_colors = sns.color_palette('rainbow', len(all_hue_categories))
+            palette = dict(zip(all_hue_categories, categories_colors))
+            # palette['Family: -1'] = (0.8, 0.8, 0.8)  # apagar
+
         for c in conditions:
             for t in times:
                 title_c = '' if c is None else c
@@ -399,8 +472,10 @@ class NMA:
 
                 if self.graph_type == 'heatmap':
                     fig = self.plot_NMA_heatmap((c, t), title)
+                elif self.graph_type == 'jointplot':
+                    fig = self.plot_NMA_jointplot((c, t), title)
                 else:
-                    fig, df_sample = self.plot_NMA_dot((c, t), self.hue, self.size, self.sample, title)
+                    fig, df_sample = self.plot_NMA_dot((c, t), self.hue, self.size, self.sample, title, palette)
                     sample_dfs.append(df_sample)
                 self.save_figs(fig, title)
 
