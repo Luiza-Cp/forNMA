@@ -7,19 +7,34 @@ def main():
     subparsers = parser.add_subparsers(help='sub-command help', dest="fornma")
 
     # parser for the "registration" command
-    parser_registration = subparsers.add_parser('registration', description='Register images in a folder',
-                                                help='Module to perform registration of images within a folder')
-    parser_registration.add_argument('paths', type=str, nargs='+', action='store',
-                                     help='paths to folders to register. If there are more than one image channels,'
-                                          ' each must be in a separate folder and passed to the parser.')
+    parser_registration = subparsers.add_parser(
+        'registration',
+        description='Register images in a folder',
+        help='Module to perform registration of images within a folder'
+    )
+    parser_registration.add_argument(
+        'paths',
+        type=str,
+        nargs='+',
+        action='store',
+        help='paths to folders to register. If there are more than one image channels,'
+        ' each must be in a separate folder and passed to the parser.'
+    )
     parser_registration.add_argument('path_to_save', type=str, help='path to save registered images')
     parser_registration.add_argument('--crop', nargs='?', type=bool, default=True,
                                      help='Crop images to keep only portions that are always in the field of view')
 
     # parser for the "segmentation" command
-    parser_segmentation = subparsers.add_parser('segmentation', description='Runs segmentation and feature extraction',
-                                                help='Module to perform image segmentation and feature extraction')
-    parser_segmentation.add_argument('parameters', type=str, help='path to parameters.toml')
+    parser_segmentation = subparsers.add_parser(
+        'segmentation',
+        description='Runs segmentation and feature extraction',
+        help='Module to perform image segmentation and feature extraction'
+    )
+    parser_segmentation.add_argument(
+        'parameters',
+        type=str,
+        help='path to parameters.toml'
+    )
     parser_segmentation.add_argument('--preview', action='store_true', help='Preview images before running')
 
     # parser for the "tracking" command
@@ -83,6 +98,8 @@ def main():
     parser_heatmap.add_argument('--single', '-s', action='store_true',
                                 help='Set True if you want a single plot with grouped data '
                                      '(equivalent to having one condition)')
+    parser_heatmap.add_argument('--jointplot', '-j', action='store_true',
+                                help='Set True if you want to plot histograms of area and NII i axis')
 
     # NMA dot_plot
     parser_dot = subparser_one.add_parser('dot_plot', help='plots a NMA dot plot')
@@ -261,7 +278,7 @@ def main():
 
     if args.fornma == 'registration':
         from src.Registration import registration
-        registration(args.path, args.path_to_save, args.crop)
+        registration(args.paths, args.path_to_save, args.crop)
 
     elif args.fornma == 'segmentation':
         import toml
@@ -279,7 +296,7 @@ def main():
         from src.Tracking import  draw_tracking
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
 
-    elif args.fornma == 'filers':
+    elif args.fornma == 'filters':
         from src.Filters import filters
         filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
@@ -296,6 +313,8 @@ def main():
         elif hasattr(args, 'column1'):
             plot_NMA(args.paths, args.saving_path, "dot", args.column1, args.column2, args.sample_size, args.single,
                      args.overtime)
+        elif hasattr(args, 'jointplot') and args.jointplot:
+            plot_NMA(args.path, args.saving_path, "jointplot", None, None, None, args.single, args.overtime)
         else:
             plot_NMA(args.path, args.saving_path, "heatmap", None, None, None, args.single, args.overtime)
 
