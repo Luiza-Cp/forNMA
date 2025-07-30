@@ -11,6 +11,8 @@ import os
 import pandas as pd
 import random
 from skimage.exposure import rescale_intensity
+from src.Tracking.LapTracker.LapTracker import LapTracker
+
 
 
 def find_colors(df: pd.DataFrame) -> dict:
@@ -102,10 +104,3 @@ def draw_tracking(path_to_tracked_df: str,
 
         cv.imwrite(os.path.join(path_to_save, image_names[i]), img)
     return None
-
-
-draw_tracking('/home/luiza/Área de Trabalho/teste/teste tracking/resultsmd=70 t=9 ms=10 mg=5.csv',
-             '/home/luiza/Área de Trabalho/teste/teste tracking/Images/Expt populacional karine 1 - poço c8-2',
-              '/home/luiza/Área de Trabalho/teste/teste tracking/results/imagens',
-                  )
-
