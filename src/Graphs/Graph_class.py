@@ -64,7 +64,7 @@ class Graphs:
 
         elif self.overtime:
             df = self.df if self.times is None else self.df[self.df['Frame'].isin(self.times)]
-            if self.times is not None and len(self.conditions) > 1:
+            if self.times is not None and self.conditions is not None and len(self.conditions) > 1:
                 df = df[df['Condition'].isin(self.conditions)]
 
         else:
@@ -397,6 +397,7 @@ class Graphs:
         ax.set_title("Cumulative Population Doubling")
         plt.xlabel('Days')
         plt.ylabel('CPD')
+        print (dict_of_pd_lists) # melhorar esse return aqui
 
         return fig
 

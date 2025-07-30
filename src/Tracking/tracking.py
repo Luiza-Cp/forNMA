@@ -11,7 +11,7 @@ import pandas as pd
 
 pd.options.mode.chained_assignment = None
 from typing import List
-from .LapTracker.LapTracker import LapTracker
+from src.Tracking.LapTracker.LapTracker import LapTracker
 
 
 def calc_distance(x: float,
@@ -65,7 +65,7 @@ def find_parent_track(df: pd.DataFrame,
         else:
             track_id_parent = df.loc[df['unique_id'] == unique, 'track_id'].iloc[0]
             parents.append(track_id_parent)
-            #df.drop(df[df['unique_id'] == unique].index, inplace=True)
+            # df.drop(df[df['unique_id'] == unique].index, inplace=True)
         df2["parent_track"].mask(df2["track_id"] == track, track_id_parent, inplace=True)
     df2.sort_values(['track_id', 'Frame'], inplace=True)
 
@@ -138,7 +138,7 @@ def naming_cell_trees(track_id: int,
                       ) -> pd.DataFrame:
     """ 
     Adds tree nomenclature to tracks.
-    It uses daughter cells to identify  where the cell divisions occur to 
+    It uses daughter cells to identify where the cell divisions occur to
     add the generation nomenclature (ie. .1.2.2.1) """
 
     if main==True:
@@ -266,12 +266,10 @@ def tracking(path_to_table: str,
 
     return final_df
 
-
-#
-# md = 70
-# t = 9
-# ms = 10
-# mg = 5
+#md = 70
+#t = 9
+#ms = 10
+#mg = 5
 #
 # bb = tracking('/home/luiza/Área de Trabalho/teste/teste tracking/Expt populacional karine 1 - poço c8-2 Results.csv',
 #               '/home/luiza/Área de Trabalho/teste/teste tracking/results',
@@ -283,3 +281,14 @@ def tracking(path_to_table: str,
 # name = 'md=' + str(md) + ' t=' + str(t) + ' ms=' + str(ms) + ' mg=' + str(mg)
 #
 # bb.to_csv( '/home/luiza/Área de Trabalho/teste/teste tracking/results' + name + '.csv')
+
+#table1 = '/media/luiza/DATA/Doutorado/forNMA/video tracking/Results/Expt populacional karine 1 - poço c8-2 Results 10 FIRST FRAMES.csv'
+#table2 = '/media/luiza/DATA/Doutorado/forNMA/video tracking/Results/Expt populacional karine 1 - poço c8-2 Results.csv',
+
+#df = tracking(
+
+#    table1, '/media/luiza/DATA/Doutorado/forNMA/video tracking/2023',
+#    max_distance=md,
+#    time_window=t,
+#    max_split_distance=ms,
+#    max_gap_closing_distance=mg)
