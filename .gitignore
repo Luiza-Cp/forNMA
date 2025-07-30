@@ -8,8 +8,8 @@ venv/
 src/Graphs/control_parameters.pickle
 
 # Generated data
-forNMA.egg-info
-build
+build/
+*.egg-info/
 
 # registered images
 tests/Results/Control green Registered/
@@ -18,6 +18,6 @@ tests/Results/Control red Registered/
 #NMA cache
 control_parameters.pickle
 
-
 #forNMA results
 tests/Results
+
