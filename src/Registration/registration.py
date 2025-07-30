@@ -47,9 +47,9 @@ def find_new_coordinates(x: int,
 )-> List[shapely.geometry.polygon.Polygon]:
     """ 
     Transforms image boundaries to its new coordinates (from registration).
-    This function inputrs are a x value, a y value and the transformation matrix(tmat).
+    This function inputs are a x value, a y value and the transformation matrix(tmat).
     The matrix is 3x3xn, being n equivalent to image number (one tmat for image).
-    Returns a polygon where each edge is given by: 0,0), (0,y), (x, 0) e (x,y).
+    Returns a polygon where each edge is given by: (0,0), (0,y), (x, 0) e (x,y).
     """
     
     polygon_list = []
@@ -127,7 +127,6 @@ def intersect_lines(bbox: shapely.geometry.polygon.Polygon,
                 upper_line.intersects(polygon.exterior),
                 bottom_line.intersects(polygon.exterior)) 
 
-       
     return intersec
 
 
@@ -145,11 +144,9 @@ def adjust_box(bbox: shapely.geometry.polygon.Polygon,
         bbox = reducing_box(bbox, bool_tuple)
         # reduces 2 px each side of the polygon (minumum and maximum x ans y)
         bool_tuple = intersect_lines(bbox, polygon)
-        
 
     x_list, y_list = bbox.exterior.coords.xy        # bbox is an inner box now
-   
-   
+
     return int(min(y_list)), int(max(y_list)), int(min(x_list)), int(max(x_list))
     
 
@@ -211,13 +208,16 @@ def registration(folders_to_register: List[str],
     """
 
     stack, names = open_images(folders_to_register[0])
-    new_stack, sr, tmat = registrate_stack(stack)   
-    crop_coordinates = coord_to_crop(stack.shape, tmat) if crop == True else None
-    save(new_stack, names, path_to_save, folders_to_register[0], crop_coordinates)
+    shape = stack.shape
+    stack, sr, tmat = registrate_stack(stack)
+    crop_coordinates = coord_to_crop(shape, tmat) if crop == True else None
+    save(stack, names, path_to_save, folders_to_register[0], crop_coordinates)
+    del stack
     if len(folders_to_register) > 1:
         for i in range(1, len(folders_to_register)):
             stack2, names2 = open_images(folders_to_register[i])
             stack2_from_stack = sr.transform_stack(stack2)
             save(stack2_from_stack, names2, path_to_save, folders_to_register[i], crop_coordinates)
+            del stack2
   
     return print('Files were registered! Check your saving path for the results.')
