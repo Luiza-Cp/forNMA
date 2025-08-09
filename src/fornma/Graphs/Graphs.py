@@ -13,11 +13,10 @@ from typing import Optional, List
 import math
 import os
 from datetime import datetime
-from src.fornma.NMA.NMA_draggable_line import draggable_lines
+from ..NMA.NMA_draggable_line import draggable_lines
 matplotlib.use('TkAgg')
 
 
-# essa classe pode ser usada para plotar foci individual
 class Graphs:
     """ Class containing graph plotting functions. """
 
@@ -214,7 +213,7 @@ class Graphs:
         x = "Frame" if self.overtime else "Condition"
         fig = plt.figure(figsize=(width, 6))
         ax = sns.boxplot(x=x, y=y, hue=hue, data=self.subset, palette="rainbow")
-        ax = sns.swarmplot(x=x, y=y, data=self.subset, color="gray", edgecolor="gray", size=3)
+        ax = sns.stripplot(x=x, y=y, data=self.subset, color="gray", edgecolor="gray", size=3)
 
         return fig
 
@@ -226,7 +225,7 @@ class Graphs:
         x = "Frame" if self.overtime else "Condition"
         fig = plt.figure(figsize=(self.fig_width, 6))
         ax = sns.violinplot(x=x, y=y, data=self.subset, inner=None, palette="rainbow")
-        ax = sns.swarmplot(x=x, y=y, data=self.subset, color="gray", edgecolor="gray", size=3)
+        ax = sns.stripplot(x=x, y=y, data=self.subset, color="gray", edgecolor="gray", size=3)
 
         return fig
 
@@ -321,7 +320,7 @@ class Graphs:
         fig = plt.figure(figsize=(self.fig_width, 6))
         sns.set_theme()
         ax = sns.lineplot(data=df, x=x, y=y, hue=hue, style=style,
-                          size=size, ci=ci, legend="full", units=units,
+                          size=size, errorbar=ci, legend="full", units=units,
                           palette='rainbow')
         plt.xticks(rotation=70)
 
@@ -417,108 +416,3 @@ class Graphs:
 
         return None
 
-#
-# def check_column_names(df: pd.DataFrame,
-#                        name: str):
-#     """ Checks if DataFrame columns are the ones expected by forNMA. If not, raises an error."""
-#
-#     columns = ['Frame', 'Cell', 'X', 'Y', 'Area', 'Perimeter', 'Aspect', 'Extent', 'Roundness', 'Radius_ratio', 'NII',
-#                'FitEllipse_X', 'FitEllipse_Y', 'FitEllipse_a', 'FitEllipse_b', 'FitEllipse_angle', 'Condition',
-#                'Overtime']
-#
-#     if not all(item in df.columns for item in columns):
-#         raise ValueError(
-#             f"The table {name} does not have forNMA output column names. Rename your columns according to forNMA's "
-#             f"standard outputs and try again.")
-#
-#     return None
-
-
-def plot(path: str,
-         path_save: str,
-         conditions: Optional[List],
-         frames: Optional[List],
-         graph_type: str,
-         gate: bool,
-         **kwargs):
-    df = pd.read_csv(path)
-    # check_column_names(df, os.path.basename(path).replace('Results.csv', ''))
-    ot = True if "Overtime" in df.columns and df['Overtime'].iloc[0] == True else False
-    graphs = Graphs(df, ot, conditions, frames, path_save)
-    graphs.is_in_df([kwargs.get('x'), kwargs.get('y'), kwargs.get('hue'), kwargs.get('size')])
-
-    if gate:
-        graphs.gate(kwargs.get('x'), kwargs.get('y'))
-
-    dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    with open(os.path.join(path_save, "logs-fornma.txt"), "a") as logs:
-        logs.write(f'\n\n{dt} - {graph_type} plot')
-
-    if graph_type == 'violin':
-        if kwargs.get('dot'):
-            print('violin-if')
-            graphs.save_figs(graphs.violin_dot(kwargs.get('y'), kwargs.get('hue')), 'violin-dot-plot')
-        else:
-            graphs.save_figs(graphs.violinplot(kwargs.get('y'), kwargs.get('hue')), 'violin-plot')
-
-    elif graph_type == 'box':
-        if kwargs.get('dot'):
-            graphs.save_figs(graphs.box_dot(kwargs.get('y'), kwargs.get('hue')), 'box-dot-plot')
-        else:
-            graphs.save_figs(graphs.boxplot(kwargs.get('y'), kwargs.get('hue')), 'box-plot')
-
-    elif graph_type == 'dot':
-        print('dot')
-        graphs.save_figs(graphs.stripplot(kwargs.get('y'), kwargs.get('hue')), 'dot-plot')
-
-    elif graph_type == 'bar':
-        graphs.save_figs(graphs.barplot(kwargs.get('y'), kwargs.get('hue')), 'bar-plot')
-
-    elif graph_type == 'scatter':
-        figs, titles = graphs.scatterplot(kwargs.get('x'), kwargs.get('y'), kwargs.get('hue'), kwargs.get('size'))
-        [graphs.save_figs(f, t) for f, t in zip(figs, titles)]
-
-    elif graph_type == 'line':
-        print(ot)
-        if not ot:
-            raise Exception(f'The Line plot is only available for data that has a time sequence. If this is your case,'
-                            f' you mighthave to change the column "Overtime" values for "True" in order to proceed.')
-        else:
-            graphs.save_figs(graphs.lineplot(**kwargs), 'line-plot')
-
-    elif graph_type == 'rolling-average':
-        if not ot:
-            raise Exception(f'The Rolling Average e plot is only available for data that has a time sequence. '
-                            f'If this is your case, you might have to change the column "Overtime" values for '
-                            f'"True" in order to proceed.')
-        else:
-            graphs.save_figs(graphs.rolling_average(kwargs.get('y'), kwargs.get('n')), 'rolling-average-plot')
-
-    elif graph_type == 'cpd':
-        if not ot:
-            raise Exception(f'The Cumulative Population Doubling plot is only available for data that has a time '
-                            f'sequence. If this is your case, you might have to change the column "Overtime"'
-                            f' values for "True" in order to proceed.')
-        else:
-            graphs.save_figs(graphs.cpd(kwargs.get('frames'), kwargs.get('control')), 'cumulative-population-doubling')
-
-    return f' Files were saved at {path_save}'
-
-#
-# p = '/home/luiza/Área de Trabalho/teste NMA/lap_lnc_tras1 Results.csv'
-# ps = '/home/luiza/Área de Trabalho/teste NMA'
-# cond = None
-# frames = None
-# gt = 'cpd'
-# g = False
-# x = 'Area'
-# y = 'NII'
-# hue = "Condition"
-# size = None
-# style = None
-# ci = 0.95
-# dot = False
-# control = 'lnc1'
-# n = 3
-
-# plot(p, ps, cond, frames, gt, g, x=x, y=y, hue=hue, size=size, control=control, n=n, style=style, ci=ci, dot=dot)
