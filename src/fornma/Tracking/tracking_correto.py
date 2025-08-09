@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
-from src.Tracking.LapTracker.LapTracker import LapTracker
+from src.fornma.Tracking.LapTracker.LapTracker import LapTracker
 import cv2 as cv
 import random
 import ast

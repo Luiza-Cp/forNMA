@@ -11,7 +11,7 @@ import pandas as pd
 
 pd.options.mode.chained_assignment = None
 from typing import List
-from src.Tracking.LapTracker.LapTracker import LapTracker
+from src.fornma.Tracking.LapTracker.LapTracker import LapTracker
 
 
 def calc_distance(x: float,

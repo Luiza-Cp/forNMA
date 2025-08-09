@@ -11,8 +11,6 @@ import os
 import pandas as pd
 import random
 from skimage.exposure import rescale_intensity
-from src.Tracking.LapTracker.LapTracker import LapTracker
-
 
 
 def find_colors(df: pd.DataFrame) -> dict:
