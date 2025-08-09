@@ -17,8 +17,8 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 
 #from src.Graphs.Graph_class import check_column_names
-from src.Graphs.NMA_draggable_line import draggable_lines
-from src.Segmentation.analyze import saving_images
+from fornma.Graphs.NMA_draggable_line import draggable_lines
+from fornma.Segmentation.analyze import saving_images
 from rich.progress import track
 
 matplotlib.use('TkAgg')
@@ -77,7 +77,7 @@ def draw_images(df_results: pd.DataFrame,
     pkls = os.listdir(path_to_pickle_folder)
     pkls = [os.path.join(path_to_pickle_folder, f) for f in pkls if f.endswith('.pkl')]
     save_pickle_path = os.path.join(path_to_save, 'pkl-data-filtered')
-    os.mkdir(save_pickle_path)
+    os.makedirs(save_pickle_path, exist_ok= True)
 
     for pkl in track(pkls, description='Re-drawing images...'):
         with open(pkl, 'rb') as p:
