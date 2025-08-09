@@ -185,7 +185,7 @@ def save(stack: np.ndarray,
     """ Saves each stack slice in the specified folder."""
     stack = to_uint16(stack)
     path = os.path.join(path_to_save, os.path.basename(original_path) + ' Registered')
-    os.makedirs(path)
+    os.makedirs(path, exist_ok = True)
     if crop != None:
         stack = stack[0:stack.shape[0], crop[0]:crop[1], crop[2]:crop[3]]
     for i in range(len(filenames)):
