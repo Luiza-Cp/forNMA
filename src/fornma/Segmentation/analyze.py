@@ -9,7 +9,6 @@ import os
 import pandas as pd
 from typing import List, Optional, Union
 import cv2 as cv
-from PySide6.QtCore import Signal
 
 from pandas import DataFrame
 from rich.progress import track
@@ -18,7 +17,7 @@ from .measure.Morphology import Morphology
 from .measure.Cell import Cell
 from .segmentation.find_contours import fornma_contour_finding, load_image
 from .segmentation.cellpose_integration import run_cellpose
-from src.Segmentation.df_managing.organize import filter_dataframe, get_foci_df, split_dfs
+from .df_managing.organize import get_foci_df, split_dfs
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -158,7 +157,7 @@ def draw_and_save(df: pd.DataFrame,
                     and 'Y_draw' not in f and 'Image_' not in f]
 
     df = df.filter(regex=ch + "|Cell|X")
-    cnt_grouped = df.groupby(['Image_name_' + ch])
+    cnt_grouped = df.groupby('Image_name_' + ch)
     fs = cv.getFontScaleFromHeight(2, 15, 2)
     for name, group in cnt_grouped:
         img = group['Image_' + ch].iloc[0]
@@ -180,6 +179,7 @@ def draw_and_save(df: pd.DataFrame,
                 cnt = list(group[col])
                 cnt = [f[0] for f in cnt if len(f) > 0] if use_cellpose or 'Cyto' in col else cnt
                 img = cv.drawContours(img, cnt, -1, (122, 144, 248), 1)
+
 
         cv.imwrite(os.path.join(saving_dir, name), img)
 
@@ -242,15 +242,25 @@ def analyze_dict(
 
         cellpose = segment_dict['use_cellpose']
         if cellpose:  # calls cellpose
-            contours = run_cellpose(img_to_segment, segment_dict['use_gpu'],
-                                    segment_dict['diameter'], segment_dict['magnification'],
-                                    segment_dict['pixel_size'], segment_dict['shape'],
-                                    segment_dict['eccentricity'], segment_dict['min_size'],
-                                    segment_dict['max_size'], segment_dict['min_radius'],
-                                    segment_dict['max_radius'], segment_dict['invert'],
-                                    segment_dict['normalize'], segment_dict['net_avg'],
-                                    segment_dict['resample'], segment_dict['flow_threshold'],
-                                    segment_dict['mask_threshold'])
+            contours = run_cellpose(
+                image_path=img_to_segment,
+                use_gpu=segment_dict['use_gpu'],
+                diameter=segment_dict['diameter'],
+                mag=segment_dict['magnification'],
+                px_s=segment_dict['pixel_size'],
+                shape=segment_dict['shape'],
+                eccentricity=segment_dict['eccentricity'],
+                min_size=segment_dict['min_size'],
+                max_size=segment_dict['max_size'],
+                min_radius=segment_dict['min_radius'],
+                max_radius=segment_dict['max_radius'],
+                invert=segment_dict['invert'],
+                normalize=segment_dict['normalize'],
+                resample=segment_dict['resample'],
+                flow_threshold=segment_dict['flow_threshold'],
+                cellprob_threshold=segment_dict['cellprob_threshold']
+                                   )
+
 
         else:  # calls forNMA pipeline
             contours = fornma_contour_finding(img_to_segment,

@@ -1,22 +1,41 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Aug  4 14:25:56 2021
+Created on Wed Aug 4 14:25:56 2021
 
 @author: Luiza
 
 File that puts all functions together 
 """
-
 import os
-import tempfile
-from typing import List, Tuple, Any, Union
-from PySide6.QtCore import Signal
-
-import cv2 as cv
+import sys
 import pandas as pd
+from typing import Any, Union, List, Tuple
+from .analyze import analyze_dict
+from .df_managing.organize import (
+    filter_dataframe, get_foci_df, split_dfs
+)
 
-from src.Segmentation.analyze import analyze_dict
-from src.Segmentation.df_managing.organize import filter_dataframe, get_foci_df, split_dfs
+pd.options.mode.chained_assignment = None  # default='warn'
+
+
+try:
+    # quando instalado como pacote
+    from src.fornma.Segmentation.analyze import analyze_dict
+    from src.fornma.Segmentation.df_managing.organize import (
+        filter_dataframe, get_foci_df, split_dfs
+    )
+except ModuleNotFoundError:
+    # quando rodado standalone dentro de src
+    sys.path.append(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+    )
+    from src.fornma.Segmentation.analyze import analyze_dict
+    from src.fornma.Segmentation.df_managing.organize import (
+        filter_dataframe, get_foci_df, split_dfs
+    )
+
+
+from src.fornma.Segmentation.analyze import analyze_dict
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -94,7 +113,7 @@ def adjust_parameters(parameters_dict) -> tuple[
                     'fast_detection': parameters_dict['segmentation']['forNMA']['find_low_intensity_nucleus'],
                     'weakly_labeled': parameters_dict['segmentation']['forNMA']['weakly_labeled'],
                     'use_cellpose': parameters_dict['segmentation']['cellpose']['use_cellpose'],
-                    'invert': False,
+                    'invert': parameters_dict['segmentation']['cellpose']['invert'],
                     'normalize': True,
                     'diameter': parameters_dict['segmentation']['cellpose']['diameter'],
                     'net_avg': True,
@@ -102,6 +121,7 @@ def adjust_parameters(parameters_dict) -> tuple[
                     'flow_threshold': parameters_dict['segmentation']['cellpose']['flow_threshold'],
                     'mask_threshold': parameters_dict['segmentation']['cellpose']['mask_threshold'],
                     'use_gpu': parameters_dict['segmentation']['cellpose']['use_gpu'],
+                    'cellprob_threshold' :  parameters_dict['segmentation']['cellpose']['cellprob_threshold'],
                     }
 
     return save_images, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \
@@ -112,7 +132,7 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
     """
        Adjusts dictionary from interface parameter dictionary  to establish new variable names.
        """
-    save_images = True  # TODO change forinterface outut
+    save_images = True  # TODO change for interface output
     path_to_save = parameters_dict['global']['output_folder']
     ch_name_list = [f.replace('Channel ', '') for f in parameters_dict.keys() if 'Channel' in f]
     ch_with_nuc = parameters_dict['global']['channel_with_nuclei']
@@ -139,7 +159,7 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
                     'fast_detection': parameters_dict['fornma']['find_low_intensity_nucleus'],
                     'weakly_labeled': parameters_dict['fornma']['weakly_labeled'],
                     'use_cellpose': parameters_dict['cellpose']['use_cellpose'],
-                    'invert': False,
+                    'invert': parameters_dict['cellpose']['invert'],
                     'normalize': True,
                     'diameter': parameters_dict['cellpose']['diameter'],
                     'net_avg': True,

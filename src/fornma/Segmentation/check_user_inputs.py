@@ -1,7 +1,6 @@
 import os
 from typing import List
 
-
 def check_dict(dictionary: dict,
                key_list: List[str]):
     """Checks if all keys are in a dictionary, given a list of standard keys."""
@@ -77,7 +76,8 @@ def check_user_inputs(dic: dict):
                 'cellpose']
     fornma_keys = ['use_fornma', 'threshold', 'offset', 'smooth', 'adjust_size', 'cut_edges',
                    'find_low_intensity_nucleus', 'weakly_labeled']
-    cellpose_keys = ['use_cellpose', 'diameter', 'flow_threshold', 'mask_threshold', 'use_gpu']
+    cellpose_keys = ['use_cellpose', 'diameter', 'flow_threshold', 'mask_threshold', 'use_gpu', 'cellprob_threshold',
+                     'invert']
     channel_keys = ['rescale_intensity', 'remove_background', 'rolling_ball_radius', 'match_histograms',
                     'measure_translocation', 'ring_size', 'use_ellipse', 'measure_foci', 'foci_min_size',
                     'foci_max_size', 'foci_min_int', 'foci_max_int', 'foci_prominence']
