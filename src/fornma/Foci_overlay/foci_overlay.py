@@ -32,7 +32,7 @@ def draw_foci_ch(group: pd.DataFrame,
     array and selects BGR colors from a given list to draw.
     After the drawing, it generates a image overlay and add it to ch_image_dict.
     """
-    ch_image_dict = {}
+    ch_image_dict = {} # incluir aqui um warning que vai remover os canais que não tem foci e ajustar para pegar só os canais com fcoi (tipo dapi n )
     image_list = []
     for i in range(len(channel_list)):
         image = np.zeros((shape[0], shape[1], 3)) if not monocolor else np.zeros(shape)
@@ -117,7 +117,7 @@ def save_images_ch(group: pd.DataFrame,
     return
 
 
-def foci_overlay(dfs: List[pd.DataFrame],
+def perform_foci_overlay(dfs: List[pd.DataFrame],
                  df_names: List[str],
                  save_images: bool,
                  path_save: str,
@@ -168,9 +168,9 @@ def test_channel_list(df: pd.DataFrame,
         return True
 
 
-def overlapping_foci(pkl_results_folder_path: str,
-                     path_to_save: str,
-                     channel_list: Optional[List[str]] = None,
+def foci_overlay(pkl_results_folder_path: str,
+                path_to_save: str,
+                channel_list: Optional[List[str]] = None,
                      ):
 
     if not os.path.exists(pkl_results_folder_path):
@@ -181,7 +181,7 @@ def overlapping_foci(pkl_results_folder_path: str,
     paths_to_dfs = [os.path.join(pkl_results_folder_path, f) for f in os.listdir(pkl_results_folder_path)]
     dfs = [pd.read_pickle(f) for f in paths_to_dfs if f.endswith('.pkl')]
     df_names = [f.replace('.pkl', '') for f in os.listdir(pkl_results_folder_path)]
-    channels_on_df = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name_' in f]
+    channels_on_df = [f.replace('Foci_cnt_', '') for f in dfs[0].columns if 'Foci_cnt_' in f]
 
     if channel_list is not None:
         # If user passes a list of channels, tests it if channels exist
@@ -200,7 +200,7 @@ def overlapping_foci(pkl_results_folder_path: str,
     for col in cols_to_remove:
         [f.drop(col, axis=1, inplace=True) for f in dfs]
 
-    foci_overlay(dfs, df_names, True, path_to_save)
+    perform_foci_overlay(dfs, df_names, True, path_to_save)
 
     return print('complete!')
 
@@ -308,7 +308,7 @@ def plot_profile(path_pickle_data: str,
                  ):
     """
     From a folder that contains pickle files, plots the profile of all nucleus intensity in all channels.
-     The x  profile is given by mean of y pixels in the x axis and the y profile is the mean of x pixels in the y axis.
+     The x profile is given by mean of y pixels in the x axis and the y profile is the mean of x pixels in the y axis.
      """
 
     paths = [os.path.join(path_pickle_data, f) for f in os.listdir(path_pickle_data)]
@@ -316,7 +316,7 @@ def plot_profile(path_pickle_data: str,
     names = [f.replace('.pkl', '')for f in os.listdir(path_pickle_data)]
 
     if columns is None:
-        channel_list = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name' in f]
+        channel_list = [f.replace('Foci_cnt_', '') for f in dfs[0].columns if 'Foci_cnt_' in f]
     else:
         channel_list = columns
     print(columns, dfs[0].columns, channel_list)
