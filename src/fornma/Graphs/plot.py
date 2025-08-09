@@ -138,24 +138,3 @@ def plot(path: Union[str, Sequence[str]],
         raise ValueError(f"graph_type inválido: {graph_type}")
 
     return f'Files were saved at {out_dir}'
-
-
-
-#
-# p = '/home/luiza/Área de Trabalho/teste NMA/lap_lnc_tras1 Results.csv'
-# ps = '/home/luiza/Área de Trabalho/teste NMA'
-# cond = None
-# frames = None
-# gt = 'cpd'
-# g = False
-# x = 'Area'
-# y = 'NII'
-# hue = "Condition"
-# size = None
-# style = None
-# ci = 0.95
-# dot = False
-# control = 'lnc1'
-# n = 3
-
-# plot(p, ps, cond, frames, gt, g, x=x, y=y, hue=hue, size=size, control=control, n=n, style=style, ci=ci, dot=dot)
