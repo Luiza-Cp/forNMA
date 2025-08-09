@@ -5,19 +5,15 @@ venv/
 /.idea
 
 # forNMA analysis data
-src/Graphs/control_parameters.pickle
+src/fornma/Graphs/control_parameters.pickle
 
 # Generated data
 build/
 *.egg-info/
 
-# registered images
-tests/Results/Control green Registered/
-tests/Results/Control red Registered/
-
 #NMA cache
 control_parameters.pickle
 
 #forNMA results
-tests/Results
+tests/
 
