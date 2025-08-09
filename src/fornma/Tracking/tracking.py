@@ -1,10 +1,11 @@
 import os
 import pandas as pd
 import numpy as np
-from src.fornma.Tracking.LapTracker.LapTracker import LapTracker
+from .LapTracker.LapTracker import LapTracker
 import cv2 as cv
 import random
 import ast
+import random
 
 pd.options.mode.chained_assignment = None
 
@@ -54,7 +55,7 @@ def run_laptracker(
             img_name = i
             break
 
-    cols = ['X', "Y", 'Frame', img_name]
+    cols = ['Cell', 'X', "Y", 'Frame', img_name]
     df2 = table[cols]
     df2['X'] = pd.to_numeric(df2['X'], downcast='integer')
     df2['Y'] = pd.to_numeric(df2['Y'], downcast='integer')
@@ -162,6 +163,7 @@ def create_tree_nomenclature(df: pd.DataFrame, max_gap_closing_distance) -> pd.D
 
 def tracking(
         path_to_table: str,
+        saving_path: str,
         max_distance: int = 30,
         time_window: int = 5,
         max_split_distance: int = 10,  # essa aqui que separa os segmentos mto grudados (2024)
@@ -172,47 +174,75 @@ def tracking(
     min_frame = df['Frame'].min()
     df = find_family(df, min_frame, max_distance)
     df = create_tree_nomenclature(df, max_gap_closing_distance)
+    results_df = pd.read_csv(path_to_table, index_col=0)
+    img_col = [f for f in df.columns if f.startswith('Image_name')][0]
+    df = df.merge(results_df, on=['Frame', 'Cell', 'X', 'Y', img_col])
+    df.to_csv(os.path.join(saving_path, 'Tracked  Results.csv'))
 
-    return df
+    return None
 
 
-# ajustar função abaixo
-def draw_track(df, folder, save):
-    img_col = [f for f in df.columns if 'Image_name' in f][0]
-    df['family_color'] = None
-    for family, df_family in df.groupby('family'):
-        seq = list(range(0, 256))
-        random_color = (random.choice(seq), random.choice(seq), random.choice(seq))
-        df.loc[df['family'] == family, 'family_color'] = [str(random_color)] * len(df_family)
-    df['family_color'] = df['family_color'].apply(ast.literal_eval)
+def _family_color_map(family):
+    # cor determinística por família (evita mudar a cada execução)
+    random.seed(hash(family) & 0xffffffff)
+    return (random.randint(0,255), random.randint(0,255), random.randint(0,255))  # BGR no OpenCV
 
+
+def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point_thickness=2, font_scale=0.7, text_thickness=1):
+
+
+    if not img_col:
+        raise KeyError("Image column not found")
+
+    # garante colunas necessárias
+    required = {'Frame','X','Y','track_id','family','family_name','previous_x','previous_y', img_col}
+    missing = required - set(df.columns)
+    if missing:
+        raise KeyError(f"Colunas faltando: {missing}")
+
+    os.makedirs(save, exist_ok=True)
+
+    df = df.sort_values(by='Frame').copy()
+    df['family_color'] = df['family'].map(_family_color_map)
+
+    # loop por frame
     for frame, df_frame in df.groupby("Frame"):
-        df = df.sort_values(by='Frame')
+        # Resolve caminho da imagem
         image_to_open = df_frame[img_col].iloc[0]
-        img = cv.imread(os.path.join(folder, image_to_open))
-        df_0 = df.loc[df['Frame'] == frame]
-        coordinates = list(zip(df_0['X'].astype(int), df_0['Y'].astype(int)))
-        track = list(df_0['track_id'].astype(str))
+        img_path = image_to_open if os.path.isabs(image_to_open) else os.path.join(folder, image_to_open)
+        img = cv.imread(img_path)
+        if img is None:
+            # pula frames com problema de leitura de imagem
+            continue
+
+        # pontos do frame atual
+        df_0 = df_frame  # já é o frame atual
+        coordinates = list(zip(df_0['X'].round().astype(int), df_0['Y'].round().astype(int)))
         family_name = list(df_0['family_name'].astype(str))
-        color = list(df_0['family_color'])
-        [cv.circle(img, f, 2, (171, 235, 85), 2) for f in coordinates]
-      #  [cv.putText(img, f, g, cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 1) for f, g in zip(track, coordinates)]
-        [cv.putText(img, f, (g[0] + 35, g[1]), cv.FONT_HERSHEY_SIMPLEX, 0.7, h, 1) for f, g, h in
-         zip(family_name, coordinates, color)]
+        colors_now = list(df_0['family_color'])
 
-        tracks_df = df.loc[df["Frame"] <= frame].sort_values(by='Frame')
-        tracks_df = tracks_df.loc[tracks_df["Frame"] >= frame-15].sort_values(by='Frame')
-        line = list(zip(tracks_df['X'], tracks_df['Y']))
-        line_previous = list(zip(tracks_df['previous_x'], tracks_df['previous_y']))
-        color_list = list(tracks_df['family_color'])
-        for f, g, h in zip(line, line_previous, color_list):
-            if not np.isnan(f[0]) and not np.isnan(g[0]):
-                g = (int(g[0]), int(g[1]))
-                cv.line(img, f, g, h, thickness=1)
+        # desenha pontos e labels
+        for (x, y), fam, color in zip(coordinates, family_name, colors_now):
+            cv.circle(img, (x, y), point_radius, color, point_thickness)
+            cv.putText(img, fam, (x + 35, y), cv.FONT_HERSHEY_SIMPLEX, font_scale, color, text_thickness)
 
-        cv.imwrite(save + str(frame) + '.jpeg', img)
+        # desenha trilhas dos últimos N frames (inclui o atual)
+        start = frame - trail_window
+        tracks_df = df[(df["Frame"] >= start) & (df["Frame"] <= frame)].sort_values(by='Frame')
+        # usa as mesmas cores por família
+        for _, row in tracks_df.iterrows():
+            x, y = row['X'], row['Y']
+            px, py = row['previous_x'], row['previous_y']
+            if np.isfinite(x) and np.isfinite(y) and np.isfinite(px) and np.isfinite(py):
+                p1 = (int(round(x)), int(round(y)))
+                p0 = (int(round(px)), int(round(py)))
+                color = row['family_color']
+                cv.line(img, p0, p1, color, thickness=1)
 
-    return
+        # salva com zero-padding no frame (opcional)
+        out_path = os.path.join(save, f"{int(frame):05d}.tiff")
+        cv.imwrite(out_path, img)
+
 
 #path_to_table = '/media/luiza/DATA/Doutorado/forNMA/experimentos/exp_kaka/populacional 1/exp kaka populacional 1/results/dados para tracking/results/GREEN_D9_2 Registered/Results_NMA_para_tracking.csv'
 #df = tracking(path_to_table,30, 5, 10,  10 )
