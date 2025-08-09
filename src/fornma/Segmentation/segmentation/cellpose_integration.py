@@ -7,6 +7,7 @@ Created on Fri Feb 11 15:35:41 2022
 """
 
 import numpy as np
+import warnings
 from cellpose import models, utils
 from typing import Optional, List
 from .find_contours import load_image
@@ -37,28 +38,50 @@ def run_cellpose(image_path: str,
                  max_size: int,
                  min_radius: int,
                  max_radius: int,
-                 invert: bool = False,
+                 invert: bool = True,
                  normalize: bool = True,
-                 net_avg: bool = True,
                  resample: bool = True,
                  flow_threshold: float = 0.4,
-                 mask_threshold: float = 0.0
+                 cellprob_threshold: float = 0
                  ) -> List[np.ndarray]:
     """
     Runs cellpose nuclear model in a specified image and returns a
     list of filtered nuclei contours.
     """
+
+    warnings.warn(
+                "⚠️ Even if you selected GPU, Cellpose may still be running on CPU. "
+        "This can be very slow. For better performance, make sure CUDA is installed "
+        "and that you are using a GPU-enabled version of PyTorch.",
+        UserWarning
+    )
     image = load_image(image_path)
-    model = models.Cellpose(model_type='nuclei', gpu=use_gpu)
-    channels = [[0, 0]]
-    masks, flows, styles, diams = model.eval([image], diameter=diameter, channels=channels,
-                                             invert=invert, normalize=normalize,
-                                             net_avg=net_avg, resample=resample,
-                                             flow_threshold=flow_threshold,
-                                             mask_threshold=mask_threshold,
-                                             min_size=min_size, )
+    model = models.CellposeModel(
+        pretrained_model="nuclei",
+        gpu=use_gpu,
+    )
+
+    masks, flows, styles = model.eval(
+        image,
+        channels=[0, 0],
+        invert=invert,
+        normalize=normalize,
+        resample= False,#resample,
+        flow_threshold= 0.0, #flow_threshold,
+        min_size= 5 ,#-1 if min_size is None else min_size,
+        diameter= None, #diameter,
+        cellprob_threshold= -6, # cellprob_threshold,
+        augment=False,
+    )
+
     outlines_cnt = utils.outlines_list(masks[0])
+    print(image.shape)
+    print (len(outlines_cnt))
+    print(masks[0].max())
+    print(invert, normalize, resample, flow_threshold, min_size, diameter, cellprob_threshold)
+    print(len(outlines_cnt))
     outlines_cnt = remove_edge_cnt(outlines_cnt, image.shape)
+    print(len(outlines_cnt))
     if len(outlines_cnt) > 0:
         outlines_cnt = filter_contours(outlines_cnt, mag, px_s, shape, eccentricity,
                                        min_size, max_size, min_radius, max_radius)
