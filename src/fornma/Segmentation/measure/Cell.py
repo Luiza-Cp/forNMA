@@ -9,7 +9,7 @@ Created on Mon May 17 09:19:03 2021
 import cv2 as cv
 import numpy as np
 import pandas as pd
-from scipy import signal
+from scipy.signal.windows import gaussian
 from skimage.feature import local_binary_pattern
 from skimage.segmentation import clear_border
 from typing import List
@@ -304,7 +304,7 @@ class Cell:
         if (kernlen % 2) == 0:
             kernlen = kernlen + 1
         std = kernlen / 5
-        GaussianKernel1d = signal.gaussian(kernlen, std=std).reshape(kernlen, 1)
+        GaussianKernel1d = gaussian(kernlen, std=std).reshape(kernlen, 1)
         GaussianKernel2d = np.outer(GaussianKernel1d, GaussianKernel1d)
 
         return GaussianKernel2d
