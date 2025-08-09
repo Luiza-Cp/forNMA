@@ -1,1 +1,1 @@
-from .Graph_class import plot
+from .plot import plot
