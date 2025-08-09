@@ -9,12 +9,14 @@ from matplotlib import pyplot as plt
 from datetime import datetime
 from scipy import stats
 import warnings
+from pathlib import Path
 
 warnings.filterwarnings('ignore')
 import matplotlib
 
 matplotlib.use('TkAgg')
 
+CONFIG_PATH = Path(__file__).parent / "control_parameters.pickle"
 
 class NMA:
     """ Class for NMA graph plotting"""
@@ -78,8 +80,8 @@ class NMA:
         self.plot()
 
     def subset_df(self, condition_time_tuple):
-
         """ Subsets the self dataframe based in a condition or time frame or both."""
+
         if all(item is None for item in condition_time_tuple):
             df = self.df
         elif condition_time_tuple[1] is None:
@@ -93,7 +95,6 @@ class NMA:
         return df
 
     def calc_area_NII_lims(self):
-
         """ Given a dataframe, establishes NMA graph limits"""
 
         df = self.df[(np.abs(stats.zscore(self.df["Area"])) < 3)]
@@ -127,7 +128,6 @@ class NMA:
         """ Generates a dataframe containing the percentage relation of all NMA groups. """
 
         has_controls = df['Condition'].iloc[0] != False and len(set(list(df['Condition']))) > 0
-        # não é falso (logo, tem valores ali) e tiver mais d 1 condição have_controls ==True
 
         df_percent_rows = []
 
@@ -142,7 +142,6 @@ class NMA:
                     df_percent_rows.append(new_row)
 
         elif has_controls:
-            # tem só controles?
             conditions = df.groupby('Condition')
             for name, group in conditions:
                 lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(group)
@@ -150,7 +149,6 @@ class NMA:
                 df_percent_rows.append(new_row)
 
         elif df['Overtime'].iloc[0]:
-            # tem sṕ tempos?
             frames = df.groupby('Frame')
             for name, group in frames:
                 lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(group)
@@ -158,7 +156,6 @@ class NMA:
                 df_percent_rows.append(new_row)
 
         else:
-            # nada destacado
             lr, li, n, i, sr, s, si = self.get_NMA_classification_from_df(df)
             new_row = [df['Condition'].iloc[0], False, df.shape[0], lr, li, n, i, sr, s, si]
             df_percent_rows.append(new_row)
@@ -167,6 +164,7 @@ class NMA:
                                   columns=["Condition", "Frame", 'Total Cells', 'LR', 'LI', 'N', 'I', 'SR', 'S', 'SI'])
 
         return percent_df
+
 
     def f_test(self,
                x: List[float],
@@ -180,6 +178,7 @@ class NMA:
         p = 1 - stats.f.cdf(f, dfn, dfd)  # find p-value of F test statistic
 
         return p
+
 
     def get_sample(self,
                    df: pd.DataFrame,
@@ -226,10 +225,7 @@ class NMA:
     def plot_NMA_heatmap(self,
                          condition_time_tuple: Tuple[Optional[str], Optional[int]],
                          title: str):
-        # plota pra uma condição sṕ. Cada condição adicional
-        # tem que chamar separado de novo. Isso é para UM plot
-
-        """  Plots a heatmap NMA ignoring values passed as hue and size."""
+        """  Plots ONE heatmap NMA ignoring values passed as hue and size."""
 
         subset_of_df = self.subset_df(condition_time_tuple)
         plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
@@ -247,13 +243,11 @@ class NMA:
 
         return fig
 
+
     def plot_NMA_jointplot(self,
                            condition_time_tuple: Tuple[Optional[str], Optional[int]],
                            title: str):
-        # plota pra uma condição sṕ. Cada condição adicional
-        # tem que chamar separado de novo. Isso é para UM plot
-
-        """  Plots a heatmap NMA ignoring values passed as hue and size."""
+        """  Plots ONE jointplot NMA ignoring values passed as hue and size."""
 
         subset_of_df = self.subset_df(condition_time_tuple)
         #plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
@@ -316,8 +310,8 @@ class NMA:
             percentages = percentages.loc[percentages['Frame'] == condition_time_tuple[1]]
 
         # make the values out of graph limits group at the limit (cytometry-like)
-        subset_of_df.loc[subset_of_df['NII'] == self.graph_limits[3], 'NII'] = self.graph_limits[3] - 0.1
-        subset_of_df.loc[subset_of_df['Area'] == self.graph_limits[1], 'Area'] = self.graph_limits[1] - 10
+        subset_of_df.loc[subset_of_df['NII'] >= self.graph_limits[3], 'NII'] = self.graph_limits[3] - 0.1
+        subset_of_df.loc[subset_of_df['Area'] >= self.graph_limits[1], 'Area'] = self.graph_limits[1] - 10
         plt.rcParams['axes.facecolor'] = 'white'
 
         fig, ax = plt.subplots(1, figsize=(10, 6))
@@ -333,12 +327,8 @@ class NMA:
             df_size = self.df[(np.abs(stats.zscore(self.df[size].fillna(self.df[size].mean()))) < 3)]
             size_norm = (df_size[size].min(), df_size[size].max())
 
-        ###### forçamento de mais cores, mudar aqui
-        cores = sns.color_palette('crest', n_colors=15)
-
-        ##########
         sns.scatterplot(data=subset_of_df, x="NII", y="Area", size=size, hue=hue,
-                        hue_norm=hue_norm, size_norm=size_norm, ax=ax, palette=cores )# devoler a paleta original
+                        hue_norm=hue_norm, size_norm=size_norm, ax=ax, palette='rainbow' )
         ax.plot(self.mean_NII + (self.sd_NII * self.std_NII) * np.cos(self.circle),
                 self.mean_a + (self.sd_area * self.std_a) * np.sin(self.circle), color='black')
 
@@ -346,39 +336,6 @@ class NMA:
                 self.v_upx, self.v_upy, self.v_midx, self.v_midy,
                 self.v_downx, self.v_downy,
                 self.v_downx2, self.v_downy, color='black')
-
-        ### add linha entre 2 frames  ####
-        #for name, group in subset_of_df.groupby("Condition"):
-        #    group = group.sort_values(by="Frame")
-
-        #   if len(group) < 2:
-        #      continue
-
-        #    x0, y0 = group['NII'].values[0], group['Area'].values[0]  # Primeiro ponto
-        #    x1, y1 = group['NII'].values[1], group['Area'].values[1]  # Segundo ponto
-
-        #    dx, dy = x1 - x0, y1 - y0  # Direção da seta
-
-        #    ax.quiver(x0, y0, dx, dy, angles="xy", scale_units="xy", scale=1, color='#D3D3D3',  width=0.005, alpha=0.5)
-
-        #ax.plot(subset_of_df['NII'], subset_of_df['Area'], color= '#D3D3D3', linewidth =1)
-
-        # ######## para desenhar track no NMA
-        #import ast
-        #subset_frame = subset_of_df['Frame'].iloc[0]
-        #to_draw = self.df[
-        #    (self.df['Frame'] <= subset_frame) &
-        #    (self.df['Frame'] >= subset_frame -4)
-        # ].sort_values(by='Frame')
-        #to_draw['family_color'] = to_draw['family_color'].apply(ast.literal_eval)
-        #for idx, row in to_draw.iterrows():
-        #    if row['family'] == 193:
-        #         ax.plot([row['previous_NII'],row['NII']],[row['previous_aresa'], row['Area']],
-        #         color=np.array(row['family_color'])/255, linewidth=1.0
-        #          )
-        #ax.set_ylim(6.0, 2000.5) # TODO trocar de volta pr normal
-       # ax.set_xlim(1.6261551860775891, 5.821612925456017)
-        ######
 
         ax.set_ylim(self.graph_limits[0], self.graph_limits[1])
         ax.set_xlim(self.graph_limits[2], self.graph_limits[3])
@@ -417,6 +374,7 @@ class NMA:
 
         return fig, df_sample
 
+
     def percentages_overtime(self,
                              group: str,
                              frames: Optional[List[int]] = None):
@@ -435,11 +393,12 @@ class NMA:
 
         return fig
 
+
     def save_figs(self,
                   fig: plt.figure,
                   title: str):
-        png = title.lstrip() + '.png'
-        svg = title.lstrip() + ".svg"
+        png = f'{title.lstrip()} {self.graph_type}.png'
+        svg = f'{title.lstrip()} {self.graph_type}.svg'
 
         try:
             fig.savefig(os.path.join(self.path_save, png))
@@ -450,6 +409,7 @@ class NMA:
         except:
             print(f'Error while saving figure {title}. Check your saving path and try again.')
         return None
+
 
     def plot(self):
 
@@ -488,6 +448,52 @@ class NMA:
         return print(f'Files were saved at: {self.path_save}')
 
 
+def add_NMA_category_to_tables(df:pd.DataFrame,
+                               parameters: dict ):
+    """ Given a dataframe and NMA parameters, returns an annotated dataframe with a NMA category for each cell"""
+    df.loc[
+        (df['Area'] >= parameters['h_y_up'][0]) &
+        (df['NII'] < parameters['v_upx'][0]),
+        'NMA_category'
+    ] = 'LR'
+    df.loc[
+        (df['Area'] > parameters['h_y_up'][0]) &
+        (df['NII'] >=  parameters['v_upx'][0]),
+        'NMA_category'
+    ] = 'LI'
+    df.loc[
+        (df['Area'] < parameters['h_y_up'][0]) &
+        (df['Area'] >= parameters['h_y_down'][0]) &
+        (df['NII'] < parameters['v_midx'][0]),
+        'NMA_category'
+    ] = 'N'
+    df.loc[
+        (df['Area'] < parameters['h_y_up'][0]) &
+        (df['Area'] >= parameters['h_y_down'][0]) &
+        (df['NII'] > parameters['v_midx'][0]),
+        'NMA_category'
+    ] = 'I'
+    df.loc[
+        (df['Area'] < parameters['h_y_down'][0]) &
+        (df['NII'] <parameters['v_downx'][0]),
+        'NMA_category'
+    ] = 'SR'
+    df.loc[
+        (df['Area'] < parameters['h_y_down'][0]) &
+        (df['NII'] >= parameters['v_downx'][0]) &
+        (df['NII'] < parameters['v_downx2'][0]),
+        'NMA_category'
+    ] = 'S'
+    df.loc[
+        (df['Area'] < parameters['h_y_down'][0]) &
+        (df['NII'] >= parameters['v_downx2'][0]),
+        'NMA_category'
+    ] = 'SI'
+
+    return df
+
+
+
 def check_column_names(df: pd.DataFrame,
                        name: str):
     """ Checks if DataFrame columns rare the ones expected by forNMA. If not, raises an error."""
@@ -512,26 +518,28 @@ def plot_NMA(path_list: List[str],
              sample_size: Optional[int] = None,
              single: Optional[bool] = None,
              overtime: bool = False, ):
-    """ From a list of paths corresponding to csv files, plots NMA graphs"""
-    if not os.path.isfile('control_parameters.pickle'):
+
+    """ From a list of paths corresponding to csv files, plots NMA graphs. Graph_tupe can be dot, jointplot or heatmap"""
+    if not os.path.isfile(CONFIG_PATH ):
         raise Exception("The NMA settings were not defined. Run 'NMA settings' command before plotting")
 
-    with open('control_parameters.pickle', 'rb') as f:
+    with open(CONFIG_PATH , 'rb') as f:
         parameters = pickle.load(f)
         control_name = parameters['name']
         sd_area = parameters['sd_area']
         sd_NII = parameters['sd_NII']
         print(
-            f'Your current control configuration was defined with table named {control_name} with an area standard '
-            f'deviation of {sd_area} and NII standard deviation of {sd_NII}.\nIf you need other control settings, '
-            f'please run "NMA control" command again.')
+            f'Your current configuration was defined with table named {control_name} with an area standard '
+            f'deviation of {sd_area} and NII standard deviation of {sd_NII}.\nIf you need other settings, '
+            f'please run "NMA settings" command again.')
 
         dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         with open(os.path.join(saving_path, "logs-fornma.txt"), "a") as logs:
-            logs.write(f'\n\n{dt} - NMA plot\nYour current control configuration was defined with table named '
+            logs.write(f'\n\n{dt} - NMA plot\nYour current configuration was defined with table named '
                        f'{control_name} with an area standard deviation of {sd_area} and NII standard deviation of '
                        f'{sd_NII}.')
 
+    print(os.path.join(saving_path, "logs-fornma.txt"))
     df_list = [pd.read_csv(f) for f in path_list]
     names = [os.path.basename(f).replace('Results.csv', '') for f in path_list]
     # [check_column_names(df, name) for df, name in zip(df_list, names)]
@@ -542,6 +550,12 @@ def plot_NMA(path_list: List[str],
     df = pd.concat(df_list, ignore_index=True) if len(df_list) > 1 else df_list[0]
     sample = True if sample_size is not None else False
     NMA(df, parameters, graph_type, single, overtime, saving_path, sample, sample_size, col1, col2)
+
+    df_list_with_NMA = [add_NMA_category_to_tables(f, parameters) for f in df_list]
+    df_names = [f['Condition'].iloc[0] for f in df_list]
+    dest = os.path.join(saving_path, 'Tables with NMA annotation')
+    os.makedirs(dest, exist_ok=True)
+    [f.to_csv(os.path.join(dest, f'{g}.csv')) for f, g in zip(df_list_with_NMA, df_names) ]
 
     return print("Complete")
 
