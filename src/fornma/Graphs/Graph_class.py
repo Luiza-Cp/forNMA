@@ -13,7 +13,7 @@ from typing import Optional, List
 import math
 import os
 from datetime import datetime
-from .NMA_draggable_line import draggable_lines
+from src.fornma.NMA.NMA_draggable_line import draggable_lines
 matplotlib.use('TkAgg')
 
 
