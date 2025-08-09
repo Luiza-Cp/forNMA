@@ -15,5 +15,6 @@ build/
 control_parameters.pickle
 
 #forNMA results
-tests/
+tests/data
+tests/results
 
