@@ -277,35 +277,37 @@ def main():
     print(args)
 
     if args.fornma == 'registration':
-        from src.Registration import registration
+        from src.fornma.Registration import registration
         registration(args.paths, args.path_to_save, args.crop)
 
     elif args.fornma == 'segmentation':
         import toml
-        from src.Segmentation import run, check_user_inputs
+        from src.fornma.Segmentation import run, check_user_inputs
         dic = toml.load(args.parameters)
         check_user_inputs(dic)
         run(dic, preview=args.preview)
 
     elif args.fornma == 'tracking':
-        from src.Tracking import tracking
+        from src.fornma.Tracking import tracking
         tracking(args.path_to_table, args.path_to_save, args.max_distance, args.time_window, args.max_split_distance,
                  args.max_gap_closing_distance, args.allow_merging)
 
     elif args.fornma == 'draw_tracking':
-        from src.Tracking import  draw_tracking
+        from src.fornma.Tracking import  draw_tracking
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
 
     elif args.fornma == 'filters':
-        from src.Filters import filters
+        from src.fornma.Filters import filters
         filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'filers':
-        from src.Filters import filters
+        from src.fornma.Filters import filters
         filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'NMA':
-        from src.Graphs import NMA_control, plot_NMA, show_nma_settings
+        from src.fornma.Graphs import show_nma_settings
+        from src.fornma.NMA import plot_NMA
+        from src.fornma.NMA import NMA_control
         if (hasattr(args, 'dest')) and args.dest == 'show':
             show_nma_settings()
         elif hasattr(args, 'area_standard_deviation'):
@@ -319,7 +321,7 @@ def main():
             plot_NMA(args.path, args.saving_path, "heatmap", None, None, None, args.single, args.overtime)
 
     elif args.fornma == 'plot':
-        from src.Graphs import plot
+        from src.fornma.Graphs import plot
         x = args.x if hasattr(args, 'x') else None
         y = args.y if hasattr(args, 'y') else None
         hue = args.hue if hasattr(args, 'hue') else None
@@ -335,7 +337,7 @@ def main():
              control=control, n=n, style=style, ci=ci, dot=dot)
 
     elif args.fornma == 'foci':
-        from src.Foci_overlap import overlapping_foci, plot_profile
+        from src.fornma.Foci_overlay import overlapping_foci, plot_profile
         if hasattr(args, 'ch'):
             overlapping_foci(args.path, args.path_to_save, args.ch)
         else:
