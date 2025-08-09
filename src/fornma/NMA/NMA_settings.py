@@ -60,7 +60,8 @@ class NMA:
         self.h_x, self.h_y_up, self.h_y_down = self.calc_lines()
         self.graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7, ec="#bdbbbb", lw=1)
         self.v_upx, self.v_upy, self.v_midx, self.v_midy, self.v_downx, self.v_downy, self.v_downx2 = self.get_vertical_lines()
-        self.v_upx, self.v_midx, self.v_downx, self.v_downx2, self.fig = self.adjust_vertical_lines() if self.headless is False else None
+        self.v_upx, self.v_midx, self.v_downx, self.v_downx2, self.fig = self.adjust_vertical_lines() if self.headless \
+                                         is False else ( self.v_upx, self.v_midx,  self.v_downx,  self.v_downx2, None)
 
     def subset_df(self, condition_time_tuple):
 
@@ -382,7 +383,8 @@ def NMA_control(path: str,
                       'fig': nma.fig,
                       }
 
-    with open('control_parameters.pickle', 'wb') as handle:
+    config_path = os.path.join(os.path.dirname(__file__), "control_parameters.pickle")
+    with open(config_path, 'wb') as handle:
         pickle.dump(nma_parameters, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     return print("NMA control setting complete")
