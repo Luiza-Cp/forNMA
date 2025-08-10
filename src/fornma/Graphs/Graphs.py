@@ -81,7 +81,6 @@ class Graphs:
 
         fig, ax = plt.subplots(figsize=(7, 5), dpi=dpi)
 
-        # Limites automáticos com pequena folga
         if xlim is None:
             xr = df[x].to_numpy()
             pad = (np.nanmax(xr) - np.nanmin(xr)) * 0.03 or 1.0
@@ -190,59 +189,6 @@ class Graphs:
                 f"{y} min: {bottom}\n"
                 f"{y} max: {upper}\n")
         with open(os.path.join(self.path_save, log_file), "a") as logs:
-            logs.write(info)
-
-        return None
-
-
-    def gate_old(self,
-             x: str,
-             y: str):
-        """If gate is true, plots all the df info for user to select a piece of data to work with."""
-        x0 = self.subset[x].quantile(.05)
-        xf = self.subset[x].quantile(.95)
-        y0 = self.subset[y].quantile(.05)
-        yf = self.subset[y].quantile(.95)
-
-        x_quantile = self.subset[x].quantile(.2)
-        y_quantile = self.subset[y].quantile(.2)
-
-        fig = plt.figure()
-        ax = fig.add_subplot(sns.scatterplot(data=self.subset, x=x, y=y, palette='rainbow'))
-        ax.set_title('Click once to move the lines. Click again to release')
-
-        upper_line = draggable_lines(ax, 'h', int(yf), [int(self.subset[x].min() - x_quantile),
-                                                        int(self.subset[x].max() + x_quantile)])
-        bottom_line = draggable_lines(ax, 'h', y0, [int(self.subset[x].min() - x_quantile),
-                                                    int(self.subset[x].max() + x_quantile)])
-        left_line = draggable_lines(ax, 'v', x0, [int(self.subset[y].min() - y_quantile),
-                                                  int(self.subset[y].max() + y_quantile)])
-        right_line = draggable_lines(ax, 'v', xf, [int(self.subset[y].min() - y_quantile),
-                                                   int(self.subset[y].max() + y_quantile)])
-
-        plt.show(block=True)
-
-        upper = self.df[y].max() if upper_line.x is None else upper_line.x
-        bottom = self.df[y].min() if bottom_line.x is None else bottom_line.x
-        left = self.df[x].min() if left_line.x is None else left_line.x
-        right = self.df[x].max() if right_line.x is None else right_line.x
-
-        plt.close('all')
-
-        df2 = self.subset.loc[(self.subset[y] < upper) & (self.subset[y] > bottom)]
-        df2 = df2.loc[(df2[x] < right) & (df2[x] > left)]
-        self.subset = df2
-        df2.to_csv(os.path.join(self.path_save, "Gated results.csv"))
-
-        dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-
-        info = f'\n\n{dt} - Gate applied:\n' \
-               f'{x} minimum: {left}\n' \
-               f'{x} minimum: {right}\n' \
-               f'{y} minimum: {bottom}\n' \
-               f'{y} minimum: {upper}\n'
-
-        with open(os.path.join(self.path_save, "logs-fornma.txt"), "a") as logs:
             logs.write(info)
 
         return None
