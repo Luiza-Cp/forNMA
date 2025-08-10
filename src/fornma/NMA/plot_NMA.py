@@ -278,7 +278,7 @@ class NMA:
         """
         Plots the NMA graph(scatterplot) with hue and size chosen by user. Same graph
         as the one defined by plot_NMA_200, but without performing sampling.
-        When sample is enabled, it performs t test statistics to get representative
+        When sample is enabled, it performs t test Statistics to get representative
         means of the population and f test for variances, for each measure to be plotted.
         It also does not plot the percentages in each graph group.
         """
