@@ -25,7 +25,6 @@ def plot(path: Union[str, Sequence[str]],
          gate: bool,
          **kwargs) -> str:
 
-    # Se for string, transforma em lista
     if isinstance(path, (str, Path)):
         paths = [Path(path)]
     else:
