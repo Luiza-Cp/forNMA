@@ -14,6 +14,9 @@ import math
 import os
 from datetime import datetime
 from ..NMA.NMA_draggable_line import draggable_lines
+import matplotlib.patches as patches
+import numpy as np
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 matplotlib.use('TkAgg')
 
 
@@ -71,7 +74,128 @@ class Graphs:
 
         return df
 
-    def gate(self,
+
+    def _raster_scatter_to_array(self, df, x, y, hue=None, size=None, dpi=300, xlim=None, ylim=None):
+        """Renderiza um scatter em memória e retorna (img[numpy], xlim, ylim)."""
+        sns.set_theme(style="white")  # sem grid
+
+        fig, ax = plt.subplots(figsize=(7, 5), dpi=dpi)
+
+        # Limites automáticos com pequena folga
+        if xlim is None:
+            xr = df[x].to_numpy()
+            pad = (np.nanmax(xr) - np.nanmin(xr)) * 0.03 or 1.0
+            xlim = (float(np.nanmin(xr) - pad), float(np.nanmax(xr) + pad))
+        if ylim is None:
+            yr = df[y].to_numpy()
+            pad = (np.nanmax(yr) - np.nanmin(yr)) * 0.03 or 1.0
+            ylim = (float(np.nanmin(yr) - pad), float(np.nanmax(yr) + pad))
+
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.set_facecolor('#E5E5E5')
+        # Scatter sempre com Seaborn e paleta rainbow
+        sns.scatterplot(data=df, x=x, y=y, hue=hue, size=size, palette="rainbow", ax=ax, rasterized=True)
+
+        # limpar ruído visual
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis("off")
+
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+        fig.tight_layout(pad=0)
+
+        # Canvas Agg -> numpy
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        buf = np.asarray(canvas.buffer_rgba())[:, :, :3].copy()
+
+        plt.close(fig)
+        return buf, xlim, ylim
+
+
+    def gate(self, x, y, hue=None, size=None, log_file="logs-fornma.txt"):
+        sns.set_theme(style="white")  # sem grid
+
+
+        df = self.subset
+
+        img, xlim, ylim = self._raster_scatter_to_array(df, x, y, hue=hue, size=size, dpi=300)
+
+        # Posições iniciais
+        x0, xf = df[x].quantile(.05), df[x].quantile(.95)
+        y0, yf = df[y].quantile(.05), df[y].quantile(.95)
+
+        # Mostrar imagem
+        fig, ax = plt.subplots(figsize=(7, 5), dpi=150)
+        ax.imshow(img, origin='upper', extent=[*xlim, *ylim], aspect='auto')
+        ax.set_facecolor('#E5E5E5')
+
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.grid(False)
+
+        ax.set_xlabel(x)
+        ax.set_ylabel(y)
+
+        ax.set_title('Click once to move the lines. Click again to release')
+
+        # Linhas arrastáveis
+        upper_line = draggable_lines(ax, 'h', yf, [xlim[0], xlim[1]])
+        bottom_line = draggable_lines(ax, 'h', y0, [xlim[0], xlim[1]])
+        left_line = draggable_lines(ax, 'v', x0, [ylim[0], ylim[1]])
+        right_line = draggable_lines(ax, 'v', xf, [ylim[0], ylim[1]])
+
+        plt.show(block=True)
+        plt.close('all')
+
+        # Limites finais
+        upper = float(df[y].max()) if upper_line.x is None else float(upper_line.x)
+        bottom = float(df[y].min()) if bottom_line.x is None else float(bottom_line.x)
+        left = float(df[x].min()) if left_line.x is None else float(left_line.x)
+        right = float(df[x].max()) if right_line.x is None else float(right_line.x)
+
+        if left > right:
+            left, right = right, left
+        if bottom > upper:
+            bottom, upper = upper, bottom
+
+        # Filtra DF
+        df_gated = df.loc[(df[y] < upper) & (df[y] > bottom) & (df[x] < right) & (df[x] > left)]
+        self.subset = df_gated
+
+        # Salva CSV
+        out_csv = os.path.join(self.path_save, "Gated results.csv")
+        df_gated.to_csv(out_csv, index=False)
+
+        # Snapshot com retângulo
+        fig2, ax2 = plt.subplots(figsize=(7, 5), dpi=150)
+        ax2.imshow(img, origin='upper', extent=[*xlim, *ylim], aspect='auto')
+        ax2.set_xlim(*xlim)
+        ax2.set_ylim(*ylim)
+        rect = patches.Rectangle((left, bottom), right - left, upper - bottom,
+                                 linewidth=1, edgecolor='r')
+        ax2.add_patch(rect)
+        fig2.tight_layout(pad=0)
+        out_png = os.path.join(self.path_save, "Gate.png")
+        fig2.savefig(out_png, dpi=300)
+        plt.close(fig2)
+
+        # Log
+        dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        info = (f"\n\n{dt} - Gate applied:\n"
+                f"{x} min: {left}\n"
+                f"{x} max: {right}\n"
+                f"{y} min: {bottom}\n"
+                f"{y} max: {upper}\n")
+        with open(os.path.join(self.path_save, log_file), "a") as logs:
+            logs.write(info)
+
+        return None
+
+
+    def gate_old(self,
              x: str,
              y: str):
         """If gate is true, plots all the df info for user to select a piece of data to work with."""
