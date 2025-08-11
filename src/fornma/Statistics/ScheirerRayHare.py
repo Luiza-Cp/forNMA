@@ -1,4 +1,4 @@
-# Scheirer_ray_hare.py
+# ScheirerRayHare.py
 
 import re
 import warnings
@@ -7,6 +7,7 @@ import numpy as np
 from scipy.stats import rankdata, chi2
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+
 
 class ScheirerRayHare:
     """
@@ -224,6 +225,13 @@ class ScheirerRayHare:
             "p-value": p_values.loc[ordered_raw].values,
         }, index=ordered_clean)
 
+        if "p" not in out.columns and "p-value" in out.columns:
+            out["p"] = out["p-value"]  # facilita integrações
+
+        # store attrs
+        self.result_ = out
+        self.yname_, self.x1name_, self.x2name_ = yname, x1name, x2name
+
         if self.ss:
             out.insert(1, "sum_sq", ss_terms.loc[ordered_raw].values)
 
@@ -271,10 +279,43 @@ class ScheirerRayHare:
             raise RuntimeError("Call .fit() before .to_dataframe().")
         return self.result_.copy()
 
-    def summary(self):
+
+    # --- utilitários de saída/decisão ---
+    def summary(self) -> str:
+        """Retorna string com a tabela (não imprime)."""
         if self.result_ is None:
             raise RuntimeError("Call .fit() before .summary().")
-        print(self.result_)
+        return self.result_.to_string()
+
+
+    def effects_significant(self, alpha: float = 0.05) -> dict[str, bool]:
+        """Dict com significância dos efeitos principais e da interação."""
+        if self.result_ is None:
+            raise RuntimeError("Call .fit() before .effects_significant().")
+        # normaliza nomes
+        idx = self.result_.index.astype(str)
+        pcol = "p" if "p" in self.result_.columns else ("p-value" if "p-value" in self.result_.columns else None)
+        if pcol is None:
+            raise RuntimeError("SRH table must contain a 'p' or 'p-value' column.")
+        # labels esperados
+        a = self.x1name_
+        b = self.x2name_
+        inter = f"{a}:{b}"
+        # pega p por label
+        def get_p(lbl):
+            m = self.result_.loc[idx == lbl, pcol]
+            return float(m.iloc[0]) if not m.empty else None
+        pa = get_p(a); pb = get_p(b); pint = get_p(inter)
+        return {
+            a: (pa is not None and pa < alpha),
+            b: (pb is not None and pb < alpha),
+            inter: (pint is not None and pint < alpha),
+        }
+
+
+    def any_significant(self, alpha: float = 0.05) -> bool:
+        """True se qualquer efeito principal ou interação for significativo."""
+        return any(self.effects_significant(alpha).values())
 
 
 
