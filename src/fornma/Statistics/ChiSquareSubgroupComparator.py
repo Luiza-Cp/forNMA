@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2_contingency, fisher_exact
 from statsmodels.stats.multitest import multipletests
-from fornma.Statistics.Helpers import AnalysisHelper
+from .Statistics.Helpers import AnalysisHelper
 from typing import Tuple
 from datetime import datetime
 from itertools import combinations
