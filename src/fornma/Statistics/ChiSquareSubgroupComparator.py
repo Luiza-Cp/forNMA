@@ -35,7 +35,7 @@ class ChiSquareSubgroupComparator:
         condition_col: str,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         self.log(f"\n=== Subgroup compare @ {datetime.now():%Y-%m-%d %H:%M:%S} ===")
-        self.log(f">>> Comparando '{condition_col}' entre grupos de '{group_col}'")
+        self.log(f">>> Comparison of '{condition_col}' between '{group_col}'")
 
         groups = df[group_col].dropna().unique().tolist()
         conditions = df[condition_col].dropna().unique().tolist()
@@ -47,7 +47,7 @@ class ChiSquareSubgroupComparator:
 
         results = []
         for grp in groups:
-            self.log(f"\n▶ Grupo: {grp}")
+            self.log(f"\n▶ Group: {grp}")
             counts = {
                 cond: int(((df[condition_col] == cond) & (df[group_col] == grp)).sum())
                 for cond in conditions
@@ -64,21 +64,21 @@ class ChiSquareSubgroupComparator:
 
                 # pula qualquer 2x2 degenerado: alguma linha OU alguma coluna com soma zero
                 if (row_sums == 0).any() or (col_sums == 0).any():
-                    self.log(f"⚠️ {c1} vs {c2}: tabela 2x2 degenerada (linha/coluna zero). Pulando.")
+                    self.log(f"⚠️ {c1} vs {c2}: degenerate 2x2 table (zero row/column). Skipping.")
                     continue
 
                 chi2_stat, p_chi2, _, expected = chi2_contingency(table, correction=False)
                 if (expected < self.expected_min).any():
-                    self.log(f"→ {c1} vs {c2}: esperado < {self.expected_min:.1f} → Fisher.")
+                    self.log(f"→ {c1} vs {c2}: expected < {self.expected_min:.1f} → Fisher.")
                     try:
                         _, p_val = fisher_exact(table)
                         test = "Fisher"
                         chi2_stat = None
                     except ValueError as e:
-                        self.log(f"❌ Fisher falhou ({e}). Pulando {c1} vs {c2}.")
+                        self.log(f"❌ Fisher failed ({e}). Skipping {c1} vs {c2}.")
                         continue
                 else:
-                    self.log(f"→ {c1} vs {c2}: usando Qui-quadrado.")
+                    self.log(f"→ {c1} vs {c2}: Applying chi-square.")
                     p_val = p_chi2
                     test = "Chi-square"
 
@@ -93,7 +93,7 @@ class ChiSquareSubgroupComparator:
 
         df_results = pd.DataFrame(results)
         if df_results.empty:
-            self.log("\n⚠️ Nenhuma comparação válida.")
+            self.log("\n⚠️ No valid comparison.")
             # também retorna a tabela de proporções vazia
             prop_table = (
                 df.groupby([condition_col, group_col])
@@ -110,7 +110,7 @@ class ChiSquareSubgroupComparator:
         df_results["Corrected p-value"] = p_corr
         df_results["Significant"] = np.where(rej, "Yes", "No")
 
-        self.log(f"\n=== Correção múltipla: {method.upper()} ===")
+        self.log(f"\n=== Multiple correction: {method.upper()} ===")
         self.log(df_results.to_string(index=False))
 
         # Tabela de proporções estilo SPSS (% por condição)
@@ -123,7 +123,7 @@ class ChiSquareSubgroupComparator:
               .sort_index(axis=1, key=lambda idx: [str(x) for x in idx])
         )
 
-        self.log("\n▶ Proporções (% por condição):")
+        self.log("\n▶ Proportions (% per condition):")
         self.log(prop_table.to_string())
 
         return df_results, prop_table

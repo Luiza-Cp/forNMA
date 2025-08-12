@@ -120,16 +120,16 @@ class ChiSquareAnalyzer:
         group_col: str,
         category_col: str,
     ) -> GlobalChi2Result:
-        self.log(f"\n=== Início: {datetime.now():%Y-%m-%d %H:%M:%S} ===")
-        self.log(f">>> Qui-quadrado de '{category_col}' por '{group_col}'")
+        self.log(f"\n=== Start: {datetime.now():%Y-%m-%d %H:%M:%S} ===")
+        self.log(f">>> Chi-square of  '{category_col}' by '{group_col}'")
 
         # Tabela de contingência
         ct = pd.crosstab(df[group_col], df[category_col])
         pct = self._percent_table_by_column(ct)
 
-        self.log("\n▶ Contagens:")
+        self.log("\n▶ Counts:")
         self.log(ct.to_string())
-        self.log("\n▶ % por coluna:")
+        self.log("\n▶ % by column:")
         self.log(pct.round(2).to_string())
 
         # Teste global (assintótico ou exato)
@@ -137,14 +137,14 @@ class ChiSquareAnalyzer:
         expected_min_val = expected.min() if expected is not None else np.nan
 
         if self.use_exact and expected_min_val < self.expected_min:
-            self.log(f"\n⚠️ Esperado < {self.expected_min:.1f}. Usando Monte Carlo para p-valor global.")
+            self.log(f"\n⚠️ Expected < {self.expected_min:.1f}. Using Monte Carlo to estimate global p-value.")
             chi2 = chi2_contingency(ct, correction=False)[0]  # estatística observada sem correção
             p_value = self.simulator.p_value(ct.values)
         else:
-            self.log("\n✅ Premissas atendidas. Usando qui-quadrado assintótico.")
+            self.log("\n✅ Assumptions met. Using asymptotic chi-square..")
             chi2, p_value = chi2_asym, p_asym
 
-        self.log("\n=== Resultado Global ===")
+        self.log("\n=== Global Result ===")
         self.log(f"Chi² = {chi2:.4f} | p = {p_value:.4e}")
 
         return GlobalChi2Result(
@@ -180,17 +180,17 @@ class ChiSquareAnalyzer:
                 chi2_stat, p_sub, _, expected_sub = chi2_contingency(sub)
                 low = (expected_sub < self.expected_min).any()
             except ValueError as e:
-                self.log(f"\n▶ {g1} vs {g2}: erro no chi2_contingency: {e}")
+                self.log(f"\n▶ {g1} vs {g2}: error in chi2_contingency: {e}")
                 low = True  # força fallback
 
             if low:
                 if sub.shape == (2, 2):
-                    self.log(f"▶ {g1} vs {g2}: esperado baixo → Fisher.")
+                    self.log(f"▶ {g1} vs {g2}: expected low → Fisher.")
                     _, p_val = fisher_exact(sub)
                     test_type = "Fisher"
                     chi2_stat = None
                 elif self.use_exact:
-                    self.log(f"▶ {g1} vs {g2}: esperado baixo → Monte Carlo.")
+                    self.log(f"▶ {g1} vs {g2}: expected low → Monte Carlo.")
                     p_val = MonteCarloChi2Simulator(
                         num_simulations=self.simulator.num_simulations,
                         seed=self.simulator.seed,
@@ -200,7 +200,7 @@ class ChiSquareAnalyzer:
                 else:
                     # se não usar exato, mantém p assintótico (se disponível)
                     if chi2_stat is None:
-                        self.log(f"⚠️ {g1} vs {g2}: sem teste válido. Pulando.")
+                        self.log(f"⚠️ {g1} vs {g2}: No valid test. Skipping.")
                         continue
                     p_val = p_sub
                     test_type = "Chi-square (assint.)"
@@ -208,7 +208,7 @@ class ChiSquareAnalyzer:
                 p_val = p_sub
                 test_type = "Chi-square"
 
-            self.log(f"▶ {g1} vs {g2} | Teste: {test_type} | p bruto = {p_val:.4e}")
+            self.log(f"▶ {g1} vs {g2} | Teste: {test_type} | p raw = {p_val:.4e}")
 
             results.append({
                 "Comparison": f"{g1} vs {g2}",
@@ -218,7 +218,7 @@ class ChiSquareAnalyzer:
             })
 
         if not results:
-            self.log("\n⚠️ Nenhuma comparação válida.")
+            self.log("\n⚠️ No valid comparison.")
             return None
 
         df_res = pd.DataFrame(results)
@@ -226,12 +226,12 @@ class ChiSquareAnalyzer:
         if correction_method == "auto":
             correction_method = self._auto_method(len(df_res))
 
-        self.log(f"\n=== Correção de múltiplas comparações: {correction_method.upper()} ===")
+        self.log(f"\n=== Correction of multiple comparisons: {correction_method.upper()} ===")
         rej, p_corr, _, _ = multipletests(df_res["p_raw"], method=correction_method)
         df_res["p_corrected"] = p_corr
         df_res["reject_null"] = rej
 
-        self.log("\n▶ Resumo post-hoc:")
+        self.log("\n▶  Post-hoc Summary:")
         self.log(df_res.to_string(index=False))
 
         return df_res

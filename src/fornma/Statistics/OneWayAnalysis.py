@@ -38,7 +38,7 @@ class OneWayAnalysis:
         import scikit_posthocs as sp  # lazy import
 
         if self.pairs_of_interest:
-            self.log("\n=== Dunn (pares de interesse; ajuste apenas nestes pares) ===")
+            self.log("\n=== Dunn (pairs of interest; fit only on these pairs) ===")
             # p crus
             dunn = sp.posthoc_dunn(self.df, val_col=self.numeric_col,
                                    group_col=self.group_col, p_adjust=None)
@@ -68,7 +68,7 @@ class OneWayAnalysis:
             return filtered
 
         else:
-            self.log(f"\n=== Dunn (matriz completa; p_adjust='{p_adjust_method}') ===")
+            self.log(f"\n=== Dunn (full matrix; p_adjust='{p_adjust_method}') ===")
             dunn = sp.posthoc_dunn(self.df, val_col=self.numeric_col,
                                    group_col=self.group_col, p_adjust=p_adjust_method)  # já ajustado
             self.log(dunn.to_string())

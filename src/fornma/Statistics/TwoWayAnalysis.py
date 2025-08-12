@@ -41,15 +41,15 @@ class TwoWayAnalysis:
 
     # -------- ANOVA 2 vias + Tukey (sem dupla correção) --------
     def run_two_way_anova(self):
-        self.log("\n✅ Premissas atendidas. Realizando ANOVA 2 vias (Type II)...")
+        self.log("\n✅ Assumptions met. Performing 2-way ANOVA (Type II)...")
         formula = f"{self.numeric_col} ~ C({self.group_col1}) * C({self.group_col2})"
         model = ols(formula, data=self.df).fit()
         anova_table = sm.stats.anova_lm(model, typ=2)
-        self.log("\n📊 Tabela ANOVA:"); self.log(anova_table.to_string())
+        self.log("\n📊 ANOVA table:"); self.log(anova_table.to_string())
 
         posthoc = None
         if (anova_table["PR(>F)"] < self.alpha).any():
-            self.log("\n📌 Pelo menos um efeito significativo. Aplicando pós-teste de Tukey nas células (A|B)...")
+            self.log("\n📌 At least one significant effect. Applying Tukey's post-test to cells (A|B)...")
             posthoc = self.helper.tukey(
                 df=self.df,
                 value_col=self.numeric_col,
@@ -58,7 +58,7 @@ class TwoWayAnalysis:
                 pairs_of_interest=self.pairs_of_interest or None
             )
         else:
-            self.log("\nTwo-way ANOVA não significativa; sem pós-teste.")
+            self.log("\nTwo-way ANOVA not significant; no post-test.")
 
         # (opcional) correção Bonferroni nos 3 efeitos (A, B, A:B)
         pvals = anova_table["PR(>F)"].astype(float).values
@@ -69,13 +69,13 @@ class TwoWayAnalysis:
 
     # -------- Dunn (com/sem pairs_of_interest) --------
     def dunn_post_hoc(self):
-        self.log("\n📌 Aplicando pós-teste de Dunn...")
+        self.log("\n📌 Applying Dunn's post-test...")
 
         def _ordenar_par(a, b):
             return tuple(sorted([str(a), str(b)]))
 
         if self.pairs_of_interest:
-            self.log("Modo: pares de interesse (ajuste somente nesses pares)")
+            self.log("Applying Mode: Pairs of Interest (Fit only these pairs) Dunn's post-test)")
             comps_ordenados = {_ordenar_par(x, y) for (x, y) in self.pairs_of_interest}
             grupos_desejados = sorted({g for par in comps_ordenados for g in par})
 
@@ -98,11 +98,11 @@ class TwoWayAnalysis:
 
             dunn_matrix = None
             letters_df = None
-            self.log("\n=== Dunn (pares de interesse) ===")
+            self.log("\n=== Dunn (interest pairs) ===")
             self.log(dunn_long.drop(columns=['par']).to_string(index=False))
 
         else:
-            self.log("Modo: matriz completa (ajuste Bonferroni em todos os pares)")
+            self.log("Mode: full matrix (Bonferroni adjustment on all pairs)")
             dunn_matrix = sp.posthoc_dunn(self.df, val_col=self.numeric_col, group_col="group", p_adjust="bonferroni")
 
             dunn_long = (dunn_matrix.reset_index()
@@ -122,9 +122,9 @@ class TwoWayAnalysis:
                          .merge(letters_df, left_on='grupo2', right_on='grupo', how='left')
                          .rename(columns={'CLD': 'CLD2'}).drop(columns=['grupo']))
 
-            self.log("\n=== Dunn (matriz completa; Bonferroni) ===")
+            self.log("\n=== Dunn (full matrix; Bonferroni) ===")
             self.log(dunn_long.to_string(index=False))
-            self.log("\n=== Letras (CLD) ===")
+            self.log("\n=== Letters (CLD) ===")
             self.log(letters_df.to_string(index=False))
 
         # salvar
@@ -148,17 +148,17 @@ class TwoWayAnalysis:
             main = anova_table
             post = tukey_df
         else:
-            self.log("\n⚠️ Premissas violadas. Aplicando teste de Scheirer-Ray-Hare (SRH)...")
+            self.log("\n⚠️ Assumpltions violated. Applying the Scheirer-Ray-Hare (SRH) test...")
             srh = ScheirerRayHare(type=2, tie_correct=True, ss=True, verbose=False)
             srh.fit(data=self.df, y=self.numeric_col, x1=self.group_col1, x2=self.group_col2)
             self.results["srh"] = srh.to_dataframe()
-            self.log("\n📊 Resultado SRH:"); self.log(srh.summary())
+            self.log("\n📊 SRH Results:"); self.log(srh.summary())
 
             if hasattr(srh, "any_significant") and srh.any_significant(self.alpha):
-                self.log("\n📌 SRH significativo. Aplicando pós-teste de Dunn...")
+                self.log("\n📌 Significant SRH. Applying Dunn's post-test...")
                 post = self.dunn_post_hoc()
             else:
-                self.log("\nℹ️ SRH não significativo. Pós-teste não aplicado.")
+                self.log("\nℹ️ SRH not significant. Post-test not applied.")
                 post = None
             main = self.results["srh"]
 
