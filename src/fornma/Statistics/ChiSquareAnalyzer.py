@@ -11,7 +11,7 @@ from typing import Optional, Tuple, List, Dict
 from scipy.stats import chi2_contingency, fisher_exact
 from statsmodels.stats.multitest import multipletests
 
-from .Statistics.Helpers import AnalysisHelper
+from .Helpers import AnalysisHelper
 
 # =========================
 # Simulador Monte Carlo
