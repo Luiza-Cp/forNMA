@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 def main():
     # top-level parser
@@ -337,6 +338,7 @@ def main():
     p_one.add_argument('--pairs_of_interest', nargs='*', default=None,
                        help='Specific pairs for post-hoc test (e.g., A B  A C)')
     p_one.add_argument('--log_file', type=str, default=None, help='Log file path')
+    p_one.add_argument('--save_dir', type=str, default='.', help='Directory to save outputs')
 
     # stats twoway
     p_two = sub_stats.add_parser('twoway', help='Two-way analysis (2-way ANOVA or SRH + post-hoc)')
@@ -348,6 +350,7 @@ def main():
     p_two.add_argument('--pairs_of_interest', nargs='*', default=None,
                        help='Specific cell pairs for post-hoc (e.g., A|X A|Y)')
     p_two.add_argument('--log_file', type=str, default=None, help='Log file path')
+    p_two.add_argument('--save_dir', type=str, default='.', help='Directory to save outputs')
 
     # stats chi2
     p_chi = sub_stats.add_parser('chi2', help='Chi-square analysis (global test + pairwise post-hoc)')
@@ -359,6 +362,7 @@ def main():
     p_chi.add_argument('--correction_method', type=str, default='auto',
                        help="Multiple-comparisons method (e.g., 'bonferroni', 'fdr_bh', or 'auto')")
     p_chi.add_argument('--log_file', type=str, default=None, help='Log file path')
+    p_chi.add_argument('--save_dir', type=str, default='.', help='Directory to save outputs')
 
     # stats chi2-subgroups
     p_chisg = sub_stats.add_parser('chi2-subgroups',
@@ -371,6 +375,7 @@ def main():
                          help="Multiple-comparisons method (e.g., 'bonferroni', 'fdr_bh', or 'auto')")
     p_chisg.add_argument('--log_file', type=str, default=None, help='Log file path')
     p_chisg.add_argument('--save_dir', type=str, default='.', help='Folder to save outputs')
+
 
     ######################################################################################################
     args = parser.parse_args()
@@ -472,71 +477,76 @@ def main():
             )
 
 
-        elif args.fornma == 'stats':
+    elif args.fornma == 'stats':
+        if hasattr(args, 'save_dir') and args.save_dir:
+            Path(args.save_dir).mkdir(parents=True, exist_ok=True)
+            forced_log = str(Path(args.save_dir) / "logs-fornma.txt")
+        else:
+            forced_log = args.log_file
 
+        from src.fornma.Statistics.Helpers import AnalysisHelper
+        helper = AnalysisHelper(alpha=args.alpha if hasattr(args, 'alpha') else 0.05,
+                                log_file=forced_log)
+        df = helper.load_and_concat(args.paths)
+
+        if args.stats_cmd == 'oneway':
+            from src.fornma.Statistics.OneWayAnalysis import OneWayAnalysis
+            ana = OneWayAnalysis(df=df, numeric_col=args.numeric_col, group_col=args.group_col,
+                                 alpha=args.alpha, pairs_of_interest=args.pairs_of_interest, helper=helper)
+            results = ana.run()
+            helper.save_stats_bundle(args.save_dir, 'oneway',
+                                     main_result=results['main_result'],
+                                     posthoc=results['posthoc'],
+                                     summary=results['summary'])
+
+
+        elif args.stats_cmd == 'twoway':
+            from src.fornma.Statistics.TwoWayAnalysis import TwoWayAnalysis
+
+            ana = TwoWayAnalysis(df=df, numeric_col=args.numeric_col,
+                                 group_col1=args.group_col1, group_col2=args.group_col2,
+                                 alpha=args.alpha, pairs_of_interest=args.pairs_of_interest, helper=helper)
+
+            results = ana.run()
+            helper.save_stats_bundle(args.save_dir, 'twoway',
+                                     main_result=results['main_result'],
+                                     posthoc=results['posthoc'],
+                                     summary=results['summary'])
+
+        elif args.stats_cmd == 'chi2':
+            from src.fornma.Statistics.ChiSquareAnalyzer import ChiSquareAnalyzer
+            ana = ChiSquareAnalyzer(expected_min=args.expected_min, use_exact=True,
+                                    log_file=forced_log, helper=helper)
+            g = ana.global_test(df, args.group_col, args.category_col)
+            post = ana.pairwise_posthoc(g.contingency_table, correction_method=args.correction_method)
+            helper.save_chi2(args.save_dir, 'chi2', g, post)
+
+        elif args.stats_cmd == 'chi2-subgroups':
             from src.fornma.Statistics.Helpers import AnalysisHelper
-            helper = AnalysisHelper(alpha=args.alpha if hasattr(args, 'alpha') else 0.05,
-                                    log_file=args.log_file if hasattr(args, 'log_file') else None)
+            from src.fornma.Statistics.ChiSquareSubgroupComparator import ChiSquareSubgroupComparator
+
+            helper = AnalysisHelper(log_file=forced_log)
             df = helper.load_and_concat(args.paths)
 
-            if args.stats_cmd == 'oneway':
-                from src.fornma.Statistics.OneWayAnalysis import OneWayAnalysis
-                ana = OneWayAnalysis(df=df, numeric_col=args.numeric_col, group_col=args.group_col,
-                                     alpha=args.alpha, pairs_of_interest=args.pairs_of_interest, helper=helper)
-                results = ana.run()
-                helper.save_stats_bundle(args.save_dir, 'oneway',
-                                         main_result=results['main_result'],
-                                         posthoc=results['posthoc'],
-                                         summary=results['summary'])
+            ana = ChiSquareSubgroupComparator(
+                expected_min=args.expected_min,
+                correction_method=args.correction_method,
+                log_file=forced_log,
+                helper=helper
+            )
 
+            df_results, prop_table = ana.compare(
+                df=df,
+                group_col=args.group_col,
+                condition_col=args.condition_col
+            )
 
-            elif args.stats_cmd == 'twoway':
-                from src.fornma.Statistics.TwoWayAnalysis import TwoWayAnalysis
-
-                ana = TwoWayAnalysis(df=df, numeric_col=args.numeric_col,
-                                     group_col1=args.group_col1, group_col2=args.group_col2,
-                                     alpha=args.alpha, pairs_of_interest=args.pairs_of_interest, helper=helper)
-
-                results = ana.run()
-                helper.save_stats_bundle(args.save_dir, 'twoway',
-                                         main_result=results['main_result'],
-                                         posthoc=results['posthoc'],
-                                         summary=results['summary'])
-
-            elif args.stats_cmd == 'chi2':
-                from src.fornma.Statistics.ChiSquareAnalyzer import ChiSquareAnalyzer
-                ana = ChiSquareAnalyzer(expected_min=args.expected_min, use_exact=True,
-                                        log_file=args.log_file, helper=helper)
-                g = ana.global_test(df, args.group_col, args.category_col)
-                post = ana.pairwise_posthoc(g.contingency_table, correction_method=args.correction_method)
-                helper.save_chi2(args.save_dir, 'chi2', g, post)
-
-            elif args.stats_cmd == 'chi2-subgroups':
-                from src.fornma.Statistics.Helpers import AnalysisHelper
-                from src.fornma.Statistics.ChiSquare_subgroups import ChiSquareSubgroupComparator
-
-                helper = AnalysisHelper(log_file=args.log_file)
-                df = helper.load_and_concat(args.paths)
-
-                ana = ChiSquareSubgroupComparator(
-                    expected_min=args.expected_min,
-                    correction_method=args.correction_method,
-                    log_file=args.log_file,
-                    helper=helper
-                )
-
-                df_results, prop_table = ana.compare(
-                    df=df,
-                    group_col=args.group_col,
-                    condition_col=args.condition_col
-                )
-
-                helper.save_chi2_subgroups(
-                    out_dir=args.save_dir,
-                    prefix='chi2_subgroups',
-                    df_results=df_results,
-                    prop_table=prop_table
-                )
+            helper.save_chi2_subgroups(
+                out_dir=args.save_dir,
+                prefix='chi2_subgroups',
+                df_results=df_results,
+                prop_table=prop_table
+            )
 
     else:
         print('No option was found')
