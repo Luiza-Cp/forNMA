@@ -5,12 +5,34 @@ import pandas as pd
 from scipy.stats import shapiro, levene
 from itertools import product
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
-
+from pathlib import Path
+from typing import Union, List
+import json
+from datetime import datetime
 
 class AnalysisHelper:
     def __init__(self, alpha: float = 0.05, log_file: str | None = None):
         self.alpha = alpha
         self.log_file = log_file
+
+    def load_and_concat(self, paths: Union[str, Path, List[Union[str, Path]]]) -> pd.DataFrame:
+        if isinstance(paths, (str, Path)):
+            paths = [paths]
+        dfs = []
+        for p in paths:
+            p = Path(p)
+            if not p.exists():
+                raise FileNotFoundError(f"File not found: {p}")
+            df_i = pd.read_csv(p)
+            if "Condition" not in df_i.columns:
+                raise ValueError(f"'Condition' column missing in {p.name}.")
+            if df_i["Condition"].isna().any() or (df_i["Condition"] == False).any():
+                raise ValueError(f"Invalid/empty values in 'Condition' for {p.name}.")
+            dfs.append(df_i)
+        if not dfs:
+            raise ValueError("No valid input files.")
+        return pd.concat(dfs, ignore_index=True)
+
 
     # logging centralizado
     def log(self, msg: str):
@@ -117,3 +139,94 @@ class AnalysisHelper:
 
     def _resolve_alpha(self, alpha: float | None) -> float:
         return self.alpha if alpha is None else alpha
+
+    def _ensure_dir(self, out_dir: str | Path) -> Path:
+        out = Path(out_dir);
+        out.mkdir(parents=True, exist_ok=True);
+        return out
+
+    def _save_df(self, df: pd.DataFrame, out: Path, name: str) -> Path:
+        p = out / f"{name}.csv";
+        df.to_csv(p, index=False);
+        return p
+
+    def save_stats_bundle(self, out_dir, prefix,
+                          main_result=None, posthoc=None, summary=None, extras: dict | None = None) -> dict:
+        out = self._ensure_dir(out_dir);
+        paths = {}
+        # main_result: DataFrame ou (stat,p)
+        if isinstance(main_result, pd.DataFrame):
+            paths["main"] = self._save_df(main_result, out, f"{prefix}_main")
+        elif isinstance(main_result, tuple) and len(main_result) == 2:
+            paths["main"] = self._save_df(pd.DataFrame([{"stat": main_result[0], "p": main_result[1]}]),
+                                          out, f"{prefix}_main")
+        if isinstance(posthoc, pd.DataFrame):
+            paths["posthoc"] = self._save_df(posthoc, out, f"{prefix}_posthoc")
+        if isinstance(summary, pd.DataFrame):
+            paths["summary"] = self._save_df(summary, out, f"{prefix}_summary")
+        if extras:
+            for k, v in extras.items():
+                if isinstance(v, pd.DataFrame):
+                    paths[k] = self._save_df(v, out, f"{prefix}_{k}")
+                elif isinstance(v, np.ndarray):
+                    paths[k] = self._save_df(pd.DataFrame(v), out, f"{prefix}_{k}")
+        (out / f"{prefix}_meta.json").write_text(json.dumps(
+            {"saved_at": datetime.now().isoformat()}, indent=2), encoding="utf-8")
+        return paths
+
+    def save_chi2(self, out_dir, prefix, global_result, posthoc: pd.DataFrame | None):
+        out = self._ensure_dir(out_dir);
+        ct = global_result.contingency_table
+        paths = {
+            "contingency": self._save_df(ct.reset_index(), out, f"{prefix}_contingency"),
+            "percentages": self._save_df(global_result.percentages.reset_index(), out, f"{prefix}_percentages"),
+        }
+        if global_result.expected is not None:
+            exp = pd.DataFrame(global_result.expected, index=ct.index, columns=ct.columns).reset_index()
+            paths["expected"] = self._save_df(exp, out, f"{prefix}_expected")
+        if posthoc is not None:
+            paths["posthoc"] = self._save_df(posthoc, out, f"{prefix}_posthoc")
+        (out / f"{prefix}_meta.json").write_text(json.dumps(
+            {"chi2": global_result.chi2, "p_value": global_result.p_value,
+             "saved_at": datetime.now().isoformat()}, indent=2), encoding="utf-8")
+        return paths
+
+    def save_chi2_subgroups(self, out_dir, prefix, df_results: pd.DataFrame, prop_table: pd.DataFrame) -> dict:
+        out = Path(out_dir);
+        out.mkdir(parents=True, exist_ok=True)
+        paths = {}
+
+        # flattens the 2x2 contingency "Table" into columns (a11..a22) before saving
+        df_to_save = df_results.copy()
+        if "Table" in df_to_save.columns:
+            def _safe_mat(x):
+                try:
+                    a = np.asarray(x, dtype=int).reshape(2, 2)
+                    return int(a[0, 0]), int(a[0, 1]), int(a[1, 0]), int(a[1, 1])
+                except Exception:
+                    return (np.nan, np.nan, np.nan, np.nan)
+
+            a = df_to_save["Table"].apply(_safe_mat)
+            df_to_save["a11"] = a.apply(lambda t: t[0])
+            df_to_save["a12"] = a.apply(lambda t: t[1])
+            df_to_save["a21"] = a.apply(lambda t: t[2])
+            df_to_save["a22"] = a.apply(lambda t: t[3])
+            df_to_save = df_to_save.drop(columns=["Table"])
+
+        p_res = out / f"{prefix}_subgroup_results.csv"
+        df_to_save.to_csv(p_res, index=False)
+        paths["results"] = p_res
+
+        p_prop = out / f"{prefix}_proportions.csv"
+        prop_table.reset_index().to_csv(p_prop, index=False)
+        paths["proportions"] = p_prop
+
+        meta = {
+            "saved_at": datetime.now().isoformat(),
+            "n_comparisons": int(len(df_results)),
+            "columns": list(df_to_save.columns),
+        }
+        (out / f"{prefix}_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        return paths
+
+
