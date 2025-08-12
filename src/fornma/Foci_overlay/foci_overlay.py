@@ -341,6 +341,3 @@ def plot_profile(path_pickle_data: str,
 
     return
 
-#plot_profile('/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/2023/novas analises/5.Pkl individuais/pkl',
-#                 '/media/luiza/DATA/Doutorado/Nicolas/RPE ETOPO/2023/novas analises/6. Foci overlay',
-#                 ['53BP1', 'gH2AX'])
