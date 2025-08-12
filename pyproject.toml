@@ -37,9 +37,6 @@ dynamic = ["version"]
 [project.optional-dependencies]
 test = ["pytest~=8.4"]
 
-[project.scripts]
-fornma = "fornma.main:main"
-
 [tool.setuptools]
 package-dir = {"" = "src"}
 
