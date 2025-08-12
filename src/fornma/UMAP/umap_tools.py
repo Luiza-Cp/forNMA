@@ -251,7 +251,7 @@ def color_umap(
     if pd.api.types.is_numeric_dtype(series):
         sc = plt.scatter(df.loc[valid_mask, umap_cols[0]],
                              df.loc[valid_mask, umap_cols[1]],
-                             c=series.values, alpha=0.6)
+                             c=series.values, alpha=0.6, s=1)
         plt.colorbar(sc, label=str(color_col))
     else:
         # Categorical: one scatter per class for a clean legend
@@ -260,7 +260,7 @@ def color_umap(
             idx = valid_mask & (df[color_col].astype(str) == lab)
             plt.scatter(df.loc[idx, umap_cols[0]],
                             df.loc[idx, umap_cols[1]],
-                            alpha=0.6, label=lab)
+                            alpha=0.6, label=lab, s=1)
             plt.legend(title=str(color_col), markerscale=1.6, fontsize=9, frameon=False)
 
     ts_csv = datetime.now().strftime("%Y%m%d-%H%M%S")
