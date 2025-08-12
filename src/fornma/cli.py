@@ -382,37 +382,37 @@ def main():
     print(args)
 
     if args.fornma == 'registration':
-        from src.fornma.Registration import registration
+        from  fornma.Registration import registration
         registration(args.paths, args.path_to_save, args.crop)
 
     elif args.fornma == 'segmentation':
         import toml
-        from src.fornma.Segmentation import run, check_user_inputs
+        from  fornma.Segmentation import run, check_user_inputs
         dic = toml.load(args.parameters)
         check_user_inputs(dic)
         run(dic, preview=args.preview)
 
     elif args.fornma == 'tracking':
-        from src.fornma.Tracking import tracking
+        from  fornma.Tracking import tracking
         tracking(args.path_to_table, args.path_to_save, args.max_distance, args.time_window, args.max_split_distance,
                  args.max_gap_closing_distance, args.allow_merging)
 
     elif args.fornma == 'draw_tracking':
-        from src.fornma.Tracking import  draw_tracking
+        from  fornma.Tracking import  draw_tracking
         draw_tracking(args.path_to_table, args.path_to_images, args.path_to_save, args.rescale_intensity)
 
     elif args.fornma == 'filters':
-        from src.fornma.Filters import filters
+        from  fornma.Filters import filters
         filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'filers':
-        from src.fornma.Filters import filters
+        from  fornma.Filters import filters
         filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'NMA':
-        from src.fornma.Graphs import show_nma_settings
-        from src.fornma.NMA import plot_NMA
-        from src.fornma.NMA import NMA_control
+        from  fornma.Graphs import show_nma_settings
+        from  fornma.NMA import plot_NMA
+        from  fornma.NMA import NMA_control
         if (hasattr(args, 'dest')) and args.dest == 'show':
             show_nma_settings()
         elif hasattr(args, 'area_standard_deviation'):
@@ -426,7 +426,7 @@ def main():
             plot_NMA(args.path, args.saving_path, "heatmap", None, None, None, args.single, args.overtime)
 
     elif args.fornma == 'plot':
-        from src.fornma.Graphs import plot
+        from  fornma.Graphs import plot
         x = args.x if hasattr(args, 'x') else None
         y = args.y if hasattr(args, 'y') else None
         hue = args.hue if hasattr(args, 'hue') else None
@@ -442,14 +442,14 @@ def main():
              control=control, n=n, style=style, ci=ci, dot=dot)
 
     elif args.fornma == 'foci':
-        from src.fornma.Foci_overlay import foci_overlay, plot_profile
+        from  fornma.Foci_overlay import foci_overlay, plot_profile
         if hasattr(args, 'ch'):
             foci_overlay(args.path, args.path_to_save, args.ch)
         else:
             plot_profile(args.path, args.path_to_save)
 
     elif args.fornma == 'umap':
-        from src.fornma.UMAP import perform_clustering, plot_elbow, color_umap
+        from  fornma.UMAP import perform_clustering, plot_elbow, color_umap
         if args.umap_cmd == 'run':
             perform_clustering(
                 path=args.paths,
@@ -484,13 +484,13 @@ def main():
         else:
             forced_log = args.log_file
 
-        from src.fornma.Statistics.Helpers import AnalysisHelper
+        from  fornma.Statistics.Helpers import AnalysisHelper
         helper = AnalysisHelper(alpha=args.alpha if hasattr(args, 'alpha') else 0.05,
                                 log_file=forced_log)
         df = helper.load_and_concat(args.paths)
 
         if args.stats_cmd == 'oneway':
-            from src.fornma.Statistics.OneWayAnalysis import OneWayAnalysis
+            from  fornma.Statistics.OneWayAnalysis import OneWayAnalysis
             ana = OneWayAnalysis(df=df, numeric_col=args.numeric_col, group_col=args.group_col,
                                  alpha=args.alpha, pairs_of_interest=args.pairs_of_interest, helper=helper)
             results = ana.run()
@@ -501,7 +501,7 @@ def main():
 
 
         elif args.stats_cmd == 'twoway':
-            from src.fornma.Statistics.TwoWayAnalysis import TwoWayAnalysis
+            from  fornma.Statistics.TwoWayAnalysis import TwoWayAnalysis
 
             ana = TwoWayAnalysis(df=df, numeric_col=args.numeric_col,
                                  group_col1=args.group_col1, group_col2=args.group_col2,
@@ -514,7 +514,7 @@ def main():
                                      summary=results['summary'])
 
         elif args.stats_cmd == 'chi2':
-            from src.fornma.Statistics.ChiSquareAnalyzer import ChiSquareAnalyzer
+            from  fornma.Statistics.ChiSquareAnalyzer import ChiSquareAnalyzer
             ana = ChiSquareAnalyzer(expected_min=args.expected_min, use_exact=True,
                                     log_file=forced_log, helper=helper)
             g = ana.global_test(df, args.group_col, args.category_col)
@@ -522,8 +522,8 @@ def main():
             helper.save_chi2(args.save_dir, 'chi2', g, post)
 
         elif args.stats_cmd == 'chi2-subgroups':
-            from src.fornma.Statistics.Helpers import AnalysisHelper
-            from src.fornma.Statistics.ChiSquareSubgroupComparator import ChiSquareSubgroupComparator
+            from  fornma.Statistics.Helpers import AnalysisHelper
+            from  fornma.Statistics.ChiSquareSubgroupComparator import ChiSquareSubgroupComparator
 
             helper = AnalysisHelper(log_file=forced_log)
             df = helper.load_and_concat(args.paths)

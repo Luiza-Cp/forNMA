@@ -49,3 +49,6 @@ where = ["src"]
 [tool.setuptools_scm]
 version_scheme = "no-guess-dev"
 local_scheme = "node-and-date"
+
+[project.scripts]
+fornma = "fornma.cli:main"
