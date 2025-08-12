@@ -1,40 +1,51 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools>=68", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "forNMA"
+name = "fornma"
 description = "A tool for single cell image analysis and phenotype integration"
 readme = "README.md"
-requires-python = ">=3.7"
-keywords = ["forNMA", "NMA", 'single cell', 'KTR', 'phenotype']
-license = {text = "BSD 3-Clause License"}
-classifiers = [
-    "Programming Language :: Python :: 3",
-]
+requires-python = ">=3.11"
+license = {text = "BSD-3-Clause"}
+keywords = ["fornma", "NMA", "single cell", "nuclei", "phenotype"]
+classifiers = ["Programming Language :: Python :: 3"]
 dependencies = [
-    "requests",
-    'importlib-metadata; python_version<"3.8"',
-    'pandas==1.4.0',
-    'scipy==1.7.3',
-    'seaborn==0.11.2',
-    'numpy==1.21.5',
-    'networkx==2.8.4',
-    'progress==1.5',
-    'scikit-image==0.19.1',
-    'scikit-learn==1.1.1',
-   # 'pyside6==6.3.1',
-    'toml==0.10.2',
-    'cellpose==1.0.0',
-    'setuptools==63.4.1',
-    'pystackreg',
-    'shapely',
-   # "PyQt5"
+  "numpy~=1.26",
+  "scipy~=1.16",
+  "pandas~=2.3",
+  "matplotlib~=3.10",
+  "seaborn~=0.13",
+  "scikit-image~=0.25",
+  "scikit-learn~=1.7",
+  "networkx~=3.5",
+  "pillow~=11.1",
+  "opencv-python~=4.10",
+  "cellpose<4",
+  "umap-learn~=0.5.9",
+  "pingouin~=0.5.5",
+  "scikit-posthocs~=0.11.4",
+  "statsmodels~=0.14.5",
+  "shapely~=2.1",
+  "pystackreg~=0.2",
+  "progress~=1.6",
+  "rich~=14.1",
+  "toml~=0.10",
 ]
 dynamic = ["version"]
 
-[tool.setuptools.packages]
-find = {}
+[project.optional-dependencies]
+test = ["pytest~=8.4"]
 
 [project.scripts]
-fornma = "src.main:main"
+fornma = "fornma.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+local_scheme = "node-and-date"
