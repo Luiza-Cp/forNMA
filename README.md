@@ -1,278 +1,311 @@
-<div id="top"></div>
+# forNMA
 
-<!-- PROJECT SHIELDS -->
-<!--
-*** I'm using markdown "reference style" links for readability.
-*** Reference links are enclosed in brackets [ ] instead of parentheses ( ).
-*** See the bottom of this document for the declaration of the reference variables
-*** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
-*** https://www.markdownguide.org/basic-syntax/#reference-style-links
--->
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
+Tools for single-cell image analysis and phenotype integration, including registration, segmentation, tracking, plotting, UMAP, and statistical analyses (one-way, two-way, chi-square).
 
+## Features
 
+- Image pipeline: registration → segmentation (+feature extraction) → tracking → drawing overlays.
+- NMA plots (dot/heatmap/joint) with reusable settings.
+- General plotting module (box/violin/dot/bar/scatter/line/rolling-average/CPD).
+- UMAP utilities: compute embeddings, elbow plot, and color by column or KMeans.
+- Statistics:
+  - One-way (ANOVA or Kruskal, with Tukey/Dunn post-hoc when appropriate).
+  - Two-way (Type II ANOVA or Scheirer-Ray-Hare, with Tukey/Dunn post-hoc).
+  - Chi-square global + pairwise post-hoc with multiple-testing correction.
+  - Chi-square subgroup comparisons (2×2 per category with correction).
+- Consistent logging and structured CSV outputs.
 
-<!-- PROJECT LOGO -->
-<br />
-<div align="center">
-  <a href="https://github.com/github_username/repo_name">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
-  </a>
+## Installation
 
-<h3 align="center">forNMA</h3>
+```bash
+# Editable install during development
+pip install -e .
 
-  <p align="center">
-    forNMA was designed to analyze and integrate data from single-cell time-lapse microscopy, performing Nuclear Morphometric Analysis, translocation measurements and nuclear foci counting.
-    <br />
-    <a href="https://github.com/github_username/repo_name"><strong>How to use »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/github_username/repo_name">View Demo</a>
-    ·
-    <a href="https://github.com/github_username/repo_name/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/github_username/repo_name/issues">Request Feature</a>
-  </p>
-</div>
+# (Optional) From TestPyPI once published:
+# pip install --index-url https://test.pypi.org/simple fornma
+```
 
+Python ≥ 3.10 is recommended.
 
+## Command-line interface
 
-<!-- TABLE OF CONTENTS -->
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
-    <ul>
-        <li><a href="#image-registration">Image Registration</a></li>
-        <li><a href="#segmentation-and-feature-extraction">Segmentation and feature extraction</a></li>
-        <li><a href="#filter-results">Filter Results</a></li>
-        <li><a href="#tracking">Tracking</a></li>
-    </ul>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
-  </ol>
-</details>
+After installation, the entrypoint is:
 
+```bash
+fornma -h
+```
 
+### Registration
 
-<!-- ABOUT THE PROJECT -->
-## About forNMA
+```bash
+fornma registration <paths...> <path_to_save> [--crop True|False]
+```
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+- Registers images across frames/channels found in the given folders.
 
-forNMA came to simplify single-cell microscopy analysis in a single pipeline. It accepts as input raw  2D muti-channel images and is divided in two main steps, the Processing and Analysis.
-The processing step has four different modules: Registration, Segmentation, Correction and Cell Tracking. 
- * The Registration module corrects microscope movements along time axis in all separate image channels. 
- * Segmentation module comprises a complex pipeline of classic computer vision approaches to better find nuclei contours. It can also be performed with the  deep learning-based segmentation method, Cellpose. In this stpe all nuclear features are measured.
- * The the Correction module removes wrongly detected nuclei with user selected parametes. 
- * Cell Tracking module links cells trough time frames based on their X and Y positions in the final DataFrame. 
+### Segmentation
 
-In the Analysis step, user can use forNMA iterative interface to plot all data generated, including [NMA](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0042522) plots integrating different cellular characteristics. Here user can also generate videos of tracked cells and perform nuclear foci overlapping. 
+```bash
+fornma segmentation <parameters.toml> [--preview]
+```
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+- Runs segmentation and feature extraction from a TOML configuration.
 
+```bash
+fornma fornma segmentation init-config <destination>
+```
+- Copies the default parameters.toml into <destination> (file or folder). Used to configure segmentation
 
+Example:
 
-### Built With
+```bash
+fornma segmentation init-config ./my_config_folder
+```
 
-* [Next.js](https://nextjs.org/)
-* [React.js](https://reactjs.org/)
-* [Vue.js](https://vuejs.org/)
-* [Angular](https://angular.io/)
-* [Svelte](https://svelte.dev/)
-* [Laravel](https://laravel.com)
-* [Bootstrap](https://getbootstrap.com)
-* [JQuery](https://jquery.com)
+### Tracking & Drawing
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+```bash
+fornma tracking <Results.csv> <path_to_save> [--max_distance INT] [--time_window INT]   [--max_split_distance INT] [--max_gap_closing_distance INT] [--allow_merging True|False]
 
+fornma draw_tracking <tracking.csv> <images_folder> <path_to_save> [--rescale_intensity True|False]
+```
 
+### Filters
 
-<!-- GETTING STARTED -->
-## Getting Started
+```bash
+fornma filter <Results.csv> <path_to_save> <column1> <column2> [--draw] [--path_to_pkl PATH]
+```
 
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
+### NMA
 
-### Prerequisites
+```bash
+# Create / update settings from a control table
+fornma NMA settings <control_table.csv> [--area_standard_deviation FLOAT] [--NII_standard_deviation FLOAT] [--headless True|False]
 
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
+# Display current settings
+fornma NMA show_settings
 
-### Installation
+# Heatmap
+fornma NMA heatmap_plot <tables...> <saving_path> [--overtime] [--single] [--jointplot]
 
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/github_username/repo_name.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
+# Dot plot
+fornma NMA dot_plot <tables...> <saving_path> [--column1 COL] [--column2 COL] [--sample_size INT] [--single] [--overtime]
+```
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+### Generic plots
 
+```bash
+fornma plot box     <Results.csv> <path_to_save> <y> [--hue COL] [--dot COL] [--conditions ...] [--gate] [--x COL]
+fornma plot violin  <Results.csv> <y> <path_to_save> [--hue COL] [--dot COL] [--conditions ...] [--gate] [--x COL]
+fornma plot dot     <Results.csv> <y> <path_to_save> [--hue COL] [--conditions ...] [--gate] [--x COL]
+fornma plot bar     <Results.csv> <y> <path_to_save> [--conditions ...] [--gate] [--x COL]
+fornma plot scatter <Results.csv> <x> <y> <path_to_save> [--hue COL] [--size COL] [--conditions ...] [--gate]
+fornma plot line    <Results.csv> <path_to_save> <y> [--frames ...] [--confidence_interval INT] [--style COL] [--hue COL] [--size COL] [--conditions ...] [--gate] [--x COL]
+fornma plot rolling-average <Results.csv> <path_to_save> <y> <n> [--conditions ...] [--gate] [--x COL]
+fornma plot cpd     <Results.csv> <path_to_save> <frames ...> [--control NAME] [--conditions ...] [--gate] [--x COL] [--y COL]
+```
 
+---
 
-<!-- USAGE EXAMPLES -->
-## Usage
-For information about forNMA parameters, interface usage and frequently asked questions, see the documentation at [Labsinal](https://nextjs.org/).
-forNMA also has a headless mode, and each module can be called independently as follows:
+## UMAP module
 
-### Image Registration
- ```sh
-   fornma registration path_list path_to_save --crop
-   ```
- Where:
- * path_list is a list where each item is a path to a folder containing all images to be registered in one channel. Every folder in the list wil be registered against each other too; 
- * path_to_save is the path where registered images will be saved;
- * -- crop is a boolean. If True, all images will be cropped to keep only the field that remains in view.
+Compute embeddings, elbow plot, and color by column or KMeans.
 
-### Segmentation and Feature Extraction
-```sh
-   fornma run parameters --headless
-  ```
-   Where:
- * parameters is the path to the parameters.toml file; 
- * -- headless is true when running without any GUI.
- 
- Here you find more infromation on how to use [TOML](https://toml.io/en/) and how to [set parameters](ufrgs.br/labsinal).
+### 1) Compute embedding
 
-### Filter Results 
-Here write about filering function
+```bash
+fornma umap run <csv...> <out_dir> [--columns COL1 COL2 ...] [--n_neighbors INT] [--min_dist FLOAT] [--metric Euclidean|...] [--scale/--no-scale]
+```
 
-### Tracking
-```sh
-   fornma tracking path_to_table path_to_save -md -t -ms -mg -am
-  ```
-  Where:
- * path_to_table is the path to forNMA results CSV file;
- * path_to_save is the path where tracked CSV will be saved;
- * -md, --max_distance is the maximal distance to allow particle linking between frames;
- * -t, --time_window is the maximal memory of the tracker to link track segments;
- * -ms, --max_split_distanceis the maximal distance to link segment starts to segment middlepoints;
- * -mg, --max_gap_closing_distance is the maximal distance for closing segment gaps;
- * -am, --allow_merging indicates whether object merging is allowed or not.
- 
-Notice that optional arguments must be optimized for every experimental condition, and default values are just a suggestion.
+**Outputs in `<out_dir>`**
+- `Results with umap coordinates.csv` (original table + `UMAP1`, `UMAP2`)
+- `umap_YYYYMMDD-HHMMSS.png`
+- `logs-fornma.txt` (created automatically when using `out_dir`)
 
-#### Draw Tracking at Images
-```sh
-   fornma draw_tracking path_to_table path_to_images path_to_save -rs
-  ```
-  Where:
- * path_to_table is the path to forNMA tracking results CSV file;
- * path_to_images is the path to a folder containing images to be drawn;
- * path_to_save is the path where images will be saved;
- * -rs, --rescale_intesity indicates whether image intensities must be rescaled.
+**Example**
 
+```bash
+fornma umap run   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   /media/luiza/DATA/Doutorado/teste-apagar-depois   --columns Area
+```
 
+### 2) Elbow plot
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+```bash
+fornma umap elbow "<out_dir>/Results with umap coordinates.csv" <out_dir> [--k_min INT] [--k_max INT]
+```
 
+Produces `elbow_plot.png`.
 
+### 3) Color UMAP
 
-<!-- ROADMAP -->
-## Roadmap
+By existing column:
 
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
+```bash
+fornma umap color "<out_dir>/Results with umap coordinates.csv" <out_dir> --color_col Condition
+```
 
-See the [open issues](https://github.com/github_username/repo_name/issues) for a full list of proposed features (and known issues).
+By KMeans clusters:
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+```bash
+fornma umap color "<out_dir>/Results with umap coordinates.csv" <out_dir> --use_clusters --n_clusters 4
+```
 
+Produces `umap_colored_*.png` (+ optional clustered CSV when using KMeans).
 
+---
 
-<!-- CONTRIBUTING -->
+## Statistics module
+
+All statistical subcommands accept **one or more CSVs**; they are concatenated after validating the presence of a non-empty `Condition` column. Logs are **forced** to `<save_dir>/logs-fornma.txt` whenever `--save_dir` is provided.
+
+### 1) One-way analysis
+
+```bash
+fornma stats oneway <csv...> <numeric_col> <group_col>   --save_dir <out_dir> [--alpha FLOAT] [--pairs_of_interest ...] [--log_file PATH]
+```
+
+- Chooses ANOVA (with Tukey) if Shapiro/Levene pass; otherwise Kruskal (with Dunn).
+- Saves:
+  - `<out_dir>/oneway_main.csv` (ANOVA table or Kruskal summary),
+  - `<out_dir>/oneway_posthoc.csv` (if applicable),
+  - `<out_dir>/oneway_summary.csv`.
+
+**Example**
+
+```bash
+fornma stats oneway   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   Area Condition   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+```
+
+### 2) Two-way analysis
+
+```bash
+fornma stats twoway <csv...> <numeric_col> <group_col1> <group_col2>   --save_dir <out_dir> [--alpha FLOAT] [--pairs_of_interest ...] [--log_file PATH]
+```
+
+- Uses Type II ANOVA (with Tukey on cells) if assumptions are OK; otherwise Scheirer-Ray-Hare (with optional Dunn).
+- Saves:
+  - `<out_dir>/twoway_main.csv` (ANOVA table or SRH results),
+  - `<out_dir>/twoway_posthoc.csv` (if applicable),
+  - `<out_dir>/twoway_summary.csv`.
+
+**Example**
+
+```bash
+fornma stats twoway   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   Area Condition NMA_category   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+```
+
+### 3) Chi-square (global + post-hoc)
+
+```bash
+fornma stats chi2 <csv...> <group_col> <category_col>   --save_dir <out_dir> [--expected_min FLOAT] [--correction_method auto|bonferroni|fdr_bh] [--num_simulations INT] [--log_file PATH]
+```
+
+- Global test (asymptotic; Monte Carlo fallback when expected counts are low).
+- Pairwise post-hoc between group levels with multiple-testing correction.
+- Saves:
+  - `<out_dir>/chi2_contingency.csv` (counts),
+  - `<out_dir>/chi2_percentages.csv` (% per column),
+  - `<out_dir>/chi2_expected.csv` (expected counts, if available),
+  - `<out_dir>/chi2_posthoc.csv` (if applicable).
+
+**Example**
+
+```bash
+fornma stats chi2   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   Condition NMA_category   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+```
+
+### 4) Chi-square subgroup comparisons
+
+```bash
+fornma stats chi2-subgroups <csv...> <group_col> <condition_col>   --save_dir <out_dir> [--expected_min FLOAT] [--correction_method bonferroni|fdr_bh|auto] [--log_file PATH]
+```
+
+- For each level in `<group_col>`, compares proportions between pairs of `<condition_col>` (2×2).
+- Uses Fisher for low expected counts; otherwise chi-square.
+- Saves:
+  - `<out_dir>/chi2_subgroups_subgroup_results.csv` (flattened 2×2 tables + p-values),
+  - `<out_dir>/chi2_subgroups_proportions.csv` (% per condition).
+
+**Example**
+
+```bash
+fornma stats chi2-subgroups   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   NMA_category Condition   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+```
+
+---
+
+## Python API (optional)
+
+You can also call functions/classes directly:
+
+```python
+import pandas as pd
+from fornma.Statistics.Helpers import AnalysisHelper
+from fornma.Statistics.OneWay import OneWayAnalysis
+
+helper = AnalysisHelper(alpha=0.05, log_file="logs-fornma.txt")
+df = helper.load_and_concat("/path/to/data.csv")
+res = OneWayAnalysis(df, numeric_col="Area", group_col="Condition", helper=helper).run()
+print(res["main_result"])
+```
+
+UMAP:
+
+```python
+from fornma.UMAP import perform_clustering
+perform_clustering(path="/path/to/data.csv", saving_path="out", columns=["Area"])
+```
+
+---
+
+## Outputs & logging
+
+- When `--save_dir` is provided, logs are **always written** to `<save_dir>/logs-fornma.txt`.
+- CSV outputs follow consistent naming (`*_main.csv`, `*_posthoc.csv`, `*_summary.csv`, etc.).
+
+---
+
+## Requirements
+
+Core: `numpy`, `pandas`, `scipy`, `matplotlib`, `scikit-learn`, `umap-learn`.Stats: `statsmodels`, `scikit-posthocs`.Imaging: `scikit-image`, `opencv-python`, `pillow`, (`cellpose<4` if you use segmentation).Plots: `seaborn` (optional).
+
+Your `pyproject.toml` / `environment.yml` should pin compatible versions (example):
+
+- numpy~=1.26, pandas~=2.3, scipy~=1.16, matplotlib~=3.10, seaborn~=0.13  
+- scikit-image~=0.25, scikit-learn~=1.7, pillow~=11.1, opencv-python~=4.10  
+- umap-learn~=0.5.9, statsmodels, scikit-posthocs
+
+---
+
+## Troubleshooting
+
+- **Command not found (`fornma`)**: reinstall in editable mode and ensure `[project.scripts] fornma = "fornma.cli:main"` is present.
+- **Import errors (`src.fornma` vs `fornma`)**: use absolute package imports `fornma.*`.
+- **Argparse errors**: run `fornma -h` or `fornma stats oneway -h` to confirm arguments.
+- **Slow runs**: large datasets + normality/homoscedasticity tests + post-hoc can take time; try a subset first.
+
+---
+
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+- Open issues and PRs with reproducible examples.
+- Keep CLI help in **English**.
+- Add tests for new subcommands and ensure outputs are logged and saved.
 
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
-Don't forget to give the project a star! Thanks again!
+---
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- LICENSE -->
 ## License
 
-Distributed under the MIT License. See `LICENSE.txt` for more information.
+BSD 3-Clause License.
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+---
 
+## Citation
 
+If you use **forNMA** in academic work, please cite the software and link to the repository/TestPyPI page.
 
-<!-- CONTACT -->
-## Contact
+---
 
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
+## Changelog
 
-Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-
-* []()
-* []()
-* []()
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- MARKDOWN LINKS & IMAGES -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/github_username/repo_name.svg?style=for-the-badge
-[contributors-url]: https://github.com/github_username/repo_name/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/github_username/repo_name.svg?style=for-the-badge
-[forks-url]: https://github.com/github_username/repo_name/network/members
-[stars-shield]: https://img.shields.io/github/stars/github_username/repo_name.svg?style=for-the-badge
-[stars-url]: https://github.com/github_username/repo_name/stargazers
-[issues-shield]: https://img.shields.io/github/issues/github_username/repo_name.svg?style=for-the-badge
-[issues-url]: https://github.com/github_username/repo_name/issues
-[license-shield]: https://img.shields.io/github/license/github_username/repo_name.svg?style=for-the-badge
-[license-url]: https://github.com/github_username/repo_name/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/linkedin_username
-[product-screenshot]: images/screenshot.png
+See `CHANGELOG.md` (or Git tags) for version history once published.

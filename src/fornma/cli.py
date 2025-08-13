@@ -42,6 +42,11 @@ def main():
     )
     parser_segmentation.add_argument('--preview', action='store_true', help='Preview images before running')
 
+    # subcomando para exportar template
+    seg_sub = parser_segmentation.add_subparsers(dest='seg_cmd')
+    p_init_cfg = seg_sub.add_parser('init-config', help='Export segmentation parameters template')
+    p_init_cfg.add_argument('dest', type=str, help='Destination file or directory')
+
     # ----------------------------------
     # parser for the "tracking" command
     # ----------------------------------
@@ -386,11 +391,16 @@ def main():
         registration(args.paths, args.path_to_save, args.crop)
 
     elif args.fornma == 'segmentation':
-        import toml
-        from  fornma.Segmentation import run, check_user_inputs
-        dic = toml.load(args.parameters)
-        check_user_inputs(dic)
-        run(dic, preview=args.preview)
+        if getattr(args, 'seg_cmd', None) == 'init-config':
+            from fornma.utils import export_parameters_toml
+            export_parameters_toml(args.dest)
+        else:
+            import toml
+            from fornma.Segmentation import run, check_user_inputs
+            dic = toml.load(args.parameters)
+            check_user_inputs(dic)
+            run(dic, preview=args.preview)
+
 
     elif args.fornma == 'tracking':
         from  fornma.Tracking import tracking
