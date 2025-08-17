@@ -6,36 +6,13 @@ Created on Wed Aug 4 14:25:56 2021
 
 File that puts all functions together 
 """
-import os
-import sys
 import pandas as pd
 from typing import Any, Union, List, Tuple
+
 from .analyze import analyze_dict
 from .df_managing.organize import (
     filter_dataframe, get_foci_df, split_dfs
 )
-
-pd.options.mode.chained_assignment = None  # default='warn'
-
-
-try:
-    # quando instalado como pacote
-    from src.fornma.Segmentation.analyze import analyze_dict
-    from src.fornma.Segmentation.df_managing.organize import (
-        filter_dataframe, get_foci_df, split_dfs
-    )
-except ModuleNotFoundError:
-    # quando rodado standalone dentro de src
-    sys.path.append(
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-    )
-    from src.fornma.Segmentation.analyze import analyze_dict
-    from src.fornma.Segmentation.df_managing.organize import (
-        filter_dataframe, get_foci_df, split_dfs
-    )
-
-
-from src.fornma.Segmentation.analyze import analyze_dict
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
