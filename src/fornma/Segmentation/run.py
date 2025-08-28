@@ -6,6 +6,7 @@ Created on Wed Aug 4 14:25:56 2021
 
 File that puts all functions together 
 """
+import os
 import pandas as pd
 from typing import Any, Union, List, Tuple
 
