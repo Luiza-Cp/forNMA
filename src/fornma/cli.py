@@ -135,6 +135,14 @@ def main():
                                  '(equivalent to having one condition)')
     parser_dot.add_argument('--overtime', '-o', action='store_true',
                             help='Set True if your data is a time sequence')
+    parser_dot.add_argument('--palette', '-p',  type=str, default=None,
+                            help='Add a matplotlib palette name')
+    parser_dot.add_argument('--hue_norm', '-hn', type=float, nargs=2, metavar=('MIN', 'MAX'),
+        help='Hue range (ex.: --hue_norm 90 150)'
+    )
+    parser_dot.add_argument('--size_norm', '-sn', type=float, nargs=2, metavar=('MIN', 'MAX'),
+                            help='Size range (ex.: --hue_size 90 150)'
+                            )
 
     # ----------------------------------
     # parser for "plot" command
@@ -420,7 +428,7 @@ def main():
         filters(args.path_to_table, args.path_to_save, args.draw, args.column1, args.column2, args.path_to_pkl)
 
     elif args.fornma == 'NMA':
-        from  fornma.Graphs import show_nma_settings
+        from  fornma.NMA import show_nma_settings
         from  fornma.NMA import plot_NMA
         from  fornma.NMA import NMA_control
         if (hasattr(args, 'dest')) and args.dest == 'show':
@@ -429,7 +437,7 @@ def main():
             NMA_control(args.path, args.area_standard_deviation, args.NII_standard_deviation, args.headless)
         elif hasattr(args, 'column1'):
             plot_NMA(args.paths, args.saving_path, "dot", args.column1, args.column2, args.sample_size, args.single,
-                     args.overtime)
+                     args.overtime, args.palette, args.hue_norm, args.size_norm)
         elif hasattr(args, 'jointplot') and args.jointplot:
             plot_NMA(args.path, args.saving_path, "jointplot", None, None, None, args.single, args.overtime)
         else:
@@ -448,8 +456,11 @@ def main():
         dot = args.dot if hasattr(args, 'dot') else None
         conditions = args.conditions if hasattr(args, 'conditions') else None
         frames = args.frames if hasattr(args, 'frames') else None
+        palette = args.palette if hasattr(args, 'palette') else None
+        hue_norm = args.hue_norm if hasattr(args, 'hue_norm') else None
+        size_norm = args.size_norm if hasattr(args, 'size_norm') else None
         plot(args.path, args.path_to_save, conditions, frames, args.graph_type, args.gate, x=x, y=y, hue=hue, size=size,
-             control=control, n=n, style=style, ci=ci, dot=dot)
+             control=control, n=n, style=style, ci=ci, dot=dot, palette=palette, hue_norm=hue_norm, size_norm=size_norm)
 
     elif args.fornma == 'foci':
         from  fornma.Foci_overlay import foci_overlay, plot_profile

@@ -21,7 +21,8 @@ CONFIG_PATH = Path(__file__).parent / "control_parameters.pickle"
 class NMA:
     """ Class for NMA graph plotting"""
 
-    def __init__(self, df, parameters, graph_type, single, overtime, path_save, sample, sample_size, hue, size, ):
+    def __init__(self, df, parameters, graph_type, single, overtime, path_save, sample, sample_size, hue, size, palette,
+                 hue_norm, size_norm):
         """
         Atributes:
 
@@ -45,11 +46,17 @@ class NMA:
         self.v_downx2: vertical bottom right line x coordinates
         self.graph_limits: tuple with min and maximum area and NII values within 3 standard deviations
         self.percentages: dataframe with cell percentages at each NMA group
+        self.palette: name of matplotlib or seaborn color palette
+        self.hue_norm: tuple with min and max hue values
+        self.size_norm: tuple with min and max size values
         """
         self.df = df
         self.sample_size = sample_size
         self.hue = hue
         self.size = size
+        self.palette = palette
+        self.hue_norm = hue_norm
+        self.size_norm = size_norm
         self.sd_area = parameters['sd_area']
         self.sd_NII = parameters['sd_NII']
         self.mean_NII = parameters['mean_NII']
@@ -230,7 +237,7 @@ class NMA:
         subset_of_df = self.subset_df(condition_time_tuple)
         plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
         fig, ax = plt.subplots()
-        sns.kdeplot(data=subset_of_df, x="NII", y="Area", cmap='rainbow',
+        sns.kdeplot(data=subset_of_df, x="NII", y="Area", cmap=self.palette,
                     fill=True, thresh=None, levels=60, ax=ax)
         ax.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
                 self.v_upx, self.v_upy, self.v_midx, self.v_midy,
@@ -253,7 +260,7 @@ class NMA:
         #plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
 
         fig = sns.jointplot(data=subset_of_df, x="NII", y="Area", kind='kde', space=0, fill=True, thresh=0,
-                            cmap='rainbow')
+                            cmap=self.palette)
         fig.ax_marg_x.set_xlim(self.graph_limits[2], self.graph_limits[3])
         fig.ax_marg_y.set_ylim(self.graph_limits[0], self.graph_limits[1])
         #.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
@@ -273,7 +280,6 @@ class NMA:
                      size: Optional[str] = None,
                      sample: bool = False,
                      title: str = 'NMA plot',
-                     palette='rainbow',
                      ):
         """
         Plots the NMA graph(scatterplot) with hue and size chosen by user. Same graph
@@ -316,19 +322,17 @@ class NMA:
 
         fig, ax = plt.subplots(1, figsize=(10, 6))
 
-        hue_norm = None
-        size_norm = None
-
-        if hue is not None and is_numeric_dtype(self.df[hue]):
+        if hue is not None and is_numeric_dtype(self.df[hue]) and self.hue_norm is None:
             df_hue = self.df[(np.abs(stats.zscore(self.df[hue].fillna(self.df[hue].mean()))) < 3)]
-            hue_norm = (df_hue[hue].min(), df_hue[hue].max())
+            self.hue_norm = (df_hue[hue].min(), df_hue[hue].max())
 
-        if size is not None and is_numeric_dtype(self.df[size]):
+
+        if size is not None and is_numeric_dtype(self.df[size]) and self.size_norm is None:
             df_size = self.df[(np.abs(stats.zscore(self.df[size].fillna(self.df[size].mean()))) < 3)]
-            size_norm = (df_size[size].min(), df_size[size].max())
+            self.size_norm = (df_size[size].min(), df_size[size].max())
 
         sns.scatterplot(data=subset_of_df, x="NII", y="Area", size=size, hue=hue,
-                        hue_norm=hue_norm, size_norm=size_norm, ax=ax, palette='rainbow' )
+                        hue_norm=self.hue_norm, size_norm=self.size_norm, ax=ax, palette=self.palette )
         ax.plot(self.mean_NII + (self.sd_NII * self.std_NII) * np.cos(self.circle),
                 self.mean_a + (self.sd_area * self.std_a) * np.sin(self.circle), color='black')
 
@@ -386,7 +390,7 @@ class NMA:
         df.drop(columns=['Total Cells'], inplace=True)
         df = df.loc[df['Condition'] == group]
         df.set_index('Frame', inplace=True)
-        sns.set_palette('rainbow', 7)
+        sns.set_palette(self.palette, 7)
         fig, ax = plt.subplots()
         df.plot(kind='bar', stacked=True, ax=ax)
         ax.set_title('NMA groups')
@@ -416,12 +420,12 @@ class NMA:
         conditions = [None] if self.single else list(set(self.df["Condition"]))
         times = list(set(self.df["Frame"])) if self.overtime else [None]
         sample_dfs = []
-        palette = 'rainbow'
+        palette = self.palette
         if self.hue is not None and not is_numeric_dtype(self.df[self.hue]):
             all_hue_categories = list(set(self.df[self.hue]))
-            categories_colors = np.random.rand(len(all_hue_categories), 3)
-            categories_colors = sns.color_palette('rainbow', len(all_hue_categories))
-            palette = dict(zip(all_hue_categories, categories_colors))
+            #categories_colors = np.random.rand(len(all_hue_categories), 3)
+            categories_colors = sns.color_palette(self.palette, len(all_hue_categories))
+            self.palette = dict(zip(all_hue_categories, categories_colors))
             # palette['Family: -1'] = (0.8, 0.8, 0.8)  # apagar
 
         for c in conditions:
@@ -435,7 +439,7 @@ class NMA:
                 elif self.graph_type == 'jointplot':
                     fig = self.plot_NMA_jointplot((c, t), title)
                 else:
-                    fig, df_sample = self.plot_NMA_dot((c, t), self.hue, self.size, self.sample, title, palette)
+                    fig, df_sample = self.plot_NMA_dot((c, t), self.hue, self.size, self.sample, title)
                     sample_dfs.append(df_sample)
                 self.save_figs(fig, title)
 
@@ -517,9 +521,17 @@ def plot_NMA(path_list: List[str],
              col2: Optional[str] = None,
              sample_size: Optional[int] = None,
              single: Optional[bool] = None,
-             overtime: bool = False, ):
+             overtime: bool = False,
+             palette = 'rainbow',
+             hue_norm=None,
+             size_norm=None
+             ):
 
     """ From a list of paths corresponding to csv files, plots NMA graphs. Graph_tupe can be dot, jointplot or heatmap"""
+
+    hue_norm = tuple(hue_norm) if hue_norm is not None else None
+    size_norm = tuple(size_norm) if size_norm is not None else None
+
     if not os.path.isfile(CONFIG_PATH ):
         raise Exception("The NMA settings were not defined. Run 'NMA settings' command before plotting")
 
@@ -549,7 +561,8 @@ def plot_NMA(path_list: List[str],
 
     df = pd.concat(df_list, ignore_index=True) if len(df_list) > 1 else df_list[0]
     sample = True if sample_size is not None else False
-    NMA(df, parameters, graph_type, single, overtime, saving_path, sample, sample_size, col1, col2)
+    NMA(df, parameters, graph_type, single, overtime, saving_path, sample, sample_size, col1, col2, palette,
+        hue_norm, size_norm)
 
     df_list_with_NMA = [add_NMA_category_to_tables(f, parameters) for f in df_list]
     df_names = [f['Condition'].iloc[0] for f in df_list]
@@ -560,7 +573,7 @@ def plot_NMA(path_list: List[str],
     return print("Complete")
 
 
-def plot_area_vs_feat(df, col, path_save):
+def plot_area_vs_feat(df, col, palette, path_save):
     sns.set_theme()
 
     grouped = df.groupby('Condition')
