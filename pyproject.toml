@@ -37,6 +37,11 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 test = ["pytest~=8.4"]
+gui = [
+  "dash>=2.17",
+  "plotly>=5.22",
+  "dash-bootstrap-components>=1.6",  # opcional, ajuda no layout
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -49,7 +54,9 @@ version_scheme = "no-guess-dev"
 local_scheme = "no-local-version"
 
 [project.scripts]
-fornma = "fornma.cli:main"
+fornma = "fornma.cli:main"            # já existe, manter
+fornma-gui = "fornma.gui.app:main"        # novo entry point da GUI
 
 [tool.setuptools.package-data]
 fornma = ["resources/*.toml"]
+
