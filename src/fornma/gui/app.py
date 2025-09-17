@@ -10,6 +10,8 @@ import dash_bootstrap_components as dbc
 
 from .layouts.segmentation import build_sidebar as build_segmentation_sidebar
 from .callbacks.segmentation import register as register_segmentation_callbacks
+from fornma.gui.utils.params_builder import build_interface_params
+from fornma.Segmentation.run import run as run_pipeline
 
 
 # --- util: native dialog to pick folders (100% local)
@@ -31,6 +33,7 @@ def pick_directory_dialog() -> str:
 # --- initial table state (1 channel, 1 example row)
 def initial_table_state() -> Dict:
     return {
+        "channels": [{"id": "ch1", "name": "Channel 1"}],
         "channels": [{"id": "ch1", "name": "Channel 1"}],
         "rows": [
             {"condition": "Control", "ch1": ""}  # use channel ids as keys
@@ -172,6 +175,7 @@ def create_app():
 
     # stores
     store = dcc.Store(id="store-images", data=initial_table_state())
+    store_seg = dcc.Store(id="store-seg", data={})
     store_clicks = dcc.Store(id="store-browse-clicks", data={})
 
     # --- IMAGES MODAL
@@ -197,6 +201,7 @@ def create_app():
     # --- MAIN LAYOUT (two columns)
     app.layout = html.Div([
         store,
+        store_seg,
         store_clicks,
 
         html.Div([
@@ -429,6 +434,17 @@ def create_app():
             data["rows"][r][ch_id] = (val or "").strip()
         return data
 
+    # em create_app(), depois dos outros callbacks (qualquer lugar apropriado)
+    @app.callback(
+        Output("save-path", "value"),
+        Input("btn-browse-save", "n_clicks"),
+        State("save-path", "value"),
+        prevent_initial_call=True
+    )
+    def _choose_save_dir(n, current_value):
+        chosen = pick_directory_dialog()
+        return chosen or current_value or ""
+
     # --- register segmentation module callbacks (collapse/options/value)
     register_segmentation_callbacks(app)
 
@@ -439,6 +455,136 @@ def create_app():
     )
     def _update_counter(data):
         return f"Channels: {len(data.get('channels', []))} | Conditions: {len(data.get('rows', []))}"
+
+    from dash import no_update
+
+    @app.callback(
+        Output("summary-box", "children", allow_duplicate=True),
+        Input("btn-preview", "n_clicks"),
+        Input("btn-run", "n_clicks"),
+        State("store-images", "data"),
+        State("store-seg", "data"),
+        prevent_initial_call=True,
+    )
+    def _on_preview_or_run(n_prev, n_run, images_data, seg_data):
+        # Quem clicou?
+        trig = ctx.triggered_id
+        if trig not in ("btn-preview", "btn-run"):
+            return no_update
+        preview = (trig == "btn-preview")
+
+        # 1) Monta dicionário no formato "interface" (flexível, sem root comum)
+        params, errs = build_interface_params(images_data, seg_data)
+        if errs:
+            return "Errors:\n- " + "\n- ".join(sorted(set(errs)))
+
+        # 2) Executa o pipeline (run.py) no modo interface
+        try:
+            run_pipeline(params, preview=preview)  # chama seu run()
+        except Exception as e:
+            return f"Run failed:\n{e}"
+
+        # 3) Mensagem simples de sucesso
+        action = "PREVIEW" if preview else "RUN"
+        chans = [k.replace("Channel ", "") for k in params.keys() if k.startswith("Channel ")]
+        return "\n".join([
+            f"{action} finished.",
+            f"Channels: {', '.join(chans)}",
+            f"Nuclei channel: {params['global'].get('channel_with_nuclei') or '—'}",
+            f"Output: {params['global'].get('output_folder', 'results')}",
+        ])
+
+    # --- SYNC: escreve todas as opções de segmentação no store-seg
+    @app.callback(
+        Output("store-seg", "data"),
+        # GENERAL
+        Input({"type": "seg-field", "group": "general", "name": "magnification"}, "value"),
+        Input({"type": "seg-field", "group": "general", "name": "pixel-size"}, "value"),
+        Input({"type": "seg-field", "group": "general", "name": "channel_with_nuclei", "field": "channels"}, "value"),
+        Input({"type": "seg-flag", "group": "general", "name": "overtime"}, "value"),
+        # SEGMENTATION (globais)
+        Input({"type": "seg-flag", "group": "segmentation", "name": "rescale-intensity"}, "value"),
+        Input({"type": "seg-flag", "group": "segmentation", "name": "remove-bg"}, "value"),
+        Input({"type": "seg-field", "group": "segmentation", "name": "rolling-radius"}, "value"),
+        Input({"type": "seg-field", "group": "segmentation", "name": "seg_method"}, "value"),
+        # FORNMA
+        Input({"type": "seg-field", "group": "fornma", "name": "threshold"}, "value"),
+        Input({"type": "seg-field", "group": "fornma", "name": "offset"}, "value"),
+        Input({"type": "seg-field", "group": "fornma", "name": "smooth"}, "value"),
+        Input({"type": "seg-field", "group": "fornma", "name": "adjust_size"}, "value"),
+        Input({"type": "seg-field", "group": "fornma", "name": "cut_edges"}, "value"),
+        Input({"type": "seg-flag", "group": "fornma", "name": "find_low_intensity_nucleus"}, "value"),
+        Input({"type": "seg-flag", "group": "fornma", "name": "weakly_labeled"}, "value"),
+        # CELLPOSE
+        Input({"type": "seg-field", "group": "cellpose", "name": "diameter"}, "value"),
+        Input({"type": "seg-field", "group": "cellpose", "name": "flow_threshold"}, "value"),
+        Input({"type": "seg-field", "group": "cellpose", "name": "mask_threshold"}, "value"),
+        Input({"type": "seg-field", "group": "cellpose", "name": "cellprob_threshold"}, "value"),
+        Input({"type": "seg-flag", "group": "cellpose", "name": "use_gpu"}, "value"),
+        Input({"type": "seg-flag", "group": "cellpose", "name": "invert"}, "value"),
+        # FILTERS
+        Input({"type": "seg-field", "group": "filters", "name": "shape"}, "value"),
+        Input({"type": "seg-field", "group": "filters", "name": "eccentricity"}, "value"),
+        Input({"type": "seg-field", "group": "filters", "name": "minimum_size"}, "value"),
+        Input({"type": "seg-field", "group": "filters", "name": "maximum_size"}, "value"),
+        Input({"type": "seg-field", "group": "filters", "name": "minimum_radius"}, "value"),
+        Input({"type": "seg-field", "group": "filters", "name": "maximum_radius"}, "value"),
+        # SAVE PATH (campo de texto/botão de browse)
+        Input("save-path", "value"),
+        prevent_initial_call=False,
+    )
+    def _sync_seg_store(
+            magnification, pixel_size, ch_with_nuclei, overtime,
+            rescale_intensity, remove_bg, rolling_radius, seg_method,
+            f_th, f_off, f_blur, f_adj, f_cut, f_findlow, f_weak,
+            c_diam, c_flow, c_mask, c_cellprob, c_gpu, c_invert,
+            fl_shape, fl_ecc, fl_min_sz, fl_max_sz, fl_min_r, fl_max_r,
+            save_path,
+    ):
+        seg_data = {
+            "general": {
+                "path_to_save": save_path or "results",
+                # Atenção: aqui guardamos o *ID* do canal (ex.: "ch1"); o builder converte para NOME depois
+                # (ele mapeia id->nome usando a lista de canais da tabela) :contentReference[oaicite:3]{index=3}
+                "channel_with_nuclei": ch_with_nuclei,
+                "overtime": bool(overtime),
+            },
+            "segmentation": {
+                "magnification": magnification,
+                "pixel-size": pixel_size,
+                "rescale-intensity": bool(rescale_intensity),
+                "remove-bg": bool(remove_bg),
+                "rolling-radius": rolling_radius,
+                "seg_method": seg_method,
+                # usado para setar cellpose.use_cellpose :contentReference[oaicite:4]{index=4}
+            },
+            "fornma": {
+                "threshold": f_th,
+                "offset": f_off,
+                "smooth": f_blur,
+                "adjust_size": f_adj,
+                "cut_edges": f_cut,
+                "find_low_intensity_nucleus": bool(f_findlow),
+                "weakly_labeled": bool(f_weak),
+            },
+            "cellpose": {
+                "diameter": c_diam,
+                "flow_threshold": c_flow,
+                "mask_threshold": c_mask,
+                "cellprob_threshold": c_cellprob,
+                "use_gpu": bool(c_gpu),
+                "invert": bool(c_invert),
+            },
+            "filters": {
+                "shape": fl_shape,
+                "eccentricity": fl_ecc,
+                "minimum_size": fl_min_sz,
+                "maximum_size": fl_max_sz,
+                "minimum_radius": fl_min_r,
+                "maximum_radius": fl_max_r,
+            },
+        }
+        return seg_data
 
     return app
 

@@ -264,7 +264,7 @@ def run(parameters_dict: dict,
             print(message)
             return None
         analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview, ch_name_list,
-                     path_to_save, wants_to_save, subfolders[i])  # ju usa esse pra remover outliers
+                     path_to_save, wants_to_save, subfolders[i])
 
     return print('finshed!')
 

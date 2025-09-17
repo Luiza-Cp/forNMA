@@ -1,20 +1,7 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 
-def build_sidebar():
-    return html.Div(id={"type": "sidebar", "tab": "tab-segmentation"}, children=[
-
-        html.H3("Segmentation — Inputs"),
-        html.Button("Load images", id="btn-open-modal"),
-        html.Div(id="summary-box", style={"whiteSpace": "pre-wrap"}),
-        html.Hr(),
-
-        dbc.Accordion(
-            id="seg-accordion",
-            start_collapsed=True,
-            always_open=True,
-            children=[
-                dbc.AccordionItem(
+GENERAL_SETTINGS = dbc.AccordionItem(
                     title="General Settings",
                     item_id="general",
                     children=[
@@ -147,8 +134,9 @@ def build_sidebar():
                             placement="right",
                         ),
                     ]
-                ),
-                dbc.AccordionItem(
+                )
+
+SEGMENTATION_SETTINGS = dbc.AccordionItem(
                     title="Segmentation Settings",
                     item_id="segmentation",
                     children=[
@@ -281,8 +269,9 @@ def build_sidebar():
                         ], width=12)
 
                     ]
-                ),
-                dbc.AccordionItem(
+                )
+
+ADVANCED_SETTINGS = dbc.AccordionItem(
                     title="Advanced Settings",
                     item_id="advanced",
                     children=[
@@ -689,27 +678,141 @@ def build_sidebar():
                         ], id="collapse-cellpose-params", is_open=False)
 
                     ]
-                ),
-                # --- Channel Settings (subtítulo + acordeão dinâmico)
-                html.Hr(className="my-3"),
-                html.H6("Channel Settings", id="subtitle-channel-settings", className="text-muted mb-2"),
-                dbc.Tooltip(
-                    "Configure per-channel measurements and options here.",
-                    target="subtitle-channel-settings",
-                    placement="right",
-                ),
+                )
 
-                dbc.Accordion(
-                    id="accordion-channels",
-                    start_collapsed=True,  # todos iniciam fechados
-                    always_open=False,  # apenas um aberto por vez
-                    flush=True,  # visual mais clean
-                ),
+def build_sidebar():
+    return html.Div(
+        id={"type": "sidebar", "tab": "tab-segmentation"},
+        # faz o container preencher a altura e virar coluna
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "height": "100%",         # o pai (left-pane) já tem 100vh
+        },
+        children=[
+            # ---------- HEADER (fixo no topo) ----------
+            html.Div(
+                id="seg-header",
+                style={
+                    "flex": "0 0 auto",
+                    "position": "sticky",
+                    "top": 0,
+                    "zIndex": 2,
+                    "background": "#eef2ff",       # mesmo fundo do left-pane
+                    "paddingBottom": "8px",
+                },
+                children=[
+                    html.H3("Segmentation — Inputs", style={"marginTop": 0}),
+                    html.Button("Load images", id="btn-open-modal"),
+                    html.Div(
+                        [
+                            dbc.Label("Saving path", id="label-save-path", style={"marginTop": "8px"}),
+                            html.Div(
+                                [
+                                    dcc.Input(
+                                        id="save-path",
+                                        value="",
+                                        placeholder="Folder to save results…",
+                                        style={"width": "80%"},
+                                        persistence=True,
+                                        persisted_props=["value"],
+                                        persistence_type="session",
+                                    ),
+                                    html.Button(
+                                        "Browse",
+                                        id="btn-browse-save",
+                                        n_clicks=0,
+                                        style={"marginLeft": "6px"},
+                                    ),
+                                ],
+                                style={"display": "flex", "alignItems": "center"},
+                            ),
+                        ]
+                    ),
+                    dbc.Tooltip(
+                        "Where outputs (tables, images, logs) will be written.",
+                        target="label-save-path",
+                        placement="right",
+                    ),
+                    html.Div(id="summary-box", style={"whiteSpace": "pre-wrap", "marginTop": "8px"}),
+                    html.Hr(style={"margin": "8px 0"}),
+                ],
+            ),
 
-            ]
-        ),
+            # ---------- SCROLL ÁREA (apenas o miolo rola) ----------
+            html.Div(
+                id="seg-scroll",
+                style={
+                    "flex": "1 1 auto",
+                    "overflowY": "auto",
+                    "paddingRight": "3px",  # espaço pro scrollbar não colar no conteúdo
+                },
+                children=[
+                    # 👉 Os itens precisam estar dentro de um Accordion
+                    dbc.Accordion(
+                        id="seg-accordion",
+                        start_collapsed=True,
+                        always_open=True,
+                        children=[
+                            GENERAL_SETTINGS,
+                            SEGMENTATION_SETTINGS,
+                            ADVANCED_SETTINGS,
+                        ],
+                    ),
 
-        html.Hr(),
-        html.Button("Preview", id="btn-preview"),
-        html.Button("Run", id="btn-run", style={"marginLeft": "8px"}),
-    ])
+                    # --- Channel Settings (subtítulo + acordeão dinâmico)
+                    html.Hr(className="my-3"),
+                    html.H6("Channel Settings", id="subtitle-channel-settings", className="text-muted mb-2"),
+                    dbc.Tooltip(
+                        "Configure per-channel measurements and options here.",
+                        target="subtitle-channel-settings",
+                        placement="right",
+                    ),
+                    dbc.Accordion(
+                        id="accordion-channels",
+                        start_collapsed=True,  # todos iniciam fechados
+                        always_open=False,  # apenas um aberto por vez
+                        flush=True,  # visual mais clean
+                    ),
+                ],
+            ),
+            # ---------- FOOTER (fixo no rodapé) ----------
+        html.Div(
+                id="seg-footer",
+                style={
+                    "flex": "0 0 auto",
+                    "position": "sticky",
+                    "bottom": 0,
+                    "zIndex": 2,
+                    "background": "#eef2ff",
+                    "padding": "8px 0",
+                    "borderTop": "1px solid #cfd8ff",
+                },
+                children=[
+                    html.Hr(style={"margin": "8px 0"}),
+                    html.Button("Preview", id="btn-preview"),
+                    html.Button("Run", id="btn-run", style={"marginLeft": "8px"}),
+                ],
+            ),
+
+            html.Div(
+                [
+                    dbc.Label("Debug — parâmetros (temporário)"),
+                    html.Pre(
+                        id="run-params",
+                        style={
+                            "whiteSpace": "pre-wrap",
+                            "overflowY": "auto",
+                            "maxHeight": "30vh",
+                            "border": "1px solid #ddd",
+                            "padding": "8px",
+                            "borderRadius": "6px",
+                            "fontSize": "12px",
+                            "background": "#fafafa",
+                        },
+                    ),
+                ],
+                id="run-params-wrapper",
+            )
+        ],
+    )

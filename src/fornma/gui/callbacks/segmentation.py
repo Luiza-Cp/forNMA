@@ -2,6 +2,9 @@
 from dash import Input, Output, State, ALL, html, dcc
 import dash_bootstrap_components as dbc
 from copy import deepcopy
+from dash import Input, Output, State, no_update
+from fornma.gui.utils.params_builder import build_interface_params
+import json
 
 def register(app):
     # --- Toggles: abre/fecha collapses de Foci e Cyto-ring
@@ -371,3 +374,41 @@ def register(app):
         return ([not x for x in max_size_on],
                 [not x for x in min_int_on],
                 [not x for x in max_int_on])
+
+    @app.callback(
+        Output("run-params", "children"),  # ⬅️ novo: onde exibiremos o dicionário
+        Input("btn-run", "n_clicks"),
+        State("store-images", "data"),
+        State("store-seg", "data"),
+        State({"type": "seg-field", "group": ALL, "name": ALL, "field": ALL}, "id"),
+        State({"type": "seg-field", "group": ALL, "name": ALL, "field": ALL}, "value"),
+        State({"type": "seg-field", "group": ALL, "name": ALL}, "id"),
+        State({"type": "seg-field", "group": ALL, "name": ALL}, "value"),
+        State({"type": "seg-flag", "group": ALL, "name": ALL}, "id"),
+        State({"type": "seg-flag", "group": ALL, "name": ALL}, "value"),
+        State({"type": "ch-field", "ch": ALL, "name": ALL}, "id"),
+        State({"type": "ch-field", "ch": ALL, "name": ALL}, "value"),
+        State({"type": "ch-flag", "ch": ALL, "name": ALL}, "id"),
+        State({"type": "ch-flag", "ch": ALL, "name": ALL}, "value"),
+        # Se você já criou o input "save-path", inclua também:
+        # State("save-path", "value"),
+        prevent_initial_call=True,
+    )
+    def _on_run_show_params(_n,
+                            images_data,
+                            seg_data,
+                            ids_fields_channels, vals_fields_channels,
+                            ids_fields, vals_fields,
+                            ids_flags, vals_flags,
+                            ids_ch_fields, vals_ch_fields,
+                            ids_ch_flags, vals_ch_flags,
+                            # save_path_value=None,  # descomente se incluiu o State acima
+                            ):
+
+        params, errs = build_interface_params(images_data, seg_data or {})
+        if errs:
+            return "Errors:\n- " + "\n- ".join(sorted(set(errs)))
+
+        pretty = json.dumps(params, indent=2, ensure_ascii=False)
+        return pretty
+
