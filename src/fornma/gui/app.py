@@ -4,7 +4,7 @@ import webbrowser
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict
-
+import os
 from dash import Dash, html, dcc, Input, Output, State, ALL, no_update, ctx
 import dash_bootstrap_components as dbc
 
@@ -12,6 +12,10 @@ from .layouts.segmentation import build_sidebar as build_segmentation_sidebar
 from .callbacks.segmentation import register as register_segmentation_callbacks
 from fornma.gui.utils.params_builder import build_interface_params
 from fornma.Segmentation.run import run as run_pipeline
+
+import json, threading, time, os
+from datetime import datetime
+PROGRESS_FILE = None  # definido quando o usuário inicia Preview/Run
 
 
 # --- util: native dialog to pick folders (100% local)
@@ -230,7 +234,30 @@ def create_app():
         elif tab == "tab-registration":
             return html.Div([html.H4("Image Registration module"), html.P("Coming soon...")])
         elif tab == "tab-segmentation":
-            return html.Div([html.H4("Segmentation module"), html.P("Coming soon...")])
+            # Área da DIREITA (fora da sidebar) com barra de progresso e log
+            return html.Div(
+                [
+                    html.H4("Segmentation — progress & logs"),
+                    dbc.Progress(
+                        id="seg-progress",
+                        value=0,
+                        max=100,
+                        striped=True,
+                        animated=True,
+                        style={"height": "22px"}
+                    ),
+                    html.Div(id="seg-progress-text", style={"marginTop": "6px", "fontFamily": "monospace"}),
+                    html.Hr(),
+                    html.Pre(
+                        id="seg-log",
+                        style={"whiteSpace": "pre-wrap", "maxHeight": "55vh", "overflowY": "auto"}
+                    ),
+                    # Interval para fazermos o polling do progresso (inicia DESLIGADO)
+                    dcc.Interval(id="seg-poll", interval=800, disabled=True)
+                ],
+                style={"padding": "8px"}
+            )
+
         elif tab == "tab-stats":
             return html.Div([html.H4("Statistics module"), html.P("Coming soon...")])
         return html.Div()
@@ -459,40 +486,92 @@ def create_app():
     from dash import no_update
 
     @app.callback(
+        Output("seg-poll", "disabled", allow_duplicate=True),
+        Output("seg-log", "children", allow_duplicate=True),
         Output("summary-box", "children", allow_duplicate=True),
+        Output("btn-stop", "style", allow_duplicate=True),
         Input("btn-preview", "n_clicks"),
         Input("btn-run", "n_clicks"),
         State("store-images", "data"),
         State("store-seg", "data"),
         prevent_initial_call=True,
     )
-    def _on_preview_or_run(n_prev, n_run, images_data, seg_data):
-        # Quem clicou?
+    def _start_preview_or_run(n_prev, n_run, images_data, seg_data):
+        from uuid import uuid4
+        import tempfile
+        global PROGRESS_FILE
+
         trig = ctx.triggered_id
         if trig not in ("btn-preview", "btn-run"):
-            return no_update
+            # ⚠️ este callback tem 4 outputs
+            return no_update, no_update, no_update, no_update
+
         preview = (trig == "btn-preview")
 
-        # 1) Monta dicionário no formato "interface" (flexível, sem root comum)
+        # 1) Monta parâmetros
         params, errs = build_interface_params(images_data, seg_data)
         if errs:
-            return "Errors:\n- " + "\n- ".join(sorted(set(errs)))
+            hide_stop = {"marginLeft": "8px", "color": "#b00020", "display": "none"}
+            return True, "", "Errors:\n- " + "\n- ".join(sorted(set(errs))), hide_stop
 
-        # 2) Executa o pipeline (run.py) no modo interface
+        # 2) Define arquivo único desta execução e zera o progresso
+        PROGRESS_FILE = os.path.join(tempfile.gettempdir(), f"_fornma_progress_{uuid4().hex}.json")
         try:
-            run_pipeline(params, preview=preview)  # chama seu run()
-        except Exception as e:
-            return f"Run failed:\n{e}"
+            with open(PROGRESS_FILE, "w") as f:
+                json.dump({
+                    "status": "starting",
+                    "total": 0,
+                    "done": 0,
+                    "percent": 0,
+                    "cancel": False,
+                    "started_at": datetime.now().isoformat(timespec="seconds")
+                }, f)
+        except Exception:
+            pass
 
-        # 3) Mensagem simples de sucesso
-        action = "PREVIEW" if preview else "RUN"
+        # 3) Thread do trabalho pesado
+        def _worker():
+            global PROGRESS_FILE
+            try:
+                os.environ["FORNMA_PROGRESS_FILE"] = PROGRESS_FILE
+                run_pipeline(params, preview=preview)
+
+                # não sobrescreve erro/cancel
+                try:
+                    with open(PROGRESS_FILE, "r") as f:
+                        d = json.load(f)
+                except Exception:
+                    d = {}
+                if d.get("status") not in ("error", "canceled"):
+                    d.update({"status": "done", "percent": 100})
+                    with open(PROGRESS_FILE, "w") as f:
+                        json.dump(d, f)
+            except Exception as e:
+                with open(PROGRESS_FILE, "w") as f:
+                    json.dump({"status": "error", "message": str(e)}, f)
+            finally:
+                # dá tempo do polling ler o último estado e remove o arquivo
+                try:
+                    time.sleep(1.0)
+                    if PROGRESS_FILE and os.path.exists(PROGRESS_FILE):
+                        os.remove(PROGRESS_FILE)
+                except Exception:
+                    pass
+                PROGRESS_FILE = None  # solta o caminho para a próxima execução
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+        # 4) Liga polling + header + mostra Stop
         chans = [k.replace("Channel ", "") for k in params.keys() if k.startswith("Channel ")]
-        return "\n".join([
-            f"{action} finished.",
-            f"Channels: {', '.join(chans)}",
+        action = "PREVIEW" if preview else "RUN"
+        header = "\n".join([
+            f"{action} started…",
+            f"Channels: {', '.join(chans) if chans else '—'}",
             f"Nuclei channel: {params['global'].get('channel_with_nuclei') or '—'}",
             f"Output: {params['global'].get('output_folder', 'results')}",
         ])
+        show_stop = {"marginLeft": "8px", "color": "#b00020", "display": "inline-block"}
+        return False, "", header, show_stop
 
     # --- SYNC: escreve todas as opções de segmentação no store-seg
     @app.callback(
@@ -531,6 +610,12 @@ def create_app():
         Input({"type": "seg-field", "group": "filters", "name": "maximum_radius"}, "value"),
         # SAVE PATH (campo de texto/botão de browse)
         Input("save-path", "value"),
+        # +++ ADICIONE ISSO AO DECORATOR +++
+        Input({"type": "ch-field", "ch": ALL, "name": ALL}, "value"),
+        State({"type": "ch-field", "ch": ALL, "name": ALL}, "id"),
+        Input({"type": "ch-flag", "ch": ALL, "name": ALL}, "value"),
+        State({"type": "ch-flag", "ch": ALL, "name": ALL}, "id"),
+
         prevent_initial_call=False,
     )
     def _sync_seg_store(
@@ -539,7 +624,7 @@ def create_app():
             f_th, f_off, f_blur, f_adj, f_cut, f_findlow, f_weak,
             c_diam, c_flow, c_mask, c_cellprob, c_gpu, c_invert,
             fl_shape, fl_ecc, fl_min_sz, fl_max_sz, fl_min_r, fl_max_r,
-            save_path,
+            save_path, perch_field_vals, perch_field_ids, perch_flag_vals, perch_flag_ids
     ):
         seg_data = {
             "general": {
@@ -584,7 +669,109 @@ def create_app():
                 "maximum_radius": fl_max_r,
             },
         }
+        # --- mapear valores POR CANAL vindos dos componentes dinâmicos
+        channels_map = {}
+
+        def _put(ch, name, val):
+            if ch is None or name is None:
+                return
+            channels_map.setdefault(ch, {})[name] = val
+
+        # Campos numéricos/inputs (rolling_ball_radius, ring_size, foci_* etc.)
+        for comp_id, val in zip(perch_field_ids or [], perch_field_vals or []):
+            if isinstance(comp_id, dict):
+                _put(comp_id.get("ch"), comp_id.get("name"), val)
+
+        # Toggles/switches (remove_background, rescale_intensity, match_histograms, use_ellipse, etc.)
+        for comp_id, val in zip(perch_flag_ids or [], perch_flag_vals or []):
+            if isinstance(comp_id, dict):
+                _put(comp_id.get("ch"), comp_id.get("name"), bool(val))
+
+        # Salva no store-seg (sem perder o que já existe)
+        seg_data = dict(seg_data or {})
+        seg_data["channels"] = channels_map
+
         return seg_data
+
+    # --- POLLING: lê o arquivo de progresso e atualiza a UI
+    @app.callback(
+        Output("seg-progress", "value"),
+        Output("seg-progress-text", "children"),
+        Output("seg-log", "children"),
+        Output("seg-poll", "disabled"),
+        Output("btn-stop", "style", allow_duplicate=True),
+        Input("seg-poll", "n_intervals"),
+        prevent_initial_call=True
+    )
+    def _poll_progress(_n):
+        show_stop = {"marginLeft": "8px", "color": "#b00020", "display": "inline-block"}
+        hide_stop = {"marginLeft": "8px", "color": "#b00020", "display": "none"}
+
+        # se ainda não foi definido ou já foi removido → nada rodando
+        if not PROGRESS_FILE or not os.path.exists(PROGRESS_FILE):
+            return no_update, no_update, no_update, True, hide_stop
+
+        try:
+            with open(PROGRESS_FILE, "r") as f:
+                d = json.load(f)
+        except Exception:
+            # erro de leitura → desliga polling nesta batida
+            return no_update, no_update, no_update, True, hide_stop
+
+        status = d.get("status", "running")
+        percent = int(d.get("percent", 0))
+        total = d.get("total")
+        done = d.get("done")
+        msg = d.get("message", "")
+        log = d.get("log", "")
+
+        # texto amigável
+        if isinstance(done, int) and isinstance(total, int) and total > 0:
+            text = f"{done}/{total} ({percent}%)"
+        else:
+            text = f"{percent}%"
+
+        if status == "error":
+            out_log = f"Run failed:\n{msg or log or 'Unknown error.'}"
+            return percent, "Error", out_log, True, hide_stop
+
+        if status == "canceled":
+            return percent, "Canceled", (log or "Canceled by user."), True, hide_stop
+
+        if status == "done":
+            return 100, "100% (done)", (log or "Finished."), True, hide_stop
+
+        # running/starting → mantém polling e mostra Stop
+        return percent, text, (log or ""), False, show_stop
+
+    @app.callback(
+        Output("seg-log", "children", allow_duplicate=True),
+        Output("seg-poll", "disabled", allow_duplicate=True),
+        Output("btn-stop", "style", allow_duplicate=True),
+        Input("btn-stop", "n_clicks"),
+        prevent_initial_call=True
+    )
+    def _on_stop(n):
+        hide_stop = {"marginLeft": "8px", "color": "#b00020", "display": "none"}
+        if not n:
+            return no_update, no_update, hide_stop
+
+        try:
+            d = {}
+            if os.path.exists(PROGRESS_FILE):
+                with open(PROGRESS_FILE, "r") as f:
+                    try:
+                        d = json.load(f)
+                    except Exception:
+                        d = {}
+            # marca cancel
+            d.update({"cancel": True, "status": d.get("status", "running")})
+            with open(PROGRESS_FILE, "w") as f:
+                json.dump(d, f)
+
+            return "Stopping… requested. Waiting current image to finish.", False, hide_stop
+        except Exception as e:
+            return f"Stop failed: {e}", False, hide_stop
 
     return app
 

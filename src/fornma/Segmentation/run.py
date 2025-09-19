@@ -4,8 +4,10 @@ Created on Wed Aug 4 14:25:56 2021
 
 @author: Luiza
 
-File that puts all functions together 
+File that puts all functions together
 """
+import json
+import time
 import os
 import pandas as pd
 from typing import Any, Union, List, Tuple
@@ -14,9 +16,11 @@ from .analyze import analyze_dict
 from .df_managing.organize import (
     filter_dataframe, get_foci_df, split_dfs
 )
+import os
+from fornma.gui.utils.progress import update_progress, cancel_requested
+
 
 pd.options.mode.chained_assignment = None  # default='warn'
-
 
 def rename_channel_parameters(channel_parameters: dict) -> dict:
     """ Renames parameter dictionary keys"""
@@ -158,8 +162,8 @@ def create_folder_dict(
 ) -> dict:
     """
     Returns the subfolders and a dictionary for a folder where:
-        key = channel name 
-        values = [ list, dict, bool] 
+        key = channel name
+        values = [ list, dict, bool]
             values[0]: a list with all folders in a given channel (each folder can be a field or a treatment condition,
             for example)
             values[1]: the param_dict for this channel
@@ -209,7 +213,7 @@ def check_size(ch_dict: dict) -> bool:
 
 def is_file_supported(subfolder_dict: dict,
                       preview: bool,
-                      ) -> tuple[list[list[Any]], Union[int, Any]]:
+                      ) -> list:
     """ Checks if all images within image folders are supported file formats."""
     supported_files = ['.bmp', '.dib', '.jpeg', '.jpg', '.jpe', '.jp2', '.png',
                        '.webp', '.pbm', '.pgm', '.ppm', '.pxm', '.pnm', '.sr',
@@ -226,6 +230,8 @@ class MockSignal:
     def emit(self, *args, **kwargs):
         return
 
+class _CanceledError(RuntimeError):
+    pass
 
 def run(parameters_dict: dict,
         preview: bool = False,
@@ -234,7 +240,9 @@ def run(parameters_dict: dict,
     Gets all user inputs and applies them to analyze all folders and subfolders.
     Then filters results, draws images (if requested) and saves all results.
     """
+    prog = os.environ.get("FORNMA_PROGRESS_FILE")
 
+    # --- prepara parâmetros no formato "interface" OU "toml" clássico
     if list(parameters_dict.keys())[0] == 'global':
         wants_to_save, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict = \
             adjust_parameters_interface(parameters_dict)
@@ -252,19 +260,109 @@ def run(parameters_dict: dict,
         if len(conditions) != len(subfolders):
             conditions = [False] * len(subfolders)
 
-    for i in range(len(subfolders)):
-        subfolder_dict = create_subfolder_dict(folder_dict, i)
-        if not check_size(subfolder_dict):
-            raise Exception("The folders contain different image numbers")
-
-        not_supported = is_file_supported(subfolder_dict, preview)
-        if len(not_supported) != 0:
-            message = f'The following files are not supported by forNMA. Remove them from your folders an try again.\n' \
-                      f'{not_supported}'
-            print(message)
+    # --- total de imagens (somando todas as subpastas) para progresso fino
+    total_images = 0
+    for i_probe in range(len(subfolders)):
+        if cancel_requested(prog):
+            update_progress(prog, status="canceled", log="Canceled before counting images.")
             return None
-        analyze_dict(subfolder_dict, segment_dict, overtime, conditions[i], preview, ch_name_list,
-                     path_to_save, wants_to_save, subfolders[i])
+        probe_dict = create_subfolder_dict(folder_dict, i_probe)
+        if not check_size(probe_dict):
+            continue
+        fk = next(iter(probe_dict.keys()))
+        n_all = len(probe_dict[fk][0])
+        n_used = 5 if (preview and n_all > 10) else n_all
+        total_images += n_used
 
-    return print('finshed!')
+    done = 0
+    update_progress(prog, status="running", total=int(total_images), done=int(done), percent=0, log="Starting…")
+
+    try:
+        for i in range(len(subfolders)):
+            # checagem cooperativa antes de iniciar a subpasta
+            if cancel_requested(prog):
+                update_progress(prog, status="canceled", done=int(done), log="Canceled before processing subfolders.")
+                return None
+
+            subfolder_dict = create_subfolder_dict(folder_dict, i)
+            if not check_size(subfolder_dict):
+                update_progress(prog, status="error", done=int(done),
+                                log="The folders contain different image numbers")
+                raise Exception("The folders contain different image numbers")
+
+            not_supported = is_file_supported(subfolder_dict, preview)
+            if len(not_supported) != 0:
+                message = (
+                    "The following files are not supported by forNMA. "
+                    "Remove them from your folders and try again.\n"
+                    f"{not_supported}"
+                )
+                print(message)
+                update_progress(prog, status="error", done=int(done), log=message)
+                return None
+
+            # === progresso por imagem COM UMA chamada a analyze_dict ===
+            # número de imagens nessa subpasta (mesmo para todos os canais)
+            first_key = next(iter(subfolder_dict.keys()))
+            n_all = len(subfolder_dict[first_key][0])
+            n_imgs = 5 if (preview and n_all > 10) else n_all
+
+            # callback chamado pelo analyze_dict após cada imagem processada
+            sub_done = 0
+            def make_progress_cb(subfolder_name, n_in_sub):
+                nonlocal sub_done, done, total_images
+                def _cb():
+                    # checagem de cancelamento A CADA IMAGEM
+                    if cancel_requested(prog):
+                        # interrompe imediatamente a função chamadora (analyze_dict)
+                        raise _CanceledError("Canceled by user")
+
+                    nonlocal sub_done, done
+                    sub_done += 1
+                    done += 1
+                    percent = int((done / max(total_images, 1)) * 100)
+                    update_progress(
+                        prog,
+                        status="running",
+                        total=int(total_images),
+                        done=int(done),
+                        percent=percent,
+                        log=f"{subfolder_name} — image {sub_done}/{n_in_sub}"
+                    )
+                return _cb
+            progress_cb = make_progress_cb(subfolders[i], n_imgs)
+
+            # chama analyze_dict UMA vez por subpasta; se não aceitar progress_cb, faz fallback
+            try:
+                analyze_dict(
+                    subfolder_dict, segment_dict, overtime, conditions[i], preview, ch_name_list,
+                    path_to_save, wants_to_save, subfolders[i],
+                    progress_cb=progress_cb  # <— versão nova com callback
+                )
+            except TypeError:
+                # Versão antiga do analyze_dict (sem progress_cb)
+                analyze_dict(
+                    subfolder_dict, segment_dict, overtime, conditions[i], preview, ch_name_list,
+                    path_to_save, wants_to_save, subfolders[i]
+                )
+                done += n_imgs
+                percent = int((done / max(total_images, 1)) * 100)
+                update_progress(
+                    prog,
+                    status="running",
+                    total=int(total_images),
+                    done=int(done),
+                    percent=percent,
+                    log=f"{subfolders[i]} — finished ({n_imgs} images)"
+                )
+
+        # finaliza progresso com sucesso
+        update_progress(prog, status="done", done=int(total_images), percent=100, log="Finished.")
+        print("finished!")
+        return None
+
+    except _CanceledError:
+        # encerramento limpo quando o usuário clica Stop
+        update_progress(prog, status="canceled", done=int(done), log=f"Canceled at subfolder '{subfolders[i]}'")
+        return None
 

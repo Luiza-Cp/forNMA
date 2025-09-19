@@ -792,6 +792,8 @@ def build_sidebar():
                     html.Hr(style={"margin": "8px 0"}),
                     html.Button("Preview", id="btn-preview"),
                     html.Button("Run", id="btn-run", style={"marginLeft": "8px"}),
+                    html.Button("Stop", id="btn-stop", style={"marginLeft": "8px", "color": "#b00020", "display": "none" }, ),
+
                 ],
             ),
 

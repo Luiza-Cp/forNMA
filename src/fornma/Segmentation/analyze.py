@@ -7,7 +7,7 @@ Created on Sun May 16 20:11:52 2021
 import numpy as np
 import os
 import pandas as pd
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 import cv2 as cv
 
 from pandas import DataFrame
@@ -210,9 +210,13 @@ def saving_images(df_draw: pd.DataFrame,
     return None
 
 
+from typing import Optional, Callable, List
+from pandas import DataFrame
+import os
+
 def analyze_dict(
         subfolder_dict: dict,  # dict of every channel
-        segment_dict: dict,  # dict of global parameters
+        segment_dict: dict,    # dict of global parameters
         is_overtime: bool,
         condition: Optional[str],
         preview: bool,
@@ -220,24 +224,33 @@ def analyze_dict(
         path_to_save: str,
         wants_to_save: bool,
         subfolder_images_in: str,
-
+        progress_cb: Optional[Callable[[], None]] = None
 ) -> Union[bool, DataFrame]:
     """
-    Given a dictionary containing information about each image channel analysis  and the parameters used to perform cell
-     segmentation, returns a dataframe containing the measurements and contours of each cell in every channel.
+    Given a dictionary containing information about each image channel analysis and the parameters used to perform cell
+    segmentation, returns a dataframe containing the measurements and contours of each cell in every channel.
     This function is responsible for organizing all measuring functions.
     """
     ref_dict = {}  # reference images for matching histograms
+    ch_segment = None
     for key, value in subfolder_dict.items():
         if value[2]:
             ch_segment = key
         ref_dict[key] = load_image(value[0][0]) if value[1]['match_hist'] else None
 
+    # segurança: se nada foi marcado para segmentar, escolhe o primeiro canal
+    if ch_segment is None:
+        ch_segment = next(iter(subfolder_dict.keys()))
+
     all_df_list = []  # all dataframes to be concatenated
-    total_images = len((list(subfolder_dict.values())[0][0]))  # number of images in the folder
-    # if running on preview mode, analyzes just the first 5 images of each folder
-    total_images = 5 if preview and total_images > 10 else total_images
-    for img_n in track(range(total_images), description=f'Analyzing {subfolder_images_in} images...'):
+
+    # número total de imagens nessa subpasta
+    total_images = len(list(subfolder_dict.values())[0][0])
+    # aplica a mesma regra do preview (limite) para não desalinhar com o run.py
+    n_imgs_used = 5 if (preview and total_images > 10) else total_images
+
+    # se você usa rich.progress.track, mantém:
+    for img_n in track(range(n_imgs_used), description=f'Analyzing {subfolder_images_in} images...'):
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
 
         cellpose = segment_dict['use_cellpose']
@@ -259,34 +272,38 @@ def analyze_dict(
                 resample=segment_dict['resample'],
                 flow_threshold=segment_dict['flow_threshold'],
                 cellprob_threshold=segment_dict['cellprob_threshold']
-                                   )
-
-
+            )
         else:  # calls forNMA pipeline
-            contours = fornma_contour_finding(img_to_segment,
-                                              magnification=segment_dict['magnification'],
-                                              pixel_size=segment_dict['pixel_size'],
-                                              rescale_intensity=segment_dict['rescale_intensity'],
-                                              remove_bg=segment_dict['remove_bg'],
-                                              radius_bg=segment_dict['radius_bg'],
-                                              threshold=segment_dict['threshold'],
-                                              offset=segment_dict['offset'],
-                                              blur=segment_dict['blur'],
-                                              adjust_size=segment_dict['adjust_size'],
-                                              cut_edges=segment_dict['cut_edges'],
-                                              shape=segment_dict['shape'],
-                                              eccentricity=segment_dict['eccentricity'],
-                                              min_size=segment_dict['min_size'],
-                                              max_size=segment_dict['max_size'],
-                                              min_radius=segment_dict['min_radius'],
-                                              max_radius=segment_dict['max_radius'],
-                                              fast_detection=segment_dict['fast_detection'],
-                                              weakly_labeled=segment_dict['weakly_labeled'])
+            contours = fornma_contour_finding(
+                img_to_segment,
+                magnification=segment_dict['magnification'],
+                pixel_size=segment_dict['pixel_size'],
+                rescale_intensity=segment_dict['rescale_intensity'],
+                remove_bg=segment_dict['remove_bg'],
+                radius_bg=segment_dict['radius_bg'],
+                threshold=segment_dict['threshold'],
+                offset=segment_dict['offset'],
+                blur=segment_dict['blur'],
+                adjust_size=segment_dict['adjust_size'],
+                cut_edges=segment_dict['cut_edges'],
+                shape=segment_dict['shape'],
+                eccentricity=segment_dict['eccentricity'],
+                min_size=segment_dict['min_size'],
+                max_size=segment_dict['max_size'],
+                min_radius=segment_dict['min_radius'],
+                max_radius=segment_dict['max_radius'],
+                fast_detection=segment_dict['fast_detection'],
+                weakly_labeled=segment_dict['weakly_labeled']
+            )
 
         contours = [f for f in contours if len(f) > 5]  # remove contours with less than 5 points
-        if len(contours) == 0:  # skips execution if there are no contours
+
+        if len(contours) == 0:
+            # imagem “vazia”: mesmo assim contamos 1 passo de progresso
             message = f'Image {os.path.basename(img_to_segment)} has no objects.'
             print(message)
+            if progress_cb is not None:
+                progress_cb()
             continue
 
         image_df = perform_measure(contours, img_n, subfolder_dict, ref_dict, segment_dict)
@@ -295,15 +312,19 @@ def analyze_dict(
         image_df['origin_folder'] = subfolder_images_in
         image_df = image_df.reset_index(drop=True)
         image_df = drop_cols(image_df, subfolder_dict)  # drop columns
-        # now the complete df is split in smaller ones and saved
 
+        # split e salvamento
         df_results, df_draw = split_dfs(image_df, ch_name_list)
         df_draw['use_cellpose'] = cellpose
         draw = df_draw if wants_to_save else None
         save_dfs(df_results, path_to_save, draw)
 
-        # save images
-        saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose']) if wants_to_save else None
-        # foci pkl object is generated here
+        # save images, se habilitado
+        if wants_to_save:
+            saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose'])
+
+        # 🔔 tick de progresso por imagem processada
+        if progress_cb is not None:
+            progress_cb()
 
     return None

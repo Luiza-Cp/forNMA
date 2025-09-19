@@ -34,6 +34,7 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
 
     images = images_data or {}
     seg    = seg_data or {}
+    per_channel = seg.get("channels", {})  # <- NOVO
 
     channels = images.get("channels", [])       # [{"id":"ch1","name":"Channel 1"}, ...]
     rows     = images.get("rows", [])           # [{"condition":"...", "ch1":"/abs/..", ...}, ...]
@@ -55,7 +56,20 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     filters      = seg.get("filters", {})
 
     # Saída e canal com núcleos (no modo interface, é NOME do canal)
-    output_folder = general.get("path_to_save") or "results"
+    # Saving path é obrigatório
+    output_folder = (general.get("path_to_save") or "").strip()
+    if not output_folder:
+        errors.append("Saving path is required. Fill the 'Saving path' field before running.")
+        return {}, errors
+
+    # (opcional, recomendado) tentar criar a pasta se não existir
+    import os
+    try:
+        os.makedirs(output_folder, exist_ok=True)
+    except Exception as e:
+        errors.append(f"Cannot create/access saving path: {e}")
+        return {}, errors
+
     ch_nuc_id = general.get("channel_with_nuclei")
     channel_with_nuclei = None
     if ch_nuc_id in ch_ids:
@@ -116,7 +130,32 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
             cond_to_path[cond] = p
 
         ch_dict = dict(_CHANNEL_DEFAULTS)
+
+        # overrides vindos do store-seg (se existirem) — mapeia nomes da UI p/ nomes do pipeline
+        ov = per_channel.get(ch_id, {})
+
+        # básicos
+        if "rescale_intensity" in ov: ch_dict["rescale_intensity"] = bool(ov["rescale_intensity"])
+        if "remove_background" in ov: ch_dict["remove_bg"] = bool(ov["remove_background"])
+        if "rolling_ball_radius" in ov: ch_dict["radius_bg"] = ov["rolling_ball_radius"]
+        if "match_histograms" in ov: ch_dict["match_hist"] = bool(ov["match_histograms"])
+
+        # translocation / ring
+        if "ring_size" in ov: ch_dict["ring_size"] = ov["ring_size"]
+        if "use_ellipse" in ov: ch_dict["use_ellipse"] = bool(ov["use_ellipse"])
+
+        # foci
+        if "wants_foci" in ov: ch_dict["wants_foci"] = bool(ov["wants_foci"])
+        if "foci_min_size" in ov: ch_dict["foci_min_size"] = ov["foci_min_size"]
+        if "foci_max_size" in ov: ch_dict["foci_max_size"] = ov["foci_max_size"]
+        if "foci_min_int" in ov: ch_dict["foci_min_int"] = ov["foci_min_int"]
+        if "foci_max_int" in ov: ch_dict["foci_max_int"] = ov["foci_max_int"]
+        if ("foci_prominence" in ov) or ("foci_proeminence" in ov):
+            ch_dict["foci_proeminence"] = ov.get("foci_prominence", ov.get("foci_proeminence"))
+
+        # por fim, os paths
         ch_dict["paths"] = cond_to_path
         params[f"Channel {ch_name}"] = ch_dict
+
 
     return params, errors
