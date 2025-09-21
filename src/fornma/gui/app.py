@@ -180,7 +180,8 @@ def create_app():
         # add other module sidebars here as needed
     ], id="left-pane", style={
         "width": "25%", "padding": "12px", "borderRight": "3px solid #2d5bd1",
-        "background": "#eef2ff", "height": "100vh", "overflowY": "auto"
+        "background": "#eef2ff", "height": "100vh", "overflowY": "auto",
+        "position": "relative", "zIndex": 2,
     })
 
     # stores
@@ -217,7 +218,13 @@ def create_app():
         html.Div([
             sidebars,  # left column (all sidebars)
             html.Div([tabs, html.Div(id="tab-content", style={"padding": "10px"})],
-                     style={"width": "75%", "padding": "10px", "height": "100vh", "overflow": "hidden"}),
+                     style={
+                         "width": "75%",
+                         "padding": "10px",
+                         "height": "100vh",
+                         "overflow": "hidden",
+                         "position": "relative",
+                         "zIndex": 1}),
         ], style={"display": "flex"}),
         modal
     ])

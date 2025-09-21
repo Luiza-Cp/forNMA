@@ -734,8 +734,30 @@ def build_sidebar():
                         target="label-save-path",
                         placement="right",
                     ),
-                    html.Div(id="summary-box", style={"whiteSpace": "pre-wrap", "marginTop": "8px"}),
+                    dbc.Accordion(
+                        [
+                            dbc.AccordionItem(
+                                html.Pre(
+                                    id="summary-box",
+                                    style={
+                                        "whiteSpace": "pre-wrap",
+                                        "margin": 0,
+                                        "maxHeight": "25vh",
+                                        "overflowY": "auto",
+                                        "fontFamily": "monospace",
+                                    },
+                                ),
+                                title="Image selection summary",
+                                item_id="summary",
+                            ),
+                        ],
+                        id="summary-accordion",
+                        start_collapsed=True,  # começa fechado
+                        always_open=True,  # permite manter vários itens abertos
+                        style={"marginTop": "8px"},
+                    ),
                     html.Hr(style={"margin": "8px 0"}),
+
                 ],
             ),
 
@@ -748,7 +770,13 @@ def build_sidebar():
                     "paddingRight": "3px",  # espaço pro scrollbar não colar no conteúdo
                 },
                 children=[
-                    # 👉 Os itens precisam estar dentro de um Accordion
+                    html.H6("Segmentation Settings", id="subtitle-segmentation-settings", className="text-muted mb-2"),
+                    dbc.Tooltip(
+                        "Configure global segmentation parameters here.",
+                        target="subtitle-segmentation-settings",
+                        placement="right",
+                    ),
+
                     dbc.Accordion(
                         id="seg-accordion",
                         start_collapsed=True,
