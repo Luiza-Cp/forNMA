@@ -20,6 +20,7 @@ from .segmentation.cellpose_integration import run_cellpose
 from .df_managing.organize import get_foci_df, split_dfs
 
 pd.options.mode.chained_assignment = None  # default='warn'
+from fornma.gui.utils.progress import update_progress
 
 
 def measure_image(
@@ -180,8 +181,13 @@ def draw_and_save(df: pd.DataFrame,
                 cnt = [f[0] for f in cnt if len(f) > 0] if use_cellpose or 'Cyto' in col else cnt
                 img = cv.drawContours(img, cnt, -1, (122, 144, 248), 1)
 
-
+        prog = os.environ.get("FORNMA_PROGRESS_FILE")
         cv.imwrite(os.path.join(saving_dir, name), img)
+        out_path = os.path.join(saving_dir, name)
+        update_progress(prog, preview_path=out_path)
+        preview_path = os.path.join(saving_dir, "_preview.png")
+        cv.imwrite(preview_path, img)  # faz uma cópia em PNG só para a UI
+        update_progress(prog, preview_path=preview_path)
 
     return None
 

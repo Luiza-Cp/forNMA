@@ -1,10 +1,9 @@
 # src/fornma/gui/app.py
-import os
 import webbrowser
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict
-import os
+import base64
 from dash import Dash, html, dcc, Input, Output, State, ALL, no_update, ctx
 import dash_bootstrap_components as dbc
 
@@ -16,6 +15,13 @@ from fornma.Segmentation.run import run as run_pipeline
 import json, threading, time, os
 from datetime import datetime
 PROGRESS_FILE = None  # definido quando o usuário inicia Preview/Run
+
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+try:
+    with open(ASSETS_DIR / "fornma_logo.png", "rb") as _lf:
+        DEFAULT_LOGO = "data:image/png;base64," + base64.b64encode(_lf.read()).decode("ascii")
+except Exception:
+    DEFAULT_LOGO = None  # se não achar o arquivo, a <img> fica sem src inicial
 
 
 # --- util: native dialog to pick folders (100% local)
@@ -234,33 +240,96 @@ def create_app():
         elif tab == "tab-registration":
             return html.Div([html.H4("Image Registration module"), html.P("Coming soon...")])
         elif tab == "tab-segmentation":
-            # Área da DIREITA (fora da sidebar) com barra de progresso e log
             return html.Div(
                 [
                     html.H4("Segmentation — progress & logs"),
-                    dbc.Progress(
-                        id="seg-progress",
-                        value=0,
-                        max=100,
-                        striped=True,
-                        animated=True,
-                        style={"height": "22px"}
+
+                    # Wrapper controlado pelo teu callback (ele liga/desliga aqui)
+                    html.Div(
+                        id="seg-run-ui",
+                        children=[
+                            # Container interno em GRID: imagem (70vh) + rodapé (12vh)
+                            html.Div(
+                                id="seg-grid",
+                                children=[
+                                    # ===== ÁREA DA IMAGEM (altura MÁX de 70vh) =====
+                                    html.Div(
+                                        id="seg-stage",
+                                        children=html.Img(
+                                            id="seg-live-img",
+                                            src=DEFAULT_LOGO,  # logo até sair a 1ª preview
+                                            style={
+                                                "width": "100%",
+                                                "height": "100%",
+                                                "maxHeight": "100%",
+                                                "objectFit": "contain",
+                                                "background": "#000",
+                                                "border": "1px solid #222",
+                                                "display": "block",
+                                            },
+                                            title="Latest saved image",
+                                        ),
+                                        style={
+                                            "minHeight": 0,
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                            "justifyContent": "center",
+                                        },
+                                    ),
+
+                                    # ===== RODAPÉ (BARRA DE PROGRESSO) — 12vh fixo =====
+                                    html.Div(
+                                        id="seg-footer",
+                                        children=[
+                                            dbc.Progress(
+                                                id="seg-progress",
+                                                value=0, max=100,
+                                                striped=True, animated=True,
+                                                style={"height": "22px"},
+                                            ),
+                                            html.Div(
+                                                id="seg-progress-text",
+                                                style={"marginTop": "6px", "fontFamily": "monospace"},
+                                            ),
+                                        ],
+                                        style={
+                                            "display": "flex",
+                                            "flexDirection": "column",
+                                            "justifyContent": "center",
+                                            "gap": "6px",
+                                        },
+                                    ),
+                                ],
+                                # <<< tamanhos travados em viewport >>>
+                                style={
+                                    "height": "82vh",  # total do painel
+                                    "width": "100%",
+                                    "boxSizing": "border-box",
+                                    "overflow": "hidden",
+                                    "display": "grid",
+                                    "gridTemplateRows": "70vh 12vh",  # imagem + rodapé
+                                    "rowGap": "8px",
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "none",  # teu callback alterna para "block"
+                            "width": "100%",
+                            "maxWidth": "100%",
+                            "overflow": "hidden",
+                        },
                     ),
-                    html.Div(id="seg-progress-text", style={"marginTop": "6px", "fontFamily": "monospace"}),
+
                     html.Hr(),
                     html.Pre(
                         id="seg-log",
-                        style={"whiteSpace": "pre-wrap", "maxHeight": "55vh", "overflowY": "auto"}
+                        style={"whiteSpace": "pre-wrap", "maxHeight": "55vh", "overflowY": "auto"},
                     ),
-                    # Interval para fazermos o polling do progresso (inicia DESLIGADO)
-                    dcc.Interval(id="seg-poll", interval=800, disabled=True)
-                ],
-                style={"padding": "8px"}
-            )
 
-        elif tab == "tab-stats":
-            return html.Div([html.H4("Statistics module"), html.P("Coming soon...")])
-        return html.Div()
+                    dcc.Interval(id="seg-poll", interval=800, disabled=True),
+                ],
+                style={"padding": "8px"},
+            )
 
     # --- OPEN/CLOSE MODAL
     @app.callback(
@@ -694,55 +763,60 @@ def create_app():
         return seg_data
 
     # --- POLLING: lê o arquivo de progresso e atualiza a UI
+    from dash import no_update
+    import os, json, base64
+
     @app.callback(
-        Output("seg-progress", "value"),
-        Output("seg-progress-text", "children"),
-        Output("seg-log", "children"),
-        Output("seg-poll", "disabled"),
-        Output("btn-stop", "style", allow_duplicate=True),
+        Output("seg-live-img", "src"),  # 1º
+        Output("seg-progress", "value"),  # 2º
+        Output("seg-progress-text", "children"),  # 3º
+        Output("seg-log", "children"),  # 4º
+        Output("seg-poll", "disabled"),  # 5º
+        Output("btn-stop", "style", allow_duplicate=True),  # 6º
         Input("seg-poll", "n_intervals"),
         prevent_initial_call=True
     )
     def _poll_progress(_n):
-        show_stop = {"marginLeft": "8px", "color": "#b00020", "display": "inline-block"}
-        hide_stop = {"marginLeft": "8px", "color": "#b00020", "display": "none"}
+        img_src = no_update
+        hide_stop = {"display": "none"}
+        show_stop = {"display": "inline-block"}
 
-        # se ainda não foi definido ou já foi removido → nada rodando
+        # Se o arquivo ainda não existe, esconda stop e desabilite polling
         if not PROGRESS_FILE or not os.path.exists(PROGRESS_FILE):
-            return no_update, no_update, no_update, True, hide_stop
+            return img_src, no_update, no_update, no_update, True, hide_stop
 
+        # Carrega o JSON de progresso
         try:
             with open(PROGRESS_FILE, "r") as f:
                 d = json.load(f)
         except Exception:
-            # erro de leitura → desliga polling nesta batida
-            return no_update, no_update, no_update, True, hide_stop
+            # Não conseguiu ler -> trate como “sem progresso”
+            return img_src, no_update, no_update, no_update, True, hide_stop
+
+        # Se chegou aqui, 'd' existe
+        preview_path = d.get("preview_path")
+        if preview_path and os.path.exists(preview_path):
+            try:
+                with open(preview_path, "rb") as pf:
+                    b64 = base64.b64encode(pf.read()).decode("ascii")
+                img_src = f"data:image/png;base64,{b64}"
+            except Exception:
+                pass  # não quebra a UI se a imagem falhar
 
         status = d.get("status", "running")
         percent = int(d.get("percent", 0))
-        total = d.get("total")
-        done = d.get("done")
-        msg = d.get("message", "")
-        log = d.get("log", "")
-
-        # texto amigável
-        if isinstance(done, int) and isinstance(total, int) and total > 0:
-            text = f"{done}/{total} ({percent}%)"
-        else:
-            text = f"{percent}%"
+        log = d.get("log", "") or ""
+        text = f"{percent}%"
 
         if status == "error":
-            out_log = f"Run failed:\n{msg or log or 'Unknown error.'}"
-            return percent, "Error", out_log, True, hide_stop
-
+            return img_src, percent, "Error", (log or "Unknown error."), True, hide_stop
         if status == "canceled":
-            return percent, "Canceled", (log or "Canceled by user."), True, hide_stop
-
+            return img_src, percent, "Canceled", (log or "Canceled by user."), True, hide_stop
         if status == "done":
-            return 100, "100% (done)", (log or "Finished."), True, hide_stop
+            return img_src, 100, "100% (done)", (log or "Finished."), True, hide_stop
 
-        # running/starting → mantém polling e mostra Stop
-        return percent, text, (log or ""), False, show_stop
+        # running / starting
+        return img_src, percent, text, log, False, show_stop
 
     @app.callback(
         Output("seg-log", "children", allow_duplicate=True),
@@ -772,6 +846,16 @@ def create_app():
             return "Stopping… requested. Waiting current image to finish.", False, hide_stop
         except Exception as e:
             return f"Stop failed: {e}", False, hide_stop
+
+    from dash import no_update
+
+    @app.callback(
+        Output("seg-run-ui", "style"),
+        Input("seg-poll", "disabled"),
+    )
+    def _toggle_seg_run_ui(disabled):
+        # se polling estiver ligado (disabled=False), mostra; caso contrário, esconde
+        return {"display": "none"} if disabled else {"display": "block"}
 
     return app
 
