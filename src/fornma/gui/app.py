@@ -244,28 +244,32 @@ def create_app():
                 [
                     html.H4("Segmentation — progress & logs"),
 
-                    # Wrapper controlado pelo teu callback (ele liga/desliga aqui)
+                    # Wrapper sempre visível
                     html.Div(
                         id="seg-run-ui",
                         children=[
-                            # Container interno em GRID: imagem (70vh) + rodapé (12vh)
+                            # Container em GRID: imagem (70vh) + rodapé (12vh)
                             html.Div(
                                 id="seg-grid",
                                 children=[
-                                    # ===== ÁREA DA IMAGEM (altura MÁX de 70vh) =====
+                                    # ===== ÁREA DA IMAGEM (70vh máx) =====
                                     html.Div(
                                         id="seg-stage",
                                         children=html.Img(
                                             id="seg-live-img",
-                                            src=DEFAULT_LOGO,  # logo até sair a 1ª preview
+                                            src=DEFAULT_LOGO,  # logo até aparecer 1ª preview
                                             style={
-                                                "width": "100%",
-                                                "height": "100%",
-                                                "maxHeight": "100%",
-                                                "objectFit": "contain",
-                                                "background": "#000",
-                                                "border": "1px solid #222",
-                                                "display": "block",
+                                                "minHeight": 0,
+                                                "display": "flex",
+                                                "alignItems": "center",
+                                                "justifyContent": "center",
+                                                # 👇 logo sempre presente como fundo
+                                                "backgroundImage": f"url({DEFAULT_LOGO})",
+                                                "backgroundRepeat": "no-repeat",
+                                                "backgroundPosition": "center",
+                                                "backgroundSize": "contain",
+                                                "maxHeight": "70vh",
+                                                "maxWidth": "100%",
                                             },
                                             title="Latest saved image",
                                         ),
@@ -277,7 +281,7 @@ def create_app():
                                         },
                                     ),
 
-                                    # ===== RODAPÉ (BARRA DE PROGRESSO) — 12vh fixo =====
+                                    # ===== RODAPÉ (BARRA DE PROGRESSO) — 12vh =====
                                     html.Div(
                                         id="seg-footer",
                                         children=[
@@ -293,14 +297,13 @@ def create_app():
                                             ),
                                         ],
                                         style={
-                                            "display": "flex",
+                                            "display": "none",  # começa escondido, callback mostra
                                             "flexDirection": "column",
                                             "justifyContent": "center",
                                             "gap": "6px",
                                         },
                                     ),
                                 ],
-                                # <<< tamanhos travados em viewport >>>
                                 style={
                                     "height": "82vh",  # total do painel
                                     "width": "100%",
@@ -313,7 +316,7 @@ def create_app():
                             ),
                         ],
                         style={
-                            "display": "none",  # teu callback alterna para "block"
+                            "display": "block",  # painel sempre visível
                             "width": "100%",
                             "maxWidth": "100%",
                             "overflow": "hidden",
@@ -767,15 +770,16 @@ def create_app():
     import os, json, base64
 
     @app.callback(
-        Output("seg-live-img", "src"),  # 1º
-        Output("seg-progress", "value"),  # 2º
-        Output("seg-progress-text", "children"),  # 3º
-        Output("seg-log", "children"),  # 4º
-        Output("seg-poll", "disabled"),  # 5º
-        Output("btn-stop", "style", allow_duplicate=True),  # 6º
+        Output("seg-live-img", "src", allow_duplicate=True),  # <-- add allow_duplicate
+        Output("seg-progress", "value"),
+        Output("seg-progress-text", "children"),
+        Output("seg-log", "children"),
+        Output("seg-poll", "disabled"),
+        Output("btn-stop", "style", allow_duplicate=True),
         Input("seg-poll", "n_intervals"),
         prevent_initial_call=True
     )
+
     def _poll_progress(_n):
         img_src = no_update
         hide_stop = {"display": "none"}
@@ -851,11 +855,27 @@ def create_app():
 
     @app.callback(
         Output("seg-run-ui", "style"),
+        Output("seg-footer", "style"),
+        Output("seg-live-img", "src", allow_duplicate=True),
         Input("seg-poll", "disabled"),
+        prevent_initial_call=True,  # <-- obrigatório com allow_duplicate
     )
     def _toggle_seg_run_ui(disabled):
-        # se polling estiver ligado (disabled=False), mostra; caso contrário, esconde
-        return {"display": "none"} if disabled else {"display": "block"}
+        base = {"display": "block", "width": "100%", "maxWidth": "100%", "overflow": "hidden"}
+
+        if disabled:
+            # Não está rodando: esconde rodapé e força o logo no src
+            footer_hide = {"display": "none"}
+            return base, footer_hide, DEFAULT_LOGO
+        else:
+            # Rodando: mostra rodapé; não mexe no src (polling vai atualizar)
+            footer_show = {
+                "display": "flex",
+                "flexDirection": "column",
+                "justifyContent": "center",
+                "gap": "6px",
+            }
+            return base, footer_show, no_update
 
     return app
 
