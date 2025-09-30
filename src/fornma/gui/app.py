@@ -9,12 +9,19 @@ import dash_bootstrap_components as dbc
 
 from .layouts.segmentation import build_sidebar as build_segmentation_sidebar
 from .callbacks.segmentation import register as register_segmentation_callbacks
+from .callbacks.registration import register as register_registration_callbacks
+
 from fornma.gui.utils.params_builder import build_interface_params
 from fornma.Segmentation.run import run as run_pipeline
 
+from .layouts.registration import build_registration_sidebar
+
+
 import json, threading, time, os
 from datetime import datetime
-PROGRESS_FILE = None  # definido quando o usuário inicia Preview/Run
+
+PROGRESS_FILE = None
+
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 try:
@@ -43,7 +50,6 @@ def pick_directory_dialog() -> str:
 # --- initial table state (1 channel, 1 example row)
 def initial_table_state() -> Dict:
     return {
-        "channels": [{"id": "ch1", "name": "Channel 1"}],
         "channels": [{"id": "ch1", "name": "Channel 1"}],
         "rows": [
             {"condition": "Control", "ch1": ""}  # use channel ids as keys
@@ -176,6 +182,7 @@ def create_app():
 
         # SEGMENTATION sidebar (imported)
         build_segmentation_sidebar(),
+        build_registration_sidebar(),
 
         # add other module sidebars here as needed
     ], id="left-pane", style={
@@ -188,6 +195,8 @@ def create_app():
     store = dcc.Store(id="store-images", data=initial_table_state())
     store_seg = dcc.Store(id="store-seg", data={})
     store_clicks = dcc.Store(id="store-browse-clicks", data={})
+    store_reg = dcc.Store(id="store-reg", data={})
+    store_reg_progress = dcc.Store(id="reg-progress-file", storage_type="session")
 
     # --- IMAGES MODAL
     modal = dbc.Modal(
@@ -214,6 +223,8 @@ def create_app():
         store,
         store_seg,
         store_clicks,
+        store_reg,
+        store_reg_progress,
 
         html.Div([
             sidebars,  # left column (all sidebars)
@@ -244,8 +255,6 @@ def create_app():
             ])
         elif tab == "tab-tracking":
             return html.Div([html.H4("Tracking module"), html.P("Coming soon...")])
-        elif tab == "tab-registration":
-            return html.Div([html.H4("Image Registration module"), html.P("Coming soon...")])
         elif tab == "tab-segmentation":
             return html.Div(
                 [
@@ -340,20 +349,119 @@ def create_app():
                 ],
                 style={"padding": "8px"},
             )
+        elif tab == "tab-registration":
+            return html.Div(
+                [
+                    html.H4("Registration — progress & logs"),
+
+                    # Wrapper sempre visível (mesma estrutura do segmentation)
+                    html.Div(
+                        id="reg-run-ui",
+                        children=[
+                            html.Div(
+                                id="reg-grid",
+                                children=[
+                                    # ===== ÁREA DA LOGO (70vh máx) =====
+                                    html.Div(
+                                        id="reg-stage",
+                                        children=html.Img(
+                                            id="reg-live-img",
+                                            src=DEFAULT_LOGO,  # logo até existir preview (aqui ficará sempre a logo)
+                                            style={
+                                                "minHeight": 0,
+                                                "display": "flex",
+                                                "alignItems": "center",
+                                                "justifyContent": "center",
+                                                # 👇 usa o MESMO padrão do segmentation
+                                                "backgroundImage": f"url({DEFAULT_LOGO})",
+                                                "backgroundRepeat": "no-repeat",
+                                                "backgroundPosition": "center",
+                                                "backgroundSize": "contain",
+                                                "maxHeight": "70vh",
+                                                "maxWidth": "100%",
+                                            },
+                                            title="forNMA",
+                                        ),
+                                        style={
+                                            "minHeight": 0,
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                            "justifyContent": "center",
+                                        },
+                                    ),
+
+                                    # ===== RODAPÉ (BARRA DE PROGRESSO) — 12vh =====
+                                    html.Div(
+                                        id="reg-footer",
+                                        children=[
+                                            dbc.Progress(
+                                                id="reg-progress",
+                                                value=0, max=100,
+                                                striped=True, animated=True,
+                                                style={"height": "22px"},
+                                            ),
+                                            html.Div(
+                                                id="reg-progress-text",
+                                                style={"marginTop": "6px", "fontFamily": "monospace"},
+                                            ),
+                                        ],
+                                        style={
+                                            "display": "none",  # começa escondido; mostre quando iniciar o registro
+                                            "flexDirection": "column",
+                                            "justifyContent": "center",
+                                            "gap": "6px",
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "height": "82vh",
+                                    "width": "100%",
+                                    "boxSizing": "border-box",
+                                    "overflow": "hidden",
+                                    "display": "grid",
+                                    "gridTemplateRows": "70vh 12vh",
+                                    "rowGap": "8px",
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "block",
+                            "width": "100%",
+                            "maxWidth": "100%",
+                            "overflow": "hidden",
+                        },
+                    ),
+
+                    html.Hr(),
+                    html.Pre(
+                        id="reg-log",
+                        style={"whiteSpace": "pre-wrap", "maxHeight": "55vh", "overflowY": "auto"},
+                    ),
+
+                    
+
+                    # Timer para polling (deixe desabilitado até plugar o runner)
+                    dcc.Interval(id="reg-poll", interval=800, disabled=True),
+                ],
+                style={"padding": "8px"},
+            )
 
     # --- OPEN/CLOSE MODAL
+    # app.py  — SUBSTITUA o callback _toggle_modal atual por este:
+
     @app.callback(
         Output("images-modal", "is_open"),
         Output("table-container", "children"),
-        Input("btn-open-modal", "n_clicks"),
+        Input("btn-open-modal", "n_clicks"),  # botão da Segmentation (já existia)
+        Input("btn-open-modal-reg", "n_clicks"),  # << NOVO: botão da Registration
         Input("btn-close-modal", "n_clicks"),
         State("images-modal", "is_open"),
         State("store-images", "data"),
         prevent_initial_call=True
     )
-    def _toggle_modal(open_clicks, close_clicks, is_open, data):
+    def _toggle_modal(n_seg, n_reg, n_close, is_open, data):
         trig = ctx.triggered_id
-        if trig == "btn-open-modal":
+        if trig in ("btn-open-modal", "btn-open-modal-reg"):
             return True, render_table(data)
         elif trig == "btn-close-modal":
             return False, no_update
@@ -553,6 +661,7 @@ def create_app():
 
     # --- register segmentation module callbacks (collapse/options/value)
     register_segmentation_callbacks(app)
+    register_registration_callbacks(app,  pick_directory_dialog)
 
     # --- update counter in modal footer
     @app.callback(
