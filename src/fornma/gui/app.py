@@ -10,6 +10,9 @@ import dash_bootstrap_components as dbc
 from .layouts.segmentation import build_sidebar as build_segmentation_sidebar
 from .callbacks.segmentation import register as register_segmentation_callbacks
 from .callbacks.registration import register as register_registration_callbacks
+from .layouts.foci_overlay import build_sidebar as build_foci_sidebar
+from .callbacks.foci_overlay import register as register_foci_callbacks
+
 
 from fornma.gui.utils.params_builder import build_interface_params
 from fornma.Segmentation.run import run as run_pipeline
@@ -183,6 +186,7 @@ def create_app():
         # SEGMENTATION sidebar (imported)
         build_segmentation_sidebar(),
         build_registration_sidebar(),
+        build_foci_sidebar(),
 
         # add other module sidebars here as needed
     ], id="left-pane", style={
@@ -197,6 +201,8 @@ def create_app():
     store_clicks = dcc.Store(id="store-browse-clicks", data={})
     store_reg = dcc.Store(id="store-reg", data={})
     store_reg_progress = dcc.Store(id="reg-progress-file", storage_type="session")
+    store_foci = dcc.Store(id="store-foci", data={})
+    store_foci_progress = dcc.Store(id="foci-progress-file", storage_type="session")
 
     # --- IMAGES MODAL
     modal = dbc.Modal(
@@ -445,6 +451,75 @@ def create_app():
                 ],
                 style={"padding": "8px"},
             )
+        elif tab == "tab-foci-overlay":
+            return html.Div(
+                [
+                    html.H4("Foci Overlay — progress & logs"),
+                    html.Div(
+                        id="foci-run-ui",
+                        children=[
+                            html.Div(
+                                id="foci-grid",
+                                children=[
+                                    html.Div(
+                                        id="foci-stage",
+                                        children=html.Img(
+                                            id="foci-live-img",
+                                            src=DEFAULT_LOGO,
+                                            style={
+                                                "minHeight": 0,
+                                                "display": "flex",
+                                                "alignItems": "center",
+                                                "justifyContent": "center",
+                                                "backgroundImage": f"url({DEFAULT_LOGO})",
+                                                "backgroundRepeat": "no-repeat",
+                                                "backgroundPosition": "center",
+                                                "backgroundSize": "contain",
+                                                "maxHeight": "70vh",
+                                                "maxWidth": "100%",
+                                            },
+                                            title="forNMA",
+                                        ),
+                                        style={"minHeight": 0, "display": "flex", "alignItems": "center", "justifyContent": "center"},
+                                    ),
+                                    html.Div(
+                                        id="foci-footer-right",
+                                        children=[
+                                            dbc.Progress(
+                                                id="foci-progress",
+                                                value=0, max=100,
+                                                striped=True, animated=True,
+                                                style={"height": "22px"},
+                                            ),
+                                            html.Div(
+                                                id="foci-progress-text",
+                                                style={"marginTop": "6px", "fontFamily": "monospace"},
+                                            ),
+                                        ],
+                                        style={
+                                            "display": "none",
+                                            "flexDirection": "column",
+                                            "justifyContent": "center",
+                                            "gap": "6px",
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "height": "82vh", "width": "100%", "boxSizing": "border-box",
+                                    "overflow": "hidden", "display": "grid",
+                                    "gridTemplateRows": "70vh 12vh", "rowGap": "8px",
+                                },
+                            ),
+                        ],
+                        style={"display": "block", "width": "100%", "maxWidth": "100%", "overflow": "hidden"},
+                    ),
+                    html.Hr(),
+                    html.Pre(id="foci-log", style={"whiteSpace": "pre-wrap", "maxHeight": "55vh", "overflowY": "auto"}),
+                    dcc.Interval(id="foci-poll", interval=800, disabled=True),
+                ],
+                style={"padding": "8px"},
+            )
+
 
     # --- OPEN/CLOSE MODAL
     # app.py  — SUBSTITUA o callback _toggle_modal atual por este:
@@ -662,6 +737,8 @@ def create_app():
     # --- register segmentation module callbacks (collapse/options/value)
     register_segmentation_callbacks(app)
     register_registration_callbacks(app,  pick_directory_dialog)
+    register_foci_callbacks(app, pick_directory_dialog)
+
 
     # --- update counter in modal footer
     @app.callback(
@@ -992,6 +1069,23 @@ def create_app():
                 "gap": "6px",
             }
             return base, footer_show, no_update
+
+    @app.callback(
+        Output("foci-run-ui", "style"),
+        Output("foci-footer-right", "style"),
+        Output("foci-live-img", "src", allow_duplicate=True),
+        Input("foci-poll", "disabled"),
+        prevent_initial_call=True,
+    )
+    def _toggle_foci_run_ui(disabled):
+        base = {"display": "block", "width": "100%", "maxWidth": "100%", "overflow": "hidden"}
+        if disabled:
+            footer_hide = {"display": "none"}
+            return base, footer_hide, DEFAULT_LOGO
+        else:
+            footer_show = {"display": "flex", "flexDirection": "column", "justifyContent": "center", "gap": "6px"}
+            return base, footer_show, no_update
+
 
     return app
 
