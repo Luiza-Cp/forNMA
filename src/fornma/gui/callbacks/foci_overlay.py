@@ -1,9 +1,21 @@
-# src/fornma/gui/callbacks/foci_overlay.py
-from dash import Input, Output, State, no_update, ctx
 import json, os, time, threading, re, glob
 from datetime import datetime
+import pandas as pd
+from dash import Input, Output, State, no_update, ctx
 
-import pandas as pd  # <== necessário para ler o .pkl
+# >>> progress utils (seu arquivo)
+try:
+    from fornma.gui.utils.progress import update_progress, cancel_requested
+except Exception:
+    # fallback para desenvolvimento local, caso o path do pacote esteja diferente
+    from progress import update_progress, cancel_requested
+
+# >>> foci functions (tenta pelo pacote; se não, importa direto do arquivo)
+try:
+    from fornma.Foci_overlay.foci_overlay import foci_overlay as run_overlay_func, plot_profile as plot_profiles_func
+except Exception:
+    from foci_overlay import foci_overlay as run_overlay_func, plot_profile as plot_profiles_func
+
 
 def _extract_df_columns_from_pkl(pkl_path: str):
     """
@@ -131,108 +143,107 @@ def register(app, pick_directory_dialog):
     def _start_run(n, pkl_path, save_path, save_imgs, channels, actions):
         from uuid import uuid4
         import tempfile
-        global PROGRESS_FILE
 
-        if not n:
-            return no_update, no_update, no_update
-
-        errs = []
-        if not (pkl_path and os.path.isdir(pkl_path)):
-            errs.append("Pickle folder is missing or does not exist.")
-        if not save_path:
-            errs.append("Saving path is required.")
-        else:
-            try:
-                os.makedirs(save_path, exist_ok=True)
-            except Exception as e:
-                errs.append(f"Cannot create/access saving path: {e}")
-        if not channels:
-            errs.append("Select at least one channel.")
-        if not actions:
-            errs.append("Select at least one action (Overlay and/or Plot profiles).")
-
-        if errs:
-            hide_stop = {"marginLeft": "8px", "color": "#b00020", "display": "none"}
-            return True, "Errors:\n- " + "\n- ".join(errs), hide_stop
-
-        PROGRESS_FILE = os.path.join(tempfile.gettempdir(), f"_fornma_progress_{uuid4().hex}.json")
-        try:
-            with open(PROGRESS_FILE, "w") as f:
-                json.dump({
-                    "status": "starting", "total": 0, "done": 0, "percent": 0,
-                    "cancel": False, "started_at": datetime.now().isoformat(timespec="seconds"),
-                }, f)
-        except Exception:
-            pass
-
-        # Worker: executa as ações em sequência
-        def _worker():
-            global PROGRESS_FILE
-            try:
-                # Dividimos o progresso igualmente entre as ações selecionadas
-                steps_per_action = 100 // max(1, len(actions))
-                pct = 0
-
-                for action in actions:
-                    # Checa cancelamento
-                    if not PROGRESS_FILE or not os.path.exists(PROGRESS_FILE):
-                        break
-
-                    # >>> Plugue aqui as funções reais:
-                    # if action == "overlay":
-                    #     run_overlay(pkl_path, save_path, save_imgs, channels, progress_file=PROGRESS_FILE, pct_base=pct, pct_span=steps_per_action)
-                    # elif action == "profiles":
-                    #     plot_profiles(pkl_path, save_path, channels, progress_file=PROGRESS_FILE, pct_base=pct, pct_span=steps_per_action)
-
-                    # Simulação (remover quando plugar real)
-                    for k in range(0, steps_per_action + 1, max(1, steps_per_action // 10)):
-                        if not PROGRESS_FILE or not os.path.exists(PROGRESS_FILE):
-                            break
-                        with open(PROGRESS_FILE, "r") as f:
-                            d = json.load(f)
-                        if d.get("cancel"):
-                            d.update({"status": "canceled"})
-                            with open(PROGRESS_FILE, "w") as f:
-                                json.dump(d, f)
-                            return
-                        current_pct = min(100, pct + k)
-                        d.update({
-                            "status": "running",
-                            "percent": current_pct,
-                            "log": f"Running {action} — channels={channels} — {current_pct}%"
-                        })
-                        with open(PROGRESS_FILE, "w") as f:
-                            json.dump(d, f)
-                        time.sleep(0.25)
-
-                    pct = min(100, pct + steps_per_action)
-
-                # final
-                try:
-                    with open(PROGRESS_FILE, "r") as f:
-                        d = json.load(f)
-                except Exception:
-                    d = {}
-                if d.get("status") not in ("error", "canceled"):
-                    d.update({"status": "done", "percent": 100, "log": "Finished all actions."})
-                    with open(PROGRESS_FILE, "w") as f: json.dump(d, f)
-
-            except Exception as e:
-                with open(PROGRESS_FILE, "w") as f:
-                    json.dump({"status": "error", "message": str(e)}, f)
-            finally:
-                try:
-                    time.sleep(1.0)
-                    if PROGRESS_FILE and os.path.exists(PROGRESS_FILE):
-                        os.remove(PROGRESS_FILE)
-                except Exception:
-                    pass
-                PROGRESS_FILE = None
-
-        threading.Thread(target=_worker, daemon=True).start()
-
+        # estilos padrão que SEMPRE existem
+        hide_stop = {"marginLeft": "8px", "color": "#b00020", "display": "none"}
         show_stop = {"marginLeft": "8px", "color": "#b00020", "display": "inline-block"}
-        return False, "Starting…", show_stop
+
+        try:
+            if not n:
+                # 3 retornos SEMPRE
+                return no_update, no_update, hide_stop
+
+            # normaliza entradas
+            actions = actions or []
+            channels = channels or []
+
+            # validações
+            errs = []
+            if not (pkl_path and os.path.isdir(pkl_path)):
+                errs.append("Pickle folder is missing or does not exist.")
+            if not save_path:
+                errs.append("Saving path is required.")
+            else:
+                try:
+                    os.makedirs(save_path, exist_ok=True)
+                except Exception as e:
+                    errs.append(f"Cannot create/access saving path: {e}")
+            if not channels:
+                errs.append("Select at least one channel.")
+            if not actions:
+                errs.append("Select at least one action (Overlay and/or Plot profiles).")
+
+            if errs:
+                return True, "Errors:\n- " + "\n- ".join(errs), hide_stop
+
+            # cria/zera progress file
+            global PROGRESS_FILE
+            PROGRESS_FILE = os.path.join(tempfile.gettempdir(), f"_fornma_progress_{uuid4().hex}.json")
+            update_progress(
+                PROGRESS_FILE,
+                status="starting", total=0, done=0, percent=0, cancel=False,
+                started_at=datetime.now().isoformat(timespec="seconds"),
+                log="Initializing…"
+            )
+
+            # worker em thread
+            def _worker():
+                global PROGRESS_FILE
+                try:
+                    num_actions = max(1, len(actions))
+                    span = 100 // num_actions
+                    base = 0
+
+                    update_progress(PROGRESS_FILE, status="running", percent=0,
+                                    log=f"Starting… actions={actions}, channels={channels}")
+
+                    for action in actions:
+                        if cancel_requested(PROGRESS_FILE):
+                            update_progress(PROGRESS_FILE, status="canceled", log="Canceled by user.")
+                            return
+
+                        update_progress(PROGRESS_FILE, status="running", percent=base,
+                                        log=f"Running {action} — channels={channels}")
+
+                        if action == "overlay":
+                            run_overlay_func(
+                                pkl_results_folder_path=pkl_path,
+                                path_to_save=save_path,
+                                channel_list=channels or None,
+                            )
+                        elif action == "profiles":
+                            plot_profiles_func(
+                                path_pickle_data=pkl_path,
+                                path_save=save_path,
+                                columns=channels or None,
+                            )
+
+                        base = min(100, base + span)
+                        update_progress(PROGRESS_FILE, status="running", percent=base,
+                                        log=f"Finished {action}")
+
+                    update_progress(PROGRESS_FILE, status="done", percent=100,
+                                    log="Finished all actions.")
+
+                except Exception as e:
+                    update_progress(PROGRESS_FILE, status="error", message=str(e))
+                finally:
+                    try:
+                        time.sleep(0.8)
+                        if PROGRESS_FILE and os.path.exists(PROGRESS_FILE):
+                            os.remove(PROGRESS_FILE)
+                    except Exception:
+                        pass
+                    PROGRESS_FILE = None
+
+            threading.Thread(target=_worker, daemon=True).start()
+
+            # habilita polling, printa log inicial e mostra STOP
+            return False, "Starting…", show_stop
+
+        except Exception as e:
+            # Se QUALQUER coisa der errado, ainda assim retornamos 3 itens
+            return True, f"Setup failed: {e}", hide_stop
 
     # --- Polling (igual antes)
     @app.callback(
@@ -290,8 +301,10 @@ def register(app, pick_directory_dialog):
             pf = globals().get("PROGRESS_FILE")
             if pf and os.path.exists(pf):
                 with open(pf, "r") as f:
-                    try: d = json.load(f)
-                    except Exception: d = {}
+                    try:
+                        d = json.load(f)
+                    except Exception:
+                        d = {}
                 d.update({"cancel": True, "status": d.get("status", "running")})
                 with open(pf, "w") as f:
                     json.dump(d, f)
