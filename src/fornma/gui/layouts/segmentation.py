@@ -66,7 +66,7 @@ GENERAL_SETTINGS = dbc.AccordionItem(
                             id={"type": "collapse", "group": "general", "name": "foci"},
                             is_open=False,
                             children=dbc.Row([
-                                dbc.Col(dbc.Label("Channels for Foci", id="label-foci-channels"), width=5),
+                                dbc.Col(dbc.Label("Channels for Foci", id="seg-label-foci-channels"), width=5),
                                 dbc.Col(
                                     html.Div(
                                         id="tip-foci-channels",
@@ -82,7 +82,7 @@ GENERAL_SETTINGS = dbc.AccordionItem(
                         ),
                         dbc.Tooltip(
                             "Choose the channel(s) where foci will be detected (e.g., 53BP1, γH2AX).",
-                            target="label-foci-channels",
+                            target="seg-label-foci-channels",
                             placement="right",
                         ),
                         dbc.Tooltip(
