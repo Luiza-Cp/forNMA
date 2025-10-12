@@ -3,7 +3,7 @@ import webbrowser
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict
-import base64
+
 from dash import Dash, html, dcc, Input, Output, State, ALL, no_update, ctx
 import dash_bootstrap_components as dbc
 
@@ -12,15 +12,15 @@ from .callbacks.segmentation import register as register_segmentation_callbacks
 from .callbacks.registration import register as register_registration_callbacks
 from .layouts.foci_overlay import build_sidebar as build_foci_sidebar
 from .callbacks.foci_overlay import register as register_foci_callbacks
-
+from .layouts.nma import build_sidebar as build_nma_sidebar
+from .callbacks.nma import register as register_nma_callbacks
 
 from fornma.gui.utils.params_builder import build_interface_params
 from fornma.Segmentation.run import run as run_pipeline
 
 from .layouts.registration import build_registration_sidebar
 
-
-import json, threading, time, os
+import json, threading, time, os, base64
 from datetime import datetime
 
 PROGRESS_FILE = None
@@ -47,6 +47,22 @@ def pick_directory_dialog() -> str:
         return path or ""
     except Exception:
         # fallback: no GUI available
+        return ""
+
+def pick_file_dialog() -> str:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        path = filedialog.askopenfilename(
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        root.destroy()
+        return path or ""
+    except Exception:
+        # fallback: sem GUI
         return ""
 
 
@@ -187,6 +203,7 @@ def create_app():
         build_segmentation_sidebar(),
         build_registration_sidebar(),
         build_foci_sidebar(),
+        build_nma_sidebar(),
 
         # add other module sidebars here as needed
     ], id="left-pane", style={
@@ -203,6 +220,9 @@ def create_app():
     store_reg_progress = dcc.Store(id="reg-progress-file", storage_type="session")
     store_foci = dcc.Store(id="store-foci", data={})
     store_foci_progress = dcc.Store(id="foci-progress-file", storage_type="session")
+    store_nma = dcc.Store(id="store-nma", data={"rows": []}, storage_type="session")
+    store_nma_ui = dcc.Store(id="store-nma-ui", data={"active_item": None},  storage_type="session")
+
 
     # --- IMAGES MODAL
     modal = dbc.Modal(
@@ -231,6 +251,10 @@ def create_app():
         store_clicks,
         store_reg,
         store_reg_progress,
+        store_foci,
+        store_foci_progress,
+        store_nma,
+        store_nma_ui,
 
         html.Div([
             sidebars,  # left column (all sidebars)
@@ -285,11 +309,7 @@ def create_app():
                                                 "display": "flex",
                                                 "alignItems": "center",
                                                 "justifyContent": "center",
-                                                # 👇 logo sempre presente como fundo
-                                                "backgroundImage": f"url({DEFAULT_LOGO})",
-                                                "backgroundRepeat": "no-repeat",
-                                                "backgroundPosition": "center",
-                                                "backgroundSize": "contain",
+                                                "objectFit": "contain",
                                                 "maxHeight": "70vh",
                                                 "maxWidth": "100%",
                                             },
@@ -448,74 +468,6 @@ def create_app():
 
                     # Timer para polling (deixe desabilitado até plugar o runner)
                     dcc.Interval(id="reg-poll", interval=800, disabled=True),
-                ],
-                style={"padding": "8px"},
-            )
-        elif tab == "tab-foci-overlay":
-            return html.Div(
-                [
-                    html.H4("Foci Overlay — progress & logs"),
-                    html.Div(
-                        id="foci-run-ui",
-                        children=[
-                            html.Div(
-                                id="foci-grid",
-                                children=[
-                                    html.Div(
-                                        id="foci-stage",
-                                        children=html.Img(
-                                            id="foci-live-img",
-                                            src=DEFAULT_LOGO,
-                                            style={
-                                                "minHeight": 0,
-                                                "display": "flex",
-                                                "alignItems": "center",
-                                                "justifyContent": "center",
-                                                "backgroundImage": f"url({DEFAULT_LOGO})",
-                                                "backgroundRepeat": "no-repeat",
-                                                "backgroundPosition": "center",
-                                                "backgroundSize": "contain",
-                                                "maxHeight": "70vh",
-                                                "maxWidth": "100%",
-                                            },
-                                            title="forNMA",
-                                        ),
-                                        style={"minHeight": 0, "display": "flex", "alignItems": "center", "justifyContent": "center"},
-                                    ),
-                                    html.Div(
-                                        id="foci-footer-right",
-                                        children=[
-                                            dbc.Progress(
-                                                id="foci-progress",
-                                                value=0, max=100,
-                                                striped=True, animated=True,
-                                                style={"height": "22px"},
-                                            ),
-                                            html.Div(
-                                                id="foci-progress-text",
-                                                style={"marginTop": "6px", "fontFamily": "monospace"},
-                                            ),
-                                        ],
-                                        style={
-                                            "display": "none",
-                                            "flexDirection": "column",
-                                            "justifyContent": "center",
-                                            "gap": "6px",
-                                        },
-                                    ),
-                                ],
-                                style={
-                                    "height": "82vh", "width": "100%", "boxSizing": "border-box",
-                                    "overflow": "hidden", "display": "grid",
-                                    "gridTemplateRows": "70vh 12vh", "rowGap": "8px",
-                                },
-                            ),
-                        ],
-                        style={"display": "block", "width": "100%", "maxWidth": "100%", "overflow": "hidden"},
-                    ),
-                    html.Hr(),
-                    html.Pre(id="foci-log", style={"whiteSpace": "pre-wrap", "maxHeight": "55vh", "overflowY": "auto"}),
-                    dcc.Interval(id="foci-poll", interval=800, disabled=True),
                 ],
                 style={"padding": "8px"},
             )
@@ -738,6 +690,7 @@ def create_app():
     register_segmentation_callbacks(app)
     register_registration_callbacks(app,  pick_directory_dialog)
     register_foci_callbacks(app, pick_directory_dialog)
+    register_nma_callbacks(app, pick_file_dialog)
 
 
     # --- update counter in modal footer
@@ -748,7 +701,6 @@ def create_app():
     def _update_counter(data):
         return f"Channels: {len(data.get('channels', []))} | Conditions: {len(data.get('rows', []))}"
 
-    from dash import no_update
 
     @app.callback(
         Output("seg-poll", "disabled", allow_duplicate=True),
@@ -959,8 +911,6 @@ def create_app():
         return seg_data
 
     # --- POLLING: lê o arquivo de progresso e atualiza a UI
-    from dash import no_update
-    import os, json, base64
 
     @app.callback(
         Output("seg-live-img", "src", allow_duplicate=True),  # <-- add allow_duplicate
