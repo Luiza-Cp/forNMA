@@ -144,6 +144,19 @@ def build_nma_right_pane():
                 ],
             ),
 
+            # --- STEP 2: Set NII thresholds (inicialmente oculto) ---
+            html.Div(
+                id="nma-step2-pane",
+                style={"display": "none", "width": f"{BAY + G}px", "maxWidth": "90vw", "margin": "0 auto"},
+                children=[
+                    html.H6("NMA — Step 2: Set NII thresholds", style={"textAlign": "center", "marginTop": "8px"}),
+                    dcc.Graph(
+                        id="nma-fig-lines",
+                        config={"editable": True, "edits": {"shapePosition": True}},  # permite arrastar as linhas
+                        style={"width": f"{G}px", "height": f"{G}px", "margin": "0 auto"},
+                    ),
+                ],
+            ),
 
             # Botão Next alinhado à largura do palco
             html.Div(

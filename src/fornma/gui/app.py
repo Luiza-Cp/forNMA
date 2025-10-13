@@ -14,6 +14,11 @@ from .layouts.foci_overlay import build_sidebar as build_foci_sidebar
 from .callbacks.foci_overlay import register as register_foci_callbacks
 from .layouts.nma import build_sidebar as build_nma_sidebar
 from .callbacks.nma import register as register_nma_callbacks
+from .layouts.nma_right import build_nma_right_pane
+from .callbacks import nma_step1 as nma_step1_callbacks
+from .callbacks import nma_step2 as nma_step2_callbacks
+
+
 
 from fornma.gui.utils.params_builder import build_interface_params
 from fornma.Segmentation.run import run as run_pipeline
@@ -471,6 +476,8 @@ def create_app():
                 ],
                 style={"padding": "8px"},
             )
+        elif tab == "tab-NMA":
+            return build_nma_right_pane()
 
 
     # --- OPEN/CLOSE MODAL
@@ -691,6 +698,8 @@ def create_app():
     register_registration_callbacks(app,  pick_directory_dialog)
     register_foci_callbacks(app, pick_directory_dialog)
     register_nma_callbacks(app, pick_file_dialog)
+    nma_step1_callbacks.register(app)
+    nma_step2_callbacks.register(app)
 
 
     # --- update counter in modal footer

@@ -176,35 +176,55 @@ def register(app):
             "xcol": xcol, "ycol": ycol,
             "mu_x": mu_x, "mu_y": mu_y,
             "sd_x": sd_x, "sd_y": sd_y,
+            "kx": kx, "ky": ky,  # 👈 novo
+            "rx": rx, "ry": ry,  # 👈 novo (raios atuais)
             "sample": {
                 "x": pool[xcol].astype(float).tolist(),
                 "y": pool[ycol].astype(float).tolist(),
             }
         }
+
         return fig, store, kx, ky, log
 
     # B) Sliders → redesenha apenas a elipse (usa a amostra guardada no store)
+
     @app.callback(
         Output("nma-fig-ellipse", "figure", allow_duplicate=True),
+        Output("store-nma-step1", "data", allow_duplicate=True),  # 2º output
         Input("nma-nii-sd", "value"),
         Input("nma-area-sd", "value"),
         State("store-nma-step1", "data"),
         prevent_initial_call=True,
     )
     def _step1_update(kx, ky, store):
+        # quando ainda não existe store (ex.: usuário mexeu nos sliders muito cedo),
+        # precisamos retornar DOIS valores
         if not store:
-            # sem store -> não desenha nada novo
-            return _make_step1_figure(None, "NII", "Area", 0, 0, 1, 1)
+            fig = _make_step1_figure(None, "NII", "Area", 0, 0, 1, 1)
+            return fig, no_update
 
-        x = np.asarray(store["sample"]["x"], dtype=float)
-        y = np.asarray(store["sample"]["y"], dtype=float)
-        xcol = store["xcol"]; ycol = store["ycol"]
-        mu_x = store["mu_x"]; mu_y = store["mu_y"]
-        sd_x = store["sd_x"]; sd_y = store["sd_y"]
+        xcol = store["xcol"];
+        ycol = store["ycol"]
+        mu_x = store["mu_x"];
+        mu_y = store["mu_y"]
+        sd_x = store["sd_x"];
+        sd_y = store["sd_y"]
 
         rx = float(kx) * sd_x
         ry = float(ky) * sd_y
 
+        # reconstrói df a partir do sample guardado
+        import pandas as pd
+        import numpy as np
+        x = np.asarray(store["sample"]["x"], dtype=float)
+        y = np.asarray(store["sample"]["y"], dtype=float)
         df = pd.DataFrame({xcol: x, ycol: y})
+
         fig = _make_step1_figure(df, xcol, ycol, mu_x, mu_y, rx, ry)
-        return fig
+
+        # atualiza o store com multiplicadores e raios atuais
+        new_store = dict(store)
+        new_store.update({"kx": float(kx), "ky": float(ky), "rx": float(rx), "ry": float(ry)})
+
+        # SEMPRE retornar 2 itens
+        return fig, new_store
