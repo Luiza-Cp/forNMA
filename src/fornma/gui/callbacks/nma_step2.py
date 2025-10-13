@@ -4,122 +4,215 @@ from dash import Input, Output, State, no_update
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
+from fornma.gui.utils.nma_helpers import (
+    load_all_datasets,
+    ellipse_trace,
+    compute_axis_ranges_from_all,
+)
 
 
+# ---------- utilidades ----------
 def _to_num(s: pd.Series) -> pd.Series:
     if s.dtype == object:
         s = s.astype(str).str.replace(",", ".", regex=False)
     return pd.to_numeric(s, errors="coerce")
 
 
-def _load_all_datasets(params: dict, sample_per_ds: int = 4000):
+def _make_step2_figure(
+    pool: pd.DataFrame,
+    xcol: str,
+    ycol: str,
+    mu_x: float,
+    mu_y: float,
+    rx: float,
+    ry: float,
+    line_xs: list[float] | None,
+    axis_ranges: dict | None = None,
+    *,
+    std_a: float | None = None,   # <- opcional: se vier do Step1, usa as fórmulas originais
+    sd_area: float | None = None, # <- opcional: idem
+):
     """
-    Carrega TODOS os datasets (controle e não-controle) de params["datasets"].
-    Retorna (pool_df, xcol, ycol, log)
-    pool_df tem colunas: NII_TMP, AREA_TMP, __ds__
+    Scatter de todos os datasets + elipse + 2 horizontais fixas (ditadas pela elipse) +
+    4 verticais arrastáveis com spans Y em 'andares' (baixo/médio/cima).
+
+    Regras de altura:
+      - Com std_a/sd_area (originais do matplotlib):
+          y_inf  = μy − sd_area·std_a
+          y_sup  = μy + sd_area·std_a
+          y_bot0 = μy − (1 + sd_area)·std_a
+          y_top0 = μy + (2 + sd_area)·std_a
+      - Sem std_a/sd_area (fallback usando só ry = sd_area·std_a):
+          y_inf  = μy − ry
+          y_sup  = μy + ry
+          y_bot0 = μy − 2·ry
+          y_top0 = μy + 2·ry
     """
-    log = []
-    if not params:
-        log.append("step2: params vazio/nulo")
-        return None, None, None, "\n".join(log)
-
-    dfs = []
-    for j, ds in enumerate(params.get("datasets", []), start=1):
-        name = ds.get("name") or f"Dataset {j}"
-        path = (ds.get("path") or "").strip()
-        a_in = (ds.get("area_col") or "").strip()
-        n_in = (ds.get("nii_col") or "").strip()
-        if not (path and a_in and n_in):
-            log.append(f"- {name}: faltando path/area/nii")
-            continue
-
-        try:
-            raw = pd.read_csv(path, engine="python", sep=None)  # infere separador
-        except Exception as e:
-            log.append(f"- {name}: erro lendo CSV: {e}")
-            continue
-
-        cols_norm = [str(c).lstrip("\ufeff").strip() for c in raw.columns]
-        raw.columns = cols_norm
-        cmap = {c.casefold(): c for c in cols_norm}
-        a_name = cmap.get(a_in.casefold()) or next((c for c in cols_norm if a_in.casefold() in c.casefold()), None)
-        n_name = cmap.get(n_in.casefold()) or next((c for c in cols_norm if n_in.casefold() in c.casefold()), None)
-        if not (a_name and n_name):
-            log.append(f"- {name}: não achou colunas (area='{a_in}', nii='{n_in}')")
-            continue
-
-        df = raw[[a_name, n_name]].copy()
-        before = len(df)
-        df[a_name] = _to_num(df[a_name])
-        df[n_name] = _to_num(df[n_name])
-        df = df.dropna()
-        after = len(df)
-        log.append(f"- {name}: válidas {after}/{before} linhas")
-
-        if after == 0:
-            continue
-
-        if after > sample_per_ds:
-            df = df.sample(n=sample_per_ds, random_state=0)
-            log.append(f"  · amostradas {sample_per_ds}")
-
-        df = df.rename(columns={a_name: "AREA_TMP", n_name: "NII_TMP"})
-        df["__ds__"] = name
-        dfs.append(df)
-
-    if not dfs:
-        log.append("step2: nenhum dataset válido encontrado.")
-        return None, None, None, "\n".join(log)
-
-    pool = pd.concat(dfs, axis=0, ignore_index=True)
-    log.append(f"step2: POOL final {len(pool)} linhas.")
-    return pool, "NII_TMP", "AREA_TMP", "\n".join(log)
-
-
-def _make_step2_figure(pool: pd.DataFrame, xcol: str, ycol: str,
-                       ymin: float, ymax: float, line_xs: list[float] | None):
     fig = go.Figure()
+
+    # =============================
+    # 1) PONTOS (agrupados por ds)
+    # =============================
     if pool is not None and not pool.empty:
         for name, g in pool.groupby("__ds__"):
             fig.add_trace(go.Scattergl(
                 x=g[xcol], y=g[ycol],
                 mode="markers",
-                name=name,
-                marker=dict(size=5, opacity=0.6),
+                name=str(name),
+                marker=dict(size=5, opacity=0.65),
+                hovertemplate=f"{xcol}=%{{x}}<br>{ycol}=%{{y}}<extra>{name}</extra>",
             ))
-
-        # se não vieram posições, usa quantis 10/30/70/90 do NII como sugestão
-        if not line_xs:
-            xs = pool[xcol].to_numpy()
-            q10, q30, q70, q90 = np.nanpercentile(xs, [10, 30, 70, 90])
-            line_xs = [float(q10), float(q30), float(q70), float(q90)]
-
-        for v in line_xs:
-            fig.add_shape(
-                type="line",
-                x0=float(v), x1=float(v),
-                y0=float(ymin), y1=float(ymax),
-                yref="y",  # coordenadas em dados
-                line=dict(color="deepskyblue", width=3),
-                editable=True,
-            )
-
-        title = "Click-and-drag the blue vertical lines to set NII limits.<br><sup>All datasets are shown</sup>"
+        title = "Step 2 — Ajuste dos limiares de NII"
     else:
         title = "No data to display."
 
+    # =============================
+    # 2) HORIZONTAIS = ELIPSE (N/I)
+    # =============================
+    # Limites “N/I” são ditados pela elipse do Step1
+    if ry is None or mu_y is None:
+        # fallback defensivo
+        mu_y = float(mu_y or 0.0)
+        ry   = float(ry or 1.0)
+    y_inf = float(mu_y) - float(ry)
+    y_sup = float(mu_y) + float(ry)
+
+    # Span de X para desenhar horizontais (usa range dos dados quando possível)
+    if pool is not None and not pool.empty:
+        xmin = float(np.nanmin(pool[xcol]))
+        xmax = float(np.nanmax(pool[xcol]))
+    else:
+        xmin = float(mu_x) - float(rx)
+        xmax = float(mu_x) + float(rx)
+
+    # Duas horizontais pretas (ditam altura dos quadrantes N e I)
+    fig.add_shape(
+        type="line", x0=xmin, x1=xmax, y0=y_inf, y1=y_inf,
+        xref="x", yref="y", line=dict(color="black", width=3)
+    )
+    fig.add_shape(
+        type="line", x0=xmin, x1=xmax, y0=y_sup, y1=y_sup,
+        xref="x", yref="y", line=dict(color="black", width=3)
+    )
+
+    # Elipse igual à do Step1
+    fig.add_trace(ellipse_trace(float(mu_x or 0), float(mu_y or 0), float(rx or 1), float(ry or 1)))
+
+    # =====================================================
+    # 3) SPANS VERTICAIS (3 andares) — iguais ao matplotlib
+    # =====================================================
+    if std_a is not None and sd_area is not None:
+        # Fórmulas originais
+        y_bot0 = float(mu_y) - (1.0 + float(sd_area)) * float(std_a)
+        y_top0 = float(mu_y) + (2.0 + float(sd_area)) * float(std_a)
+        y_inf  = float(mu_y) - float(sd_area) * float(std_a)  # redefine com std_a/sd_area exatos
+        y_sup  = float(mu_y) + float(sd_area) * float(std_a)
+    else:
+        # Fallback com ry (mantém a lógica de “três andares” sem std_a explícito)
+        y_bot0 = float(mu_y) - 2.0 * float(ry)
+        y_top0 = float(mu_y) + 2.0 * float(ry)
+        # y_inf/y_sup já definidos acima pelo ry
+
+    span_down = (y_bot0, y_inf)   # “andar” inferior
+    span_mid  = (y_inf,  y_sup)   # “andar” do meio
+    span_up   = (y_sup,  y_top0)  # “andar” superior
+
+    # ===========================================
+    # 4) POSIÇÕES INICIAIS EM X (4 verticais)
+    # ===========================================
+    if not line_xs:
+        # Fim da elipse (direita)
+        x_end_ellipse = float(mu_x) + float(rx)
+
+        # Clip opcional ao range do eixo, se já vier definido
+        if axis_ranges and axis_ranges.get("x"):
+            x_min_ax, x_max_ax = map(float, axis_ranges["x"])
+            x_end_ellipse = max(min(x_end_ellipse, x_max_ax), x_min_ax)
+
+        # up e mid começam iguais, no fim da elipse
+        x_up = x_end_ellipse
+        x_mid = x_end_ellipse
+
+        if pool is not None and not pool.empty:
+            xs = _to_num(pool[xcol]).to_numpy()
+            q10, q90 = np.nanpercentile(xs, [10, 90])
+            x_bottom, x_bottom2 = float(q10), float(q90)
+        else:
+            # fallback em torno de μx ± rx
+            x_bottom = float(mu_x) - 0.75 * float(rx)
+            x_bottom2 = float(mu_x) + 0.75 * float(rx)
+
+        line_xs = [x_bottom, x_mid, x_up, x_bottom2]
+    else:
+        # Garante 4 posições e re-alinha v_mid ao v_up no init
+        line_xs = (list(line_xs) + [line_xs[-1]])[:4]
+        # força alinhamento mid = up no primeiro draw
+        line_xs[1] = float(line_xs[2])
+
+    x_bottom, x_mid, x_up, x_bottom2 = line_xs[:4]
+
+
+    # Cria as 4 verticais azuis já com spans Y por “andar”
+    fig.add_shape(
+        type="line",
+        x0=float(x_bottom), x1=float(x_bottom),
+        y0=span_down[0], y1=span_down[1],
+        xref="x", yref="y",
+        line=dict(color="deepskyblue", width=3),
+        editable=True,
+        name="v_down",
+    )
+    fig.add_shape(
+        type="line",
+        x0=float(x_mid), x1=float(x_mid),
+        y0=span_mid[0], y1=span_mid[1],
+        xref="x", yref="y",
+        line=dict(color="deepskyblue", width=3),
+        editable=True,
+        name="v_mid",
+    )
+    fig.add_shape(
+        type="line",
+        x0=float(x_up), x1=float(x_up),
+        y0=span_up[0], y1=span_up[1],
+        xref="x", yref="y",
+        line=dict(color="deepskyblue", width=3),
+        editable=True,
+        name="v_up",
+    )
+    fig.add_shape(
+        type="line",
+        x0=float(x_bottom2), x1=float(x_bottom2),
+        y0=span_down[0], y1=span_down[1],
+        xref="x", yref="y",
+        line=dict(color="deepskyblue", width=3),
+        editable=True,
+        name="v_down2",
+    )
+
+    # ===========================================
+    # 5) LAYOUT / AXES
+    # ===========================================
     fig.update_layout(
         autosize=False, width=640, height=640,
         margin=dict(l=60, r=10, t=80, b=60),
         title=dict(text=title, x=0.5, xanchor="center"),
         xaxis_title=xcol or "NII",
         yaxis_title=ycol or "Area",
+        showlegend=True,
     )
+
+    # aplica ranges globais se existirem
+    if axis_ranges and axis_ranges.get("x") and axis_ranges.get("y"):
+        fig.update_layout(xaxis_range=axis_ranges["x"], yaxis_range=axis_ranges["y"])
+
     return fig
 
 
+
+# ---------- registro ----------
 def register(app):
-    # NEXT → constrói Step 2 com limites verticais da elipse (Step 1)
+    # NEXT → constrói Step 2 usando elipse do Step 1 e eixos ±3sd (iguais ao Step 1)
     @app.callback(
         Output("store-nma-wizard", "data"),
         Output("nma-fig-lines", "figure"),
@@ -129,68 +222,225 @@ def register(app):
         prevent_initial_call=True,
     )
     def _go_to_step2(_n, store_nma, step1):
+        # 1) dados-base
         params = (store_nma or {}).get("params")
-        pool, xcol, ycol, log = _load_all_datasets(params)
+        pool, xcol, ycol, _ = load_all_datasets(params)
 
-        # pega limites verticais da elipse (Step 1)
+        # elipse do step1
+        mu_x = (step1 or {}).get("mu_x")
         mu_y = (step1 or {}).get("mu_y")
-        ry   = (step1 or {}).get("ry")
-        if mu_y is None or ry is None:
-            if pool is not None and not pool.empty:
-                ymin, ymax = float(pool[ycol].min()), float(pool[ycol].max())
-            else:
-                ymin, ymax = 0.0, 1.0
-        else:
-            ymin, ymax = float(mu_y - ry), float(mu_y + ry)
+        rx = (step1 or {}).get("rx")
+        ry = (step1 or {}).get("ry")
+        std_a = (step1 or {}).get("std_a")
+        sd_area = (step1 or {}).get("sd_area")
 
-        fig = _make_step2_figure(pool, xcol, ycol, ymin, ymax, line_xs=None)
+        # 2) ranges globais (preferir salvos; senão recalcula)
+        axis = (step1 or {}).get("axis")
+        if not (axis and axis.get("x") and axis.get("y")):
+            axis = compute_axis_ranges_from_all(params, k=3.0, headroom=0.05)
+
+        # 3) recuperar linhas salvas do store-nma
+        saved = ((store_nma or {}).get("step2", {}) or {}).get("lines", {})
+
+        def _xs_from_saved(saved_dict):
+            # ordem: v_down, v_mid, v_up, v_down2
+            keys = ["v_down", "v_mid", "v_up", "v_down2"]
+            xs = []
+            for k in keys:
+                x = (saved_dict.get(k) or {}).get("x")
+                xs.append(float(x) if x is not None else None)
+            # se v_up existir, alinhar v_mid a v_up no primeiro draw (tua regra)
+            if xs[2] is not None:
+                xs[1] = xs[2]
+            return xs if any(v is not None for v in xs) else None
+
+        line_xs = _xs_from_saved(saved)
+
+        # 4) montar figura (usa a tua função já ajustada com os 3 “andares”)
+        fig = _make_step2_figure(
+            pool=pool,
+            xcol=xcol, ycol=ycol,
+            mu_x=mu_x, mu_y=mu_y,
+            rx=rx, ry=ry,
+            line_xs=line_xs,  # <- carrega posições salvas (ou defaults)
+            axis_ranges=axis,
+            std_a=std_a, sd_area=sd_area,
+        )
+
+        # 5) avança wizard para step 2 (destrava o _toggle_panes)
         return {"step": 2}, fig
 
-    # trava o Y das linhas quando o usuário arrasta (snap y para [ymin,ymax])
+    # trava o Y das verticais quando o usuário arrasta (snap y para [μy−ry, μy+ry])
     @app.callback(
         Output("nma-fig-lines", "figure", allow_duplicate=True),
+        Output("store-nma", "data", allow_duplicate=True),
         Input("nma-fig-lines", "relayoutData"),
         State("nma-fig-lines", "figure"),
         State("store-nma-step1", "data"),
+        State("store-nma", "data"),
         prevent_initial_call=True,
     )
-    def _lock_line_y(relayout, fig, step1):
+    def _lock_line_y(relayout, fig, step1, store_nma):
+        """
+        Mantém as linhas verticais (v_up, v_mid, v_down, v_down2) estritamente verticais,
+        repondo y0/y1 conforme o 'andar' e salvando as posições no store-nma.
+        """
         if not relayout or not fig:
-            return no_update
+            return no_update, no_update
 
-        mu_y = (step1 or {}).get("mu_y")
-        ry   = (step1 or {}).get("ry")
-        if mu_y is None or ry is None:
-            return no_update
-        ymin = float(mu_y - ry)
-        ymax = float(mu_y + ry)
+        store_nma = store_nma or {}
+        step1 = step1 or {}
 
-        shapes = [dict(s) for s in (fig.get("layout", {}).get("shapes") or [])]
+        # --- Parâmetros do Step1: média e "altura" dos quadrantes (ry) ---
+        # mean_a pode ter sido salvo como 'mean_a' ou 'mu_y'
+        mean_a = step1.get("mean_a", step1.get("mu_y"))
+        # ry pode estar direto, ou podemos obter por sd_area * std_a
+        ry = step1.get("ry")
+        if ry is None:
+            std_a = step1.get("std_a")
+            sd_area = step1.get("sd_area")
+            if std_a is not None and sd_area is not None:
+                try:
+                    ry = float(sd_area) * float(std_a)
+                except Exception:
+                    ry = None
+
+        if mean_a is None or ry is None:
+            # sem parâmetros mínimos, não alteramos a figura nem o store
+            return no_update, no_update
+
+        mean_a = float(mean_a)
+        ry = float(ry)
+
+        # Se tivermos std_a e sd_area, usamos as fórmulas originais do matplotlib.
+        std_a = step1.get("std_a")
+        sd_area = step1.get("sd_area")
+        if std_a is not None and sd_area is not None:
+            try:
+                std_a = float(std_a)
+                sd_area = float(sd_area)
+                y_inf = mean_a - sd_area * std_a
+                y_sup = mean_a + sd_area * std_a
+                y_bot0 = mean_a - (1.0 + sd_area) * std_a
+                y_top0 = mean_a + (2.0 + sd_area) * std_a
+            except Exception:
+                # fallback seguro com ry
+                y_inf = mean_a - ry
+                y_sup = mean_a + ry
+                y_bot0 = mean_a - 2.0 * ry
+                y_top0 = mean_a + 2.0 * ry
+        else:
+            # fallback usando apenas ry (mantém a lógica de 3 andares)
+            y_inf = mean_a - ry
+            y_sup = mean_a + ry
+            y_bot0 = mean_a - 2.0 * ry
+            y_top0 = mean_a + 2.0 * ry
+
+        spans = {
+            "v_up": (y_sup, y_top0),  # andar superior
+            "v_mid": (y_inf, y_sup),  # andar do meio
+            "v_down": (y_bot0, y_inf),  # andar inferior
+            "v_down2": (y_bot0, y_inf),  # idem inferior
+        }
+
+        # --- Preparos da figura/axis ---
+        layout = fig.get("layout", {}) or {}
+        shapes = [dict(s) for s in (layout.get("shapes") or [])]
+        if not shapes:
+            return no_update, no_update
+
+        # range do eixo X para clip opcional
+        xaxis = layout.get("xaxis", {}) or {}
+        x_range = xaxis.get("range")
+        x_min_ax = x_max_ax = None
+        if isinstance(x_range, (list, tuple)) and len(x_range) == 2:
+            try:
+                x_min_ax, x_max_ax = map(float, x_range)
+            except Exception:
+                x_min_ax = x_max_ax = None
+
+        # --- Aplica mudanças vindas do relayoutData ---
         changed = False
-        for k, v in relayout.items():
-            if not k.startswith("shapes["):
+        for key, val in (relayout or {}).items():
+            # Esperamos formatos tipo: 'shapes[3].x0', 'shapes[3].x1'
+            if not key.startswith("shapes["):
                 continue
             try:
-                idx = int(k.split("[", 1)[1].split("]", 1)[0])
+                idx_str = key.split("[", 1)[1].split("]", 1)[0]
+                idx = int(idx_str)
             except Exception:
                 continue
-            if 0 <= idx < len(shapes):
-                s = shapes[idx]
-                if k.endswith(".x0"): s["x0"] = float(v)
-                if k.endswith(".x1"): s["x1"] = float(v)
-                # força Y
-                s["y0"] = ymin
-                s["y1"] = ymax
+            if idx < 0 or idx >= len(shapes):
+                continue
+
+            s = shapes[idx]
+            role = s.get("name")  # "v_up" | "v_mid" | "v_down" | "v_down2" (somente verticais azuis têm name)
+            if role not in spans:
+                # Ignora horizontais pretas, elipse, etc.
+                continue
+
+            # Só processa mudanças em X; mantém as linhas estritamente verticais
+            if key.endswith(".x0") or key.endswith(".x1"):
+                try:
+                    new_x = float(val)
+                except Exception:
+                    continue
+
+                # clip opcional ao range do eixo
+                if x_min_ax is not None and x_max_ax is not None:
+                    if new_x < x_min_ax:
+                        new_x = x_min_ax
+                    elif new_x > x_max_ax:
+                        new_x = x_max_ax
+
+                # atualiza x0/x1 iguais
+                s["x0"] = new_x
+                s["x1"] = new_x
+
+                # repõe y0/y1 conforme o 'andar'
+                y0, y1 = spans[role]
+                s["y0"] = float(y0)
+                s["y1"] = float(y1)
                 s["yref"] = "y"
+
                 shapes[idx] = s
                 changed = True
 
         if not changed:
-            return no_update
+            return no_update, no_update
 
+        # --- Reescreve shapes na figure ---
         new_fig = dict(fig)
-        new_fig.setdefault("layout", {})["shapes"] = shapes
-        return new_fig
+        new_layout = dict(layout)
+        new_layout["shapes"] = shapes
+        new_fig["layout"] = new_layout
+
+        # --- Salva posições finais no store-nma ---
+        lines_data = {}
+        for s in shapes:
+            # só coleta as verticais azuis com 'name'
+            name = s.get("name")
+            if not name:
+                continue
+            line_meta = s.get("line", {}) or {}
+            if line_meta.get("color") != "deepskyblue":
+                continue
+            try:
+                lines_data[name] = {
+                    "x": float(s["x0"]),
+                    "y0": float(s["y0"]),
+                    "y1": float(s["y1"]),
+                }
+            except Exception:
+                # ignora se algum dado não estiver coerente
+                pass
+
+        new_store = dict(store_nma)
+        step2_ns = dict(new_store.get("step2", {}) or {})
+        step2_ns["lines"] = lines_data
+        new_store["step2"] = step2_ns
+
+        return new_fig, new_store
 
     # alterna visibilidade dos panes preservando estilos originais
     @app.callback(
@@ -209,12 +459,11 @@ def register(app):
         s2 = dict(s2 or {})
         step = (wiz or {}).get("step", 1)
         if step == 2:
-            s1["display"] = "none"
+            s1["display"]  = "none"
             sNII["display"] = "none"
-            s2["display"] = "block"
+            s2["display"]  = "block"
         else:
-            s1["display"] = "flex"  # Step 1 precisa ser 'flex' como no layout
+            s1["display"]  = "flex"     # como no layout original
             sNII["display"] = "block"
-            s2["display"] = "none"
+            s2["display"]  = "none"
         return s1, sNII, s2
-
