@@ -31,8 +31,8 @@ def _make_step1_figure(df: pd.DataFrame | None, xcol: str, ycol: str,
         autosize=False, width=640, height=640,
         margin=dict(l=60, r=10, t=70, b=60),
         title=dict(text=title_txt, x=0.5, xanchor="center"),
-        xaxis_title=(xcol or "NII"),
-        yaxis_title=(ycol or "Area"),
+        xaxis_title="NII",
+        yaxis_title=ycol or "Area",
     )
     return fig
 
@@ -85,6 +85,8 @@ def register(app):
         fig = _make_step1_figure(pool, xcol, ycol, mu_x, mu_y, rx, ry)
         if axis and axis.get("x") and axis.get("y"):
             fig.update_layout(xaxis_range=axis["x"], yaxis_range=axis["y"])
+        fig.update_xaxes(fixedrange=True)
+        fig.update_yaxes(fixedrange=True)
 
         store = {
             "xcol": xcol, "ycol": ycol,

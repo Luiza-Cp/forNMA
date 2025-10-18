@@ -18,133 +18,156 @@ def build_nma_right_pane():
             "gap": "12px",
         },
         children=[
-            # título centralizado com a mesma largura do palco (slider+gráfico)
-            html.Div(
-                html.H6("NMA — Step 1: Adjust threshold ellipse", style={"margin": 0, "textAlign": "center"}),
-                style={"width": "calc(var(--bay) + var(--g))", "maxWidth": "90vw", "margin": "0 auto"},
-            ),
-
             dcc.Store(id="store-nma-step1", data={}),
             dcc.Store(id="store-nma-wizard", data={"step": 1}),
+            dcc.Store(id="store-nma-settings", data={}),
 
-            # ... dentro da lista children de build_nma_right_pane(), logo após o título:
-
-            html.Pre(
-                id="nma-step1-debug",
-                style={
-                    "width": "calc(var(--bay) + var(--g))",
-                    "maxWidth": "90vw",
-                    "margin": "4px auto 0",
-                    "background": "#f8fafc",
-                    "border": "1px solid #e5e7eb",
-                    "borderRadius": "6px",
-                    "padding": "6px 8px",
-                    "fontSize": "12px",
-                    "whiteSpace": "pre-wrap",
-
-                },
-            ),
-
-            # ===== PALCO central =====
+            # ===================== STEP 1 =====================
             html.Div(
-                id="nma-stage1",
-                style={
-                    "display": "flex",
-                    "justifyContent": "center",
-                    "alignItems": "stretch",
-                    "gap": "0",
-                    "width": "calc(var(--bay) + var(--g))",
-                    "maxWidth": "90vw",
-                    "margin": "0 auto",
-                },
+                id="nma-step1-pane",
+                style={"display": "block", "width": f"{BAY + G}px", "maxWidth": "90vw", "margin": "0 auto"},
                 children=[
-
-
-                    # Coluna estreita: rótulo À ESQUERDA do slider vertical (altura = G)
+                    # título
                     html.Div(
+                        html.H6("NMA — Step 1: Adjust threshold ellipse",
+                                style={"margin": 0, "textAlign": "center"}),
+                    ),
+
+                    # debug (opcional)
+                    html.Pre(
+                        id="nma-step1-debug",
                         style={
-                            "width": "var(--bay)",
-                            "height": f"{G}px",
+                            "width": "100%",
+                            "margin": "4px auto 0",
+                            "background": "#f8fafc",
+                            "border": "1px solid #e5e7eb",
+                            "borderRadius": "6px",
+                            "padding": "6px 8px",
+                            "fontSize": "12px",
+                            "whiteSpace": "pre-wrap",
+                        },
+                    ),
+
+                    # palco: rótulo + slider vertical + gráfico
+                    html.Div(
+                        id="nma-stage1",
+                        style={
                             "display": "flex",
-                            "alignItems": "center",
                             "justifyContent": "center",
+                            "alignItems": "stretch",
+                            "gap": "0",
+                            "width": "100%",
+                            "margin": "0 auto",
                         },
                         children=[
-                            # Linha com rótulo (esquerda) + slider (direita)
+                            # Coluna estreita: rótulo + slider vertical (altura = G)
                             html.Div(
                                 style={
+                                    "width": "var(--bay)",
+                                    "height": f"{G}px",
                                     "display": "flex",
                                     "alignItems": "center",
                                     "justifyContent": "center",
-                                    "gap": "6px",
-                                    "height": "100%",
                                 },
                                 children=[
-                                    # RÓTULO — vertical, centralizado, do lado esquerdo
                                     html.Div(
                                         style={
-                                            "height": "100%",
-                                            "width": "28px",  # ajuste fino da largura do rótulo
                                             "display": "flex",
                                             "alignItems": "center",
                                             "justifyContent": "center",
+                                            "gap": "6px",
+                                            "height": "100%",
                                         },
-                                        children=html.Span(
-                                            "Area SD",
-                                            style={
-                                                "writingMode": "vertical-rl",
-                                                "transform": "rotate(180deg)",
-                                                # texto de baixo para cima (como no print)
-                                                "fontSize": "12px",
-                                                "color": "#6b7280",
-                                                "userSelect": "none",
-                                            },
-                                        ),
-                                    ),
-                                    # SLIDER vertical (altura EXATA = G)
-                                    dcc.Slider(
-                                        id="nma-area-sd",
-                                        min=0.5, max=3.0, step=0.05, value=1.0,
-                                        marks=None,
-                                        updatemode="drag",
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        vertical=True,
-                                        verticalHeight=G,  # <- mesma altura do gráfico
+                                        children=[
+                                            html.Div(
+                                                style={
+                                                    "height": "100%",
+                                                    "width": "28px",
+                                                    "display": "flex",
+                                                    "alignItems": "center",
+                                                    "justifyContent": "center",
+                                                },
+                                                children=html.Span(
+                                                    "Standard Deviations from Area",
+                                                    style={
+                                                        "writingMode": "vertical-rl",
+                                                        "transform": "rotate(180deg)",
+                                                        "fontSize": "12px",
+                                                        "color": "#6b7280",
+                                                        "userSelect": "none",
+                                                        "height": "100%",
+                                                        "display": "flex",
+                                                        "alignItems": "flex-end",   # texto começa embaixo
+                                                        "justifyContent": "center",
+                                                        "paddingBottom": "4px",
+                                                    },
+                                                ),
+                                            ),
+                                            html.Div(
+                                                dcc.Slider(
+                                                    id="nma-area-sd",
+                                                    min=0.5, max=3.0, step=0.05, value=1.0,
+                                                    marks={"0.5": "0.5", "3": "3"},
+                                                    updatemode="drag",
+                                                    tooltip={"placement": "bottom", "always_visible": False},
+                                                    vertical=True,
+                                                    verticalHeight=G,
+                                                ),
+                                                style={"overflow": "visible"},
+                                            ),
+                                        ],
                                     ),
                                 ],
+                            ),
+
+                            # Coluna larga: gráfico (G x G)
+                            html.Div(
+                                style={"width": "var(--g)"},
+                                children=dcc.Graph(
+                                    id="nma-fig-ellipse",
+                                    config={"editable": False,  "edits": {"shapePosition": True}, "displayModeBar": False},
+                                    style={"width": f"{G}px", "height": f"{G}px"},
+                                ),
                             ),
                         ],
                     ),
 
-                    # Coluna larga: gráfico quadrado (G x G)
+                    # Slider horizontal (NII)
                     html.Div(
-                        style={"width": "var(--g)"},
-                        children=dcc.Graph(
-                            id="nma-fig-ellipse",
-                            config={"editable": False},
-                            style={"width": f"{G}px", "height": f"{G}px"},
-                        ),
+                        id="nma-nii-slider-row",
+                        style={"width": f"{G}px", "maxWidth": "90vw", "margin": "0 auto"},
+                        children=[
+                            html.Div(
+                                "Standard Deviations from NII",
+                                style={"fontSize": "12px", "color": "#6b7280", "marginBottom": "6px"},
+                            ),
+                            html.Div(
+                                dcc.Slider(
+                                    id="nma-nii-sd",
+                                    min=0.5, max=3.0, step=0.05, value=1.0,
+                                    marks={"0.5": "0.5", "3": "3"},
+                                    updatemode="drag",
+                                    tooltip={"placement": "bottom", "always_visible": False},
+                                ),
+                                style={"overflow": "visible", "marginBottom": "6px"},
+                            ),
+                        ],
+                    ),
+
+                    # Botão Next (só Step 1)
+                    html.Div(
+                        style={
+                            "width": "100%",
+                            "margin": "0 auto",
+                            "display": "flex",
+                            "justifyContent": "center",
+                        },
+                        children=[html.Button("Next", id="nma-step1-next")],
                     ),
                 ],
             ),
 
-            # Slider horizontal (NII) — mesma largura do gráfico (G)
-            html.Div(
-                id="nma-nii-slider-row",
-                style={"width": f"{G}px", "maxWidth": "90vw", "margin": "0 auto"},
-                children=[
-                    dbc.Label("NII SD"),
-                    dcc.Slider(
-                        id="nma-nii-sd",
-                        min=0.5, max=3.0, step=0.05, value=1.0,
-                        marks=None,
-                        updatemode="drag",
-                        tooltip={"placement": "bottom", "always_visible": False},
-                    ),
-                ],
-            ),
-
-            # --- STEP 2: Set NII thresholds (inicialmente oculto) ---
+            # ===================== STEP 2 =====================
             html.Div(
                 id="nma-step2-pane",
                 style={"display": "none", "width": f"{BAY + G}px", "maxWidth": "90vw", "margin": "0 auto"},
@@ -152,24 +175,40 @@ def build_nma_right_pane():
                     html.H6("NMA — Step 2: Set NII thresholds", style={"textAlign": "center", "marginTop": "8px"}),
                     dcc.Graph(
                         id="nma-fig-lines",
-                        config={"editable": True, "edits": {"shapePosition": True}},  # permite arrastar as linhas
+                        config={"editable": True, "edits": {"shapePosition": True}, "displayModeBar": False},
                         style={"width": f"{G}px", "height": f"{G}px", "margin": "0 auto"},
+                    ),
+                    html.Div(
+                        className="d-flex justify-content-center gap-2 mt-2",
+                        children=[
+                            html.Button("Previous", id="nma-step2-prev"),
+                            html.Button("Complete", id="nma-step2-complete", className="ms-2"),
+                        ],
                     ),
                 ],
             ),
 
-            # Botão Next alinhado à largura do palco
+            # ===================== RESULT (Step 3) =====================
             html.Div(
-                style={
-                    "width": f"{BAY+G}px",
-                    "maxWidth": "90vw",
-                    "margin": "0 auto",
-                    "display": "flex",
-                    "justifyContent": "center",
-                },
-                children=[html.Button("Next", id="nma-step1-next")],
+                id="nma-result-pane",
+                style={"display": "none", "width": f"{BAY + G}px", "maxWidth": "90vw", "margin": "0 auto"},
+                children=[
+                    html.H6("NMA — Settings criadas", style={"textAlign": "center", "marginTop": "8px"}),
+                    html.Div(
+                        "NMA setting complete",
+                        style={"textAlign": "center", "margin": "6px 0 12px", "color": "#065f46"},
+                    ),
+                    dcc.Graph(
+                        id="nma-fig-preview",
+                        config={"displayModeBar": False},
+                        style={"width": f"{G}px", "height": f"{G}px", "margin": "0 auto"},
+                    ),
+                    html.Div(
+                        className="d-flex justify-content-center mt-2",
+                        children=[html.Button("Download settings", id="nma-download-settings")],
+                        # só layout por enquanto
+                    ),
+                ],
             ),
-
-
         ],
     )

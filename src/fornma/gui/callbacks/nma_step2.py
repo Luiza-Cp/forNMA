@@ -1,6 +1,7 @@
 # src/fornma/gui/callbacks/nma_step2.py
 from __future__ import annotations
 from dash import Input, Output, State, no_update
+import dash  # <- necessário para dash.exceptions.PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -35,18 +36,6 @@ def _make_step2_figure(
     """
     Scatter de todos os datasets + elipse + 2 horizontais fixas (ditadas pela elipse) +
     4 verticais arrastáveis com spans Y em 'andares' (baixo/médio/cima).
-
-    Regras de altura:
-      - Com std_a/sd_area (originais do matplotlib):
-          y_inf  = μy − sd_area·std_a
-          y_sup  = μy + sd_area·std_a
-          y_bot0 = μy − (1 + sd_area)·std_a
-          y_top0 = μy + (2 + sd_area)·std_a
-      - Sem std_a/sd_area (fallback usando só ry = sd_area·std_a):
-          y_inf  = μy − ry
-          y_sup  = μy + ry
-          y_bot0 = μy − 2·ry
-          y_top0 = μy + 2·ry
     """
     fig = go.Figure()
 
@@ -62,22 +51,20 @@ def _make_step2_figure(
                 marker=dict(size=5, opacity=0.65),
                 hovertemplate=f"{xcol}=%{{x}}<br>{ycol}=%{{y}}<extra>{name}</extra>",
             ))
-        title = "Step 2 — Ajuste dos limiares de NII"
+        title = "Adjust NII thresholds by dragging the blue lines"
     else:
         title = "No data to display."
 
     # =============================
     # 2) HORIZONTAIS = ELIPSE (N/I)
     # =============================
-    # Limites “N/I” são ditados pela elipse do Step1
     if ry is None or mu_y is None:
-        # fallback defensivo
         mu_y = float(mu_y or 0.0)
         ry   = float(ry or 1.0)
     y_inf = float(mu_y) - float(ry)
     y_sup = float(mu_y) + float(ry)
 
-    # Span de X para desenhar horizontais (usa range dos dados quando possível)
+    # Span de X para desenhar horizontais
     if pool is not None and not pool.empty:
         xmin = float(np.nanmin(pool[xcol]))
         xmax = float(np.nanmax(pool[xcol]))
@@ -85,7 +72,6 @@ def _make_step2_figure(
         xmin = float(mu_x) - float(rx)
         xmax = float(mu_x) + float(rx)
 
-    # Duas horizontais pretas (ditam altura dos quadrantes N e I)
     fig.add_shape(
         type="line", x0=xmin, x1=xmax, y0=y_inf, y1=y_inf,
         xref="x", yref="y", line=dict(color="black", width=3)
@@ -95,41 +81,34 @@ def _make_step2_figure(
         xref="x", yref="y", line=dict(color="black", width=3)
     )
 
-    # Elipse igual à do Step1
+    # Elipse do Step1
     fig.add_trace(ellipse_trace(float(mu_x or 0), float(mu_y or 0), float(rx or 1), float(ry or 1)))
 
     # =====================================================
     # 3) SPANS VERTICAIS (3 andares) — iguais ao matplotlib
     # =====================================================
     if std_a is not None and sd_area is not None:
-        # Fórmulas originais
         y_bot0 = float(mu_y) - (1.0 + float(sd_area)) * float(std_a)
         y_top0 = float(mu_y) + (2.0 + float(sd_area)) * float(std_a)
-        y_inf  = float(mu_y) - float(sd_area) * float(std_a)  # redefine com std_a/sd_area exatos
+        y_inf  = float(mu_y) - float(sd_area) * float(std_a)
         y_sup  = float(mu_y) + float(sd_area) * float(std_a)
     else:
-        # Fallback com ry (mantém a lógica de “três andares” sem std_a explícito)
         y_bot0 = float(mu_y) - 2.0 * float(ry)
         y_top0 = float(mu_y) + 2.0 * float(ry)
-        # y_inf/y_sup já definidos acima pelo ry
 
-    span_down = (y_bot0, y_inf)   # “andar” inferior
-    span_mid  = (y_inf,  y_sup)   # “andar” do meio
-    span_up   = (y_sup,  y_top0)  # “andar” superior
+    span_down = (y_bot0, y_inf)
+    span_mid  = (y_inf,  y_sup)
+    span_up   = (y_sup,  y_top0)
 
     # ===========================================
     # 4) POSIÇÕES INICIAIS EM X (4 verticais)
     # ===========================================
     if not line_xs:
-        # Fim da elipse (direita)
         x_end_ellipse = float(mu_x) + float(rx)
-
-        # Clip opcional ao range do eixo, se já vier definido
         if axis_ranges and axis_ranges.get("x"):
             x_min_ax, x_max_ax = map(float, axis_ranges["x"])
             x_end_ellipse = max(min(x_end_ellipse, x_max_ax), x_min_ax)
 
-        # up e mid começam iguais, no fim da elipse
         x_up = x_end_ellipse
         x_mid = x_end_ellipse
 
@@ -138,21 +117,46 @@ def _make_step2_figure(
             q10, q90 = np.nanpercentile(xs, [10, 90])
             x_bottom, x_bottom2 = float(q10), float(q90)
         else:
-            # fallback em torno de μx ± rx
             x_bottom = float(mu_x) - 0.75 * float(rx)
             x_bottom2 = float(mu_x) + 0.75 * float(rx)
 
         line_xs = [x_bottom, x_mid, x_up, x_bottom2]
     else:
-        # Garante 4 posições e re-alinha v_mid ao v_up no init
         line_xs = (list(line_xs) + [line_xs[-1]])[:4]
-        # força alinhamento mid = up no primeiro draw
         line_xs[1] = float(line_xs[2])
 
     x_bottom, x_mid, x_up, x_bottom2 = line_xs[:4]
 
+    # --- Labels dentro das caixas ---
+    def mid(a, b):
+        return 0.5 * (float(a) + float(b))
 
-    # Cria as 4 verticais azuis já com spans Y por “andar”
+    x_left = mid(xmin, float(mu_x))
+    x_center = float(mu_x)
+    x_right = mid(float(mu_x), xmax)
+
+    y_down_c = mid(y_bot0, y_inf)
+    y_mid_c  = mid(y_inf,  y_sup)
+    y_up_c   = mid(y_sup,  y_top0)
+
+    labels = [
+        dict(x=x_center, y=mu_y,    text="N"),
+        dict(x=x_right,  y=y_mid_c, text="I"),
+        dict(x=x_left,   y=y_up_c,  text="LR"),
+        dict(x=x_right,  y=y_up_c,  text="LI"),
+        dict(x=x_center, y=y_down_c,text="S"),
+        dict(x=x_left,   y=y_down_c,text="SR"),
+        dict(x=x_right,  y=y_down_c,text="SI"),
+    ]
+    for ann in labels:
+        fig.add_annotation(
+            x=ann["x"], y=ann["y"], text=ann["text"],
+            showarrow=False, font=dict(size=12, color="#374151"),
+            xref="x", yref="y", xanchor="center", yanchor="middle",
+            align="center", bgcolor="rgba(255,255,255,0.6)",
+        )
+
+    # 4 verticais azuis
     fig.add_shape(
         type="line",
         x0=float(x_bottom), x1=float(x_bottom),
@@ -164,7 +168,7 @@ def _make_step2_figure(
     )
     fig.add_shape(
         type="line",
-        x0=float(x_mid), x1=float(x_mid),
+        x0=float(x_center) + float(rx), x1=float(x_center) + float(rx),
         y0=span_mid[0], y1=span_mid[1],
         xref="x", yref="y",
         line=dict(color="deepskyblue", width=3),
@@ -197,12 +201,13 @@ def _make_step2_figure(
         autosize=False, width=640, height=640,
         margin=dict(l=60, r=10, t=80, b=60),
         title=dict(text=title, x=0.5, xanchor="center"),
-        xaxis_title=xcol or "NII",
-        yaxis_title=ycol or "Area",
+        xaxis_title="NII",
+        yaxis_title="Area",
         showlegend=True,
     )
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
 
-    # aplica ranges globais se existirem
     if axis_ranges and axis_ranges.get("x") and axis_ranges.get("y"):
         fig.update_layout(xaxis_range=axis_ranges["x"], yaxis_range=axis_ranges["y"])
 
@@ -212,9 +217,9 @@ def _make_step2_figure(
 
 # ---------- registro ----------
 def register(app):
-    # NEXT → constrói Step 2 usando elipse do Step 1 e eixos ±3sd (iguais ao Step 1)
+    # NEXT → constrói Step 2 usando elipse do Step 1 e eixos ±3sd
     @app.callback(
-        Output("store-nma-wizard", "data"),
+        Output("store-nma-wizard", "data", allow_duplicate=True),  # <- allow_duplicate aqui
         Output("nma-fig-lines", "figure"),
         Input("nma-step1-next", "n_clicks"),
         State("store-nma", "data"),
@@ -234,43 +239,41 @@ def register(app):
         std_a = (step1 or {}).get("std_a")
         sd_area = (step1 or {}).get("sd_area")
 
-        # 2) ranges globais (preferir salvos; senão recalcula)
+        # 2) ranges globais
         axis = (step1 or {}).get("axis")
         if not (axis and axis.get("x") and axis.get("y")):
             axis = compute_axis_ranges_from_all(params, k=3.0, headroom=0.05)
 
-        # 3) recuperar linhas salvas do store-nma
+        # 3) recuperar linhas salvas
         saved = ((store_nma or {}).get("step2", {}) or {}).get("lines", {})
 
         def _xs_from_saved(saved_dict):
-            # ordem: v_down, v_mid, v_up, v_down2
             keys = ["v_down", "v_mid", "v_up", "v_down2"]
             xs = []
             for k in keys:
                 x = (saved_dict.get(k) or {}).get("x")
                 xs.append(float(x) if x is not None else None)
-            # se v_up existir, alinhar v_mid a v_up no primeiro draw (tua regra)
             if xs[2] is not None:
                 xs[1] = xs[2]
             return xs if any(v is not None for v in xs) else None
 
         line_xs = _xs_from_saved(saved)
 
-        # 4) montar figura (usa a tua função já ajustada com os 3 “andares”)
+        # 4) figura
         fig = _make_step2_figure(
             pool=pool,
             xcol=xcol, ycol=ycol,
             mu_x=mu_x, mu_y=mu_y,
             rx=rx, ry=ry,
-            line_xs=line_xs,  # <- carrega posições salvas (ou defaults)
+            line_xs=line_xs,
             axis_ranges=axis,
             std_a=std_a, sd_area=sd_area,
         )
 
-        # 5) avança wizard para step 2 (destrava o _toggle_panes)
+        # 5) avança wizard para step 2
         return {"step": 2}, fig
 
-    # trava o Y das verticais quando o usuário arrasta (snap y para [μy−ry, μy+ry])
+    # trava o Y das verticais quando o usuário arrasta (snap por "andar")
     @app.callback(
         Output("nma-fig-lines", "figure", allow_duplicate=True),
         Output("store-nma", "data", allow_duplicate=True),
@@ -281,20 +284,13 @@ def register(app):
         prevent_initial_call=True,
     )
     def _lock_line_y(relayout, fig, step1, store_nma):
-        """
-        Mantém as linhas verticais (v_up, v_mid, v_down, v_down2) estritamente verticais,
-        repondo y0/y1 conforme o 'andar' e salvando as posições no store-nma.
-        """
         if not relayout or not fig:
             return no_update, no_update
 
         store_nma = store_nma or {}
         step1 = step1 or {}
 
-        # --- Parâmetros do Step1: média e "altura" dos quadrantes (ry) ---
-        # mean_a pode ter sido salvo como 'mean_a' ou 'mu_y'
         mean_a = step1.get("mean_a", step1.get("mu_y"))
-        # ry pode estar direto, ou podemos obter por sd_area * std_a
         ry = step1.get("ry")
         if ry is None:
             std_a = step1.get("std_a")
@@ -306,13 +302,11 @@ def register(app):
                     ry = None
 
         if mean_a is None or ry is None:
-            # sem parâmetros mínimos, não alteramos a figura nem o store
             return no_update, no_update
 
         mean_a = float(mean_a)
         ry = float(ry)
 
-        # Se tivermos std_a e sd_area, usamos as fórmulas originais do matplotlib.
         std_a = step1.get("std_a")
         sd_area = step1.get("sd_area")
         if std_a is not None and sd_area is not None:
@@ -324,32 +318,28 @@ def register(app):
                 y_bot0 = mean_a - (1.0 + sd_area) * std_a
                 y_top0 = mean_a + (2.0 + sd_area) * std_a
             except Exception:
-                # fallback seguro com ry
                 y_inf = mean_a - ry
                 y_sup = mean_a + ry
                 y_bot0 = mean_a - 2.0 * ry
                 y_top0 = mean_a + 2.0 * ry
         else:
-            # fallback usando apenas ry (mantém a lógica de 3 andares)
             y_inf = mean_a - ry
             y_sup = mean_a + ry
             y_bot0 = mean_a - 2.0 * ry
             y_top0 = mean_a + 2.0 * ry
 
         spans = {
-            "v_up": (y_sup, y_top0),  # andar superior
-            "v_mid": (y_inf, y_sup),  # andar do meio
-            "v_down": (y_bot0, y_inf),  # andar inferior
-            "v_down2": (y_bot0, y_inf),  # idem inferior
+            "v_up": (y_sup, y_top0),
+            "v_mid": (y_inf, y_sup),
+            "v_down": (y_bot0, y_inf),
+            "v_down2": (y_bot0, y_inf),
         }
 
-        # --- Preparos da figura/axis ---
         layout = fig.get("layout", {}) or {}
         shapes = [dict(s) for s in (layout.get("shapes") or [])]
         if not shapes:
             return no_update, no_update
 
-        # range do eixo X para clip opcional
         xaxis = layout.get("xaxis", {}) or {}
         x_range = xaxis.get("range")
         x_min_ax = x_max_ax = None
@@ -359,45 +349,34 @@ def register(app):
             except Exception:
                 x_min_ax = x_max_ax = None
 
-        # --- Aplica mudanças vindas do relayoutData ---
         changed = False
         for key, val in (relayout or {}).items():
-            # Esperamos formatos tipo: 'shapes[3].x0', 'shapes[3].x1'
             if not key.startswith("shapes["):
                 continue
             try:
-                idx_str = key.split("[", 1)[1].split("]", 1)[0]
-                idx = int(idx_str)
+                idx = int(key.split("[", 1)[1].split("]", 1)[0])
             except Exception:
                 continue
             if idx < 0 or idx >= len(shapes):
                 continue
 
             s = shapes[idx]
-            role = s.get("name")  # "v_up" | "v_mid" | "v_down" | "v_down2" (somente verticais azuis têm name)
+            role = s.get("name")
             if role not in spans:
-                # Ignora horizontais pretas, elipse, etc.
                 continue
 
-            # Só processa mudanças em X; mantém as linhas estritamente verticais
             if key.endswith(".x0") or key.endswith(".x1"):
                 try:
                     new_x = float(val)
                 except Exception:
                     continue
 
-                # clip opcional ao range do eixo
                 if x_min_ax is not None and x_max_ax is not None:
-                    if new_x < x_min_ax:
-                        new_x = x_min_ax
-                    elif new_x > x_max_ax:
-                        new_x = x_max_ax
+                    new_x = min(max(new_x, x_min_ax), x_max_ax)
 
-                # atualiza x0/x1 iguais
                 s["x0"] = new_x
                 s["x1"] = new_x
 
-                # repõe y0/y1 conforme o 'andar'
                 y0, y1 = spans[role]
                 s["y0"] = float(y0)
                 s["y1"] = float(y1)
@@ -409,16 +388,13 @@ def register(app):
         if not changed:
             return no_update, no_update
 
-        # --- Reescreve shapes na figure ---
         new_fig = dict(fig)
         new_layout = dict(layout)
         new_layout["shapes"] = shapes
         new_fig["layout"] = new_layout
 
-        # --- Salva posições finais no store-nma ---
         lines_data = {}
         for s in shapes:
-            # só coleta as verticais azuis com 'name'
             name = s.get("name")
             if not name:
                 continue
@@ -432,7 +408,6 @@ def register(app):
                     "y1": float(s["y1"]),
                 }
             except Exception:
-                # ignora se algum dado não estiver coerente
                 pass
 
         new_store = dict(store_nma)
@@ -442,28 +417,288 @@ def register(app):
 
         return new_fig, new_store
 
-    # alterna visibilidade dos panes preservando estilos originais
+    # Alterna visibilidade dos panes
     @app.callback(
-        Output("nma-stage1", "style"),
-        Output("nma-nii-slider-row", "style"),
-        Output("nma-step2-pane", "style"),
+        Output("nma-step1-pane", "style", allow_duplicate=True),
+        Output("nma-step2-pane", "style", allow_duplicate=True),
+        Output("nma-result-pane", "style", allow_duplicate=True),
         Input("store-nma-wizard", "data"),
-        State("nma-stage1", "style"),
-        State("nma-nii-slider-row", "style"),
-        State("nma-step2-pane", "style"),
-        prevent_initial_call=False,
+        prevent_initial_call=True,
     )
-    def _toggle_panes(wiz, s1, sNII, s2):
-        s1 = dict(s1 or {})
-        sNII = dict(sNII or {})
-        s2 = dict(s2 or {})
-        step = (wiz or {}).get("step", 1)
-        if step == 2:
-            s1["display"]  = "none"
-            sNII["display"] = "none"
-            s2["display"]  = "block"
+    def _toggle_panes(data):
+        step = (data or {}).get("step", 1)
+        show = {"display": "block"}
+        hide = {"display": "none"}
+        if step == 1:  return show, hide, hide
+        if step == 2:  return hide, show, hide
+        return hide, hide, show  # step == 3
+
+    # Step2 → Previous
+    @app.callback(
+        Output("store-nma-wizard", "data", allow_duplicate=True),
+        Input("nma-step2-prev", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def _step2_prev(n):
+        if not n:
+            raise dash.exceptions.PreventUpdate
+        return {"step": 1}
+
+    # Step2 → Complete: salva thresholds e vai para Step 3
+    @app.callback(
+        Output("store-nma-settings", "data"),
+        Output("store-nma-wizard", "data", allow_duplicate=True),
+        Input("nma-step2-complete", "n_clicks"),
+        State("nma-fig-lines", "figure"),
+        State("store-nma-step1", "data"),
+        prevent_initial_call=True,
+    )
+    def _step2_complete_save(n, fig, step1):
+        if not n:
+            raise dash.exceptions.PreventUpdate
+
+        # --- extrai thresholds das shapes do gráfico (por NOME) ---
+        shapes = (fig or {}).get("layout", {}).get("shapes", []) or []
+
+        # verticais (pelos nomes definidos no Step 2)
+        vmap = {"v_down": None, "v_mid": None, "v_up": None, "v_down2": None}
+        for s in shapes:
+            if not isinstance(s, dict):
+                continue
+            if s.get("type") != "line":
+                continue
+            name = s.get("name")
+            # é vertical se x0 == x1
+            try:
+                x0 = float(s.get("x0", "nan"))
+                x1 = float(s.get("x1", "inf"))
+            except Exception:
+                continue
+            if name in vmap and x0 == x1:
+                vmap[name] = x0
+
+        # horizontais pretas (duas) — usa igualdade de y0==y1
+        hlines = [s for s in shapes
+                  if isinstance(s, dict) and s.get("type") == "line"
+                  and str(s.get("y0")) is not None and str(s.get("y1")) is not None
+                  and float(s.get("y0", 0)) == float(s.get("y1", 1))]
+        ys = sorted({float(s["y0"]) for s in hlines}) if hlines else []
+        y_low, y_high = (ys[0], ys[-1]) if len(ys) >= 2 else (None, None)
+
+        # também salva centro/DPs vindos do Step 1 (se existirem)
+        step1 = step1 or {}
+        settings = {
+            "nii_mu": step1.get("mean_nii"),
+            "nii_sd": step1.get("std_nii"),
+            "area_mu": step1.get("mean_area"),
+            "area_sd": step1.get("std_area"),
+            "k_nii": step1.get("nii_sd_factor"),
+            "k_area": step1.get("area_sd_factor"),
+            "thresholds": {
+                # nomes das verticais (para reuso 1:1 no preview)
+                "v_down": vmap["v_down"],
+                "v_mid": vmap["v_mid"],
+                "v_up": vmap["v_up"],
+                "v_down2": vmap["v_down2"],
+                # agregados (retrocompatível com usos anteriores)
+                "x_left": vmap["v_down"],
+                "x_mid": vmap["v_mid"],
+                "x_right": vmap["v_up"],
+                # horizontais
+                "y_low": y_low,
+                "y_high": y_high,
+            },
+        }
+
+        # avança para o Step 3 (resultado/preview)
+        return settings, {"step": 3}
+
+    @app.callback(
+        Output("nma-fig-preview", "figure"),
+        Input("store-nma-settings", "data"),
+        State("store-nma-step1", "data"),
+        State("store-nma", "data"),
+        prevent_initial_call=True,
+    )
+    def _build_preview(settings, step1, store_nma):
+        import plotly.express as px
+        import plotly.graph_objects as go
+
+        step1 = step1 or {}
+        settings = settings or {}
+        thr = settings.get("thresholds", {}) or {}
+
+        # ==== DADOS (só controles) ====
+        df_json = step1.get("df_json")
+        if df_json is not None:
+            df = pd.read_json(df_json, orient="split")
+            xcol = "NII" if "NII" in df.columns else (step1.get("col_x") or "NII")
+            ycol = "Area" if "Area" in df.columns else (step1.get("col_y") or "Area")
         else:
-            s1["display"]  = "flex"     # como no layout original
-            sNII["display"] = "block"
-            s2["display"]  = "none"
-        return s1, sNII, s2
+            params = (store_nma or {}).get("params")
+            pool, xcol, ycol, _ = load_all_datasets(params)
+            df = pool.copy() if pool is not None else pd.DataFrame(columns=[xcol or "NII", ycol or "Area"])
+
+        # normaliza
+        rename_map = {}
+        if "NII" not in df.columns and xcol in df.columns:  rename_map[xcol] = "NII"
+        if "Area" not in df.columns and ycol in df.columns: rename_map[ycol] = "Area"
+        if step1.get("col_x_tmp") in df.columns:            rename_map[step1["col_x_tmp"]] = "NII"
+        if step1.get("col_y_tmp") in df.columns:            rename_map[step1["col_y_tmp"]] = "Area"
+        if rename_map: df = df.rename(columns=rename_map)
+
+        # filtra controles
+        control_label = str(step1.get("control_label", "control")).lower()
+        cond_col = next((c for c in df.columns if c.lower() in ("condition", "cond", "group", "grupo")), None)
+        if cond_col:
+            m = (df[cond_col].astype(str).str.lower().isin(["control", "controle", control_label])
+                 | df[cond_col].astype(str).str.contains("control", case=False, regex=False))
+            df_plot = df[m].copy()
+        else:
+            df_plot = df.copy()
+
+        # ==== PARÂMETROS GEOMÉTRICOS ====
+        mu_x = float(step1.get("mu_x") or step1.get("mean_nii") or 0.0)
+        mu_y = float(step1.get("mu_y") or step1.get("mean_area") or 0.0)
+        rx = float(step1.get("rx") or (step1.get("std_nii") or 1.0) * float(step1.get("nii_sd_factor", 1.0)))
+        # ry: usa regra com std_a/sd_area se houver
+        if isinstance(step1.get("std_a"), (int, float)) and isinstance(step1.get("sd_area"), (int, float)):
+            ry = float(step1["sd_area"]) * float(step1["std_a"])
+            y_low = mu_y - ry
+            y_high = mu_y + ry
+            y_bot0 = mu_y - (1.0 + float(step1["sd_area"])) * float(step1["std_a"])
+            y_top0 = mu_y + (2.0 + float(step1["sd_area"])) * float(step1["std_a"])
+        else:
+            ry = float(step1.get("ry") or 1.0)
+            y_low = mu_y - ry
+            y_high = mu_y + ry
+            y_bot0 = mu_y - 2.0 * ry
+            y_top0 = mu_y + 2.0 * ry
+
+        # sobrepõe valores do usuário (se existem)
+        y_low = float(thr.get("y_low", y_low)) if thr.get("y_low") is not None else y_low
+        y_high = float(thr.get("y_high", y_high)) if thr.get("y_high") is not None else y_high
+
+        x_v_down = thr.get("v_down", thr.get("x_left"))
+        x_v_mid = thr.get("v_mid", thr.get("x_mid"))
+        x_v_up = thr.get("v_up", thr.get("x_right"))
+        # fallback do x_v_mid = fim da elipse
+        if x_v_mid is None: x_v_mid = mu_x + rx
+
+        # ==== FIG ====
+        fig = px.scatter(df_plot if not df_plot.empty else pd.DataFrame({"NII": [], "Area": []}),
+                         x="NII", y="Area", opacity=0.75)
+        fig.update_layout(
+            margin=dict(l=60, r=10, t=40, b=60),
+            xaxis_title="NII",
+            yaxis_title="Area",
+            showlegend=False,
+        )
+        fig.update_xaxes(fixedrange=True)
+        fig.update_yaxes(fixedrange=True)
+
+        # ranges do step1 (se houver)
+        axis = step1.get("axis")
+        if axis and axis.get("x") and axis.get("y"):
+            fig.update_layout(xaxis_range=axis["x"], yaxis_range=axis["y"])
+
+        # elipse
+        fig.add_trace(ellipse_trace(mu_x, mu_y, rx, ry))
+
+        # horizontais pretas (largura 3)
+        xr = fig.layout.xaxis.range or [
+            float(df_plot["NII"].min()) if "NII" in df_plot and not df_plot.empty else mu_x - rx * 2,
+            float(df_plot["NII"].max()) if "NII" in df_plot and not df_plot.empty else mu_x + rx * 2,
+        ]
+        x0, x1 = float(xr[0]), float(xr[1])
+        for y in [y_low, y_high]:
+            fig.add_shape(type="line", x0=x0, x1=x1, y0=float(y), y1=float(y),
+                          xref="x", yref="y", line=dict(color="black", width=3))
+
+        # verticais em PRETO (mesma espessura das horizontais) com spans por “andar”
+        spans = [(y_bot0, y_low), (y_low, y_high), (y_high, y_top0)]
+        x_v_down = thr.get("v_down", thr.get("x_left"))
+        x_v_mid = thr.get("v_mid", thr.get("x_mid"))
+        x_v_up = thr.get("v_up", thr.get("x_right"))
+        x_v_down2 = thr.get("v_down2", None)  # <- nova (segunda do painel inferior)
+        if x_v_mid is None:
+            x_v_mid = mu_x + rx  # fallback: fim da elipse
+
+        # v_down  (andar inferior)
+        if x_v_down is not None:
+            y0, y1 = spans[0]
+            fig.add_shape(type="line",
+                          x0=float(x_v_down), x1=float(x_v_down),
+                          y0=float(y0), y1=float(y1),
+                          xref="x", yref="y",
+                          line=dict(color="black", width=3))
+
+        # v_mid   (andar do meio)
+        if x_v_mid is not None:
+            y0, y1 = spans[1]
+            fig.add_shape(type="line",
+                          x0=float(x_v_mid), x1=float(x_v_mid),
+                          y0=float(y0), y1=float(y1),
+                          xref="x", yref="y",
+                          line=dict(color="black", width=3))
+
+        # v_up    (andar superior)
+        if x_v_up is not None:
+            y0, y1 = spans[2]
+            fig.add_shape(type="line",
+                          x0=float(x_v_up), x1=float(x_v_up),
+                          y0=float(y0), y1=float(y1),
+                          xref="x", yref="y",
+                          line=dict(color="black", width=3))
+
+        # v_down2 (segunda do andar inferior)
+        if x_v_down2 is not None:
+            y0, y1 = spans[0]
+            fig.add_shape(type="line",
+                          x0=float(x_v_down2), x1=float(x_v_down2),
+                          y0=float(y0), y1=float(y1),
+                          xref="x", yref="y",
+                          line=dict(color="black", width=3))
+
+        # ===== Rótulos (caixas) SI, S, SR, N, LR, LI, I =====
+        # centros para posicionamento
+        xr = fig.layout.xaxis.range or [
+            float(df_plot["NII"].min()) if "NII" in df_plot and not df_plot.empty else mu_x - rx * 2,
+            float(df_plot["NII"].max()) if "NII" in df_plot and not df_plot.empty else mu_x + rx * 2,
+        ]
+        xmin, xmax = float(xr[0]), float(xr[1])
+
+        def mid(a, b):
+            return 0.5 * (float(a) + float(b))
+
+        x_left_c = mid(xmin, mu_x)
+        x_center_c = mu_x
+        x_right_c = mid(mu_x, xmax)
+        y_down_c = mid(y_bot0, y_low)
+        y_mid_c = mid(y_low, y_high)
+        y_up_c = mid(y_high, y_top0)
+
+        labels = [
+            ("SR", x_left_c, y_down_c),
+            ("S", x_center_c, y_down_c),
+            ("SI", x_right_c, y_down_c),
+            ("N", x_center_c, y_mid_c),
+            ("LR", x_left_c, y_up_c),
+            ("LI", x_right_c, y_up_c),
+            ("I", x_right_c, y_mid_c),
+        ]
+        for text, x, y in labels:
+            fig.add_annotation(
+                x=x, y=y, text=text,
+                xref="x", yref="y",
+                showarrow=False,
+                xanchor="center", yanchor="middle",
+                font=dict(size=12, color="#111827"),
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="#111827", borderwidth=1, borderpad=2,
+            )
+
+        return fig
+
+
+
