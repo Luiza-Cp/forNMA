@@ -27,24 +27,18 @@ def build_nma_right_pane():
                 id="nma-step1-pane",
                 style={"display": "block", "width": f"{BAY + G}px", "maxWidth": "90vw", "margin": "0 auto"},
                 children=[
-                    # título
                     html.Div(
                         html.H6("NMA — Step 1: Adjust threshold ellipse",
                                 style={"margin": 0, "textAlign": "center"}),
                     ),
 
-                    # debug (opcional)
                     html.Pre(
                         id="nma-step1-debug",
                         style={
-                            "width": "100%",
-                            "margin": "4px auto 0",
-                            "background": "#f8fafc",
-                            "border": "1px solid #e5e7eb",
-                            "borderRadius": "6px",
-                            "padding": "6px 8px",
-                            "fontSize": "12px",
-                            "whiteSpace": "pre-wrap",
+                            "width": "100%", "margin": "4px auto 0",
+                            "background": "#f8fafc", "border": "1px solid #e5e7eb",
+                            "borderRadius": "6px", "padding": "6px 8px",
+                            "fontSize": "12px", "whiteSpace": "pre-wrap",
                         },
                     ),
 
@@ -97,7 +91,7 @@ def build_nma_right_pane():
                                                         "userSelect": "none",
                                                         "height": "100%",
                                                         "display": "flex",
-                                                        "alignItems": "flex-end",   # texto começa embaixo
+                                                        "alignItems": "flex-end",
                                                         "justifyContent": "center",
                                                         "paddingBottom": "4px",
                                                     },
@@ -125,7 +119,7 @@ def build_nma_right_pane():
                                 style={"width": "var(--g)"},
                                 children=dcc.Graph(
                                     id="nma-fig-ellipse",
-                                    config={"editable": False,  "edits": {"shapePosition": True}, "displayModeBar": False},
+                                    config={"editable": False, "displayModeBar": False},
                                     style={"width": f"{G}px", "height": f"{G}px"},
                                 ),
                             ),
@@ -156,12 +150,7 @@ def build_nma_right_pane():
 
                     # Botão Next (só Step 1)
                     html.Div(
-                        style={
-                            "width": "100%",
-                            "margin": "0 auto",
-                            "display": "flex",
-                            "justifyContent": "center",
-                        },
+                        style={"width": "100%", "margin": "0 auto", "display": "flex", "justifyContent": "center"},
                         children=[html.Button("Next", id="nma-step1-next")],
                     ),
                 ],
@@ -175,7 +164,7 @@ def build_nma_right_pane():
                     html.H6("NMA — Step 2: Set NII thresholds", style={"textAlign": "center", "marginTop": "8px"}),
                     dcc.Graph(
                         id="nma-fig-lines",
-                        config={"editable": True, "edits": {"shapePosition": True}, "displayModeBar": False},
+                        config={"editable": True, "edits": {"shapePosition": True}},
                         style={"width": f"{G}px", "height": f"{G}px", "margin": "0 auto"},
                     ),
                     html.Div(
@@ -195,7 +184,7 @@ def build_nma_right_pane():
                 children=[
                     html.H6("NMA — Settings criadas", style={"textAlign": "center", "marginTop": "8px"}),
                     html.Div(
-                        "NMA setting complete",
+                        "As configurações foram criadas com sucesso.",
                         style={"textAlign": "center", "margin": "6px 0 12px", "color": "#065f46"},
                     ),
                     dcc.Graph(
@@ -203,12 +192,48 @@ def build_nma_right_pane():
                         config={"displayModeBar": False},
                         style={"width": f"{G}px", "height": f"{G}px", "margin": "0 auto"},
                     ),
+
+                    # Botão inicial (mostra painel)
                     html.Div(
-                        className="d-flex justify-content-center mt-2",
-                        children=[html.Button("Download settings", id="nma-download-settings")],
-                        # só layout por enquanto
+                        style={"display": "flex", "justifyContent": "center", "marginTop": "12px"},
+                        children=[html.Button("Save settings", id="nma-save-open")],
+                    ),
+
+                    # Painel de SAVE (inicialmente oculto)
+                    html.Div(
+                        id="nma-save-panel",
+                        style={"display": "none"},
+                        children=[
+                            html.Div(
+                                style={
+                                    "marginTop": "12px",
+                                    "display": "flex",
+                                    "flexDirection": "column",
+                                    "alignItems": "center",
+                                    "gap": "8px",
+                                },
+                                children=[
+                                    html.Div(
+                                        style={"display": "flex", "gap": "8px", "alignItems": "center"},
+                                        children=[
+                                            dcc.Input(
+                                                id="nma-save-path",
+                                                type="text",
+                                                placeholder="Escolha a pasta (ou digite o caminho)…",
+                                                style={"width": "420px"},
+                                            ),
+                                            html.Button("Browse…", id="nma-save-browse"),
+                                        ],
+                                    ),
+                                    html.Button("Save now", id="nma-save-do"),
+                                    html.Div(id="nma-save-status", style={"textAlign": "center", "marginTop": "6px"}),
+                                ],
+                            ),
+                        ],
                     ),
                 ],
             ),
+
         ],
     )
+

@@ -10,6 +10,15 @@ from fornma.gui.utils.nma_helpers import (
     ellipse_trace,
     compute_axis_ranges_from_all,
 )
+import io, os, pickle
+from pathlib import Path
+import matplotlib.patches as mp
+import io, os, pickle
+from pathlib import Path
+import matplotlib.patches as mp  # para mp.Ellipse no payload
+# para o seletor de pastas (abre o diálogo do SO no backend/local)
+import tkinter as tk
+from tkinter import filedialog as tkfd
 
 
 # ---------- utilidades ----------
@@ -17,6 +26,110 @@ def _to_num(s: pd.Series) -> pd.Series:
     if s.dtype == object:
         s = s.astype(str).str.replace(",", ".", regex=False)
     return pd.to_numeric(s, errors="coerce")
+def build_pkl_payload(settings: dict, step1: dict, store_nma: dict) -> dict:
+    """
+    Constrói um dicionário com o MESMO schema usado no NMA_settings.py (control_parameters.pickle).
+    Chaves: name, sd_area, sd_NII, mean_NII, std_NII, mean_a, std_a, circle, graph_limits,
+            ellipse, h_x, h_y_up, h_y_down, graph_box, v_upx, v_upy, v_midx, v_midy,
+            v_downx, v_downy, v_downx2, fig(None).
+    """
+    settings = settings or {}
+    step1    = step1 or {}
+    params   = (store_nma or {}).get("params")
+
+    # --- 1) parâmetros geométricos do Step 1 ---
+    mean_NII = float(step1.get("mean_nii", step1.get("mu_x", 0.0)))
+    mean_a   = float(step1.get("mean_area", step1.get("mu_y", 0.0)))
+    std_NII  = float(step1.get("std_nii",  step1.get("std_x", 1.0)))
+    std_a    = float(step1.get("std_a",    step1.get("std_y", 1.0)))
+    sd_area  = float(step1.get("sd_area", step1.get("area_sd_factor", 1.0)))   # nº de SD (slider Área)
+    sd_NII   = float(step1.get("nii_sd_factor", step1.get("sd_nii", 1.0)))      # nº de SD (slider NII)
+
+    rx = sd_NII * std_NII
+    ry = sd_area * std_a
+
+    # --- 2) horizontais (iguais às do NMA_settings.py) ---
+    h_x      = [mean_NII - rx, mean_NII + 3.0 * rx]
+    h_y_up   = [mean_a + ry, mean_a + ry]
+    h_y_down = [mean_a - ry, mean_a - ry]
+
+    # --- 3) elipse (objeto matplotlib) e circle (linspace) ---
+    circle  = np.linspace(0, 2 * np.pi, 100)
+    ellipse = mp.Ellipse((mean_NII, mean_a),
+                         2 * rx,            # width
+                         2 * ry,            # height
+                         ec='black', fc=None, fill=False)
+
+    # --- 4) limites do gráfico (como calc_area_NII_lims) ---
+    # usa função global se disponível, senão degrada para ranges do step1
+    try:
+        # preferir ±3sd globais + headroom, depois converter ao estilo min/max
+        axis = step1.get("axis")
+        if not (axis and axis.get("x") and axis.get("y")):
+            axis = compute_axis_ranges_from_all(params, k=3.0, headroom=0.0)
+        min_a, max_a = float(axis["y"][0]), float(axis["y"][1])
+        min_NII, max_NII = float(axis["x"][0]), float(axis["x"][1])
+        # pequeno ajuste no "min" (segue ideia do código original menos 1/3 do min)
+        min_a = min_a - (min_a / 3.0) if min_a > 0 else min_a
+        min_NII = min_NII - (min_NII / 3.0) if min_NII > 0 else min_NII
+        graph_limits = (min_a, max_a, min_NII, max_NII)
+    except Exception:
+        graph_limits = (mean_a - 3*std_a, mean_a + 3*std_a,
+                        mean_NII - 3*std_NII, mean_NII + 3*std_NII)
+
+    # --- 5) verticais do usuário (por nome), convertendo para o formato do PKL ---
+    thr      = (settings.get("thresholds") or {})
+    v_upx_x  = thr.get("v_up",   thr.get("x_right", mean_NII + 1.5*rx))
+    v_midx_x = thr.get("v_mid",  thr.get("x_mid",   mean_NII + 1.5*rx))
+    v_downx_x= thr.get("v_down", thr.get("x_left",  mean_NII))
+    v_downx2_x = thr.get("v_down2", None)
+
+    # y spans iguais ao script original:
+    #   v_upy:   [mean_a + sd_area*std_a, mean_a + (2+sd_area)*std_a]
+    #   v_midy:  [mean_a - sd_area*std_a, v_upy[0]]
+    #   v_downy: [mean_a - (1+sd_area)*std_a, mean_a - sd_area*std_a]
+    v_upy   = [int(mean_a + sd_area*std_a),            int(mean_a + (2.0 + sd_area)*std_a)]
+    v_midy  = [int(mean_a - sd_area*std_a),            int(v_upy[0])]
+    v_downy = [int(mean_a - (1.0 + sd_area)*std_a),    int(mean_a - sd_area*std_a)]
+
+    v_upx    = [float(v_upx_x),    float(v_upx_x)]
+    v_midx   = [float(v_midx_x),   float(v_midx_x)]
+    v_downx  = [float(v_downx_x),  float(v_downx_x)]
+    v_downx2 = [float(v_downx2_x), float(v_downx2_x)] if v_downx2_x is not None else [float(v_upx_x), float(v_upx_x)]
+
+    # --- 6) rótulos/estilo da caixa (igual ao original) ---
+    graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7, ec="#bdbbbb", lw=1)
+
+    # --- 7) nome do dataset (quando houver) ---
+    name = (params or {}).get("name") or (step1.get("dataset_name") or "Dataset 1")
+
+    # --- 8) figura matplotlib (no nosso fluxo não existe aqui) ---
+    fig = None
+
+    return {
+        "name": name,
+        "sd_area": sd_area,
+        "sd_NII": sd_NII,
+        "mean_NII": mean_NII,
+        "std_NII": std_NII,
+        "mean_a": mean_a,
+        "std_a": std_a,
+        "circle": circle,
+        "graph_limits": graph_limits,
+        "ellipse": ellipse,
+        "h_x": h_x,
+        "h_y_up": h_y_up,
+        "h_y_down": h_y_down,
+        "graph_box": graph_box,
+        "v_upx": v_upx,
+        "v_upy": v_upy,
+        "v_midx": v_midx,
+        "v_midy": v_midy,
+        "v_downx": v_downx,
+        "v_downy": v_downy,
+        "v_downx2": v_downx2,
+        "fig": fig,
+    }
 
 
 def _make_step2_figure(
@@ -699,6 +812,79 @@ def register(app):
             )
 
         return fig
+
+
+    # abre o painel de SAVE quando clicar em "Save settings"
+    @app.callback(
+        Output("nma-save-panel", "style", allow_duplicate=True),
+        Input("nma-save-open", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def _open_save_panel(n):
+        if not n:
+            raise dash.exceptions.PreventUpdate
+        return {"display": "block"}  # já centralizamos via estilos do container
+
+    # botão "Browse…" → abre seletor de pastas do sistema e preenche o input
+    @app.callback(
+        Output("nma-save-path", "value", allow_duplicate=True),
+        Input("nma-save-browse", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def _browse_folder(n):
+        if not n:
+            raise dash.exceptions.PreventUpdate
+        try:
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            path = tkfd.askdirectory(title="Escolha a pasta para salvar as configurações")
+            root.destroy()
+            if not path:
+                raise dash.exceptions.PreventUpdate
+            return path
+        except Exception:
+            # Se falhar (ex.: ambiente headless), não apaga o campo
+            raise dash.exceptions.PreventUpdate
+
+    # "Save now" → grava o pickle no disco
+    @app.callback(
+        Output("nma-save-status", "children", allow_duplicate=True),
+        Input("nma-save-do", "n_clicks"),
+        State("nma-save-path", "value"),
+        State("store-nma-settings", "data"),
+        State("store-nma-step1", "data"),
+        State("store-nma", "data"),
+        prevent_initial_call=True,
+    )
+    def _save_settings_to_disk(n, save_dir, settings, step1, store_nma):
+        if not n:
+            raise dash.exceptions.PreventUpdate
+
+        if not save_dir or not str(save_dir).strip():
+            return "⚠️ Informe (ou escolha com Browse) uma pasta válida."
+
+        p = Path(str(save_dir)).expanduser().resolve()
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            return f"❌ Não foi possível criar/acessar a pasta: {e}"
+
+        try:
+            payload = build_pkl_payload(settings or {}, step1 or {}, store_nma or {})
+            out_path = p / "control_parameters.pickle"
+            with open(out_path, "wb") as f:
+                pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+        except Exception as e:
+            return f"❌ Erro ao salvar: {e}"
+
+        return f"✅ Salvo em: {out_path}"
+
+
+
+
+
+
 
 
 
