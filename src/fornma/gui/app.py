@@ -27,9 +27,9 @@ from .layouts.registration import build_registration_sidebar
 
 import json, threading, time, os, base64
 from datetime import datetime
+from fornma.gui.callbacks import nma_step1
 
 PROGRESS_FILE = None
-
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 try:
@@ -698,6 +698,7 @@ def create_app():
     register_registration_callbacks(app,  pick_directory_dialog)
     register_foci_callbacks(app, pick_directory_dialog)
     register_nma_callbacks(app, pick_file_dialog)
+    nma_step1.register_load_settings_callbacks(app)
     nma_step1_callbacks.register(app)
     nma_step2_callbacks.register(app)
 

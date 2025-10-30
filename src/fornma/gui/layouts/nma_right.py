@@ -148,6 +148,17 @@ def build_nma_right_pane():
                         ],
                     ),
 
+                    # 🔵 Botão AUTO (DBSCAN) — novo
+                    html.Div(
+                        style={
+                            "width": f"{G}px", "maxWidth": "90vw", "margin": "0 auto",
+                            "display": "flex", "justifyContent": "center", "gap": "8px",
+                        },
+                        children=[
+                            html.Button("Auto (DBSCAN)", id="nma-find-settings", title="Detect core cluster and set ellipse/sliders"),
+                        ],
+                    ),
+
                     # Botão Next (só Step 1)
                     html.Div(
                         style={"width": "100%", "margin": "0 auto", "display": "flex", "justifyContent": "center"},
@@ -183,57 +194,25 @@ def build_nma_right_pane():
                 style={"display": "none", "width": f"{BAY + G}px", "maxWidth": "90vw", "margin": "0 auto"},
                 children=[
                     html.H6("NMA — Settings criadas", style={"textAlign": "center", "marginTop": "8px"}),
-                    html.Div(
-                        "As configurações foram criadas com sucesso.",
-                        style={"textAlign": "center", "margin": "6px 0 12px", "color": "#065f46"},
-                    ),
                     dcc.Graph(
                         id="nma-fig-preview",
                         config={"displayModeBar": False},
                         style={"width": f"{G}px", "height": f"{G}px", "margin": "0 auto"},
                     ),
 
-                    # Botão inicial (mostra painel)
+                    # SAVE panel (mantido do seu layout atual)
                     html.Div(
                         style={"display": "flex", "justifyContent": "center", "marginTop": "12px"},
                         children=[html.Button("Save settings", id="nma-save-open")],
                     ),
-
-                    # Painel de SAVE (inicialmente oculto)
                     html.Div(
-                        id="nma-save-panel",
-                        style={"display": "none"},
-                        children=[
-                            html.Div(
-                                style={
-                                    "marginTop": "12px",
-                                    "display": "flex",
-                                    "flexDirection": "column",
-                                    "alignItems": "center",
-                                    "gap": "8px",
-                                },
-                                children=[
-                                    html.Div(
-                                        style={"display": "flex", "gap": "8px", "alignItems": "center"},
-                                        children=[
-                                            dcc.Input(
-                                                id="nma-save-path",
-                                                type="text",
-                                                placeholder="Escolha a pasta (ou digite o caminho)…",
-                                                style={"width": "420px"},
-                                            ),
-                                            html.Button("Browse…", id="nma-save-browse"),
-                                        ],
-                                    ),
-                                    html.Button("Save now", id="nma-save-do"),
-                                    html.Div(id="nma-save-status", style={"textAlign": "center", "marginTop": "6px"}),
-                                ],
-                            ),
-                        ],
+                        id="nma-save-status",
+                        style={"textAlign": "center", "marginTop": "8px", "fontFamily": "monospace"},
                     ),
+
+
+
                 ],
             ),
-
         ],
     )
-

@@ -73,7 +73,36 @@ def _footer():
         },
         children=[
             html.Hr(style={"margin": "8px 0"}),
-            html.Button("Create NMA Settings", id="btn-nma-build"),
+
+            dbc.Row(
+                [
+                    dbc.Col(
+                        dbc.Button(
+                            "Create NMA settings",
+                            id="btn-nma-build",
+                            color="primary",
+                            className="w-100",
+                            n_clicks=0,
+                        ),
+                        width=6,
+                    ),
+                    dbc.Col(
+                        dbc.Button(
+                            "Load settings",
+                            id="btn-nma-load",
+                            color="secondary",
+                            className="w-100",
+                            n_clicks=0,
+                        ),
+                        width=6,
+                    ),
+                ],
+                className="g-2",
+            ),
+            html.Div(
+                id="nma-load-status",
+                style={"marginTop": "8px", "fontFamily": "monospace"}
+            ),
         ],
     )
 

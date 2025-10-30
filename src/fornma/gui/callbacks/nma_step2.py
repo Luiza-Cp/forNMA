@@ -21,6 +21,36 @@ import tkinter as tk
 from tkinter import filedialog as tkfd
 
 
+def _extract_y_thresholds(fig_lines: dict):
+    if not fig_lines or "layout" not in fig_lines:
+        return None, None
+    ys = []
+    for shp in (fig_lines["layout"].get("shapes") or []):
+        if shp.get("type") == "line" and shp.get("y0") == shp.get("y1"):
+            try:
+                ys.append(float(shp["y0"]))
+            except Exception:
+                pass
+    if not ys:
+        return None, None
+    ys = sorted(ys)
+    return ys[0], ys[-1]  # low, high
+
+def _extract_verticals(fig_lines: dict):
+    # Lê linhas azuis por "name" (v_down, v_mid, v_up, v_down2); se não houver, deixa None
+    vmap = {"v_down": None, "v_mid": None, "v_up": None, "v_down2": None}
+    if not fig_lines or "layout" not in fig_lines:
+        return vmap
+    for s in (fig_lines["layout"].get("shapes") or []):
+        if s.get("type") == "line" and s.get("line", {}).get("color") == "deepskyblue":
+            name = s.get("name")
+            if name in vmap:
+                try:
+                    vmap[name] = float(s["x0"])
+                except Exception:
+                    pass
+    return vmap
+
 # ---------- utilidades ----------
 def _to_num(s: pd.Series) -> pd.Series:
     if s.dtype == object:
@@ -848,43 +878,159 @@ def register(app):
             raise dash.exceptions.PreventUpdate
 
     # "Save now" → grava o pickle no disco
+    # === SAVE: clicar em "Save settings" -> abre seletor de pasta e salva imediatamente ===
     @app.callback(
-        Output("nma-save-status", "children", allow_duplicate=True),
-        Input("nma-save-do", "n_clicks"),
-        State("nma-save-path", "value"),
+        Output("nma-save-status", "children"),
+        Input("nma-save-open", "n_clicks"),
         State("store-nma-settings", "data"),
         State("store-nma-step1", "data"),
         State("store-nma", "data"),
         prevent_initial_call=True,
     )
-    def _save_settings_to_disk(n, save_dir, settings, step1, store_nma):
+    def _save_settings_click(n, settings, step1, store_nma):
         if not n:
             raise dash.exceptions.PreventUpdate
 
-        if not save_dir or not str(save_dir).strip():
-            return "⚠️ Informe (ou escolha com Browse) uma pasta válida."
-
-        p = Path(str(save_dir)).expanduser().resolve()
+        # 1) Monta o payload no MESMO schema esperado pelo NMA_settings.py
         try:
-            p.mkdir(parents=True, exist_ok=True)
+            payload = build_pkl_payload(settings=settings or {}, step1=step1 or {}, store_nma=store_nma or {})
         except Exception as e:
-            return f"❌ Não foi possível criar/acessar a pasta: {e}"
+            return f"Erro ao montar payload: {e}"
 
+        # 2) Pergunta a pasta para salvar (diálogo nativo do SO)
         try:
-            payload = build_pkl_payload(settings or {}, step1 or {}, store_nma or {})
-            out_path = p / "control_parameters.pickle"
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            save_dir = tkfd.askdirectory(title="Escolha a pasta para salvar as configurações NMA")
+            root.destroy()
+        except Exception as e:
+            return f"Não foi possível abrir o seletor de pastas (ambiente headless?): {e}"
+
+        if not save_dir:
+            raise dash.exceptions.PreventUpdate  # usuário cancelou
+
+        # 3) Escreve o arquivo .pickle no diretório escolhido
+        try:
+            save_dir = Path(save_dir)
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            # nome padrão compatível com o seu script antigo:
+            out_path = save_dir / "control_parameters.pickle"
             with open(out_path, "wb") as f:
-                pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(payload, f)
+
+            # (opcional) um JSON visível para inspeção rápida
+            # from json import dump;  dump(payload, open(save_dir / "control_parameters.json", "w"), default=str, indent=2)
+
+            return f"✅ Settings salvas em: {out_path}"
         except Exception as e:
-            return f"❌ Erro ao salvar: {e}"
+            return f"Erro ao salvar o arquivo: {e}"
 
-        return f"✅ Salvo em: {out_path}"
+    @app.callback(
+        Output("nma-fig-preview", "figure", allow_duplicate=True),
+        Output("nma-result-pane", "style", allow_duplicate=True),
+        Output("nma-step2-pane", "style", allow_duplicate=True),
+        Input("nma-step2-complete", "n_clicks"),
+        State("store-nma-settings", "data"),  # <- lê o CONSOLIDADO
+        prevent_initial_call=True,
+    )
+    def _step2_complete(n, settings):
+        if not n:
+            return no_update, no_update, no_update
 
+        if not settings or not settings.get("sample"):
+            f = go.Figure()
+            f.update_layout(title="Missing final settings", width=640, height=640)
+            return f, {"display": "block"}, {"display": "none"}
 
+        xcol = settings.get("xcol", "NII")
+        ycol = settings.get("ycol", "Area")
+        mu_x = float(settings.get("mu_x", 0.0))
+        mu_y = float(settings.get("mu_y", 0.0))
+        rx = float(settings.get("rx", 1.0))
+        ry = float(settings.get("ry", 1.0))
+        axis = settings.get("axis") or {}
 
+        x = np.asarray(settings["sample"]["x"], dtype=float)
+        y = np.asarray(settings["sample"]["y"], dtype=float)
+        df = pd.DataFrame({xcol: x, ycol: y})
 
+        fig = go.Figure()
+        if not df.empty:
+            fig.add_trace(go.Scattergl(
+                x=df[xcol], y=df[ycol],
+                mode="markers",
+                marker=dict(size=6, opacity=0.65, color="#2563eb"),
+                name="Controls (sample)",
+            ))
 
+        # Elipse FINAL (vem do Step 1/Auto/Sliders já consolidado)
+        ell = ellipse_trace(mu_x, mu_y, rx, ry)
+        ell.update(line=dict(color="#111827", width=2), name="Ellipse (final)")
+        fig.add_trace(ell)
 
+        # Se o Step 2 definiu faixas horizontais, plote-as
+        y_lo = settings.get("y_lo");
+        y_hi = settings.get("y_hi")
+        if y_lo is not None:
+            fig.add_shape(type="line", x0=df[xcol].min(), x1=df[xcol].max(),
+                          y0=y_lo, y1=y_lo, line=dict(color="#ef4444", width=2, dash="dot"))
+        if y_hi is not None:
+            fig.add_shape(type="line", x0=df[xcol].min(), x1=df[xcol].max(),
+                          y0=y_hi, y1=y_hi, line=dict(color="#ef4444", width=2, dash="dot"))
 
+        fig.update_layout(
+            autosize=False, width=640, height=640,
+            margin=dict(l=60, r=10, t=70, b=60),
+            title=dict(text="NMA — Preview (final)", x=0.5, xanchor="center"),
+            xaxis_title=xcol, yaxis_title=ycol, showlegend=True,
+        )
+        if axis and axis.get("x") and axis.get("y"):
+            fig.update_layout(xaxis_range=axis["x"], yaxis_range=axis["y"])
+        fig.update_xaxes(fixedrange=True)
+        fig.update_yaxes(fixedrange=True)
 
+        return fig, {"display": "block"}, {"display": "none"}
+
+    def register_step2_collect(app):
+        @app.callback(
+            Output("store-nma-settings", "data", allow_duplicate=True),
+            Input("nma-fig-lines", "figure"),
+            State("store-nma-step1", "data"),
+            prevent_initial_call=True,
+        )
+        def _collect(fig_lines, step1):
+            if not step1:
+                return no_update
+
+            vmap = _extract_verticals(fig_lines)
+            y_low, y_high = _extract_y_thresholds(fig_lines)
+
+            settings = {
+                "xcol": step1.get("xcol"),
+                "ycol": step1.get("ycol"),
+                "mu_x": step1.get("mu_x"),
+                "mu_y": step1.get("mu_y"),
+                "rx": step1.get("rx"),
+                "ry": step1.get("ry"),
+                "kx": step1.get("kx"),
+                "ky": step1.get("ky"),
+                "axis": step1.get("axis"),
+                "sample": step1.get("sample"),
+                "thresholds": {
+                    "v_down": vmap["v_down"],
+                    "v_mid": vmap["v_mid"],
+                    "v_up": vmap["v_up"],
+                    "v_down2": vmap["v_down2"],
+                    # aliases retrocompatíveis que o build_pkl_payload também aceita
+                    "x_left": vmap["v_down"],
+                    "x_mid": vmap["v_mid"],
+                    "x_right": vmap["v_up"],
+                    # horizontais
+                    "y_low": y_low,
+                    "y_high": y_high,
+                },
+            }
+            return settings
 
