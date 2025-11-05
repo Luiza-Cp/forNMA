@@ -370,20 +370,26 @@ def register_load_settings_callbacks(app):
             Output("store-nma", "data", allow_duplicate=True),
             Output("store-nma-step1", "data", allow_duplicate=True),
             Output("store-nma-settings", "data", allow_duplicate=True),
-            Output("nma-result-pane", "style", allow_duplicate=True),
             Output("nma-step1-pane", "style", allow_duplicate=True),
             Output("nma-step2-pane", "style", allow_duplicate=True),
+            Output("nma-result-pane", "style", allow_duplicate=True),
             Output("nma-load-status", "children", allow_duplicate=True),
         ],
         [Input("btn-nma-load", "n_clicks")],
-        [State("store-nma", "data")],  # 👈 preserva o que já existe
+        [State("store-nma", "data")],
         prevent_initial_call=True,
     )
     def _on_click_load(n_clicks, store_nma_in):
+        import pickle
+        from pathlib import Path
+        import tkinter as tk
+        from tkinter import filedialog as tkfd
+        import dash
+
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
 
-        # 1) escolher arquivo
+        # --- seletor de arquivo .pkl/.pickle
         root = tk.Tk();
         root.withdraw();
         root.attributes("-topmost", True)
@@ -395,23 +401,90 @@ def register_load_settings_callbacks(app):
         if not file_path:
             raise dash.exceptions.PreventUpdate
 
-        # 2) carregar pickle
         with open(file_path, "rb") as f:
-            payload = pickle.load(f)
+            pkl = pickle.load(f)
 
-        # 3) converter p/ stores (sem mexer no df já carregado)
-        store_nma_out, store_step1, store_settings = _pkl_to_stores(payload, store_nma_in)
+        # --- preserva dataset já carregado
+        store_nma_out = dict(store_nma_in or {})
 
-        # 4) mostrar resultado e esconder steps
-        show, hide = {"display": "block"}, {"display": "none"}
+        # --- inferir colunas atualmente escolhidas no painel esquerdo
+        def _infer_cols_from_params(params):
+            rows = (params or {}).get("rows") or []
+            # preferir a primeira linha marcada como Control; se não houver, primeira linha qualquer
+            row = next((r for r in rows if r.get("is_control")), None) or (rows[0] if rows else {})
+            col_x = (row.get("col_nii") or row.get("col_x") or "NII")
+            col_y = (row.get("col_area") or row.get("col_y") or "Area")
+            return str(col_x), str(col_y)
+
+        params = (store_nma_out.get("params") or {})
+        col_x, col_y = _infer_cols_from_params(params)
+
+        # --- converter PKL -> stores (apenas parâmetros geométricos e thresholds)
+        def _pkl_to_step_stores(pkl, col_x: str, col_y: str):
+            mean_nii = float(pkl.get("mean_NII", 0.0))
+            mean_a = float(pkl.get("mean_a", 0.0))
+            std_nii = float(pkl.get("std_NII", 1.0))
+            std_a = float(pkl.get("std_a", 1.0))
+            sd_area = float(pkl.get("sd_area", 1.0))
+            sd_nii = float(pkl.get("sd_NII", 1.0))
+            rx = sd_nii * std_nii
+            ry = sd_area * std_a
+
+            gl = pkl.get("graph_limits") or (
+                mean_a - 3 * std_a, mean_a + 3 * std_a, mean_nii - 3 * std_nii, mean_nii + 3 * std_nii
+            )
+            min_a, max_a, min_nii, max_nii = [float(x) for x in gl]
+            axis = {"x": [min_nii, max_nii], "y": [min_a, max_a]}
+
+            def _first(v, default=None):
+                try:
+                    return float(v[0])
+                except Exception:
+                    return default
+
+            thresholds = {
+                "v_up": _first(pkl.get("v_upx")),
+                "v_mid": _first(pkl.get("v_midx")),
+                "v_down": _first(pkl.get("v_downx")),
+                "v_down2": _first(pkl.get("v_downx2")),
+                "y_low": _first(pkl.get("h_y_down"), mean_a - ry),
+                "y_high": _first(pkl.get("h_y_up"), mean_a + ry),
+                # aliases aceitos em alguns previews
+                "x_left": _first(pkl.get("v_downx"), mean_nii - rx),
+                "x_mid": _first(pkl.get("v_midx"), mean_nii),
+                "x_right": _first(pkl.get("v_upx"), mean_nii + rx),
+            }
+
+            store_step1 = {
+                "mu_x": mean_nii,
+                "mu_y": mean_a,
+                "std_nii": std_nii,
+                "std_a": std_a,
+                "sd_area": sd_area,
+                "nii_sd_factor": sd_nii,
+                "rx": rx,
+                "ry": ry,
+                "axis": axis,
+                "col_x": col_x,
+                "col_y": col_y,
+                # manter o mesmo rótulo usado na sua setagem manual
+                "control_label": (params.get("control_label") or "control"),
+            }
+            store_settings = {"thresholds": thresholds}
+            return store_step1, store_settings
+
+        store_step1, store_settings = _pkl_to_step_stores(pkl, col_x, col_y)
+
+        # --- mostrar o STEP 2 (preview sobre dados), esconder step1 e result
+        hide, show = {"display": "none"}, {"display": "block"}
         status = f"✅ Settings carregadas de: {Path(file_path).name}"
 
         return (
-            store_nma_out,  # 👈 mantém df_json/params já presentes
-            store_step1,
-            store_settings,
-            show,
-            hide,
-            hide,
+            store_nma_out,  # mantém dados já carregados
+            store_step1,  # parâmetros geométricos
+            store_settings,  # thresholds
+            hide,  # nma-step1-pane
+            show,  # nma-step2-pane  (<< usa o preview padrão do Step 2)
+            hide,  # nma-result-pane
             status,
         )
