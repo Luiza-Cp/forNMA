@@ -722,6 +722,29 @@ def register(app):
         y_low = float(thr.get("y_low", y_low)) if thr.get("y_low") is not None else y_low
         y_high = float(thr.get("y_high", y_high)) if thr.get("y_high") is not None else y_high
 
+        # --- GARANTE COERÊNCIA ELIPSE x THRESHOLDS HORIZONTAIS ---
+        # Se temos y_low e y_high vindos do Step 2, recalculamos ry (e opcionalmente mu_y)
+        try:
+            if y_low is not None and y_high is not None:
+                y_low_f = float(y_low)
+                y_high_f = float(y_high)
+
+                # raio vertical = metade da distância entre as horizontais
+                ry = abs(y_high_f - y_low_f) / 2.0
+
+                # centro vertical = meio entre as horizontais
+                mu_y = (y_high_f + y_low_f) / 2.0
+
+                # atualiza também os limites dos "andares" para ficar tudo consistente
+                y_low = mu_y - ry
+                y_high = mu_y + ry
+                y_bot0 = mu_y - 2.0 * ry
+                y_top0 = mu_y + 2.0 * ry
+        except Exception:
+            # se der algum problema numérico, cai fora silenciosamente
+            pass
+
+
         x_v_down = thr.get("v_down", thr.get("x_left"))
         x_v_mid = thr.get("v_mid", thr.get("x_mid"))
         x_v_up = thr.get("v_up", thr.get("x_right"))

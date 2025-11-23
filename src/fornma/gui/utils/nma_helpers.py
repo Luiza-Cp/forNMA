@@ -157,7 +157,7 @@ def ellipse_trace(xc, yc, rx, ry, n=256, name="threshold"):
     x = xc + rx * np.cos(t)
     y = yc + ry * np.sin(t)
     return go.Scatter(x=x, y=y, mode="lines", line=dict(width=2, color="black"),
-                      name=name, hoverinfo="skip")
+                      name=name, hoverinfo="skip", cliponaxis=True,)
 
 
 # -------------------- ranges globais --------------------
