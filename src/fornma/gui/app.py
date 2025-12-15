@@ -70,6 +70,20 @@ def pick_file_dialog() -> str:
         # fallback: sem GUI
         return ""
 
+def pick_pickle_dialog() -> str:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        path = filedialog.askopenfilename(
+            filetypes=[("Pickle files", "*.pkl *.pickle"), ("All files", "*.*")]
+        )
+        root.destroy()
+        return path or ""
+    except Exception:
+        return ""
 
 # --- initial table state (1 channel, 1 example row)
 def initial_table_state() -> Dict:
@@ -227,6 +241,9 @@ def create_app():
     store_foci_progress = dcc.Store(id="foci-progress-file", storage_type="session")
     store_nma = dcc.Store(id="store-nma", data={"rows": []}, storage_type="session")
     store_nma_ui = dcc.Store(id="store-nma-ui", data={"active_item": None},  storage_type="session")
+    # opções de plot da análise NMA (dot / heatmap)
+    store_nma_plot = dcc.Store(id="store-nma-plot", data={}, storage_type="session")
+
 
 
     # --- IMAGES MODAL
@@ -260,6 +277,7 @@ def create_app():
         store_foci_progress,
         store_nma,
         store_nma_ui,
+        store_nma_plot,
 
         html.Div([
             sidebars,  # left column (all sidebars)
@@ -698,7 +716,7 @@ def create_app():
     register_registration_callbacks(app,  pick_directory_dialog)
     register_foci_callbacks(app, pick_directory_dialog)
     register_nma_callbacks(app, pick_file_dialog)
-    nma_step1.register_load_settings_callbacks(app)
+    nma_step1.register_load_settings_callbacks(app, pick_pickle_dialog)
     nma_step1_callbacks.register(app)
     nma_step2_callbacks.register(app)
 

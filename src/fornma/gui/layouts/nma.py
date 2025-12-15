@@ -137,5 +137,11 @@ def build_sidebar():
                 ],
                 id="nma-params-wrapper",
             ),
+            html.Div(
+                id="nma-plot-config-container",
+                children=[
+
+                ],
+            ),
         ],
     )

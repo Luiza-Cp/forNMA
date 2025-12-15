@@ -19,7 +19,8 @@ import matplotlib.patches as mp  # para mp.Ellipse no payload
 # para o seletor de pastas (abre o diálogo do SO no backend/local)
 import tkinter as tk
 from tkinter import filedialog as tkfd
-
+# Adicione esta linha no início do arquivo nma_step2.py (após os imports)
+__all__ = ['register', '_build_preview', 'build_pkl_payload']
 
 def _extract_y_thresholds(fig_lines: dict):
     if not fig_lines or "layout" not in fig_lines:
@@ -56,87 +57,211 @@ def _to_num(s: pd.Series) -> pd.Series:
     if s.dtype == object:
         s = s.astype(str).str.replace(",", ".", regex=False)
     return pd.to_numeric(s, errors="coerce")
+
+
 def build_pkl_payload(settings: dict, step1: dict, store_nma: dict) -> dict:
     """
-    Constrói um dicionário com o MESMO schema usado no NMA_settings.py (control_parameters.pickle).
-    Chaves: name, sd_area, sd_NII, mean_NII, std_NII, mean_a, std_a, circle, graph_limits,
-            ellipse, h_x, h_y_up, h_y_down, graph_box, v_upx, v_upy, v_midx, v_midy,
-            v_downx, v_downy, v_downx2, fig(None).
+    Constrói um dicionário com o MESMO schema usado pelo script original (control_parameters.pickle).
     """
+    print("\n=== [DEBUG BUILD_PKL] INICIANDO ===")
+
     settings = settings or {}
-    step1    = step1 or {}
-    params   = (store_nma or {}).get("params")
+    step1 = step1 or {}
+    store_nma = store_nma or {}
+    params = store_nma.get("params")
 
-    # --- 1) parâmetros geométricos do Step 1 ---
-    mean_NII = float(step1.get("mean_nii", step1.get("mu_x", 0.0)))
-    mean_a   = float(step1.get("mean_area", step1.get("mu_y", 0.0)))
-    std_NII  = float(step1.get("std_nii",  step1.get("std_x", 1.0)))
-    std_a    = float(step1.get("std_a",    step1.get("std_y", 1.0)))
-    sd_area  = float(step1.get("sd_area", step1.get("area_sd_factor", 1.0)))   # nº de SD (slider Área)
-    sd_NII   = float(step1.get("nii_sd_factor", step1.get("sd_nii", 1.0)))      # nº de SD (slider NII)
+    # --- 1) DEBUG: Verificar valores recebidos ---
+    print("Valores recebidos do step1:")
+    print(f"  mu_x: {step1.get('mu_x')}")
+    print(f"  mu_y: {step1.get('mu_y')}")
+    print(f"  sd_x (std_NII real): {step1.get('sd_x')}")
+    print(f"  sd_y (std_a real): {step1.get('sd_y')}")
+    print(f"  kx: {step1.get('kx')}")
+    print(f"  ky: {step1.get('ky')}")
+    print(f"  rx: {step1.get('rx')}")
+    print(f"  ry: {step1.get('ry')}")
 
-    rx = sd_NII * std_NII
-    ry = sd_area * std_a
+    # --- 2) parâmetros básicos do Step 1 ---
+    # Usar as chaves CORRETAS que sabemos existir no step1
+    mean_NII = float(step1.get("mu_x", 0.0))
+    mean_a = float(step1.get("mu_y", 0.0))
 
-    # --- 2) horizontais (iguais às do NMA_settings.py) ---
-    h_x      = [mean_NII - rx, mean_NII + 3.0 * rx]
-    h_y_up   = [mean_a + ry, mean_a + ry]
-    h_y_down = [mean_a - ry, mean_a - ry]
+    # OBTER DESVIO PADRÃO DO CONTROLE - usar sd_x e sd_y!
+    std_NII = float(step1.get("sd_x", 1.0))  # Este é o std_NII correto do controle
+    std_a = float(step1.get("sd_y", 1.0))  # Este é o std_a correto do controle
 
-    # --- 3) elipse (objeto matplotlib) e circle (linspace) ---
-    circle  = np.linspace(0, 2 * np.pi, 100)
-    ellipse = mp.Ellipse((mean_NII, mean_a),
-                         2 * rx,            # width
-                         2 * ry,            # height
-                         ec='black', fc=None, fill=False)
+    # Fatores dos sliders
+    kx = float(step1.get("kx", 1.0))  # fator do slider NII
+    ky = float(step1.get("ky", 1.0))  # fator do slider Area
 
-    # --- 4) limites do gráfico (como calc_area_NII_lims) ---
-    # usa função global se disponível, senão degrada para ranges do step1
+    print(f"\nValores extraídos (corretos):")
+    print(f"  std_NII (de sd_x): {std_NII}")
+    print(f"  std_a (de sd_y): {std_a}")
+    print(f"  kx: {kx}, ky: {ky}")
+
+    # --- 3) thresholds vindos do Step 2 ---
+    thr = (settings.get("thresholds") or {})
+
+    # --- 4) Calcular rx (horizontal) e ry (vertical) ---
+    # rx = fator_NII * std_NII (do controle)
+    rx = kx * std_NII
+
+    # ry inicial = fator_Area * std_a (do controle)
+    ry_initial = ky * std_a
+
+    print(f"\nValores calculados inicialmente:")
+    print(f"  rx (kx * std_NII): {kx} * {std_NII} = {rx}")
+    print(f"  ry_initial (ky * std_a): {ky} * {std_a} = {ry_initial}")
+
+    # --- 5) Ajustar se Step 2 tem thresholds horizontais ---
+    y_low = thr.get("y_low")
+    y_high = thr.get("y_high")
+
+    if y_low is not None and y_high is not None:
+        try:
+            y_low_f = float(y_low)
+            y_high_f = float(y_high)
+
+            # Recalcular mean_a e ry baseado nas linhas horizontais do Step 2
+            mean_a = (y_high_f + y_low_f) / 2.0
+            ry = abs(y_high_f - y_low_f) / 2.0
+
+            # Ajustar ky para que ky * std_a = ry (para manter consistência)
+            if std_a != 0:
+                ky = ry / std_a
+            else:
+                ky = 1.0
+
+            print(f"\nAjustado por thresholds do Step 2:")
+            print(f"  y_low: {y_low_f}, y_high: {y_high_f}")
+            print(f"  Novo mean_a: {mean_a}")
+            print(f"  Novo ry: {ry}")
+            print(f"  ky ajustado: {ky} (era: {step1.get('ky')})")
+
+        except Exception as e:
+            print(f"Erro ao ajustar por thresholds: {e}")
+            ry = ry_initial
+    else:
+        ry = ry_initial
+
+    # --- 6) sd_NII e sd_area são os fatores (kx e ky) ---
+    sd_NII = kx
+    sd_area = ky
+
+    print(f"\nValores finais para pickle:")
+    print(f"  sd_NII: {sd_NII}")
+    print(f"  sd_area: {sd_area}")
+    print(f"  std_NII: {std_NII}")
+    print(f"  std_a: {std_a}")
+    print(f"  mean_NII: {mean_NII}")
+    print(f"  mean_a: {mean_a}")
+    print(f"  rx final (sd_NII * std_NII): {sd_NII * std_NII}")
+    print(f"  ry final (sd_area * std_a): {sd_area * std_a}")
+
+    # --- 7) horizontais ---
+    # Obter limites do gráfico para h_x cobrir toda largura
     try:
-        # preferir ±3sd globais + headroom, depois converter ao estilo min/max
         axis = step1.get("axis")
         if not (axis and axis.get("x") and axis.get("y")):
             axis = compute_axis_ranges_from_all(params, k=3.0, headroom=0.0)
+
         min_a, max_a = float(axis["y"][0]), float(axis["y"][1])
         min_NII, max_NII = float(axis["x"][0]), float(axis["x"][1])
-        # pequeno ajuste no "min" (segue ideia do código original menos 1/3 do min)
-        min_a = min_a - (min_a / 3.0) if min_a > 0 else min_a
-        min_NII = min_NII - (min_NII / 3.0) if min_NII > 0 else min_NII
+
+        if min_a > 0:
+            min_a -= min_a / 3.0
+        if min_NII > 0:
+            min_NII -= min_NII / 3.0
+
         graph_limits = (min_a, max_a, min_NII, max_NII)
     except Exception:
-        graph_limits = (mean_a - 3*std_a, mean_a + 3*std_a,
-                        mean_NII - 3*std_NII, mean_NII + 3*std_NII)
+        graph_limits = (
+            mean_a - 3 * std_a,
+            mean_a + 3 * std_a,
+            mean_NII - 3 * std_NII,
+            mean_NII + 3 * std_NII,
+        )
 
-    # --- 5) verticais do usuário (por nome), convertendo para o formato do PKL ---
-    thr      = (settings.get("thresholds") or {})
-    v_upx_x  = thr.get("v_up",   thr.get("x_right", mean_NII + 1.5*rx))
-    v_midx_x = thr.get("v_mid",  thr.get("x_mid",   mean_NII + 1.5*rx))
-    v_downx_x= thr.get("v_down", thr.get("x_left",  mean_NII))
+    # h_x deve cobrir toda a largura do gráfico
+    min_NII = graph_limits[2]
+    max_NII = graph_limits[3]
+    h_x = [min_NII, max_NII]
+
+    h_y_up = [mean_a + ry, mean_a + ry]
+    h_y_down = [mean_a - ry, mean_a - ry]
+
+    print(f"\nLinhas horizontais:")
+    print(f"  h_x (largura total): [{min_NII:.2f}, {max_NII:.2f}]")
+    print(f"  h_y_down: {h_y_down}")
+    print(f"  h_y_up: {h_y_up}")
+
+    # --- 8) elipse + circle ---
+    circle = np.linspace(0, 2 * np.pi, 100)
+    ellipse = {
+        "center": (mean_NII, mean_a),
+        "width": 2 * rx,
+        "height": 2 * ry,
+        "angle": 0
+    }
+
+    print(f"\nElipse:")
+    print(f"  centro: ({mean_NII}, {mean_a})")
+    print(f"  largura (2*rx): {2 * rx}")
+    print(f"  altura (2*ry): {2 * ry}")
+
+    # --- 9) verticais ---
+    v_downx_x = thr.get("v_down", thr.get("x_left", mean_NII))
+    v_midx_x = thr.get("v_mid", thr.get("x_mid", mean_NII + 0.75 * rx))
+    v_upx_x = thr.get("v_up", thr.get("x_right", mean_NII + 1.5 * rx))
     v_downx2_x = thr.get("v_down2", None)
 
-    # y spans iguais ao script original:
-    #   v_upy:   [mean_a + sd_area*std_a, mean_a + (2+sd_area)*std_a]
-    #   v_midy:  [mean_a - sd_area*std_a, v_upy[0]]
-    #   v_downy: [mean_a - (1+sd_area)*std_a, mean_a - sd_area*std_a]
-    v_upy   = [int(mean_a + sd_area*std_a),            int(mean_a + (2.0 + sd_area)*std_a)]
-    v_midy  = [int(mean_a - sd_area*std_a),            int(v_upy[0])]
-    v_downy = [int(mean_a - (1.0 + sd_area)*std_a),    int(mean_a - sd_area*std_a)]
+    v_downx_x = float(v_downx_x) if v_downx_x is not None else float(mean_NII)
+    v_midx_x = float(v_midx_x) if v_midx_x is not None else float(mean_NII + 0.75 * rx)
+    v_upx_x = float(v_upx_x) if v_upx_x is not None else float(mean_NII + 1.5 * rx)
 
-    v_upx    = [float(v_upx_x),    float(v_upx_x)]
-    v_midx   = [float(v_midx_x),   float(v_midx_x)]
-    v_downx  = [float(v_downx_x),  float(v_downx_x)]
-    v_downx2 = [float(v_downx2_x), float(v_downx2_x)] if v_downx2_x is not None else [float(v_upx_x), float(v_upx_x)]
+    if v_downx2_x is not None:
+        v_downx2_x = float(v_downx2_x)
+    else:
+        v_downx2_x = v_upx_x
 
-    # --- 6) rótulos/estilo da caixa (igual ao original) ---
-    graph_box = dict(boxstyle="round,pad=0.3", fc="#dedcdc", alpha=0.7, ec="#bdbbbb", lw=1)
+    # spans em Y (3 andares)
+    # Usando o ry ajustado para consistência
+    y_bot0 = mean_a - 2.0 * ry
+    y_inf = mean_a - ry
+    y_sup = mean_a + ry
+    y_top0 = mean_a + 2.0 * ry
 
-    # --- 7) nome do dataset (quando houver) ---
+    v_upy = [y_sup, y_top0]
+    v_midy = [y_inf, y_sup]
+    v_downy = [y_bot0, y_inf]
+
+    v_downx = [v_downx_x, v_downx_x]
+    v_midx = [v_midx_x, v_midx_x]
+    v_upx = [v_upx_x, v_upx_x]
+    v_downx2 = [v_downx2_x, v_downx2_x]
+
+    print(f"\nLinhas verticais:")
+    print(f"  v_downx: {v_downx} (x={v_downx_x})")
+    print(f"  v_midx: {v_midx} (x={v_midx_x})")
+    print(f"  v_upx: {v_upx} (x={v_upx_x})")
+    print(f"  v_downx2: {v_downx2} (x={v_downx2_x})")
+    print(f"  Spans Y: v_upy={v_upy}, v_midy={v_midy}, v_downy={v_downy}")
+
+    # --- 10) box style ---
+    graph_box = dict(
+        boxstyle="round,pad=0.3",
+        fc="#dedcdc",
+        alpha=0.7,
+        ec="#bdbbbb",
+        lw=1,
+    )
+
+    # --- 11) nome / fig ---
     name = (params or {}).get("name") or (step1.get("dataset_name") or "Dataset 1")
-
-    # --- 8) figura matplotlib (no nosso fluxo não existe aqui) ---
     fig = None
 
-    return {
+    # --- 12) payload final ---
+    payload = {
         "name": name,
         "sd_area": sd_area,
         "sd_NII": sd_NII,
@@ -147,10 +272,12 @@ def build_pkl_payload(settings: dict, step1: dict, store_nma: dict) -> dict:
         "circle": circle,
         "graph_limits": graph_limits,
         "ellipse": ellipse,
+
         "h_x": h_x,
         "h_y_up": h_y_up,
         "h_y_down": h_y_down,
         "graph_box": graph_box,
+
         "v_upx": v_upx,
         "v_upy": v_upy,
         "v_midx": v_midx,
@@ -158,9 +285,20 @@ def build_pkl_payload(settings: dict, step1: dict, store_nma: dict) -> dict:
         "v_downx": v_downx,
         "v_downy": v_downy,
         "v_downx2": v_downx2,
+
+        # escalares auxiliares
+        "x_left": v_downx_x,
+        "x_mid": v_midx_x,
+        "x_right": v_upx_x,
+
         "fig": fig,
     }
 
+    print("\n=== [DEBUG BUILD_PKL] FINALIZADO ===")
+    print(f"Número de chaves no payload: {len(payload)}")
+    print("====================================\n")
+
+    return payload
 
 def _make_step2_figure(
     pool: pd.DataFrame,
@@ -664,6 +802,23 @@ def register(app):
         prevent_initial_call=True,
     )
     def _build_preview(settings, step1, store_nma):
+        print("\n=== [DEBUG BUILD_PKL] VALORES DE ENTRADA ===")
+        print(f"Step1 recebido - chaves: {list(step1.keys())}")
+
+        # Verificar TODOS os valores relevantes
+        for key in ['mu_x', 'mu_y', 'sd_x', 'sd_y', 'std_nii', 'std_a',
+                    'std_NII', 'std_area', 'nii_std', 'area_std',
+                    'kx', 'ky', 'rx', 'ry']:
+            if key in step1:
+                print(f"  {key}: {step1[key]} (tipo: {type(step1[key])})")
+
+        std_NII_final = step1.get('std_nii') or step1.get('std_NII') or step1.get('sd_x') or 1.0
+        std_a_final = step1.get('std_a') or step1.get('std_area') or step1.get('sd_y') or 1.0
+
+        print(f"\nValores extraídos:")
+        print(f"  std_NII_final: {std_NII_final}")
+        print(f"  std_a_final: {std_a_final}")
+        print("==========================================\n")
         import plotly.express as px
         import plotly.graph_objects as go
 
