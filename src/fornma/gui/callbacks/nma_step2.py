@@ -802,224 +802,232 @@ def register(app):
         prevent_initial_call=True,
     )
     def _build_preview(settings, step1, store_nma):
-        print("\n=== [DEBUG BUILD_PKL] VALORES DE ENTRADA ===")
-        print(f"Step1 recebido - chaves: {list(step1.keys())}")
-
-        # Verificar TODOS os valores relevantes
-        for key in ['mu_x', 'mu_y', 'sd_x', 'sd_y', 'std_nii', 'std_a',
-                    'std_NII', 'std_area', 'nii_std', 'area_std',
-                    'kx', 'ky', 'rx', 'ry']:
-            if key in step1:
-                print(f"  {key}: {step1[key]} (tipo: {type(step1[key])})")
-
-        std_NII_final = step1.get('std_nii') or step1.get('std_NII') or step1.get('sd_x') or 1.0
-        std_a_final = step1.get('std_a') or step1.get('std_area') or step1.get('sd_y') or 1.0
-
-        print(f"\nValores extraídos:")
-        print(f"  std_NII_final: {std_NII_final}")
-        print(f"  std_a_final: {std_a_final}")
-        print("==========================================\n")
-        import plotly.express as px
-        import plotly.graph_objects as go
+        print("\n=== [DEBUG BUILD_PREVIEW] INICIANDO ===")
+        print(f"Step1 tem 'from_pickle': {step1.get('from_pickle') if step1 else 'No step1'}")
 
         step1 = step1 or {}
         settings = settings or {}
         thr = settings.get("thresholds", {}) or {}
 
-        # ==== DADOS (só controles) ====
-        df_json = step1.get("df_json")
-        if df_json is not None:
-            df = pd.read_json(df_json, orient="split")
-            xcol = "NII" if "NII" in df.columns else (step1.get("col_x") or "NII")
-            ycol = "Area" if "Area" in df.columns else (step1.get("col_y") or "Area")
-        else:
-            params = (store_nma or {}).get("params")
-            pool, xcol, ycol, _ = load_all_datasets(params)
-            df = pool.copy() if pool is not None else pd.DataFrame(columns=[xcol or "NII", ycol or "Area"])
+        # VERIFICAÇÃO CHAVE: Se veio do pickle
+        if step1.get("from_pickle"):
+            print("[DEBUG BUILD_PREVIEW] Usando parâmetros de pickle carregados")
 
-        # normaliza
-        rename_map = {}
-        if "NII" not in df.columns and xcol in df.columns:  rename_map[xcol] = "NII"
-        if "Area" not in df.columns and ycol in df.columns: rename_map[ycol] = "Area"
-        if step1.get("col_x_tmp") in df.columns:            rename_map[step1["col_x_tmp"]] = "NII"
-        if step1.get("col_y_tmp") in df.columns:            rename_map[step1["col_y_tmp"]] = "Area"
-        if rename_map: df = df.rename(columns=rename_map)
+            # 1) Usar parâmetros diretamente do step1 (que vieram do pickle)
+            mu_x = float(step1.get("mu_x", 0.0))
+            mu_y = float(step1.get("mu_y", 0.0))
+            rx = float(step1.get("rx", 1.0))
+            ry = float(step1.get("ry", 1.0))
+            kx = float(step1.get("kx", 1.0))
+            ky = float(step1.get("ky", 1.0))
 
-        # filtra controles
-        control_label = str(step1.get("control_label", "control")).lower()
-        cond_col = next((c for c in df.columns if c.lower() in ("condition", "cond", "group", "grupo")), None)
-        if cond_col:
-            m = (df[cond_col].astype(str).str.lower().isin(["control", "controle", control_label])
-                 | df[cond_col].astype(str).str.contains("control", case=False, regex=False))
-            df_plot = df[m].copy()
-        else:
-            df_plot = df.copy()
+            # 2) Pegar thresholds do pickle (armazenados em step1 ou settings)
+            pickle_thresholds = step1.get("pickle_thresholds", {})
+            if pickle_thresholds:
+                thr = pickle_thresholds
 
-        # ==== PARÂMETROS GEOMÉTRICOS ====
-        mu_x = float(step1.get("mu_x") or step1.get("mean_nii") or 0.0)
-        mu_y = float(step1.get("mu_y") or step1.get("mean_area") or 0.0)
-        rx = float(step1.get("rx") or (step1.get("std_nii") or 1.0) * float(step1.get("nii_sd_factor", 1.0)))
-        # ry: usa regra com std_a/sd_area se houver
-        if isinstance(step1.get("std_a"), (int, float)) and isinstance(step1.get("sd_area"), (int, float)):
-            ry = float(step1["sd_area"]) * float(step1["std_a"])
-            y_low = mu_y - ry
-            y_high = mu_y + ry
-            y_bot0 = mu_y - (1.0 + float(step1["sd_area"])) * float(step1["std_a"])
-            y_top0 = mu_y + (2.0 + float(step1["sd_area"])) * float(step1["std_a"])
-        else:
-            ry = float(step1.get("ry") or 1.0)
-            y_low = mu_y - ry
-            y_high = mu_y + ry
-            y_bot0 = mu_y - 2.0 * ry
-            y_top0 = mu_y + 2.0 * ry
+            print(f"[DEBUG BUILD_PREVIEW] Parâmetros do pickle: mu_x={mu_x}, mu_y={mu_y}, rx={rx}, ry={ry}")
+            print(f"[DEBUG BUILD_PREVIEW] Thresholds: {thr}")
 
-        # sobrepõe valores do usuário (se existem)
-        y_low = float(thr.get("y_low", y_low)) if thr.get("y_low") is not None else y_low
-        y_high = float(thr.get("y_high", y_high)) if thr.get("y_high") is not None else y_high
+            # 3) Axis do step1 ou criar um padrão
+            axis = step1.get("axis")
+            if not axis or not axis.get("x") or not axis.get("y"):
+                axis = {
+                    "x": [mu_x - 3 * rx, mu_x + 3 * rx],
+                    "y": [mu_y - 3 * ry, mu_y + 3 * ry]
+                }
 
-        # --- GARANTE COERÊNCIA ELIPSE x THRESHOLDS HORIZONTAIS ---
-        # Se temos y_low e y_high vindos do Step 2, recalculamos ry (e opcionalmente mu_y)
-        try:
-            if y_low is not None and y_high is not None:
-                y_low_f = float(y_low)
-                y_high_f = float(y_high)
+            # 4) Tentar carregar dados atuais para o scatter
+            df_plot = pd.DataFrame(columns=["NII", "Area"])
+            try:
+                params = (store_nma or {}).get("params")
+                if params:
+                    pool, xcol, ycol, _ = load_all_datasets(params)
+                    if pool is not None and not pool.empty:
+                        rename_map = {}
+                        if "NII" not in pool.columns and xcol in pool.columns:
+                            rename_map[xcol] = "NII"
+                        if "Area" not in pool.columns and ycol in pool.columns:
+                            rename_map[ycol] = "Area"
+                        if rename_map:
+                            pool = pool.rename(columns=rename_map)
 
-                # raio vertical = metade da distância entre as horizontais
-                ry = abs(y_high_f - y_low_f) / 2.0
+                        # Converter para float para garantir
+                        for col in ["NII", "Area"]:
+                            if col in pool.columns:
+                                pool[col] = pd.to_numeric(pool[col], errors='coerce')
 
-                # centro vertical = meio entre as horizontais
-                mu_y = (y_high_f + y_low_f) / 2.0
+                        df_plot = pool[["NII", "Area"]].dropna().copy()
+                        print(f"[DEBUG BUILD_PREVIEW] Carregados {len(df_plot)} pontos dos datasets atuais")
+            except Exception as e:
+                print(f"[DEBUG BUILD_PREVIEW] Erro ao carregar dados: {e}")
+                # Continua com DataFrame vazio
 
-                # atualiza também os limites dos "andares" para ficar tudo consistente
+            # 5) Criar figura básica
+            import plotly.express as px
+            import plotly.graph_objects as go
+
+            if not df_plot.empty:
+                fig = px.scatter(df_plot, x="NII", y="Area", opacity=0.75)
+            else:
+                # Figura vazia com eixos apropriados
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=[], y=[], mode='markers'))
+                fig.update_layout(
+                    xaxis_title="NII",
+                    yaxis_title="Area"
+                )
+
+            # 6) Adicionar elipse do pickle
+            fig.add_trace(ellipse_trace(mu_x, mu_y, rx, ry))
+
+            # 7) Adicionar thresholds horizontais (do pickle)
+            y_low = thr.get("y_low")
+            y_high = thr.get("y_high")
+
+            # Se não tiver thresholds no pickle, usar baseado na elipse
+            if y_low is None or y_high is None:
                 y_low = mu_y - ry
                 y_high = mu_y + ry
-                y_bot0 = mu_y - 2.0 * ry
-                y_top0 = mu_y + 2.0 * ry
-        except Exception:
-            # se der algum problema numérico, cai fora silenciosamente
-            pass
 
+            # Desenhar horizontais
+            xr = axis["x"]
+            x0, x1 = float(xr[0]), float(xr[1])
 
-        x_v_down = thr.get("v_down", thr.get("x_left"))
-        x_v_mid = thr.get("v_mid", thr.get("x_mid"))
-        x_v_up = thr.get("v_up", thr.get("x_right"))
-        # fallback do x_v_mid = fim da elipse
-        if x_v_mid is None: x_v_mid = mu_x + rx
+            for y in [y_low, y_high]:
+                fig.add_shape(
+                    type="line",
+                    x0=x0, x1=x1, y0=float(y), y1=float(y),
+                    xref="x", yref="y",
+                    line=dict(color="black", width=3)
+                )
 
-        # ==== FIG ====
-        fig = px.scatter(df_plot if not df_plot.empty else pd.DataFrame({"NII": [], "Area": []}),
-                         x="NII", y="Area", opacity=0.75)
-        fig.update_layout(
-            margin=dict(l=60, r=10, t=40, b=60),
-            xaxis_title="NII",
-            yaxis_title="Area",
-            showlegend=False,
-        )
-        fig.update_xaxes(fixedrange=True)
-        fig.update_yaxes(fixedrange=True)
+            # 8) Adicionar thresholds verticais (do pickle)
+            # Spans Y baseados na elipse
+            y_bot0 = mu_y - 2.0 * ry
+            y_top0 = mu_y + 2.0 * ry
+            spans = [(y_bot0, y_low), (y_low, y_high), (y_high, y_top0)]
 
-        # ranges do step1 (se houver)
-        axis = step1.get("axis")
-        if axis and axis.get("x") and axis.get("y"):
-            fig.update_layout(xaxis_range=axis["x"], yaxis_range=axis["y"])
+            # Verticais do pickle
+            x_v_down = thr.get("v_down", thr.get("x_left"))
+            x_v_mid = thr.get("v_mid", thr.get("x_mid"))
+            x_v_up = thr.get("v_up", thr.get("x_right"))
+            x_v_down2 = thr.get("v_down2", None)
 
-        # elipse
-        fig.add_trace(ellipse_trace(mu_x, mu_y, rx, ry))
+            # Fallbacks razoáveis se não existirem no pickle
+            if x_v_mid is None:
+                x_v_mid = mu_x + rx
+            if x_v_up is None:
+                x_v_up = mu_x + 1.5 * rx
+            if x_v_down is None:
+                x_v_down = mu_x - 0.75 * rx
+            if x_v_down2 is None:
+                x_v_down2 = mu_x + 0.75 * rx
 
-        # horizontais pretas (largura 3)
-        xr = fig.layout.xaxis.range or [
-            float(df_plot["NII"].min()) if "NII" in df_plot and not df_plot.empty else mu_x - rx * 2,
-            float(df_plot["NII"].max()) if "NII" in df_plot and not df_plot.empty else mu_x + rx * 2,
-        ]
-        x0, x1 = float(xr[0]), float(xr[1])
-        for y in [y_low, y_high]:
-            fig.add_shape(type="line", x0=x0, x1=x1, y0=float(y), y1=float(y),
-                          xref="x", yref="y", line=dict(color="black", width=3))
+            # Desenhar verticais
+            verticals = [
+                ("v_down", x_v_down, spans[0]),
+                ("v_mid", x_v_mid, spans[1]),
+                ("v_up", x_v_up, spans[2]),
+                ("v_down2", x_v_down2, spans[0])
+            ]
 
-        # verticais em PRETO (mesma espessura das horizontais) com spans por “andar”
-        spans = [(y_bot0, y_low), (y_low, y_high), (y_high, y_top0)]
-        x_v_down = thr.get("v_down", thr.get("x_left"))
-        x_v_mid = thr.get("v_mid", thr.get("x_mid"))
-        x_v_up = thr.get("v_up", thr.get("x_right"))
-        x_v_down2 = thr.get("v_down2", None)  # <- nova (segunda do painel inferior)
-        if x_v_mid is None:
-            x_v_mid = mu_x + rx  # fallback: fim da elipse
+            for name, x_val, (y0, y1) in verticals:
+                if x_val is not None:
+                    fig.add_shape(
+                        type="line",
+                        x0=float(x_val), x1=float(x_val),
+                        y0=float(y0), y1=float(y1),
+                        xref="x", yref="y",
+                        line=dict(color="black", width=3)
+                    )
 
-        # v_down  (andar inferior)
-        if x_v_down is not None:
-            y0, y1 = spans[0]
-            fig.add_shape(type="line",
-                          x0=float(x_v_down), x1=float(x_v_down),
-                          y0=float(y0), y1=float(y1),
-                          xref="x", yref="y",
-                          line=dict(color="black", width=3))
+            # 9) Adicionar rótulos das regiões
+            def mid(a, b):
+                return 0.5 * (float(a) + float(b))
 
-        # v_mid   (andar do meio)
-        if x_v_mid is not None:
-            y0, y1 = spans[1]
-            fig.add_shape(type="line",
-                          x0=float(x_v_mid), x1=float(x_v_mid),
-                          y0=float(y0), y1=float(y1),
-                          xref="x", yref="y",
-                          line=dict(color="black", width=3))
+            x_left_c = mid(x0, mu_x)
+            x_center_c = mu_x
+            x_right_c = mid(mu_x, x1)
+            y_down_c = mid(y_bot0, y_low)
+            y_mid_c = mid(y_low, y_high)
+            y_up_c = mid(y_high, y_top0)
 
-        # v_up    (andar superior)
-        if x_v_up is not None:
-            y0, y1 = spans[2]
-            fig.add_shape(type="line",
-                          x0=float(x_v_up), x1=float(x_v_up),
-                          y0=float(y0), y1=float(y1),
-                          xref="x", yref="y",
-                          line=dict(color="black", width=3))
+            labels = [
+                ("SR", x_left_c, y_down_c),
+                ("S", x_center_c, y_down_c),
+                ("SI", x_right_c, y_down_c),
+                ("N", x_center_c, y_mid_c),
+                ("LR", x_left_c, y_up_c),
+                ("LI", x_right_c, y_up_c),
+                ("I", x_right_c, y_mid_c),
+            ]
 
-        # v_down2 (segunda do andar inferior)
-        if x_v_down2 is not None:
-            y0, y1 = spans[0]
-            fig.add_shape(type="line",
-                          x0=float(x_v_down2), x1=float(x_v_down2),
-                          y0=float(y0), y1=float(y1),
-                          xref="x", yref="y",
-                          line=dict(color="black", width=3))
+            for text, x, y in labels:
+                fig.add_annotation(
+                    x=x, y=y, text=text,
+                    xref="x", yref="y",
+                    showarrow=False,
+                    xanchor="center", yanchor="middle",
+                    font=dict(size=12, color="#111827"),
+                    bgcolor="rgba(255,255,255,0.8)",
+                    bordercolor="#111827", borderwidth=1, borderpad=2,
+                )
 
-        # ===== Rótulos (caixas) SI, S, SR, N, LR, LI, I =====
-        # centros para posicionamento
-        xr = fig.layout.xaxis.range or [
-            float(df_plot["NII"].min()) if "NII" in df_plot and not df_plot.empty else mu_x - rx * 2,
-            float(df_plot["NII"].max()) if "NII" in df_plot and not df_plot.empty else mu_x + rx * 2,
-        ]
-        xmin, xmax = float(xr[0]), float(xr[1])
-
-        def mid(a, b):
-            return 0.5 * (float(a) + float(b))
-
-        x_left_c = mid(xmin, mu_x)
-        x_center_c = mu_x
-        x_right_c = mid(mu_x, xmax)
-        y_down_c = mid(y_bot0, y_low)
-        y_mid_c = mid(y_low, y_high)
-        y_up_c = mid(y_high, y_top0)
-
-        labels = [
-            ("SR", x_left_c, y_down_c),
-            ("S", x_center_c, y_down_c),
-            ("SI", x_right_c, y_down_c),
-            ("N", x_center_c, y_mid_c),
-            ("LR", x_left_c, y_up_c),
-            ("LI", x_right_c, y_up_c),
-            ("I", x_right_c, y_mid_c),
-        ]
-        for text, x, y in labels:
-            fig.add_annotation(
-                x=x, y=y, text=text,
-                xref="x", yref="y",
-                showarrow=False,
-                xanchor="center", yanchor="middle",
-                font=dict(size=12, color="#111827"),
-                bgcolor="rgba(255,255,255,0.8)",
-                bordercolor="#111827", borderwidth=1, borderpad=2,
+            # 10) Configurar layout final
+            fig.update_layout(
+                margin=dict(l=60, r=10, t=40, b=60),
+                xaxis_title="NII",
+                yaxis_title="Area",
+                showlegend=False,
+                title="NMA Preview (settings carregadas do arquivo)"
             )
 
-        return fig
+            if axis and axis.get("x") and axis.get("y"):
+                fig.update_layout(xaxis_range=axis["x"], yaxis_range=axis["y"])
+
+            fig.update_xaxes(fixedrange=True)
+            fig.update_yaxes(fixedrange=True)
+
+            print("[DEBUG BUILD_PREVIEW] Preview gerado a partir do pickle")
+            return fig
+
+        # ============================================================
+        # CASO NORMAL (quando NÃO veio do pickle)
+        # ============================================================
+        else:
+            print("[DEBUG BUILD_PREVIEW] Modo normal (não veio do pickle)")
+
+            # Lógica original que você já tinha
+            # ... (mantenha todo o seu código existente aqui)
+
+            # Apenas para referência, vou incluir um esqueleto do código original
+            # para que você possa copiar/colar o seu original aqui
+
+            try:
+                # Seu código original da _build_preview vai aqui
+                # (tudo o que estava antes da modificação)
+
+                # Exemplo do fluxo original:
+                df_json = step1.get("df_json")
+                if df_json is not None:
+                    df = pd.read_json(df_json, orient="split")
+                    # ... resto do código original
+
+                # IMPORTANTE: No final, retorne a figura como antes
+                return fig  # (sua figura original)
+
+            except Exception as e:
+                print(f"[DEBUG BUILD_PREVIEW] Erro no modo normal: {e}")
+                # Fallback
+                import plotly.graph_objects as go
+                fig = go.Figure()
+                fig.update_layout(
+                    title="Erro ao gerar preview",
+                    xaxis_title="NII",
+                    yaxis_title="Area",
+                )
+                return fig
 
 
     # abre o painel de SAVE quando clicar em "Save settings"

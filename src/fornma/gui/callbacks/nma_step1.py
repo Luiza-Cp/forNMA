@@ -176,7 +176,10 @@ def register(app):
         prevent_initial_call=True,
     )
     def _step1_init(_n_clicks, store_nma):
+
         params = (store_nma or {}).get("params")
+        if params and params.get("loaded_from_pickle"):
+            raise dash.exceptions.PreventUpdate
         if not params:
             if ctx.triggered_id == "btn-nma-build":
                 return no_update, no_update, no_update, no_update, "aguardando params do botão…"
@@ -400,7 +403,7 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
             Output("nma-step1-pane", "style", allow_duplicate=True),
             Output("nma-step2-pane", "style", allow_duplicate=True),
             Output("nma-result-pane", "style", allow_duplicate=True),
-            Output("nma-fig-preview", "figure", allow_duplicate=True),  # ADICIONADO
+            Output("nma-fig-preview", "figure", allow_duplicate=True),
             Output("nma-load-status", "children", allow_duplicate=True),
             Output("store-nma-ui", "data", allow_duplicate=True),
         ],
@@ -435,69 +438,59 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
 
             print(f"[DEBUG LOAD SETTINGS] Pickle carregado. Chaves: {list(pkl.keys())}")
 
+
         except Exception as e:
             print(f"[DEBUG LOAD SETTINGS] Erro ao carregar pickle: {e}")
-            # Retornar no_update para todos os outputs
-            return [dash.no_update] * 8 + [f"Erro ao carregar arquivo: {e}"]
+            return [dash.no_update] * 10 + [f"Erro ao carregar arquivo: {e}"]
 
-        # Extrair dados do pickle
-        datasets = pkl.get("datasets", []) or []
-        controls = pkl.get("controls", []) or []
 
-        # --- reconstruir store-nma ---
+
+        # ---- CORREÇÃO PRINCIPAL ----
+        # NÃO reconstrua os datasets do pickle. Em vez disso, mantenha o store_nma existente
+        # e apenas atualize os parâmetros geométricos nos stores step1 e settings.
+
+        # Se houver rows no store_nma_in, mantenha-as
         store_nma_out = dict(store_nma_in or {})
 
-        rows = []
-        for i, d in enumerate(datasets):
-            path_csv = (d.get("path") or "").strip()
-            rows.append({
-                "idx": i,
-                "name": d.get("name"),
-                "path": path_csv,
-                "columns": _read_columns(path_csv) if path_csv else [],
-                "area_col": d.get("area_col"),
-                "nii_col": d.get("nii_col"),
-                "is_control": d.get("is_control", False),
-            })
+        # RECONSTRUIR params das rows existentes
+        rows = store_nma_out.get("rows", [])
+        datasets_list = []
+        controls_list = []
 
-        if rows:
-            store_nma_out["rows"] = rows
-            store_nma_out["params"] = {
-                "datasets": datasets,
-                "controls": controls,
+        for r in rows:
+            dataset_info = {
+                "name": r.get("name", ""),
+                "path": r.get("path", ""),
+                "area_col": r.get("area_col"),
+                "nii_col": r.get("nii_col"),
+                "is_control": r.get("is_control", False)
             }
+            datasets_list.append(dataset_info)
 
-        print(f"[DEBUG LOAD SETTINGS] {len(rows)} datasets reconstruídos")
+            if r.get("is_control"):
+                controls_list.append(r.get("name", ""))
 
-        # --- criar store-nma-step1 do pickle ---
-        # Extrair valores geométricos do pickle
-        store_step1 = {
-            "mu_x": float(pkl.get("mean_NII", 0.0)),
-            "mu_y": float(pkl.get("mean_a", 0.0)),
-            "sd_x": float(pkl.get("std_NII", 1.0)),  # std_NII
-            "sd_y": float(pkl.get("std_a", 1.0)),  # std_a
-            "kx": float(pkl.get("sd_NII", 1.0)),  # fator NII
-            "ky": float(pkl.get("sd_area", 1.0)),  # fator Area
-            "rx": float(pkl.get("sd_NII", 1.0)) * float(pkl.get("std_NII", 1.0)),
-            "ry": float(pkl.get("sd_area", 1.0)) * float(pkl.get("std_a", 1.0)),
-            "col_x": "NII",
-            "col_y": "Area",
-            "axis": {
-                "x": [float(pkl.get("graph_limits", [0, 0, 0, 0])[2]),
-                      float(pkl.get("graph_limits", [0, 0, 0, 0])[3])],
-                "y": [float(pkl.get("graph_limits", [0, 0, 0, 0])[0]),
-                      float(pkl.get("graph_limits", [0, 0, 0, 0])[1])]
-            } if "graph_limits" in pkl and len(pkl["graph_limits"]) == 4 else {
-                "x": [float(pkl.get("mean_NII", 0)) - 3 * float(pkl.get("std_NII", 1)),
-                      float(pkl.get("mean_NII", 0)) + 3 * float(pkl.get("std_NII", 1))],
-                "y": [float(pkl.get("mean_a", 0)) - 3 * float(pkl.get("std_a", 1)),
-                      float(pkl.get("mean_a", 0)) + 3 * float(pkl.get("std_a", 1))]
-            },
-            "control_label": "control",
+        # ATUALIZAR params no store_nma_out
+        store_nma_out["params"] = {
+            "datasets": datasets_list,
+            "controls": controls_list
         }
 
+        # Mas atualize os params com as informações do pickle se necessário
+        params = store_nma_out.get("params", {})
+
+        # Adicione metadados do pickle aos params se quiser
+        params["loaded_from_pickle"] = {
+            "file": file_path,
+            "mean_NII": pkl.get("mean_NII"),
+            "mean_a": pkl.get("mean_a"),
+        }
+
+        store_nma_out["params"] = params
+        print(f"[DEBUG LOAD SETTINGS] Store-nma mantido com {len(store_nma_out.get('rows', []))} rows")
+
+
         # --- criar store-nma-settings do pickle ---
-        # Extrair thresholds
         def _first(v, default=None):
             try:
                 return float(v[0]) if isinstance(v, (list, tuple)) else float(v)
@@ -524,6 +517,9 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
             "k_nii": float(pkl.get("sd_NII", 1.0)),
             "k_area": float(pkl.get("sd_area", 1.0)),
             "thresholds": thresholds,
+            # Adicione metadados
+            "loaded_from_pickle": True,
+            "pickle_file": file_path,
         }
 
         print(f"[DEBUG LOAD SETTINGS] Stores criados com sucesso")
@@ -539,11 +535,17 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
         print(f"[DEBUG LOAD SETTINGS] Indo para Step 3...")
 
         # AGORA PRECISAMOS GERAR O PREVIEW!
-        # Vamos chamar a função _build_preview do nma_step2.py
-        # Primeiro, vamos importar e usar a mesma lógica
+        # Para isso, precisamos dos datasets. Como não os temos no pickle,
+        # precisamos usar os datasets que já estão no store_nma_in
+
         try:
             # Importar a função que gera o preview
             from .nma_step2 import _build_preview
+
+            # Para gerar o preview, precisamos dos dados.
+            # Vamos ver se temos dados no store_nma_in
+            if store_nma_in and store_nma_in.get("rows"):
+                print(f"[DEBUG LOAD SETTINGS] Usando {len(store_nma_in['rows'])} datasets existentes para preview")
 
             # Gerar o gráfico de preview
             fig_preview = _build_preview(store_settings, store_step1, store_nma_out)
@@ -556,13 +558,48 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
             import plotly.graph_objects as go
             fig_preview = go.Figure()
             fig_preview.update_layout(
-                title="Preview não disponível",
+                title="Preview não disponível (carregue datasets primeiro)",
                 xaxis_title="NII",
                 yaxis_title="Area",
             )
+            # Extrair valores geométricos do pickle (igual ao NMA step1 faz)
+            store_step1 = {
+                "from_pickle": True,  # FLAG IMPORTANTE
+                "mu_x": float(pkl.get("mean_NII", 0.0)),
+                "mu_y": float(pkl.get("mean_a", 0.0)),
+                "sd_x": float(pkl.get("std_NII", 1.0)),  # std_NII do controle
+                "sd_y": float(pkl.get("std_a", 1.0)),  # std_a do controle
+                "kx": float(pkl.get("sd_NII", 1.0)),  # fator NII (sd_NII)
+                "ky": float(pkl.get("sd_area", 1.0)),  # fator Area (sd_area)
+                "rx": float(pkl.get("sd_NII", 1.0)) * float(pkl.get("std_NII", 1.0)),
+                "ry": float(pkl.get("sd_area", 1.0)) * float(pkl.get("std_a", 1.0)),
+                "col_x": "NII",
+                "col_y": "Area",
+                "axis": {
+                    "x": [float(pkl.get("graph_limits", [0, 0, 0, 0])[2]),
+                          float(pkl.get("graph_limits", [0, 0, 0, 0])[3])],
+                    "y": [float(pkl.get("graph_limits", [0, 0, 0, 0])[0]),
+                          float(pkl.get("graph_limits", [0, 0, 0, 0])[1])]
+                } if "graph_limits" in pkl and len(pkl["graph_limits"]) == 4 else {
+                    "x": [float(pkl.get("mean_NII", 0)) - 3 * float(pkl.get("std_NII", 1)),
+                          float(pkl.get("mean_NII", 0)) + 3 * float(pkl.get("std_NII", 1))],
+                    "y": [float(pkl.get("mean_a", 0)) - 3 * float(pkl.get("std_a", 1)),
+                          float(pkl.get("mean_a", 0)) + 3 * float(pkl.get("std_a", 1))]
+                },
+                "control_label": "control",
+                # Adicionar thresholds também para fácil acesso
+                "pickle_thresholds": {
+                    "v_down": _first(pkl.get("v_downx")),
+                    "v_mid": _first(pkl.get("v_midx")),
+                    "v_up": _first(pkl.get("v_upx")),
+                    "v_down2": _first(pkl.get("v_downx2")),
+                    "y_low": _first(pkl.get("h_y_down")),
+                    "y_high": _first(pkl.get("h_y_up")),
+                }
+            }
 
         return (
-            store_nma_out,  # store-nma
+            store_nma_out,  # store-nma (mantido, com possível atualização de params)
             store_step1,  # store-nma-step1
             store_settings,  # store-nma-settings
             store_wizard,  # store-nma-wizard (step: 3)
