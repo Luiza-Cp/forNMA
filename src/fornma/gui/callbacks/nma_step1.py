@@ -165,6 +165,7 @@ def _make_step1_figure(df: pd.DataFrame | None, xcol: str, ycol: str,
 # ---------- registro ----------
 def register(app):
     # A) Clique em "Create NMA Settings" → gera amostra, SDs e desenha figura inicial
+    # A) Clique em "Create NMA Settings" → gera amostra, SDs e desenha figura inicial
     @app.callback(
         Output("nma-fig-ellipse", "figure"),
         Output("store-nma-step1", "data"),
@@ -176,10 +177,12 @@ def register(app):
         prevent_initial_call=True,
     )
     def _step1_init(_n_clicks, store_nma):
-
         params = (store_nma or {}).get("params")
+
+        # Se params vieram do pickle, não executa este callback
         if params and params.get("loaded_from_pickle"):
             raise dash.exceptions.PreventUpdate
+
         if not params:
             if ctx.triggered_id == "btn-nma-build":
                 return no_update, no_update, no_update, no_update, "aguardando params do botão…"
@@ -192,20 +195,9 @@ def register(app):
 
         if pool is None or pool.empty:
             fig = _make_step1_figure(None, "NII", "Area", 0, 0, 1, 1)
-            mu_x = float(pool[xcol].mean())
-            std_NII = float(pool[xcol].std(ddof=1) or 1.0)
-            mu_y = float(pool[ycol].mean())
-            std_a = float(pool[ycol].std(ddof=1) or 1.0)
+            return fig, {}, 1.0, 1.0, f"{log}\nNão há dados de controle para calcular a elipse."
 
-            print(f"mean_NII (controle): {mu_x}")
-            print(f"std_NII (controle): {std_NII}")
-            print(f"mean_area (controle): {mu_y}")
-            print(f"std_area (controle): {std_a}")
-            print(f"Exemplo de dados NII: {pool[xcol].iloc[:3].tolist()}")
-            print(f"Exemplo de dados Area: {pool[ycol].iloc[:3].tolist()}")
-
-            return fig, {}, 1.0, 1.0, log
-
+        # SÓ EXECUTA ESTE BLOCO SE pool NÃO FOR None/VAZIO
         mu_x = float(pool[xcol].mean())
         sd_x = float(pool[xcol].std(ddof=1) or 1.0)
         mu_y = float(pool[ycol].mean())
@@ -223,7 +215,6 @@ def register(app):
             fig.update_layout(xaxis_range=axis["x"], yaxis_range=axis["y"])
         fig.update_xaxes(fixedrange=True)
         fig.update_yaxes(fixedrange=True)
-
 
         store = {
             "xcol": xcol, "ycol": ycol,
@@ -417,6 +408,13 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
         import dash
         import dash.exceptions
 
+        # Função auxiliar definida no início
+        def _first(v, default=None):
+            try:
+                return float(v[0]) if isinstance(v, (list, tuple)) else float(v)
+            except Exception:
+                return default
+
         if not n_clicks:
             raise dash.exceptions.PreventUpdate
 
@@ -438,12 +436,9 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
 
             print(f"[DEBUG LOAD SETTINGS] Pickle carregado. Chaves: {list(pkl.keys())}")
 
-
         except Exception as e:
             print(f"[DEBUG LOAD SETTINGS] Erro ao carregar pickle: {e}")
             return [dash.no_update] * 10 + [f"Erro ao carregar arquivo: {e}"]
-
-
 
         # ---- CORREÇÃO PRINCIPAL ----
         # NÃO reconstrua os datasets do pickle. Em vez disso, mantenha o store_nma existente
@@ -473,30 +468,48 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
         # ATUALIZAR params no store_nma_out
         store_nma_out["params"] = {
             "datasets": datasets_list,
-            "controls": controls_list
+            "controls": controls_list,
+            "loaded_from_pickle": True
         }
 
-        # Mas atualize os params com as informações do pickle se necessário
-        params = store_nma_out.get("params", {})
-
-        # Adicione metadados do pickle aos params se quiser
-        params["loaded_from_pickle"] = {
-            "file": file_path,
-            "mean_NII": pkl.get("mean_NII"),
-            "mean_a": pkl.get("mean_a"),
-        }
-
-        store_nma_out["params"] = params
         print(f"[DEBUG LOAD SETTINGS] Store-nma mantido com {len(store_nma_out.get('rows', []))} rows")
 
+        # --- criar store-nma-step1 do pickle ---
+        store_step1 = {
+            "from_pickle": True,  # FLAG IMPORTANTE
+            "mu_x": float(pkl.get("mean_NII", 0.0)),
+            "mu_y": float(pkl.get("mean_a", 0.0)),
+            "sd_x": float(pkl.get("std_NII", 1.0)),
+            "sd_y": float(pkl.get("std_a", 1.0)),
+            "kx": float(pkl.get("sd_NII", 1.0)),
+            "ky": float(pkl.get("sd_area", 1.0)),
+            "rx": float(pkl.get("sd_NII", 1.0)) * float(pkl.get("std_NII", 1.0)),
+            "ry": float(pkl.get("sd_area", 1.0)) * float(pkl.get("std_a", 1.0)),
+            "col_x": "NII",
+            "col_y": "Area",
+            "axis": {
+                "x": [float(pkl.get("graph_limits", [0, 0, 0, 0])[2]),
+                      float(pkl.get("graph_limits", [0, 0, 0, 0])[3])],
+                "y": [float(pkl.get("graph_limits", [0, 0, 0, 0])[0]),
+                      float(pkl.get("graph_limits", [0, 0, 0, 0])[1])]
+            } if "graph_limits" in pkl and len(pkl["graph_limits"]) == 4 else {
+                "x": [float(pkl.get("mean_NII", 0)) - 3 * float(pkl.get("std_NII", 1)),
+                      float(pkl.get("mean_NII", 0)) + 3 * float(pkl.get("std_NII", 1))],
+                "y": [float(pkl.get("mean_a", 0)) - 3 * float(pkl.get("std_a", 1)),
+                      float(pkl.get("mean_a", 0)) + 3 * float(pkl.get("std_a", 1))]
+            },
+            "control_label": "control",
+            "pickle_thresholds": {
+                "v_down": _first(pkl.get("v_downx")),
+                "v_mid": _first(pkl.get("v_midx")),
+                "v_up": _first(pkl.get("v_upx")),
+                "v_down2": _first(pkl.get("v_downx2")),
+                "y_low": _first(pkl.get("h_y_down")),
+                "y_high": _first(pkl.get("h_y_up")),
+            }
+        }
 
         # --- criar store-nma-settings do pickle ---
-        def _first(v, default=None):
-            try:
-                return float(v[0]) if isinstance(v, (list, tuple)) else float(v)
-            except Exception:
-                return default
-
         thresholds = {
             "v_down": _first(pkl.get("v_downx")),
             "v_mid": _first(pkl.get("v_midx")),
@@ -517,9 +530,7 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
             "k_nii": float(pkl.get("sd_NII", 1.0)),
             "k_area": float(pkl.get("sd_area", 1.0)),
             "thresholds": thresholds,
-            # Adicione metadados
             "loaded_from_pickle": True,
-            "pickle_file": file_path,
         }
 
         print(f"[DEBUG LOAD SETTINGS] Stores criados com sucesso")
@@ -534,16 +545,10 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
 
         print(f"[DEBUG LOAD SETTINGS] Indo para Step 3...")
 
-        # AGORA PRECISAMOS GERAR O PREVIEW!
-        # Para isso, precisamos dos datasets. Como não os temos no pickle,
-        # precisamos usar os datasets que já estão no store_nma_in
-
+        # Gerar o preview
         try:
-            # Importar a função que gera o preview
             from .nma_step2 import _build_preview
 
-            # Para gerar o preview, precisamos dos dados.
-            # Vamos ver se temos dados no store_nma_in
             if store_nma_in and store_nma_in.get("rows"):
                 print(f"[DEBUG LOAD SETTINGS] Usando {len(store_nma_in['rows'])} datasets existentes para preview")
 
@@ -554,52 +559,16 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
 
         except Exception as e:
             print(f"[DEBUG LOAD SETTINGS] Erro ao gerar preview: {e}")
-            # Criar figura vazia como fallback
             import plotly.graph_objects as go
             fig_preview = go.Figure()
             fig_preview.update_layout(
-                title="Preview não disponível (carregue datasets primeiro)",
+                title="Preview não disponível",
                 xaxis_title="NII",
                 yaxis_title="Area",
             )
-            # Extrair valores geométricos do pickle (igual ao NMA step1 faz)
-            store_step1 = {
-                "from_pickle": True,  # FLAG IMPORTANTE
-                "mu_x": float(pkl.get("mean_NII", 0.0)),
-                "mu_y": float(pkl.get("mean_a", 0.0)),
-                "sd_x": float(pkl.get("std_NII", 1.0)),  # std_NII do controle
-                "sd_y": float(pkl.get("std_a", 1.0)),  # std_a do controle
-                "kx": float(pkl.get("sd_NII", 1.0)),  # fator NII (sd_NII)
-                "ky": float(pkl.get("sd_area", 1.0)),  # fator Area (sd_area)
-                "rx": float(pkl.get("sd_NII", 1.0)) * float(pkl.get("std_NII", 1.0)),
-                "ry": float(pkl.get("sd_area", 1.0)) * float(pkl.get("std_a", 1.0)),
-                "col_x": "NII",
-                "col_y": "Area",
-                "axis": {
-                    "x": [float(pkl.get("graph_limits", [0, 0, 0, 0])[2]),
-                          float(pkl.get("graph_limits", [0, 0, 0, 0])[3])],
-                    "y": [float(pkl.get("graph_limits", [0, 0, 0, 0])[0]),
-                          float(pkl.get("graph_limits", [0, 0, 0, 0])[1])]
-                } if "graph_limits" in pkl and len(pkl["graph_limits"]) == 4 else {
-                    "x": [float(pkl.get("mean_NII", 0)) - 3 * float(pkl.get("std_NII", 1)),
-                          float(pkl.get("mean_NII", 0)) + 3 * float(pkl.get("std_NII", 1))],
-                    "y": [float(pkl.get("mean_a", 0)) - 3 * float(pkl.get("std_a", 1)),
-                          float(pkl.get("mean_a", 0)) + 3 * float(pkl.get("std_a", 1))]
-                },
-                "control_label": "control",
-                # Adicionar thresholds também para fácil acesso
-                "pickle_thresholds": {
-                    "v_down": _first(pkl.get("v_downx")),
-                    "v_mid": _first(pkl.get("v_midx")),
-                    "v_up": _first(pkl.get("v_upx")),
-                    "v_down2": _first(pkl.get("v_downx2")),
-                    "y_low": _first(pkl.get("h_y_down")),
-                    "y_high": _first(pkl.get("h_y_up")),
-                }
-            }
 
         return (
-            store_nma_out,  # store-nma (mantido, com possível atualização de params)
+            store_nma_out,  # store-nma
             store_step1,  # store-nma-step1
             store_settings,  # store-nma-settings
             store_wizard,  # store-nma-wizard (step: 3)
