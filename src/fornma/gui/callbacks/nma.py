@@ -145,7 +145,7 @@ def _render_row(d: dict) -> dbc.Card:
                     ),
                     dbc.Row(
                         [
-                            dbc.Col(dbc.Label("Area column", id={"type": "nma-label-area", "idx": i}), md=2),
+                            dbc.Col(dbc.Label("Area column", id={"type": "nma-label-area", "idx": i}), md=4),
                             dbc.Col(
                                 dcc.Dropdown(
                                     id={"type": "nma-area", "idx": i},
@@ -156,7 +156,12 @@ def _render_row(d: dict) -> dbc.Card:
                                 ),
                                 md=4,
                             ),
-                            dbc.Col(dbc.Label("NII column", id={"type": "nma-label-nii", "idx": i}), md=2),
+                        ],
+                        className="mb-1 g-2",
+                    ),
+                    dbc.Row(
+                        [
+                            dbc.Col(dbc.Label("NII column", id={"type": "nma-label-nii", "idx": i}), md=4),
                             dbc.Col(
                                 dcc.Dropdown(
                                     id={"type": "nma-nii", "idx": i},
@@ -169,10 +174,6 @@ def _render_row(d: dict) -> dbc.Card:
                             ),
                         ],
                         className="mb-1 g-2",
-                    ),
-                    html.Small(
-                        f"Detected columns: {', '.join(cols) if cols else '—'}",
-                        className="text-muted",
                     ),
                 ]
             ),

@@ -74,30 +74,58 @@ def _footer():
         children=[
             html.Hr(style={"margin": "8px 0"}),
 
-            dbc.Row(
-                [
-                    dbc.Col(
-                        dbc.Button(
-                            "Create NMA settings",
-                            id="btn-nma-build",
-                            color="primary",
-                            className="w-100",
-                            n_clicks=0,
-                        ),
-                        width=6,
+            # Container que controla a visibilidade dos botões
+            html.Div(
+                id="nma-buttons-container",
+                children=[
+                    # Alerta informativo
+                    dbc.Alert(
+                        id="nma-alert-info",
+                        color="info",
+                        className="mb-2",
+                        style={"fontSize": "12px", "display": "none"},
                     ),
-                    dbc.Col(
-                        dbc.Button(
-                            "Load settings",
-                            id="btn-nma-load",
-                            color="secondary",
-                            className="w-100",
-                            n_clicks=0,
-                        ),
-                        width=6,
+
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                html.Div(
+                                    [
+                                        dbc.Button(
+                                            "Create NMA settings",
+                                            id="btn-nma-build",
+                                            color="primary",
+                                            className="w-100",
+                                            n_clicks=0,
+                                            disabled=True,
+                                        ),
+                                        dbc.Tooltip(
+                                            "Mark at least one dataset as 'Control' to create NMA settings",
+                                            target="btn-nma-build-wrapper",  # Mude o target para o wrapper
+                                            placement="top",
+                                        ),
+                                    ],
+                                    id="btn-nma-build-wrapper",  # Container com ID para o tooltip
+                                ),
+                                width=6,
+                            ),
+                            dbc.Col(
+                                dbc.Button(
+                                    "Load settings",
+                                    id="btn-nma-load",
+                                    color="secondary",
+                                    className="w-100",
+                                    n_clicks=0,
+                                    disabled=True,  # Inicialmente desabilitado
+                                ),
+                                width=6,
+                            ),
+                        ],
+                        className="g-2",
                     ),
                 ],
-                className="g-2",
+                # Inicialmente escondido
+                style={"display": "none"},
             ),
             html.Div(
                 id="nma-load-status",

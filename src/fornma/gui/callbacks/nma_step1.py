@@ -15,7 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 import pickle
 from pathlib import Path
 import dash
-from dash import Input, Output, State, no_update, ctx
+from dash import Input, Output, State, no_update, ctx, ALL
 
 # seletor nativo do SO
 import tkinter as tk
@@ -579,3 +579,98 @@ def register_load_settings_callbacks(app, pick_file_dialog_func):
             status,  # nma-load-status
             {"active_item": None},
         )
+
+    # Callback para controlar visibilidade e estado dos botões
+    @app.callback(
+        Output("nma-buttons-container", "style"),
+        Output("btn-nma-build", "disabled"),
+        Output("btn-nma-load", "disabled"),
+        Output("nma-alert-info", "children"),
+        Output("nma-alert-info", "is_open"),
+        Output("nma-alert-info", "color"),
+        Input("store-nma", "data"),
+        prevent_initial_call=False,
+    )
+    def _toggle_nma_buttons_state(store_nma):
+        """
+        Controla a visibilidade e estado dos botões baseado nos datasets carregados.
+        """
+        store_nma = store_nma or {}
+        rows = store_nma.get("rows", [])
+
+        # Contadores
+        valid_datasets = 0  # datasets com path preenchido
+        control_datasets = 0  # datasets marcados como controle
+
+        for row in rows:
+            path = row.get("path", "").strip()
+            if path and path != "":
+                valid_datasets += 1
+                if row.get("is_control", False):
+                    control_datasets += 1
+
+        # Se não houver nenhum dataset válido, esconde tudo
+        if valid_datasets == 0:
+            return {"display": "none"}, True, True, "", False, "info"
+
+        # Se houver datasets válidos, mostra o container
+        alert_message = ""
+        alert_open = False
+        alert_color = "info"
+
+        # Verifica se pode habilitar "Create NMA settings"
+        can_create = control_datasets > 0
+
+        if control_datasets == 0:
+            alert_message = "Mark at least one dataset as 'Control' to enable 'Create NMA settings'."
+            alert_open = True
+            alert_color = "warning"
+
+        # "Load settings" sempre habilitado se houver datasets válidos
+        load_disabled = False
+
+        return (
+            {"display": "block"},  # Mostra container
+            not can_create,  # Desabilita "Create" se não houver controles
+            load_disabled,  # "Load" sempre habilitado se houver datasets
+            alert_message,
+            alert_open,
+            alert_color
+        )
+
+    # Callback para atualizar alerta quando muda o checkbox "Control"
+    @app.callback(
+        Output("nma-alert-info", "children", allow_duplicate=True),
+        Output("nma-alert-info", "is_open", allow_duplicate=True),
+        Output("nma-alert-info", "color", allow_duplicate=True),
+        Input({"type": "nma-control", "idx": ALL}, "value"),
+        State("store-nma", "data"),
+        prevent_initial_call=True,
+    )
+    def _update_control_alert(control_values, store_nma):
+        """
+        Atualiza o alerta quando o checkbox "Control" é alterado.
+        """
+        store_nma = store_nma or {}
+        rows = store_nma.get("rows", [])
+
+        # Conta controles atuais
+        control_count = 0
+        for row in rows:
+            if row.get("is_control", False):
+                control_count += 1
+
+        # Atualiza baseado nos novos valores do checkbox (opcional)
+        # Mas aqui vamos usar a lógica simples
+        if control_count == 0:
+            return (
+                "Mark at least one dataset as 'Control' to enable 'Create NMA settings'.",
+                True,
+                "warning"
+            )
+        else:
+            return (
+                f"Ready! {control_count} dataset(s) marked as control.",
+                True,
+                "success"
+            )
