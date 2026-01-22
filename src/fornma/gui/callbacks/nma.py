@@ -2,6 +2,7 @@
 # src/fornma/gui/callbacks/nma.py
 import os, json, time, threading, traceback, base64, io
 
+
 # progress file helpers (GUI)
 try:
     from fornma.gui.utils.progress import update_progress, cancel_requested
@@ -542,15 +543,25 @@ def register(app, pick_file_dialog):
             html.H5("NMA analysis", className="mt-2"),
             html.Small("Choose how you want to plot NMA (dot plot or heatmap)."),
 
-            dbc.RadioItems(
-                id="nma-plot-kind",
-                options=[
-                    {"label": "Dot plot", "value": "dot"},
-                    {"label": "Heatmap", "value": "heatmap"},
+            # Tooltip para tipo de plot
+            html.Div(
+                [
+                    dbc.RadioItems(
+                        id="nma-plot-kind",
+                        options=[
+                            {"label": "Dot plot", "value": "dot"},
+                            {"label": "Heatmap", "value": "heatmap"},
+                        ],
+                        value="dot",
+                        inline=True,
+                        className="mt-2",
+                    ),
+                    dbc.Tooltip(
+                        "Dot plot: Individual nuclei as points. Heatmap: Density visualization for large datasets.",
+                        target="nma-plot-kind",
+                        placement="top",
+                    ),
                 ],
-                value="dot",
-                inline=True,
-                className="mt-2",
             ),
 
             # --- DOT PLOT ---
@@ -559,8 +570,22 @@ def register(app, pick_file_dialog):
 
                 # colunas vindas dos datasets
                 dbc.Row([
-                    dbc.Col(dbc.Label("Color by (column1)"), width=6),
-                    dbc.Col(dbc.Label("Size by (column2)"), width=6),
+                    dbc.Col([
+                        dbc.Label("Color by (column1)"),
+                        dbc.Tooltip(
+                            "Select column for color encoding. Nuclei will be colored based on values in this column.",
+                            target="nma-dot-column1-wrapper",
+                            placement="top",
+                        ),
+                    ], width=6, id="nma-dot-column1-wrapper"),
+                    dbc.Col([
+                        dbc.Label("Size by (column2)"),
+                        dbc.Tooltip(
+                            "Select column for size encoding. Nuclei size will scale with values in this column.",
+                            target="nma-dot-column2-wrapper",
+                            placement="top",
+                        ),
+                    ], width=6, id="nma-dot-column2-wrapper"),
                 ], className="mb-1"),
                 dbc.Row([
                     dbc.Col(
@@ -585,6 +610,12 @@ def register(app, pick_file_dialog):
                 dbc.Row([
                     dbc.Col([
                         dbc.Label("Hue norm (min / max)"),
+                        dbc.Tooltip(
+                            "Manually set color scale limits. Leave empty for automatic scaling based on data range.",
+                            target="nma-dot-hue-norm-wrapper",
+                            placement="top",
+                        ),
+                        html.Div(id="nma-dot-hue-norm-wrapper"),
                         dbc.InputGroup([
                             dbc.Input(id="nma-dot-hue-min", type="number", placeholder="min"),
                             dbc.Input(id="nma-dot-hue-max", type="number", placeholder="max"),
@@ -592,6 +623,12 @@ def register(app, pick_file_dialog):
                     ], width=6),
                     dbc.Col([
                         dbc.Label("Size norm (min / max)"),
+                        dbc.Tooltip(
+                            "Manually set size scaling limits. Leave empty for automatic scaling.",
+                            target="nma-dot-size-norm-wrapper",
+                            placement="top",
+                        ),
+                        html.Div(id="nma-dot-size-norm-wrapper"),
                         dbc.InputGroup([
                             dbc.Input(id="nma-dot-size-min", type="number", placeholder="min"),
                             dbc.Input(id="nma-dot-size-max", type="number", placeholder="max"),
@@ -603,6 +640,12 @@ def register(app, pick_file_dialog):
                 dbc.Row([
                     dbc.Col([
                         dbc.Label("Sample size"),
+                        dbc.Tooltip(
+                            "Random subsample for faster plotting. Leave empty to use all nuclei.",
+                            target="nma-dot-sample-size-wrapper",
+                            placement="top",
+                        ),
+                        html.Div(id="nma-dot-sample-size-wrapper"),
                         dbc.Input(
                             id="nma-dot-sample-size",
                             type="number",
@@ -616,6 +659,12 @@ def register(app, pick_file_dialog):
                 dbc.Row([
                     dbc.Col([
                         dbc.Label("Palette"),
+                        dbc.Tooltip(
+                            "Color palette for visualization. Different palettes highlight different data patterns.",
+                            target="nma-dot-palette-wrapper",
+                            placement="top",
+                        ),
+                        html.Div(id="nma-dot-palette-wrapper"),
                         dcc.Dropdown(
                             id="nma-dot-palette",
                             options=palette_options,
@@ -625,15 +674,24 @@ def register(app, pick_file_dialog):
                     ], width=6),
                 ], className="mb-2"),
 
-                dbc.Checklist(
-                    id="nma-dot-flags",
-                    options=[
-                        {"label": "Single plot (grouped data)", "value": "single"},
-                        {"label": "Overtime (time sequence)", "value": "overtime"},
-                    ],
-                    value=[],
-                    inline=False,
-                ),
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Checklist(
+                            id="nma-dot-flags",
+                            options=[
+                                {"label": "Single plot (grouped data)", "value": "single"},
+                                {"label": "Overtime (time sequence)", "value": "overtime"},
+                            ],
+                            value=[],
+                            inline=False,
+                        ),
+                        dbc.Tooltip(
+                            "Single plot: Combine all datasets in one plot. Overtime: Visualize temporal changes if time data exists.",
+                            target="nma-dot-flags",
+                            placement="top",
+                        ),
+                    ], width=12),
+                ]),
             ]),
 
             # --- HEATMAP ---
@@ -648,6 +706,11 @@ def register(app, pick_file_dialog):
                     ],
                     value=[],
                     inline=False,
+                ),
+                dbc.Tooltip(
+                    "Single plot: Combined view. Overtime: Time series visualization. Jointplot: Include marginal histograms.",
+                    target="nma-heatmap-flags",
+                    placement="top",
                 ),
             ]),
 
@@ -667,6 +730,12 @@ def register(app, pick_file_dialog):
                     dbc.Col(
                         [
                             dbc.Label("Saving path"),
+                            dbc.Tooltip(
+                                "Directory where NMA results and plots will be saved.",
+                                target="nma-run-save-path-wrapper",
+                                placement="top",
+                            ),
+                            html.Div(id="nma-run-save-path-wrapper"),
                             dbc.Input(
                                 id="nma-run-save-path",
                                 type="text",
@@ -684,7 +753,12 @@ def register(app, pick_file_dialog):
                                 size="sm",
                                 className="mt-4",
                                 title="Choose folder to save NMA output",
-                            )
+                            ),
+                            dbc.Tooltip(
+                                "Select output directory for NMA analysis results",
+                                target="nma-run-browse",
+                                placement="top",
+                            ),
                         ],
                         width=3,
                     ),
@@ -700,6 +774,11 @@ def register(app, pick_file_dialog):
                         className="btn btn-primary",
                         title="Run NMA analysis with the selected options",
                     ),
+                    dbc.Tooltip(
+                        "Start NMA analysis with current settings. This may take several minutes depending on dataset size.",
+                        target="btn-nma-run",
+                        placement="top",
+                    ),
                     html.Small(
                         id="nma-run-summary",
                         className="text-muted d-block mt-1",
@@ -707,8 +786,8 @@ def register(app, pick_file_dialog):
                 ],
                 className="mb-2",
             ),
-
         ]
+
 
     # 12) mostrar apenas o bloco correspondente ao tipo de plot
     @app.callback(
@@ -1190,7 +1269,7 @@ def register(app, pick_file_dialog):
         Output("nma-log", "children", allow_duplicate=True),
         Output("nma-poll", "disabled", allow_duplicate=True),
         Output("btn-nma-stop", "style", allow_duplicate=True),
-        Output("nma-results-container", "children", allow_duplicate=True),
+        # REMOVE ESTA LINHA: Output("nma-results-container", "children", allow_duplicate=True),
         Input("nma-poll", "n_intervals"),
         prevent_initial_call=True,
     )
@@ -1201,48 +1280,35 @@ def register(app, pick_file_dialog):
 
         pf = globals().get("NMA_PROGRESS_FILE")
         if not (pf and os.path.exists(pf)):
-            return no_update, no_update, no_update, True, hide_stop, no_update
+            return no_update, no_update, no_update, True, hide_stop  # 5 valores
 
         try:
             with open(pf, "r") as f:
                 d = json.load(f)
         except Exception:
-            return no_update, no_update, no_update, True, hide_stop, no_update
+            return no_update, no_update, no_update, True, hide_stop  # 5 valores
 
-        status  = d.get("status", "running")
+        status = d.get("status", "running")
         percent = int(d.get("percent", 0))
-        log     = d.get("log", "") or ""
-        img     = d.get("image")
-        title   = d.get("title") or "NMA plot"
+        log = d.get("log", "") or ""
 
-        # componente de imagem (último plot gerado)
-        img_comp = no_update
-        if img:
-            img_comp = html.Figure(
-                [
-                    html.Img(
-                        src=img,
-                        style={"maxWidth": "100%", "height": "auto", "borderRadius": "6px"},
-                    ),
-                    html.Figcaption(title, style={"fontSize": "11px", "marginTop": "4px"}),
-                ],
-                style={"margin": 0},
-            )
+        # REMOVE a parte do img_comp, não é mais necessário
+        # pois não temos nma-results-container
 
         if status == "error":
-            return percent, "Error", (log or "Unknown error."), True, hide_stop, img_comp
+            return percent, "Error", (log or "Unknown error."), True, hide_stop  # 5 valores
         if status == "canceled":
-            return percent, "Canceled", (log or "Canceled by user."), True, hide_stop, img_comp
+            return percent, "Canceled", (log or "Canceled by user."), True, hide_stop  # 5 valores
         if status == "done":
-            # aqui mantemos o último plot no container
             try:
                 os.remove(pf)
             except Exception:
                 pass
             globals()["NMA_PROGRESS_FILE"] = None
-            return 100, "100% (done)", (log or "Finished."), True, hide_stop, img_comp
+            return 100, "100% (done)", (log or "Finished."), True, hide_stop  # 5 valores
 
-        return percent, f"{percent}%", log, False, show_stop, img_comp
+        # running / starting
+        return percent, f"{percent}%", log, False, show_stop  # 5 valores
 
 
     # --- STOP: sinaliza cancelamento no progress_file ---
@@ -1268,6 +1334,187 @@ def register(app, pick_file_dialog):
                 pass
 
         return "Cancel requested…", True, hide_stop
+
+    # ========== IMAGE VIEWER CALLBACKS ==========
+
+    def _list_image_files(folder_path):
+        """Lista arquivos PNG e SVG de uma pasta"""
+        import glob
+        import os
+
+        if not folder_path or not os.path.exists(folder_path):
+            return []
+
+        image_files = []
+
+        # Listar PNGs
+        png_files = glob.glob(os.path.join(folder_path, "*.png"))
+        # Listar SVGs
+        svg_files = glob.glob(os.path.join(folder_path, "*.svg"))
+
+        # Combinar e ordenar
+        all_files = sorted(png_files + svg_files)
+
+        # Filtrar duplicados (mesmo nome, extensões diferentes)
+        seen_names = set()
+        for file_path in all_files:
+            file_name = os.path.basename(file_path)
+            base_name = os.path.splitext(file_name)[0]
+            if base_name not in seen_names:
+                seen_names.add(base_name)
+                image_files.append({
+                    "path": file_path,
+                    "name": file_name,
+                    "type": "png" if file_path.lower().endswith('.png') else "svg"
+                })
+
+        return image_files
+
+    # Callback para listar imagens e esconder barra de progresso
+    @app.callback(
+        Output("nma-image-store", "data"),
+        Output("nma-image-viewer", "style"),
+        Output("nma-progress-container", "style"),
+        Input("nma-poll", "n_intervals"),
+        Input("nma-progress", "value"),
+        Input("nma-log", "children"),
+        State("nma-run-save-path", "value"),
+        prevent_initial_call=True,
+    )
+    def _update_image_list_and_hide_progress(n_intervals, progress_value, log_text, save_path):
+        # Verificar se o NMA terminou
+        nma_done = False
+
+        if progress_value == 100:
+            nma_done = True
+
+        if log_text and ("Finished" in log_text or "100%" in log_text):
+            nma_done = True
+
+        # Se não está feito, manter progresso visível
+        if not nma_done:
+            return no_update, {"display": "none"}, {"display": "block"}
+
+        # Se está feito e temos save_path, listar imagens
+        if nma_done and save_path:
+            image_files = _list_image_files(save_path)
+
+            if image_files:
+                new_data = {
+                    "image_files": image_files,
+                    "current_index": 0,
+                    "current_folder": save_path
+                }
+                return new_data, {"display": "block"}, {"display": "none"}
+            else:
+                # NMA terminou, mas não há imagens
+                return no_update, {"display": "none"}, {"display": "none"}
+
+        return no_update, {"display": "none"}, {"display": "none"}
+
+    @app.callback(
+        Output("nma-current-image", "src"),
+        Output("nma-image-counter", "children"),
+        Output("nma-image-name", "children"),
+        Input("nma-image-store", "data"),
+        Input("nma-prev-image", "n_clicks"),
+        Input("nma-next-image", "n_clicks"),
+        State("nma-image-store", "data"),
+        prevent_initial_call=True,
+    )
+    def _update_displayed_image(data, prev_clicks, next_clicks, current_store):
+        # Verificar qual input disparou o callback
+        trigger = ctx.triggered_id
+
+        # Se for uma mudança no store (primeira carga) ou clique nas setas
+        if trigger == "nma-image-store" or trigger in ["nma-prev-image", "nma-next-image"]:
+
+            # Usar current_store se disponível, senão usar data
+            store_data = current_store if current_store else data
+
+            if not store_data or not store_data.get("image_files"):
+                return "", "0/0", "Nenhuma imagem disponível"
+
+            image_files = store_data["image_files"]
+            current_index = store_data["current_index"]
+
+            # Se for clique nas setas, calcular novo índice
+            if trigger == "nma-prev-image" and current_index > 0:
+                current_index -= 1
+            elif trigger == "nma-next-image" and current_index < len(image_files) - 1:
+                current_index += 1
+
+            # Atualizar o store com o novo índice (se mudou)
+            if trigger in ["nma-prev-image", "nma-next-image"]:
+                new_store_data = dict(store_data)
+                new_store_data["current_index"] = current_index
+                # Aqui você precisaria atualizar o store, mas isso criaria loop
+                # Em vez disso, vamos apenas usar o índice calculado
+
+            # Carregar a imagem atual
+            current_image = image_files[current_index]
+
+            try:
+                with open(current_image["path"], "rb") as f:
+                    image_data = base64.b64encode(f.read()).decode()
+
+                if current_image["type"] == "png":
+                    img_src = f"data:image/png;base64,{image_data}"
+                else:  # SVG
+                    img_src = f"data:image/svg+xml;base64,{image_data}"
+            except Exception:
+                img_src = ""
+
+            counter = f"{current_index + 1}/{len(image_files)}"
+            name = current_image["name"]
+
+            return img_src, counter, name
+
+        return no_update, no_update, no_update
+
+
+    # Callback para mostrar visualizador quando há imagens no store
+    @app.callback(
+        Output("nma-image-viewer", "style", allow_duplicate=True),
+        Input("nma-image-store", "data"),
+        prevent_initial_call=True,
+    )
+    def _show_viewer_when_images_exist(data):
+        if data and data.get("image_files"):
+            return {"display": "block"}
+        return {"display": "none"}
+
+    @app.callback(
+        Output("nma-image-store", "data", allow_duplicate=True),
+        Input("nma-prev-image", "n_clicks"),
+        Input("nma-next-image", "n_clicks"),
+        State("nma-image-store", "data"),
+        prevent_initial_call=True,
+    )
+    def _update_store_on_navigation(prev_clicks, next_clicks, data):
+        if not ctx.triggered_id or not data or not data.get("image_files"):
+            return no_update
+
+        button_id = ctx.triggered_id
+        image_files = data["image_files"]
+        current_index = data["current_index"]
+
+        # Determinar nova posição
+        if button_id == "nma-prev-image" and current_index > 0:
+            new_index = current_index - 1
+        elif button_id == "nma-next-image" and current_index < len(image_files) - 1:
+            new_index = current_index + 1
+        else:
+            new_index = current_index
+
+        # Atualizar dados apenas se o índice mudou
+        if new_index != current_index:
+            new_data = dict(data)
+            new_data["current_index"] = new_index
+            return new_data
+
+        return no_update
+
 
 
 

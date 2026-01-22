@@ -259,7 +259,7 @@ def build_nma_right_pane():
                 id="nma-result-pane",
                 style={
                     "display": "none",
-                    "width": "100%",          # agora usamos a largura toda
+                    "width": "100%",  # agora usamos a largura toda
                     "maxWidth": "100%",
                     "margin": "0 auto",
                 },
@@ -279,7 +279,7 @@ def build_nma_right_pane():
                             "justifyContent": "center",
                         },
                         children=[
-                            # COLUNA ESQUERDA: preview + salvar settings
+                            # COLUNA ESQUERDA: preview + salvar settings (mantém igual)
                             html.Div(
                                 style={
                                     "flex": "0 0 auto",
@@ -320,11 +320,13 @@ def build_nma_right_pane():
                                 ],
                             ),
 
-                            # COLUNA DIREITA: progresso, log, imagens do NMA
+                            # COLUNA DIREITA: progresso, log, navegador de gráficos
                             html.Div(
                                 style={
                                     "flex": "1 1 auto",
                                     "maxWidth": "100%",
+                                    "display": "flex",
+                                    "flexDirection": "column",
                                 },
                                 children=[
                                     # poll
@@ -334,70 +336,160 @@ def build_nma_right_pane():
                                         disabled=True,
                                     ),
 
-                                    # Barra de progresso
-                                    dbc.Progress(
-                                        id="nma-progress",
-                                        value=0,
-                                        label="0%",
-                                        striped=True,
-                                        animated=True,
-                                        style={
-                                            "height": "18px",
-                                            "marginTop": "0px",
-                                        },
-                                    ),
-
-                                    # Log + botão STOP
+                                    # Barra de progresso e log (durante execução)
                                     html.Div(
-                                        style={
-                                            "display": "flex",
-                                            "justifyContent": "space-between",
-                                            "alignItems": "flex-start",
-                                            "gap": "8px",
-                                            "marginTop": "8px",
-                                        },
+                                        id="nma-progress-container",
                                         children=[
-                                            html.Pre(
-                                                id="nma-log",
+                                            # Barra de progresso
+                                            dbc.Progress(
+                                                id="nma-progress",
+                                                value=0,
+                                                label="0%",
+                                                striped=True,
+                                                animated=True,
                                                 style={
-                                                    "flex": "1",
-                                                    "margin": 0,
-                                                    "padding": "6px 8px",
-                                                    "backgroundColor": "#f9fafb",
-                                                    "borderRadius": "6px",
-                                                    "maxHeight": "140px",
-                                                    "overflowY": "auto",
-                                                    "fontSize": "11px",
-                                                    "whiteSpace": "pre-wrap",
+                                                    "height": "18px",
+                                                    "marginTop": "0px",
                                                 },
                                             ),
-                                            dbc.Button(
-                                                "Stop",
-                                                id="btn-nma-stop",
-                                                size="sm",
-                                                color="danger",
-                                                outline=True,
-                                                style={"display": "none"},
+
+                                            # Log + botão STOP
+                                            html.Div(
+                                                style={
+                                                    "display": "flex",
+                                                    "justifyContent": "space-between",
+                                                    "alignItems": "flex-start",
+                                                    "gap": "8px",
+                                                    "marginTop": "8px",
+                                                },
+                                                children=[
+                                                    html.Pre(
+                                                        id="nma-log",
+                                                        style={
+                                                            "flex": "1",
+                                                            "margin": 0,
+                                                            "padding": "6px 8px",
+                                                            "backgroundColor": "#f9fafb",
+                                                            "borderRadius": "6px",
+                                                            "maxHeight": "140px",
+                                                            "overflowY": "auto",
+                                                            "fontSize": "11px",
+                                                            "whiteSpace": "pre-wrap",
+                                                        },
+                                                    ),
+                                                    dbc.Button(
+                                                        "Stop",
+                                                        id="btn-nma-stop",
+                                                        size="sm",
+                                                        color="danger",
+                                                        outline=True,
+                                                        style={"display": "none"},
+                                                    ),
+                                                ],
                                             ),
-                                        ],
+                                        ]
                                     ),
 
-                                    # Container para resultados / imagens geradas
+                                    # Navegador de gráficos (inicia escondido)
                                     html.Div(
-                                        id="nma-results-container",
-                                        style={
-                                            "marginTop": "10px",
-                                            "maxHeight": "calc(100vh - 260px)",
-                                            "overflowY": "auto",
-                                            "border": "1px solid #e5e7eb",
-                                            "borderRadius": "6px",
-                                            "padding": "6px",
-                                        },
+                                        id="nma-image-viewer",
+                                        style={"display": "none"},
+                                        children=[
+                                            html.H6(
+                                                "Gráficos Gerados",
+                                                style={"textAlign": "center", "marginTop": "20px",
+                                                       "marginBottom": "10px"}
+                                            ),
+
+                                            # Navegação com setas
+                                            html.Div(
+                                                style={
+                                                    "display": "flex",
+                                                    "justifyContent": "center",
+                                                    "alignItems": "center",
+                                                    "gap": "20px",
+                                                    "marginBottom": "10px"
+                                                },
+                                                children=[
+                                                    html.Button(
+                                                        "← Anterior",
+                                                        id="nma-prev-image",
+                                                        style={
+                                                            "padding": "8px 16px",
+                                                            "border": "1px solid #ccc",
+                                                            "background": "#fff",
+                                                            "cursor": "pointer"
+                                                        }
+                                                    ),
+                                                    html.Span(
+                                                        id="nma-image-counter",
+                                                        style={
+                                                            "fontSize": "14px",
+                                                            "fontWeight": "bold",
+                                                            "minWidth": "100px",
+                                                            "textAlign": "center"
+                                                        }
+                                                    ),
+                                                    html.Button(
+                                                        "Próximo →",
+                                                        id="nma-next-image",
+                                                        style={
+                                                            "padding": "8px 16px",
+                                                            "border": "1px solid #ccc",
+                                                            "background": "#fff",
+                                                            "cursor": "pointer"
+                                                        }
+                                                    ),
+                                                ]
+                                            ),
+
+                                            # Container da imagem atual
+                                            html.Div(
+                                                style={
+                                                    "display": "flex",
+                                                    "justifyContent": "center",
+                                                    "alignItems": "center",
+                                                    "minHeight": "400px",
+                                                    "border": "1px solid #eee",
+                                                    "background": "#f9f9f9",
+                                                    "overflow": "hidden"
+                                                },
+                                                children=[
+                                                    html.Img(
+                                                        id="nma-current-image",
+                                                        src="",
+                                                        style={
+                                                            "maxWidth": "100%",
+                                                            "maxHeight": "400px",
+                                                            "objectFit": "contain"
+                                                        }
+                                                    ),
+                                                ]
+                                            ),
+
+                                            # Informações do arquivo
+                                            html.Div(
+                                                id="nma-image-name",
+                                                style={
+                                                    "marginTop": "10px",
+                                                    "fontSize": "12px",
+                                                    "color": "#666",
+                                                    "textAlign": "center",
+                                                    "wordBreak": "break-all"
+                                                }
+                                            ),
+                                        ],
                                     ),
                                 ],
                             ),
                         ],
                     ),
+
+                    dcc.Store(id="nma-image-store", data={
+                        "image_files": [],
+                        "current_index": 0,
+                        "current_folder": ""
+                    }),
                 ],
             ),
         ],
