@@ -1515,6 +1515,29 @@ def register(app, pick_file_dialog):
 
         return no_update
 
+    # Callback para esconder botão Save settings quando inicia a plotagem
+    @app.callback(
+        Output("nma-save-settings-container", "style"),
+        Input("btn-nma-run", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def _hide_save_on_run(n_clicks):
+        if n_clicks:
+            return {"display": "none"}  # Esconde
+        return {"display": "flex"}  # Mostra
+
+    # Callback para manter escondido após término
+    @app.callback(
+        Output("nma-save-settings-container", "style", allow_duplicate=True),
+        Input("nma-image-viewer", "style"),
+        prevent_initial_call=True,
+    )
+    def _keep_save_hidden(viewer_style):
+        # Se o visualizador de imagens está visível, mantém botão escondido
+        if viewer_style and viewer_style.get("display") == "block":
+            return {"display": "none"}
+        return no_update
+
 
 
 

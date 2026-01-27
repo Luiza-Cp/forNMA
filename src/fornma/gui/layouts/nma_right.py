@@ -296,6 +296,7 @@ def build_nma_right_pane():
                                         },
                                     ),
                                     html.Div(
+                                        id="nma-save-settings-container",
                                         style={
                                             "display": "flex",
                                             "flexDirection": "column",

@@ -1303,53 +1303,60 @@ def register(app):
 
     # "Save now" → grava o pickle no disco
     # === SAVE: clicar em "Save settings" -> abre seletor de pasta e salva imediatamente ===
+    # Em nma_step2.py, modifique o callback:
     @app.callback(
         Output("nma-save-status", "children"),
         Input("nma-save-open", "n_clicks"),
         State("store-nma-settings", "data"),
         State("store-nma-step1", "data"),
         State("store-nma", "data"),
+        State("nma-run-save-path", "value"),
         prevent_initial_call=True,
     )
-    def _save_settings_click(n, settings, step1, store_nma):
+    def _save_settings_click(n, settings, step1, store_nma, run_save_path):
         if not n:
             raise dash.exceptions.PreventUpdate
 
-        # 1) Monta o payload no MESMO schema esperado pelo NMA_settings.py
         try:
-            payload = build_pkl_payload(settings=settings or {}, step1=step1 or {}, store_nma=store_nma or {})
+            payload = build_pkl_payload(
+                settings=settings or {},
+                step1=step1 or {},
+                store_nma=store_nma or {}
+            )
         except Exception as e:
             return f"Erro ao montar payload: {e}"
 
-        # 2) Pergunta a pasta para salvar (diálogo nativo do SO)
-        try:
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            save_dir = tkfd.askdirectory(title="Escolha a pasta para salvar as configurações NMA")
-            root.destroy()
-        except Exception as e:
-            return f"Não foi possível abrir o seletor de pastas (ambiente headless?): {e} "
+        # Usa o caminho do run ou cria um padrão
+        save_path = run_save_path
+        if not save_path:
+            # Tenta usar o caminho do primeiro dataset
+            params = (store_nma or {}).get("params")
+            if params and params.get("datasets"):
+                first_path = params["datasets"][0].get("path")
+                if first_path:
+                    from pathlib import Path
+                    save_path = str(Path(first_path).parent)
+                else:
+                    save_path = "."
+            else:
+                save_path = "."
 
-        if not save_dir:
-            raise dash.exceptions.PreventUpdate  # usuário cancelou
-
-        # 3) Escreve o arquivo .pickle no diretório escolhido
         try:
-            save_dir = Path(save_dir)
+            from pathlib import Path
+            import time
+
+            save_dir = Path(save_path)
             save_dir.mkdir(parents=True, exist_ok=True)
 
-            # nome padrão compatível com o seu script antigo:
-            out_path = save_dir / "control_parameters.pickle"
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            out_path = save_dir / f"nma_settings_{timestamp}.pickle"
+
             with open(out_path, "wb") as f:
                 pickle.dump(payload, f)
 
-            # (opcional) um JSON visível para inspeção rápida
-            # from json import dump;  dump(payload, open(save_dir / "control_parameters.json", "w"), default=str, indent=2)
-
             return f"✅ Settings salvas em: {out_path}"
         except Exception as e:
-            return f"Erro ao salvar o arquivo: {e}"
+            return f"Erro ao salvar: {e}"
 
     @app.callback(
         Output("nma-fig-preview", "figure", allow_duplicate=True),
