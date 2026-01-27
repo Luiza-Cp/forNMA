@@ -497,7 +497,7 @@ def _make_step2_figure(
 
 
 # ---------- registro ----------
-def register(app):
+def register(app, pick_directory_dialog_func):
     # NEXT → constrói Step 2 usando elipse do Step 1 e eixos ±3sd
     @app.callback(
         Output("store-nma-wizard", "data", allow_duplicate=True),  # <- allow_duplicate aqui
@@ -1303,20 +1303,19 @@ def register(app):
 
     # "Save now" → grava o pickle no disco
     # === SAVE: clicar em "Save settings" -> abre seletor de pasta e salva imediatamente ===
-    # Em nma_step2.py, modifique o callback:
     @app.callback(
         Output("nma-save-status", "children"),
         Input("nma-save-open", "n_clicks"),
         State("store-nma-settings", "data"),
         State("store-nma-step1", "data"),
         State("store-nma", "data"),
-        State("nma-run-save-path", "value"),
         prevent_initial_call=True,
     )
-    def _save_settings_click(n, settings, step1, store_nma, run_save_path):
+    def _save_settings_click(n, settings, step1, store_nma):
         if not n:
             raise dash.exceptions.PreventUpdate
 
+        # 1) Monta o payload
         try:
             payload = build_pkl_payload(
                 settings=settings or {},
@@ -1326,37 +1325,28 @@ def register(app):
         except Exception as e:
             return f"Erro ao montar payload: {e}"
 
-        # Usa o caminho do run ou cria um padrão
-        save_path = run_save_path
-        if not save_path:
-            # Tenta usar o caminho do primeiro dataset
-            params = (store_nma or {}).get("params")
-            if params and params.get("datasets"):
-                first_path = params["datasets"][0].get("path")
-                if first_path:
-                    from pathlib import Path
-                    save_path = str(Path(first_path).parent)
-                else:
-                    save_path = "."
-            else:
-                save_path = "."
+        # 2) Usa a função passada para selecionar pasta
+        save_dir = pick_directory_dialog_func()
 
+        if not save_dir:
+            # Usuário cancelou o diálogo
+            return "❌ Operação cancelada pelo usuário"
+
+        # 3) Salva o arquivo com nome fixo (control_parameters.pickle)
         try:
             from pathlib import Path
-            import time
 
-            save_dir = Path(save_path)
+            save_dir = Path(save_dir)
             save_dir.mkdir(parents=True, exist_ok=True)
 
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            out_path = save_dir / f"nma_settings_{timestamp}.pickle"
+            out_path = save_dir / "control_parameters.pickle"
 
             with open(out_path, "wb") as f:
                 pickle.dump(payload, f)
 
             return f"✅ Settings salvas em: {out_path}"
         except Exception as e:
-            return f"Erro ao salvar: {e}"
+            return f"Erro ao salvar o arquivo: {e}"
 
     @app.callback(
         Output("nma-fig-preview", "figure", allow_duplicate=True),

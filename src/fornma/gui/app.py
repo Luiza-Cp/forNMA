@@ -718,7 +718,7 @@ def create_app():
     register_nma_callbacks(app, pick_file_dialog)
     nma_step1.register_load_settings_callbacks(app, pick_pickle_dialog)
     nma_step1_callbacks.register(app)
-    nma_step2_callbacks.register(app)
+    nma_step2_callbacks.register(app, pick_directory_dialog)
 
 
     # --- update counter in modal footer
