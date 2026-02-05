@@ -21,6 +21,7 @@ def build_nma_right_pane():
             dcc.Store(id="store-nma-step1", data={}),
             dcc.Store(id="store-nma-wizard", data={"step": 1}),
             dcc.Store(id="store-nma-settings", data={}),
+            dcc.Store(id="nma-temp-cleanup", data={"cleaned": False}),
 
             # ===================== STEP 1 =====================
             html.Div(

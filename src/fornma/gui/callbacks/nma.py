@@ -999,6 +999,10 @@ def register(app, pick_file_dialog):
         prevent_initial_call=True,
     )
     def _start_nma_run(n_clicks, store_nma, settings, step1, plot_cfg, save_path):
+        import tempfile, pathlib, time as _time, shutil, uuid  # ← ESTA LINHA
+        ts = int(_time.time())  # ← DEPENDE DA LINHA ACIMA
+        temp_dir = tempfile.mkdtemp(prefix=f"nma_{ts}_")
+        print(f"[DEBUG TEMP] Pasta temporária criada: {temp_dir}")  # ← ADICIONE ESTA LINHA
         from dash import no_update
         hide_stop = {"display": "none"}
         show_stop = {"display": "inline-block"}
@@ -1090,12 +1094,16 @@ def register(app, pick_file_dialog):
             print("  hue_norm:", hue_norm, " size_norm:", size_norm)
 
             # ------------------ progress file ------------------
-            import tempfile, pathlib, time as _time
+            import tempfile, pathlib, time as _time, shutil, uuid
             ts = int(_time.time())
             progress_dir = os.path.join(tempfile.gettempdir(), "fornma_progress")
             pathlib.Path(progress_dir).mkdir(parents=True, exist_ok=True)
             progress_file = os.path.join(progress_dir, f"nma_progress_{ts}.json")
             print("  progress_file:", progress_file)
+
+            # ------------------ criar pasta temporária única ------------------
+            temp_dir = tempfile.mkdtemp(prefix=f"nma_{ts}_")
+            print("  temp_dir:", temp_dir)
 
             try:
                 update_progress(
@@ -1103,6 +1111,7 @@ def register(app, pick_file_dialog):
                     status="running",
                     percent=0,
                     log="Starting NMA…\n" + warn if warn else "Starting NMA…",
+                    temp_dir=temp_dir
                 )
             except Exception as e:
                 print("[DEBUG NMA] update_progress init failed:", repr(e))
@@ -1121,51 +1130,9 @@ def register(app, pick_file_dialog):
 
                     payload_pkl = build_pkl_payload(settings or {}, step1 or {}, store_nma or {})
 
-                    # DEBUG: inspeção rápida do payload antes de salvar
-                    try:
-                        print("\n[NMA DEBUG] ==== _start_nma_run: payload_pkl (antes de salvar) ====")
-                        print("[NMA DEBUG] keys:", sorted(payload_pkl.keys()))
-                        print("[NMA DEBUG] x_left/x_mid/x_right:",
-                              payload_pkl.get("x_left"),
-                              payload_pkl.get("x_mid"),
-                              payload_pkl.get("x_right"))
-                        print("[NMA DEBUG] v_downx/v_midx/v_upx/v_downx2:",
-                              payload_pkl.get("v_downx"),
-                              payload_pkl.get("v_midx"),
-                              payload_pkl.get("v_upx"),
-                              payload_pkl.get("v_downx2"))
-                        print("[NMA DEBUG] h_y_down/h_y_up:",
-                              payload_pkl.get("h_y_down"),
-                              payload_pkl.get("h_y_up"))
-                        print("[NMA DEBUG] =============================================\n")
-                    except Exception as e_dbg:
-                        print("[NMA DEBUG] erro ao imprimir payload_pkl:", repr(e_dbg))
-
-                    # salva o pickle
+                    # Salva o pickle
                     with open(NMA_CONFIG_PATH, "wb") as f:
                         pickle.dump(payload_pkl, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-                    # DEBUG: reler do disco e conferir se está igual
-                    try:
-                        with open(NMA_CONFIG_PATH, "rb") as f:
-                            cp = pickle.load(f)
-                        print("\n[NMA DEBUG] ==== _start_nma_run: control_parameters reloaded ====")
-                        print("[NMA DEBUG] keys:", sorted(cp.keys()))
-                        print("[NMA DEBUG] x_left/x_mid/x_right:",
-                              cp.get("x_left"),
-                              cp.get("x_mid"),
-                              cp.get("x_right"))
-                        print("[NMA DEBUG] v_downx/v_midx/v_upx/v_downx2:",
-                              cp.get("v_downx"),
-                              cp.get("v_midx"),
-                              cp.get("v_upx"),
-                              cp.get("v_downx2"))
-                        print("[NMA DEBUG] h_y_down/h_y_up:",
-                              cp.get("h_y_down"),
-                              cp.get("h_y_up"))
-                        print("[NMA DEBUG] =============================================\n")
-                    except Exception as e2:
-                        print("[NMA DEBUG] ERRO ao reler control_parameters.pickle:", repr(e2))
 
                 except Exception as e:
                     print("[DEBUG NMA] build_pkl_payload failed:", repr(e))
@@ -1173,13 +1140,14 @@ def register(app, pick_file_dialog):
             # ------------------ worker thread ------------------
             def _worker():
                 import traceback  # <- pra evitar NameError dentro do except
+                import glob
                 print("[DEBUG NMA] worker started")
                 try:
                     orig_save = NMAClass.save_figs
                     done = 0
 
-                    def _save_with_progress(self, fig, title):
-                        nonlocal done
+                    def _save_with_progress_and_copy(self, fig, title):
+                        nonlocal done, temp_dir
                         done += 1
                         pct = min(95, done * 5)
                         print(f"[DEBUG NMA] save_figs called, title={title}, pct={pct}")
@@ -1210,9 +1178,69 @@ def register(app, pick_file_dialog):
                         except Exception as e:
                             print("[DEBUG NMA] update_progress in save_figs failed:", repr(e))
 
-                        return orig_save(self, fig, title)
+                        # Salva originalmente na pasta de destino
+                        result = orig_save(self, fig, title)
 
-                    NMAClass.save_figs = _save_with_progress
+                        # COPIA para a pasta temporária
+                        # COPIA para a pasta temporária
+                        try:
+                            # Limpar espaços extras do título
+                            clean_title = title.strip()
+                            print(f"[DEBUG TEMP] Buscando arquivos para título: '{clean_title}'")
+
+                            # Listar todos os arquivos PNG e SVG na pasta
+                            all_png_files = glob.glob(os.path.join(save_path, "*.png"))
+                            all_svg_files = glob.glob(os.path.join(save_path, "*.svg"))
+                            all_files = all_png_files + all_svg_files
+
+                            print(f"[DEBUG TEMP] Total de arquivos na pasta: {len(all_files)}")
+
+                            # Filtrar arquivos que contenham o título (ignorando case e espaços)
+                            matching_files = []
+                            for file_path in all_files:
+                                file_name = os.path.basename(file_path).lower()
+                                # Remover extensão para comparação
+                                file_base = os.path.splitext(file_name)[0]
+
+                                # Verificar se o título (limpo) está no nome do arquivo
+                                if clean_title.lower().strip() in file_base:
+                                    matching_files.append(file_path)
+
+                            print(f"[DEBUG TEMP] Arquivos correspondentes encontrados: {len(matching_files)}")
+                            for f in matching_files:
+                                print(f"  - {os.path.basename(f)}")
+
+                            if matching_files:
+                                latest_file = max(matching_files, key=os.path.getmtime)
+                                dest_path = os.path.join(temp_dir, os.path.basename(latest_file))
+                                shutil.copy2(latest_file, dest_path)
+                                print(f"[DEBUG TEMP] Copiado: {latest_file} -> {dest_path}")
+
+                                # Verificar se o arquivo foi realmente copiado
+                                if os.path.exists(dest_path):
+                                    print(
+                                        f"[DEBUG TEMP] Confirmação: {os.path.basename(dest_path)} copiado com sucesso")
+                                else:
+                                    print(f"[DEBUG TEMP] ERRO: Arquivo não foi copiado corretamente")
+                            else:
+                                # Tentar uma busca mais flexível - remover espaços do título
+                                title_no_spaces = clean_title.replace(" ", "")
+                                for file_path in all_files:
+                                    file_name = os.path.basename(file_path).lower()
+                                    file_base = os.path.splitext(file_name)[0].replace(" ", "")
+                                    if title_no_spaces.lower() in file_base:
+                                        shutil.copy2(file_path, temp_dir)
+                                        print(f"[DEBUG TEMP] Copiado (busca sem espaços): {file_path} -> {temp_dir}")
+                                        break
+                                else:
+                                    print(f"[DEBUG TEMP] Nenhum arquivo encontrado para título: '{clean_title}'")
+
+                        except Exception as e:
+                            print(f"[DEBUG TEMP] ERRO ao copiar: {e}")
+
+                        return result
+
+                    NMAClass.save_figs = _save_with_progress_and_copy
 
                     print("[DEBUG NMA] calling run_nma_cli(...)")
                     run_nma_cli(
@@ -1229,6 +1257,29 @@ def register(app, pick_file_dialog):
                         size_norm=size_norm,
                     )
                     print("[DEBUG NMA] run_nma_cli finished OK")
+                    print("[DEBUG NMA] run_nma_cli finished OK")
+
+                    # Listar conteúdo das pastas detalhadamente
+                    print(f"\n[DEBUG TEMP] === CONTEÚDO DAS PASTAS APÓS EXECUÇÃO ===")
+                    print(f"[DEBUG TEMP] Pasta de destino ({save_path}):")
+                    try:
+                        for f in sorted(os.listdir(save_path)):
+                            if f.endswith(('.png', '.svg')):
+                                full_path = os.path.join(save_path, f)
+                                mod_time = time.ctime(os.path.getmtime(full_path))
+                                print(f"  - {f} (modificado: {mod_time})")
+                    except Exception as e:
+                        print(f"  ERRO: {e}")
+
+                    print(f"\n[DEBUG TEMP] Pasta temporária ({temp_dir}):")
+                    try:
+                        if os.path.exists(temp_dir):
+                            for f in sorted(os.listdir(temp_dir)):
+                                print(f"  - {f}")
+                        else:
+                            print("  [Pasta temporária não existe]")
+                    except Exception as e:
+                        print(f"  ERRO: {e}")
 
                     NMAClass.save_figs = orig_save
 
@@ -1237,6 +1288,7 @@ def register(app, pick_file_dialog):
                         status="done",
                         percent=100,
                         log="NMA finished.",
+                        temp_dir=temp_dir
                     )
                     print("[DEBUG NMA] worker finished OK")
                 except Exception as e:
@@ -1247,11 +1299,13 @@ def register(app, pick_file_dialog):
                             status="error",
                             percent=0,
                             log="".join(traceback.format_exception_only(type(e), e)),
+                            temp_dir=temp_dir
                         )
                     except Exception as e2:
                         print("[DEBUG NMA] update_progress on error failed:", repr(e2))
 
             threading.Thread(target=_worker, daemon=True).start()
+
 
             # habilita o poll, escreve log e mostra STOP
             return False, "Running NMA…", show_stop
@@ -1337,10 +1391,16 @@ def register(app, pick_file_dialog):
 
     # ========== IMAGE VIEWER CALLBACKS ==========
 
-    def _list_image_files(folder_path):
-        """Lista arquivos PNG e SVG de uma pasta"""
+    def _list_image_files(folder_path, temp_dir=None):
+        """Lista arquivos PNG e SVG de uma pasta, priorizando pasta temporária"""
         import glob
         import os
+
+        # Se temos pasta temporária, usá-la
+        if temp_dir and os.path.exists(temp_dir):
+            folder_path = temp_dir
+            print(f"[DEBUG] Listando imagens da pasta temporária: {temp_dir}")
+        print(f"[DEBUG TEMP] Listando imagens em: {folder_path}")  # ← ADICIONE
 
         if not folder_path or not os.path.exists(folder_path):
             return []
@@ -1395,82 +1455,71 @@ def register(app, pick_file_dialog):
         if not nma_done:
             return no_update, {"display": "none"}, {"display": "block"}
 
-        # Se está feito e temos save_path, listar imagens
-        if nma_done and save_path:
-            image_files = _list_image_files(save_path)
+        # Se está feito, tentar obter a pasta temporária do progress_file
+        temp_dir = None
+        pf = globals().get("NMA_PROGRESS_FILE")
+        if pf and os.path.exists(pf):
+            try:
+                with open(pf, "r") as f:
+                    d = json.load(f)
+                temp_dir = d.get("temp_dir")
+                print(f"[DEBUG] Temp_dir do progress_file: {temp_dir}")
+            except Exception:
+                pass
 
-            if image_files:
-                new_data = {
-                    "image_files": image_files,
-                    "current_index": 0,
-                    "current_folder": save_path
-                }
-                return new_data, {"display": "block"}, {"display": "none"}
-            else:
-                # NMA terminou, mas não há imagens
-                return no_update, {"display": "none"}, {"display": "none"}
+        # Listar imagens (priorizando pasta temporária)
+        image_files = _list_image_files(save_path, temp_dir=temp_dir)
 
-        return no_update, {"display": "none"}, {"display": "none"}
+        if not image_files:
+            return {
+                "image_files": [],
+                "current_index": 0,
+                "current_folder": save_path,
+                "temp_dir": temp_dir
+            }, {"display": "none"}, {"display": "none"}
+
+        return {
+            "image_files": image_files,
+            "current_index": 0,
+            "current_folder": save_path,
+            "temp_dir": temp_dir
+        }, {"display": "block"}, {"display": "none"}
 
     @app.callback(
-        Output("nma-current-image", "src"),
-        Output("nma-image-counter", "children"),
-        Output("nma-image-name", "children"),
+        Output("nma-current-image", "src", allow_duplicate=True),
+        Output("nma-image-counter", "children", allow_duplicate=True),
+        Output("nma-image-name", "children", allow_duplicate=True),
         Input("nma-image-store", "data"),
-        Input("nma-prev-image", "n_clicks"),
-        Input("nma-next-image", "n_clicks"),
-        State("nma-image-store", "data"),
         prevent_initial_call=True,
     )
-    def _update_displayed_image(data, prev_clicks, next_clicks, current_store):
-        # Verificar qual input disparou o callback
-        trigger = ctx.triggered_id
+    def _update_displayed_image(data):
+        if not data or not data.get("image_files"):
+            return "", "0/0", "Nenhuma imagem disponível"
 
-        # Se for uma mudança no store (primeira carga) ou clique nas setas
-        if trigger == "nma-image-store" or trigger in ["nma-prev-image", "nma-next-image"]:
+        image_files = data["image_files"]
+        current_index = data["current_index"]
 
-            # Usar current_store se disponível, senão usar data
-            store_data = current_store if current_store else data
+        # Garantir que o índice está dentro dos limites
+        if current_index >= len(image_files):
+            current_index = 0
 
-            if not store_data or not store_data.get("image_files"):
-                return "", "0/0", "Nenhuma imagem disponível"
+        current_image = image_files[current_index]
 
-            image_files = store_data["image_files"]
-            current_index = store_data["current_index"]
+        try:
+            with open(current_image["path"], "rb") as f:
+                image_data = base64.b64encode(f.read()).decode()
 
-            # Se for clique nas setas, calcular novo índice
-            if trigger == "nma-prev-image" and current_index > 0:
-                current_index -= 1
-            elif trigger == "nma-next-image" and current_index < len(image_files) - 1:
-                current_index += 1
+            if current_image["type"] == "png":
+                img_src = f"data:image/png;base64,{image_data}"
+            else:  # SVG
+                img_src = f"data:image/svg+xml;base64,{image_data}"
+        except Exception:
+            img_src = ""
 
-            # Atualizar o store com o novo índice (se mudou)
-            if trigger in ["nma-prev-image", "nma-next-image"]:
-                new_store_data = dict(store_data)
-                new_store_data["current_index"] = current_index
-                # Aqui você precisaria atualizar o store, mas isso criaria loop
-                # Em vez disso, vamos apenas usar o índice calculado
+        counter = f"{current_index + 1}/{len(image_files)}"
+        name = current_image["name"]
 
-            # Carregar a imagem atual
-            current_image = image_files[current_index]
-
-            try:
-                with open(current_image["path"], "rb") as f:
-                    image_data = base64.b64encode(f.read()).decode()
-
-                if current_image["type"] == "png":
-                    img_src = f"data:image/png;base64,{image_data}"
-                else:  # SVG
-                    img_src = f"data:image/svg+xml;base64,{image_data}"
-            except Exception:
-                img_src = ""
-
-            counter = f"{current_index + 1}/{len(image_files)}"
-            name = current_image["name"]
-
-            return img_src, counter, name
-
-        return no_update, no_update, no_update
+        return img_src, counter, name
 
 
     # Callback para mostrar visualizador quando há imagens no store
@@ -1538,8 +1587,42 @@ def register(app, pick_file_dialog):
             return {"display": "none"}
         return no_update
 
+    # Callback para limpar pasta temporária quando inicia nova execução
+    @app.callback(
+        Output("nma-temp-cleanup", "data", allow_duplicate=True),  # Store fictício apenas para trigger
+        Input("btn-nma-run", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def _cleanup_old_temp_dirs(n_clicks):
+        if not n_clicks:
+            return no_update
 
+        # Limpar pastas temporárias antigas (mais de 1 hora)
+        try:
+            import tempfile
+            import shutil
+            import time
 
+            temp_base = tempfile.gettempdir()
+            nma_temp_pattern = os.path.join(temp_base, "nma_*")
+
+            import glob
+            old_dirs = glob.glob(nma_temp_pattern)
+
+            for dir_path in old_dirs:
+                try:
+                    # Verificar se a pasta tem mais de 1 hora
+                    if os.path.isdir(dir_path):
+                        dir_age = time.time() - os.path.getctime(dir_path)
+                        if dir_age > 3600:  # 1 hora
+                            shutil.rmtree(dir_path, ignore_errors=True)
+                            print(f"[DEBUG] Limpou pasta temporária antiga: {dir_path}")
+                except Exception as e:
+                    print(f"[DEBUG] Erro ao limpar {dir_path}: {e}")
+        except Exception as e:
+            print(f"[DEBUG] Erro geral na limpeza: {e}")
+
+        return {"cleaned": True}
 
 
 
