@@ -29,12 +29,18 @@ function Status({ level = "info", text }) {
   return <div className={`status ${level}`}>{text}</div>;
 }
 
-function PlotPanel({ figure }) {
+function PlotPanel({ figure, config, onRelayout }) {
   const ref = React.useRef(null);
 
   React.useEffect(() => {
     if (!ref.current || !figure) return;
-    Plotly.react(ref.current, figure.data, figure.layout, { displayModeBar: false });
+    Plotly.react(ref.current, figure.data, figure.layout, config || { displayModeBar: false });
+    if (onRelayout && ref.current?.on) {
+      if (ref.current.removeAllListeners) {
+        ref.current.removeAllListeners("plotly_relayout");
+      }
+      ref.current.on("plotly_relayout", onRelayout);
+    }
   }, [figure]);
 
   return <div className="plot" ref={ref} />;
@@ -85,6 +91,115 @@ function buildStep1Figure(sample, stats, graphLimits, sdNii, sdArea) {
   return { data, layout };
 }
 
+function computeThresholds(stats, sdNii, sdArea) {
+  if (!stats) {
+    return {
+      v_up: 0,
+      v_mid: 0,
+      v_down: 0,
+      v_down2: 0,
+      y_high: 0,
+      y_low: 0,
+    };
+  }
+  const v = stats.mu_x + 1.5 * (sdNii || 1) * (stats.sd_x || 1);
+  const y_high = stats.mu_y + (sdArea || 1) * (stats.sd_y || 1);
+  const y_low = stats.mu_y - (sdArea || 1) * (stats.sd_y || 1);
+  return {
+    v_up: v,
+    v_mid: v,
+    v_down: stats.mu_x,
+    v_down2: v,
+    y_high,
+    y_low,
+  };
+}
+
+function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea) {
+  const data = [...(traces || [])];
+  const rx = (sdNii || 1) * (stats.sd_x || 1);
+  const ry = (sdArea || 1) * (stats.sd_y || 1);
+  data.push(ellipseTrace(stats.mu_x, stats.mu_y, rx, ry));
+
+  const y_high = stats.mu_y + (sdArea || 1) * (stats.sd_y || 1);
+  const y_low = stats.mu_y - (sdArea || 1) * (stats.sd_y || 1);
+  const v_up_top = stats.mu_y + (2 + (sdArea || 1)) * (stats.sd_y || 1);
+  const v_down_bottom = stats.mu_y - (1 + (sdArea || 1)) * (stats.sd_y || 1);
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const y_top = clamp(v_up_top, graphLimits[0], graphLimits[1]);
+  const y_bottom = clamp(v_down_bottom, graphLimits[0], graphLimits[1]);
+
+  const shapes = [
+    {
+      type: "line",
+      x0: graphLimits[2],
+      x1: graphLimits[3],
+      y0: y_high,
+      y1: y_high,
+      line: { color: "black", width: 2 },
+      editable: false,
+    },
+    {
+      type: "line",
+      x0: graphLimits[2],
+      x1: graphLimits[3],
+      y0: y_low,
+      y1: y_low,
+      line: { color: "black", width: 2 },
+      editable: false,
+    },
+    {
+      type: "line",
+      x0: thresholds.v_down,
+      x1: thresholds.v_down,
+      y0: y_bottom,
+      y1: y_low,
+      line: { color: "#12c7e5", width: 3 },
+      editable: true,
+    },
+    {
+      type: "line",
+      x0: thresholds.v_down2,
+      x1: thresholds.v_down2,
+      y0: y_bottom,
+      y1: y_low,
+      line: { color: "#12c7e5", width: 3 },
+      editable: true,
+    },
+    {
+      type: "line",
+      x0: thresholds.v_mid,
+      x1: thresholds.v_mid,
+      y0: y_low,
+      y1: y_high,
+      line: { color: "#12c7e5", width: 3 },
+      editable: true,
+    },
+    {
+      type: "line",
+      x0: thresholds.v_up,
+      x1: thresholds.v_up,
+      y0: y_high,
+      y1: y_top,
+      line: { color: "#12c7e5", width: 3 },
+      editable: true,
+    },
+  ];
+
+  const layout = {
+    autosize: false,
+    width: 640,
+    height: 640,
+    margin: { l: 60, r: 10, t: 50, b: 60 },
+    title: { text: "NMA · Thresholds", x: 0.5, xanchor: "center" },
+    xaxis: { title: "NII", range: [graphLimits[2], graphLimits[3]], fixedrange: true },
+    yaxis: { title: "Area", range: [graphLimits[0], graphLimits[1]], fixedrange: true },
+    shapes,
+  };
+
+  return { data, layout };
+}
+
 export default function App() {
   const [rows, setRows] = useState([{
     ...emptyRow(),
@@ -115,6 +230,9 @@ export default function App() {
   });
 
   const [step2Figure, setStep2Figure] = useState(null);
+  const [step2Traces, setStep2Traces] = useState(null);
+  const [step2Stats, setStep2Stats] = useState(null);
+  const [step2GraphLimits, setStep2GraphLimits] = useState(null);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
   const hasControl = datasets.some((d) => d.is_control);
@@ -153,19 +271,15 @@ export default function App() {
       setStep1GraphLimits(data.axis ? [data.axis.y[0], data.axis.y[1], data.axis.x[0], data.axis.x[1]] : null);
       setSdArea(data.sd_factors.sd_area);
       setSdNii(data.sd_factors.sd_nii);
-      const fig = buildStep1Figure(data.sample, data.stats, data.axis ? [data.axis.y[0], data.axis.y[1], data.axis.x[0], data.axis.x[1]] : null, data.sd_factors.sd_nii, data.sd_factors.sd_area);
+      const fig = buildStep1Figure(
+        data.sample,
+        data.stats,
+        data.axis ? [data.axis.y[0], data.axis.y[1], data.axis.x[0], data.axis.x[1]] : null,
+        data.sd_factors.sd_nii,
+        data.sd_factors.sd_area
+      );
       setStep1Figure(fig);
-      // Initialize thresholds for step 2 from step 1 defaults (do not expose in step 1 UI)
-      const t = data.figure?.data?.reduce((acc, d) => {
-        if (!d?.name) return acc;
-        if (["v_up", "v_mid", "v_down", "v_down2"].includes(d.name)) {
-          acc[d.name] = d.x?.[0] ?? acc[d.name];
-        }
-        if (d.name === "y_high") acc.y_high = d.y?.[0] ?? acc.y_high;
-        if (d.name === "y_low") acc.y_low = d.y?.[0] ?? acc.y_low;
-        return acc;
-      }, { ...thresholds });
-      if (t) setThresholds(t);
+      setThresholds(computeThresholds(data.stats, data.sd_factors.sd_nii, data.sd_factors.sd_area));
       setStatus("Step 1 ready. Adjust sliders and continue when OK.");
       setStatusLevel("success");
       setStep1Ready(true);
@@ -185,6 +299,9 @@ export default function App() {
       setSdArea(data.sd_factors.sd_area);
       if (step1Stats && step1GraphLimits && step1Sample) {
         setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, data.sd_factors.sd_nii, data.sd_factors.sd_area));
+      }
+      if (step1Stats) {
+        setThresholds(computeThresholds(step1Stats, data.sd_factors.sd_nii, data.sd_factors.sd_area));
       }
       setStatus("DBSCAN applied. Update the step 2 figure.");
       setStatusLevel("success");
@@ -207,12 +324,22 @@ export default function App() {
         thresholds,
       };
       const data = await callApi("/nma/settings/figure", payload);
-      setStep2Figure(data.figure);
+      const traces = (data.figure?.data || []).filter(
+        (t) => t?.mode?.includes("markers") || t?.type === "scattergl"
+      );
+      setStep2Traces(traces);
+      const stats = step1Stats || data.stats;
+      const graphLimits = data.graph_limits;
+      setStep2Stats(stats);
+      setStep2GraphLimits(graphLimits);
+      setStep2Figure(buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea));
       setStatus("Step 2 ready.");
       setStatusLevel("success");
+      return true;
     } catch (err) {
       setStatus(err.message);
       setStatusLevel("error");
+      return false;
     }
   };
 
@@ -344,7 +471,13 @@ export default function App() {
                   type="number"
                   step="0.1"
                   value={sdArea}
-                  onChange={(e) => setSdArea(parseFloat(e.target.value || "0"))}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value || "0");
+                    setSdArea(v);
+                    if (step1Stats) {
+                      setThresholds(computeThresholds(step1Stats, sdNii, v));
+                    }
+                  }}
                 />
               </div>
               <div className="metric">
@@ -353,7 +486,13 @@ export default function App() {
                   type="number"
                   step="0.1"
                   value={sdNii}
-                  onChange={(e) => setSdNii(parseFloat(e.target.value || "0"))}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value || "0");
+                    setSdNii(v);
+                    if (step1Stats) {
+                      setThresholds(computeThresholds(step1Stats, v, sdArea));
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -366,16 +505,7 @@ export default function App() {
               {Object.keys(thresholds).map((k) => (
                 <div className="row" key={k}>
                   <label className="label">{k}</label>
-                  <input
-                    type="number"
-                    value={thresholds[k]}
-                    onChange={(e) =>
-                      setThresholds((prev) => ({
-                        ...prev,
-                        [k]: parseFloat(e.target.value || "0"),
-                      }))
-                    }
-                  />
+                  <div className="readonly">{Number(thresholds[k]).toFixed(3)}</div>
                 </div>
               ))}
             </div>
@@ -388,7 +518,16 @@ export default function App() {
             {step1Ready && (
               <div className="wizard-actions">
                 <button className="secondary" onClick={() => setStep(1)} disabled={step === 1}>Previous</button>
-                <button className="primary" onClick={() => setStep(2)} disabled={step === 2}>Next</button>
+                <button
+                  className="primary"
+                  onClick={async () => {
+                    const ok = await handleStep2();
+                    if (ok) setStep(2);
+                  }}
+                  disabled={step === 2}
+                >
+                  Next
+                </button>
               </div>
             )}
           </div>
@@ -415,6 +554,7 @@ export default function App() {
                       setSdArea(v);
                       if (step1Stats && step1GraphLimits && step1Sample) {
                         setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, sdNii, v));
+                        setThresholds(computeThresholds(step1Stats, sdNii, v));
                       }
                     }}
                   />
@@ -435,6 +575,7 @@ export default function App() {
                     setSdNii(v);
                     if (step1Stats && step1GraphLimits && step1Sample) {
                       setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, v, sdArea));
+                      setThresholds(computeThresholds(step1Stats, v, sdArea));
                     }
                   }}
                 />
@@ -447,7 +588,36 @@ export default function App() {
             <section>
               <h2>Step 2 · Threshold lines</h2>
               <p className="hint">Use additional datasets for reference.</p>
-              <PlotPanel figure={step2Figure} />
+              {step2Figure ? (
+                <PlotPanel
+                  figure={step2Figure}
+                  config={{ displayModeBar: false, editable: true, edits: { shapePosition: true } }}
+                  onRelayout={(ev) => {
+                    if (!step2GraphLimits || !step2Stats || !step2Traces) return;
+                    const getShape = (idx) => {
+                      const x0 = ev[`shapes[${idx}].x0`];
+                      const x1 = ev[`shapes[${idx}].x1`];
+                      return x0 ?? x1;
+                    };
+                    const v_down = getShape(2);
+                    const v_down2 = getShape(3);
+                    const v_mid = getShape(4);
+                    const v_up = getShape(5);
+                    if (v_down == null && v_down2 == null && v_mid == null && v_up == null) return;
+                    const next = {
+                      ...thresholds,
+                      v_down: v_down ?? thresholds.v_down,
+                      v_down2: v_down2 ?? thresholds.v_down2,
+                      v_mid: v_mid ?? thresholds.v_mid,
+                      v_up: v_up ?? thresholds.v_up,
+                    };
+                    setThresholds(next);
+                    setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea));
+                  }}
+                />
+              ) : (
+                <div className="hint">Click Next to generate the Step 2 figure.</div>
+              )}
             </section>
           )}
         </main>
