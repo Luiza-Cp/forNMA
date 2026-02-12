@@ -317,6 +317,52 @@ button:disabled {
   gap: 8px;
 }
 
+.percentages {
+  margin-top: 16px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+
+.percentages h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.percent-table {
+  display: grid;
+  gap: 6px;
+}
+
+.percent-row {
+  display: grid;
+  grid-template-columns: 90px repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px;
+}
+
+.percent-row.header {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.percent-row .cell {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #f7fafc;
+  text-align: right;
+}
+
+.percent-row .cell:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 
 @media (max-width: 1100px) {
   .layout {

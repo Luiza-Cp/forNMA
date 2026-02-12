@@ -115,7 +115,7 @@ function computeThresholds(stats, sdNii, sdArea) {
   };
 }
 
-function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea) {
+function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea, percentages) {
   const xMin = graphLimits[2];
   const xMax = graphLimits[3];
   const yMin = graphLimits[0];
@@ -123,16 +123,26 @@ function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea) {
   const yHigh = stats.mu_y + (sdArea || 1) * (stats.sd_y || 1);
   const yLow = stats.mu_y - (sdArea || 1) * (stats.sd_y || 1);
   const mid = (a, b) => (a + b) / 2;
+  const makeText = (label) => {
+    const pct = percentages?.[label];
+    if (!pct) return label;
+    const lines = Object.entries(pct)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => `${name}: ${value.toFixed(1)}%`);
+    return [label, ...lines].join("<br>");
+  };
   return [
-    { text: "SR", x: mid(xMin, thresholds.v_down), y: mid(yMin, yLow) },
-    { text: "S", x: mid(thresholds.v_down, thresholds.v_down2), y: mid(yMin, yLow) },
-    { text: "SI", x: mid(thresholds.v_down2, xMax), y: mid(yMin, yLow) },
-    { text: "N", x: mid(xMin, thresholds.v_mid), y: mid(yLow, yHigh) },
-    { text: "I", x: mid(thresholds.v_mid, xMax), y: mid(yLow, yHigh) },
-    { text: "LR", x: mid(xMin, thresholds.v_up), y: mid(yHigh, yMax) },
-    { text: "LI", x: mid(thresholds.v_up, xMax), y: mid(yHigh, yMax) },
+    { label: "SR", x: mid(xMin, thresholds.v_down), y: mid(yMin, yLow) },
+    { label: "S", x: mid(thresholds.v_down, thresholds.v_down2), y: mid(yMin, yLow) },
+    { label: "SI", x: mid(thresholds.v_down2, xMax), y: mid(yMin, yLow) },
+    { label: "N", x: mid(xMin, thresholds.v_mid), y: mid(yLow, yHigh) },
+    { label: "I", x: mid(thresholds.v_mid, xMax), y: mid(yLow, yHigh) },
+    { label: "LR", x: mid(xMin, thresholds.v_up), y: mid(yHigh, yMax) },
+    { label: "LI", x: mid(thresholds.v_up, xMax), y: mid(yHigh, yMax) },
   ].map((a) => ({
-    ...a,
+    text: makeText(a.label),
+    x: a.x,
+    y: a.y,
     showarrow: false,
     font: { size: 12, color: "#1b2a3a" },
     bgcolor: "rgba(245, 248, 251, 0.9)",
@@ -140,6 +150,73 @@ function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea) {
     borderwidth: 1,
     borderpad: 4,
   }));
+}
+
+function computeQuadrantPercentages(traces, thresholds, stats, sdArea) {
+  if (!traces || !stats) return null;
+  const yHigh = stats.mu_y + (sdArea || 1) * (stats.sd_y || 1);
+  const yLow = stats.mu_y - (sdArea || 1) * (stats.sd_y || 1);
+  const out = { LR: {}, LI: {}, N: {}, I: {}, SR: {}, S: {}, SI: {} };
+  const toNum = (v) => {
+    if (v == null) return NaN;
+    if (typeof v === "string") return Number(v.replace(",", "."));
+    return Number(v);
+  };
+  const toArray = (v) => {
+    if (!v) return [];
+    if (Array.isArray(v)) return v;
+    if (ArrayBuffer.isView(v)) return Array.from(v);
+    if (typeof v === "object") {
+      if (v.bdata && v.dtype && typeof window !== "undefined") {
+        try {
+          const bin = atob(v.bdata);
+          const buf = new ArrayBuffer(bin.length);
+          const bytes = new Uint8Array(buf);
+          for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+          let arr = null;
+          if (v.dtype === "f4") arr = new Float32Array(buf);
+          if (v.dtype === "f8") arr = new Float64Array(buf);
+          if (v.dtype === "i4") arr = new Int32Array(buf);
+          if (v.dtype === "i2") arr = new Int16Array(buf);
+          if (arr) return Array.from(arr);
+        } catch (_) {
+          return [];
+        }
+      }
+      if (Array.isArray(v.data)) return v.data;
+      if (Array.isArray(v.values)) return v.values;
+      if (Array.isArray(v.array)) return v.array;
+    }
+    return [];
+  };
+  traces.forEach((t) => {
+    const name = t.name || "dataset";
+    const xs = toArray(t.x);
+    const ys = toArray(t.y);
+    let total = 0;
+    const counts = { LR: 0, LI: 0, N: 0, I: 0, SR: 0, S: 0, SI: 0 };
+    for (let i = 0; i < xs.length; i += 1) {
+      const x = toNum(xs[i]);
+      const y = toNum(ys[i]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      total += 1;
+      if (y >= yHigh) {
+        if (x < thresholds.v_up) counts.LR += 1;
+        else counts.LI += 1;
+      } else if (y >= yLow) {
+        if (x < thresholds.v_mid) counts.N += 1;
+        else counts.I += 1;
+      } else {
+        if (x < thresholds.v_down) counts.SR += 1;
+        else if (x < thresholds.v_down2) counts.S += 1;
+        else counts.SI += 1;
+      }
+    }
+    Object.keys(counts).forEach((k) => {
+      out[k][name] = total === 0 ? 0 : (counts[k] / total) * 100;
+    });
+  });
+  return out;
 }
 
 function buildStep2Figure(
@@ -232,7 +309,15 @@ function buildStep2Figure(
     xaxis: { title: "NII", range: [graphLimits[2], graphLimits[3]], fixedrange: true },
     yaxis: { title: "Area", range: [graphLimits[0], graphLimits[1]], fixedrange: true },
     shapes,
-    annotations: withLabels ? buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea) : [],
+    annotations: withLabels
+      ? buildQuadrantAnnotations(
+          graphLimits,
+          thresholds,
+          stats,
+          sdArea,
+          computeQuadrantPercentages(traces, thresholds, stats, sdArea)
+        )
+      : [],
   };
 
   return { data, layout };
@@ -273,6 +358,7 @@ export default function App() {
   const [step2GraphLimits, setStep2GraphLimits] = useState(null);
   const [finalMode, setFinalMode] = useState(false);
   const [downloadReady, setDownloadReady] = useState(false);
+  const [step2Percentages, setStep2Percentages] = useState(null);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
   const hasControl = datasets.some((d) => d.is_control);
@@ -372,7 +458,8 @@ export default function App() {
       const graphLimits = data.graph_limits;
       setStep2Stats(stats);
       setStep2GraphLimits(graphLimits);
-      setStep2Figure(buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea, false));
+      setStep2Figure(buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea, true));
+      setStep2Percentages(computeQuadrantPercentages(traces, thresholds, stats, sdArea));
       setFinalMode(false);
       setStatus("Step 2 ready.");
       setStatusLevel("success");
@@ -408,6 +495,7 @@ export default function App() {
     );
     setStep2Figure(fig);
     setFinalMode(true);
+    setStep2Percentages(computeQuadrantPercentages(step2Traces, thresholds, step2Stats, sdArea));
     try {
       await callApi("/nma/settings/save", {
         name: datasets.find((d) => d.is_control)?.name || "control",
@@ -702,12 +790,47 @@ export default function App() {
                       v_up: v_up ?? thresholds.v_up,
                     };
                     setThresholds(next);
-                    setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea, false));
+                    setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea, true));
+                    setStep2Percentages(computeQuadrantPercentages(step2Traces, next, step2Stats, sdArea));
                     setFinalMode(false);
                   }}
                 />
               ) : (
                 <div className="hint">Click Next to generate the Step 2 figure.</div>
+              )}
+              {step2Percentages && (
+                (() => {
+                  const datasetNames = Array.from(
+                    new Set(
+                      Object.values(step2Percentages).flatMap((v) => Object.keys(v)).concat(
+                        (step2Traces || []).map((t) => t.name).filter(Boolean)
+                      )
+                    )
+                  );
+                  return (
+                    <div className="percentages">
+                      <h3>Quadrant distribution (%)</h3>
+                      <div className="percent-table">
+                        <div className="percent-row header">
+                          <div className="cell">Quadrant</div>
+                          {datasetNames.map((name) => (
+                            <div className="cell" key={`h-${name}`}>{name}</div>
+                          ))}
+                        </div>
+                        {["LR", "LI", "N", "I", "SR", "S", "SI"].map((q) => (
+                          <div className="percent-row" key={`q-${q}`}>
+                            <div className="cell">{q}</div>
+                            {datasetNames.map((name) => (
+                              <div className="cell" key={`${q}-${name}`}>
+                                {step2Percentages[q]?.[name] != null ? step2Percentages[q][name].toFixed(1) : "-"}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()
               )}
               {finalMode && downloadReady && (
                 <div className="section">
