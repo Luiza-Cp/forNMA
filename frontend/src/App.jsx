@@ -115,7 +115,44 @@ function computeThresholds(stats, sdNii, sdArea) {
   };
 }
 
-function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea) {
+function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea) {
+  const xMin = graphLimits[2];
+  const xMax = graphLimits[3];
+  const yMin = graphLimits[0];
+  const yMax = graphLimits[1];
+  const yHigh = stats.mu_y + (sdArea || 1) * (stats.sd_y || 1);
+  const yLow = stats.mu_y - (sdArea || 1) * (stats.sd_y || 1);
+  const mid = (a, b) => (a + b) / 2;
+  return [
+    { text: "SR", x: mid(xMin, thresholds.v_down), y: mid(yMin, yLow) },
+    { text: "S", x: mid(thresholds.v_down, thresholds.v_down2), y: mid(yMin, yLow) },
+    { text: "SI", x: mid(thresholds.v_down2, xMax), y: mid(yMin, yLow) },
+    { text: "N", x: mid(xMin, thresholds.v_mid), y: mid(yLow, yHigh) },
+    { text: "I", x: mid(thresholds.v_mid, xMax), y: mid(yLow, yHigh) },
+    { text: "LR", x: mid(xMin, thresholds.v_up), y: mid(yHigh, yMax) },
+    { text: "LI", x: mid(thresholds.v_up, xMax), y: mid(yHigh, yMax) },
+  ].map((a) => ({
+    ...a,
+    showarrow: false,
+    font: { size: 12, color: "#1b2a3a" },
+    bgcolor: "rgba(245, 248, 251, 0.9)",
+    bordercolor: "rgba(27, 42, 58, 0.15)",
+    borderwidth: 1,
+    borderpad: 4,
+  }));
+}
+
+function buildStep2Figure(
+  traces,
+  stats,
+  graphLimits,
+  thresholds,
+  sdNii,
+  sdArea,
+  withLabels = false,
+  verticalColor = "#12c7e5",
+  horizontalColor = "black"
+) {
   const data = [...(traces || [])];
   const rx = (sdNii || 1) * (stats.sd_x || 1);
   const ry = (sdArea || 1) * (stats.sd_y || 1);
@@ -136,7 +173,7 @@ function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea)
       x1: graphLimits[3],
       y0: y_high,
       y1: y_high,
-      line: { color: "black", width: 2 },
+      line: { color: horizontalColor, width: 2 },
       editable: false,
     },
     {
@@ -145,7 +182,7 @@ function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea)
       x1: graphLimits[3],
       y0: y_low,
       y1: y_low,
-      line: { color: "black", width: 2 },
+      line: { color: horizontalColor, width: 2 },
       editable: false,
     },
     {
@@ -154,7 +191,7 @@ function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea)
       x1: thresholds.v_down,
       y0: y_bottom,
       y1: y_low,
-      line: { color: "#12c7e5", width: 3 },
+      line: { color: verticalColor, width: 3 },
       editable: true,
     },
     {
@@ -163,7 +200,7 @@ function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea)
       x1: thresholds.v_down2,
       y0: y_bottom,
       y1: y_low,
-      line: { color: "#12c7e5", width: 3 },
+      line: { color: verticalColor, width: 3 },
       editable: true,
     },
     {
@@ -172,7 +209,7 @@ function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea)
       x1: thresholds.v_mid,
       y0: y_low,
       y1: y_high,
-      line: { color: "#12c7e5", width: 3 },
+      line: { color: verticalColor, width: 3 },
       editable: true,
     },
     {
@@ -181,7 +218,7 @@ function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea)
       x1: thresholds.v_up,
       y0: y_high,
       y1: y_top,
-      line: { color: "#12c7e5", width: 3 },
+      line: { color: verticalColor, width: 3 },
       editable: true,
     },
   ];
@@ -195,6 +232,7 @@ function buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea)
     xaxis: { title: "NII", range: [graphLimits[2], graphLimits[3]], fixedrange: true },
     yaxis: { title: "Area", range: [graphLimits[0], graphLimits[1]], fixedrange: true },
     shapes,
+    annotations: withLabels ? buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea) : [],
   };
 
   return { data, layout };
@@ -233,6 +271,8 @@ export default function App() {
   const [step2Traces, setStep2Traces] = useState(null);
   const [step2Stats, setStep2Stats] = useState(null);
   const [step2GraphLimits, setStep2GraphLimits] = useState(null);
+  const [finalMode, setFinalMode] = useState(false);
+  const [downloadReady, setDownloadReady] = useState(false);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
   const hasControl = datasets.some((d) => d.is_control);
@@ -332,7 +372,8 @@ export default function App() {
       const graphLimits = data.graph_limits;
       setStep2Stats(stats);
       setStep2GraphLimits(graphLimits);
-      setStep2Figure(buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea));
+      setStep2Figure(buildStep2Figure(traces, stats, graphLimits, thresholds, sdNii, sdArea, false));
+      setFinalMode(false);
       setStatus("Step 2 ready.");
       setStatusLevel("success");
       return true;
@@ -340,6 +381,51 @@ export default function App() {
       setStatus(err.message);
       setStatusLevel("error");
       return false;
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!step2Traces || !step2Stats || !step2GraphLimits) {
+      setStatus("Generate the Step 2 figure first.");
+      setStatusLevel("error");
+      return;
+    }
+    if (!step1Stats) {
+      setStatus("Run step 1 first.");
+      setStatusLevel("error");
+      return;
+    }
+    const fig = buildStep2Figure(
+      step2Traces,
+      step2Stats,
+      step2GraphLimits,
+      thresholds,
+      sdNii,
+      sdArea,
+      true,
+      "black",
+      "black"
+    );
+    setStep2Figure(fig);
+    setFinalMode(true);
+    try {
+      await callApi("/nma/settings/save", {
+        name: datasets.find((d) => d.is_control)?.name || "control",
+        mean_nii: step1Stats.mu_x,
+        std_nii: step1Stats.sd_x,
+        mean_area: step1Stats.mu_y,
+        std_area: step1Stats.sd_y,
+        sd_nii: sdNii,
+        sd_area: sdArea,
+        graph_limits: step1GraphLimits || step2GraphLimits || [0, 0, 0, 0],
+        thresholds,
+      });
+      setDownloadReady(true);
+      setStatus("Completed. Final figure ready.");
+      setStatusLevel("success");
+    } catch (err) {
+      setStatus(err.message);
+      setStatusLevel("error");
     }
   };
 
@@ -518,16 +604,19 @@ export default function App() {
             {step1Ready && (
               <div className="wizard-actions">
                 <button className="secondary" onClick={() => setStep(1)} disabled={step === 1}>Previous</button>
-                <button
-                  className="primary"
-                  onClick={async () => {
-                    const ok = await handleStep2();
-                    if (ok) setStep(2);
-                  }}
-                  disabled={step === 2}
-                >
-                  Next
-                </button>
+                {step === 1 ? (
+                  <button
+                    className="primary"
+                    onClick={async () => {
+                      const ok = await handleStep2();
+                      if (ok) setStep(2);
+                    }}
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button className="primary" onClick={handleComplete}>Complete</button>
+                )}
               </div>
             )}
           </div>
@@ -591,8 +680,9 @@ export default function App() {
               {step2Figure ? (
                 <PlotPanel
                   figure={step2Figure}
-                  config={{ displayModeBar: false, editable: true, edits: { shapePosition: true } }}
+                  config={{ displayModeBar: false, editable: !finalMode, edits: { shapePosition: true } }}
                   onRelayout={(ev) => {
+                    if (finalMode) return;
                     if (!step2GraphLimits || !step2Stats || !step2Traces) return;
                     const getShape = (idx) => {
                       const x0 = ev[`shapes[${idx}].x0`];
@@ -612,11 +702,24 @@ export default function App() {
                       v_up: v_up ?? thresholds.v_up,
                     };
                     setThresholds(next);
-                    setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea));
+                    setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea, false));
+                    setFinalMode(false);
                   }}
                 />
               ) : (
                 <div className="hint">Click Next to generate the Step 2 figure.</div>
+              )}
+              {finalMode && downloadReady && (
+                <div className="section">
+                  <button
+                    className="primary"
+                    onClick={() => {
+                      window.location.href = `${API_BASE}/nma/settings/download`;
+                    }}
+                  >
+                    Download settings
+                  </button>
+                </div>
               )}
             </section>
           )}

@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.colors import qualitative as qual_colors
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors import NearestNeighbors
@@ -470,4 +471,15 @@ def nma_settings_get():
         std_area=float(pkl.get("std_a", 0.0)),
         graph_limits=[float(x) for x in (pkl.get("graph_limits") or [0, 0, 0, 0])],
         thresholds=thresholds,
+    )
+
+
+@app.get("/nma/settings/download")
+def nma_settings_download():
+    if not NMA_SETTINGS_PATH.exists():
+        raise HTTPException(status_code=404, detail="NMA settings not found")
+    return FileResponse(
+        path=NMA_SETTINGS_PATH,
+        filename="nma_settings.pickle",
+        media_type="application/octet-stream",
     )
