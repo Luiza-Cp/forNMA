@@ -72,6 +72,28 @@ def nma_datasets_columns(req: DatasetColumnsRequest):
     return DatasetColumnsResponse(columns=cols)
 
 
+@app.post("/system/pick-csv")
+def system_pick_csv():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        path = filedialog.askopenfilename(
+            title="Select dataset CSV",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        root.destroy()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to open file picker: {e}")
+
+    if not path:
+        raise HTTPException(status_code=400, detail="No file selected.")
+    return {"path": path}
+
+
 def _params_to_dict(req) -> Dict:
     return {"datasets": [d.model_dump() for d in req.params.datasets]}
 

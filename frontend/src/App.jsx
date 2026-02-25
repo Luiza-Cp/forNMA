@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import Plotly from "plotly.js-dist-min";
 
 const API_BASE = "http://127.0.0.1:8000";
+const round2 = (n) => Math.round(Number(n) * 100) / 100;
 
 const emptyRow = () => ({
   name: "",
@@ -384,6 +385,17 @@ export default function App() {
     return res.json();
   };
 
+  const pickCsvPath = async () => {
+    const res = await fetch(`${API_BASE}/system/pick-csv`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    return res.json();
+  };
+
   const handleStep1 = async () => {
     setStatus("Computing step 1...");
     setStatusLevel("info");
@@ -396,8 +408,8 @@ export default function App() {
       setStep1Sample(data.sample);
       setStep1Stats(data.stats);
       setStep1GraphLimits(data.axis ? [data.axis.y[0], data.axis.y[1], data.axis.x[0], data.axis.x[1]] : null);
-      setSdArea(data.sd_factors.sd_area);
-      setSdNii(data.sd_factors.sd_nii);
+      setSdArea(round2(data.sd_factors.sd_area));
+      setSdNii(round2(data.sd_factors.sd_nii));
       const fig = buildStep1Figure(
         data.sample,
         data.stats,
@@ -422,8 +434,8 @@ export default function App() {
     try {
       const payload = { params: { datasets } };
       const data = await callApi("/nma/settings/auto-dbscan", payload);
-      setSdNii(data.sd_factors.sd_nii);
-      setSdArea(data.sd_factors.sd_area);
+      setSdNii(round2(data.sd_factors.sd_nii));
+      setSdArea(round2(data.sd_factors.sd_area));
       if (step1Stats && step1GraphLimits && step1Sample) {
         setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, data.sd_factors.sd_nii, data.sd_factors.sd_area));
       }
@@ -535,8 +547,8 @@ export default function App() {
       const data = await res.json();
 
       // Apply settings
-      setSdArea(data.sd_area);
-      setSdNii(data.sd_nii);
+      setSdArea(round2(data.sd_area));
+      setSdNii(round2(data.sd_nii));
       setThresholds(data.thresholds);
       setStep1Stats({
         mu_x: data.mean_nii,
@@ -682,12 +694,32 @@ export default function App() {
                   Control
                 </label>
               </div>
-              <input
-                className="input"
-                placeholder="/path/Results.csv"
-                value={row.path}
-                onChange={(e) => updateRow(idx, { path: e.target.value })}
-              />
+              <div className="row path-row">
+                <input
+                  className="input"
+                  placeholder="/path/Results.csv"
+                  value={row.path}
+                  onChange={(e) => updateRow(idx, { path: e.target.value })}
+                />
+                <button
+                  className="ghost"
+                  onClick={async () => {
+                    setStatus("Opening file picker...");
+                    setStatusLevel("info");
+                    try {
+                      const res = await pickCsvPath();
+                      updateRow(idx, { path: res.path || "" });
+                      setStatus("Path selected.");
+                      setStatusLevel("success");
+                    } catch (err) {
+                      setStatus(err.message);
+                      setStatusLevel("error");
+                    }
+                  }}
+                >
+                  Browse CSV
+                </button>
+              </div>
               <div className="row">
                 <select
                   className="input"
@@ -748,9 +780,9 @@ export default function App() {
                 <input
                   type="number"
                   step="0.1"
-                  value={sdArea}
+                  value={Number.isFinite(sdArea) ? sdArea.toFixed(2) : ""}
                   onChange={(e) => {
-                    const v = parseFloat(e.target.value || "0");
+                    const v = round2(parseFloat(e.target.value || "0"));
                     setSdArea(v);
                     if (step1Stats) {
                       setThresholds(computeThresholds(step1Stats, sdNii, v));
@@ -763,9 +795,9 @@ export default function App() {
                 <input
                   type="number"
                   step="0.1"
-                  value={sdNii}
+                  value={Number.isFinite(sdNii) ? sdNii.toFixed(2) : ""}
                   onChange={(e) => {
-                    const v = parseFloat(e.target.value || "0");
+                    const v = round2(parseFloat(e.target.value || "0"));
                     setSdNii(v);
                     if (step1Stats) {
                       setThresholds(computeThresholds(step1Stats, v, sdArea));
@@ -846,8 +878,8 @@ export default function App() {
                     max="5"
                     step="0.1"
                     value={5 - sdArea}
-                    onChange={(e) => {
-                      const v = 5 - parseFloat(e.target.value || "0");
+                  onChange={(e) => {
+                      const v = round2(5 - parseFloat(e.target.value || "0"));
                       setSdArea(v);
                       if (step1Stats && step1GraphLimits && step1Sample) {
                         setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, sdNii, v));
@@ -868,7 +900,7 @@ export default function App() {
                   step="0.1"
                   value={sdNii}
                   onChange={(e) => {
-                    const v = parseFloat(e.target.value || "0");
+                    const v = round2(parseFloat(e.target.value || "0"));
                     setSdNii(v);
                     if (step1Stats && step1GraphLimits && step1Sample) {
                       setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, v, sdArea));
