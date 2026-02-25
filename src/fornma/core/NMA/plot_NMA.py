@@ -235,8 +235,9 @@ class NMA:
         """  Plots ONE heatmap NMA ignoring values passed as hue and size."""
 
         subset_of_df = self.subset_df(condition_time_tuple)
-        plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
         fig, ax = plt.subplots()
+        # Keep background style local to this axis (avoid leaking to other plots).
+        ax.set_facecolor('#7e03ff')
         sns.kdeplot(data=subset_of_df, x="NII", y="Area", cmap=self.palette,
                     fill=True, thresh=None, levels=60, ax=ax)
         ax.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
@@ -257,10 +258,13 @@ class NMA:
         """  Plots ONE jointplot NMA ignoring values passed as hue and size."""
 
         subset_of_df = self.subset_df(condition_time_tuple)
-        #plt.rcParams['axes.facecolor'] = '#7e03ff'  # '#03051A'
 
         fig = sns.jointplot(data=subset_of_df, x="NII", y="Area", kind='kde', space=0, fill=True, thresh=0,
                             cmap=self.palette)
+        # Remove colored background from marginal panels.
+        fig.ax_marg_x.patch.set_alpha(0.0)
+        fig.ax_marg_y.patch.set_alpha(0.0)
+        fig.ax_joint.set_facecolor("white")
         fig.ax_marg_x.set_xlim(self.graph_limits[2], self.graph_limits[3])
         fig.ax_marg_y.set_ylim(self.graph_limits[0], self.graph_limits[1])
         #.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
