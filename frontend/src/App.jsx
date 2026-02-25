@@ -403,6 +403,7 @@ export default function App() {
       single: false,
       overtime: false,
       jointplot: false,
+      palette: "",
     },
   });
   const [plotSavePath, setPlotSavePath] = useState("");
@@ -844,6 +845,7 @@ export default function App() {
           single: !!plotConfig.heatmap.single,
           overtime: !!plotConfig.heatmap.overtime,
           jointplot: !!plotConfig.heatmap.jointplot,
+          palette: plotConfig.heatmap.palette || null,
         },
       };
 
@@ -1259,35 +1261,50 @@ export default function App() {
                     </div>
                   </>
                 ) : (
-                  <div className="check-grid">
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        checked={plotConfig.heatmap.single}
-                        onChange={(e) => updateHeatmapConfig({ single: e.target.checked })}
-                      />
-                      Single plot
-                      <Tip text="Combine all datasets in one heatmap view." />
-                    </label>
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        checked={plotConfig.heatmap.overtime}
-                        onChange={(e) => updateHeatmapConfig({ overtime: e.target.checked })}
-                      />
-                      Overtime
-                      <Tip text="Use time-sequence heatmap when temporal data is available." />
-                    </label>
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        checked={plotConfig.heatmap.jointplot}
-                        onChange={(e) => updateHeatmapConfig({ jointplot: e.target.checked })}
-                      />
-                      Jointplot
-                      <Tip text="Include marginal histograms alongside the heatmap." />
-                    </label>
-                  </div>
+                  <>
+                    <div className="field-head">Heatmap palette <Tip text="Color palette used for heatmap rendering." /></div>
+                    <div className="row">
+                      <select
+                        className="input"
+                        value={plotConfig.heatmap.palette}
+                        onChange={(e) => updateHeatmapConfig({ palette: e.target.value })}
+                      >
+                        <option value="">Palette (optional)</option>
+                        {PALETTE_OPTIONS.map((p) => (
+                          <option key={`heat-pal-${p}`} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="check-grid">
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={plotConfig.heatmap.single}
+                          onChange={(e) => updateHeatmapConfig({ single: e.target.checked })}
+                        />
+                        Single plot
+                        <Tip text="Combine all datasets in one heatmap view." />
+                      </label>
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={plotConfig.heatmap.overtime}
+                          onChange={(e) => updateHeatmapConfig({ overtime: e.target.checked })}
+                        />
+                        Overtime
+                        <Tip text="Use time-sequence heatmap when temporal data is available." />
+                      </label>
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={plotConfig.heatmap.jointplot}
+                          onChange={(e) => updateHeatmapConfig({ jointplot: e.target.checked })}
+                        />
+                        Jointplot
+                        <Tip text="Include marginal histograms alongside the heatmap." />
+                      </label>
+                    </div>
+                  </>
                 )}
                 <div className="field-head">Saving path <Tip text="Directory where NMA plots and outputs will be saved." /></div>
                 <div className="row path-row">

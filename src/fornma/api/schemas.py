@@ -151,6 +151,7 @@ class NMAHeatmapPlotConfig(BaseModel):
     single: bool = False
     overtime: bool = False
     jointplot: bool = False
+    palette: Optional[str] = None
 
 
 class NMAPlotRunRequest(BaseModel):

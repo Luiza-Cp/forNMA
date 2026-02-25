@@ -154,7 +154,7 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
         graph_type = "jointplot" if req.heatmap.jointplot else "heatmap"
         single = bool(req.heatmap.single)
         overtime = bool(req.heatmap.overtime)
-        palette = req.dot.palette or "viridis"
+        palette = req.heatmap.palette or "viridis"
     else:
         graph_type = "dot"
         single = bool(req.dot.single)
@@ -171,18 +171,22 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
     _set_plot_job(job_id, status="running", progress=5, message="Starting NMA plotting...", output_dir=str(output_dir))
 
     original_save_figs = NMAClass.save_figs
+    created_png_files: list[str] = []
 
     def _save_with_progress(self, fig, title):
         original_save_figs(self, fig, title)
-        files = _png_files_in_dir(output_dir)
+        png_name = f"{title.lstrip()} {self.graph_type}.png"
+        png_path = str((output_dir / png_name).resolve())
+        if png_path not in created_png_files:
+            created_png_files.append(png_path)
         prev = PLOT_JOBS.get(job_id, {})
         current = int(prev.get("progress", 5))
         next_progress = min(95, current + 8)
         _set_plot_job(
             job_id,
             progress=next_progress,
-            message=f"Plotting... ({len(files)} image(s) saved)",
-            files=files,
+            message=f"Plotting... ({len(created_png_files)} image(s) saved)",
+            files=created_png_files.copy(),
         )
 
     try:
@@ -203,7 +207,7 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
             hue_norm=hue_norm,
             size_norm=size_norm,
         )
-        files = _png_files_in_dir(output_dir)
+        files = [p for p in created_png_files if Path(p).exists()]
         _set_plot_job(
             job_id,
             status="completed",
