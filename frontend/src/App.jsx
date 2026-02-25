@@ -1077,7 +1077,7 @@ export default function App() {
                 <h4>Control</h4>
                 <div className="row">
                   <div className="metric">
-                    <label>Area SD</label>
+                    <label>Area SD <Tip text="Number of standard deviations applied to Area to define vertical spread of thresholds/ellipse." /></label>
                     <input
                       type="number"
                       step="0.1"
@@ -1092,7 +1092,7 @@ export default function App() {
                     />
                   </div>
                   <div className="metric">
-                    <label>NII SD</label>
+                    <label>NII SD <Tip text="Number of standard deviations applied to NII to define horizontal spread of thresholds/ellipse." /></label>
                     <input
                       type="number"
                       step="0.1"
@@ -1406,7 +1406,7 @@ export default function App() {
               <p className="hint">Adjust SDs or use auto-DBSCAN.</p>
               <div className="plot-shell">
                 <div className="slider-vertical">
-                  <label>Area SD</label>
+                  <label>Area SD <Tip text="Adjust Area standard deviation for threshold and ellipse height." /></label>
                   <input
                     type="range"
                     min="0"
@@ -1427,7 +1427,7 @@ export default function App() {
                 <PlotPanel figure={step1Figure} />
               </div>
               <div className="slider-horizontal">
-                <label>NII SD</label>
+                <label>NII SD <Tip text="Adjust NII standard deviation for threshold and ellipse width." /></label>
                 <input
                   type="range"
                   min="0"
