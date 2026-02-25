@@ -106,6 +106,16 @@ body {
   background: #fbfdff;
 }
 
+.dataset-header-row {
+  justify-content: space-between;
+}
+
+.dataset-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .row {
   display: flex;
   gap: 8px;
@@ -190,6 +200,11 @@ button.ghost {
   background: transparent;
   color: var(--muted);
   border: 1px solid var(--border);
+}
+
+button.btn-small {
+  padding: 5px 10px;
+  font-size: 12px;
 }
 
 button:disabled {

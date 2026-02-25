@@ -3,8 +3,10 @@ import Plotly from "plotly.js-dist-min";
 
 const API_BASE = "http://127.0.0.1:8000";
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
+const makeRowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const emptyRow = () => ({
+  id: makeRowId(),
   name: "",
   path: "",
   area_col: "Area",
@@ -330,6 +332,7 @@ export default function App() {
     name: "Control",
     is_control: true,
   }]);
+  const [collapsedById, setCollapsedById] = useState({});
 
   const [step, setStep] = useState(1);
   const [step1Ready, setStep1Ready] = useState(false);
@@ -371,6 +374,14 @@ export default function App() {
 
   const addRow = () => setRows((prev) => [...prev, emptyRow()]);
   const removeRow = (idx) => setRows((prev) => prev.filter((_, i) => i !== idx));
+  const toggleDatasetCollapse = (rowId) => {
+    setCollapsedById((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
+  };
+  const setAllCollapsed = (collapsed) => {
+    setCollapsedById(
+      Object.fromEntries(rows.map((r) => [r.id, collapsed]))
+    );
+  };
 
   const callApi = async (path, payload) => {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -675,98 +686,114 @@ export default function App() {
         <aside className="panel">
           <h3>Datasets</h3>
           <p className="hint">Mark at least one control. Paths must be local.</p>
+          <div className="row row-right">
+            <button className="ghost btn-small" onClick={() => setAllCollapsed(true)}>Minimize all</button>
+            <button className="ghost btn-small" onClick={() => setAllCollapsed(false)}>Expand all</button>
+          </div>
 
           {rows.map((row, idx) => (
-            <div className="dataset" key={idx}>
-              <div className="row">
-                <input
-                  className="input"
-                  placeholder="Name"
-                  value={row.name}
-                  onChange={(e) => updateRow(idx, { name: e.target.value })}
-                />
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={row.is_control}
-                    onChange={(e) => updateRow(idx, { is_control: e.target.checked })}
-                  />
-                  Control
-                </label>
-              </div>
-              <div className="row path-row">
-                <input
-                  className="input"
-                  placeholder="/path/Results.csv"
-                  value={row.path}
-                  onChange={(e) => updateRow(idx, { path: e.target.value })}
-                />
-                <button
-                  className="ghost"
-                  onClick={async () => {
-                    setStatus("Opening file picker...");
-                    setStatusLevel("info");
-                    try {
-                      const res = await pickCsvPath();
-                      updateRow(idx, { path: res.path || "" });
-                      setStatus("Path selected.");
-                      setStatusLevel("success");
-                    } catch (err) {
-                      setStatus(err.message);
-                      setStatusLevel("error");
-                    }
-                  }}
-                >
-                  Browse CSV
+            <div className="dataset" key={row.id}>
+              <div className="row dataset-header-row">
+                <div className="dataset-title">
+                  {row.name?.trim() || `Dataset ${idx + 1}`}{row.is_control ? " (Control)" : ""}
+                </div>
+                <button className="ghost btn-small" onClick={() => toggleDatasetCollapse(row.id)}>
+                  {collapsedById[row.id] ? "Expand" : "Minimize"}
                 </button>
               </div>
-              <div className="row">
-                <select
-                  className="input"
-                  value={row.area_col}
-                  onChange={(e) => updateRow(idx, { area_col: e.target.value })}
-                >
-                  {(row.columns || ["Area"]).map((c) => (
-                    <option key={`area-${idx}-${c}`} value={c}>{c}</option>
-                  ))}
-                </select>
-                <select
-                  className="input"
-                  value={row.nii_col}
-                  onChange={(e) => updateRow(idx, { nii_col: e.target.value })}
-                >
-                  {(row.columns || ["NII"]).map((c) => (
-                    <option key={`nii-${idx}-${c}`} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="row row-right">
-                <button
-                  className="ghost"
-                  onClick={async () => {
-                    setStatus("Loading columns...");
-                    setStatusLevel("info");
-                    try {
-                      const res = await callApi("/nma/datasets/columns", { path: row.path });
-                      const cols = res.columns || [];
-                      const areaGuess = cols.find((c) => c.toLowerCase().includes("area")) || cols[0] || "Area";
-                      const niiGuess = cols.find((c) => c.toLowerCase().includes("nii")) || cols[0] || "NII";
-                      updateRow(idx, { columns: cols, area_col: areaGuess, nii_col: niiGuess });
-                      setStatus("Columns loaded.");
-                      setStatusLevel("success");
-                    } catch (err) {
-                      setStatus(err.message);
-                      setStatusLevel("error");
-                    }
-                  }}
-                  disabled={!row.path.trim()}
-                >
-                  Load columns
-                </button>
-                {rows.length > 1 && (
-                  <button className="ghost" onClick={() => removeRow(idx)}>Remove</button>
-                )}
-              </div>
+              {!collapsedById[row.id] && (
+                <>
+                  <div className="row">
+                    <input
+                      className="input"
+                      placeholder="Name"
+                      value={row.name}
+                      onChange={(e) => updateRow(idx, { name: e.target.value })}
+                    />
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={row.is_control}
+                        onChange={(e) => updateRow(idx, { is_control: e.target.checked })}
+                      />
+                      Control
+                    </label>
+                  </div>
+                  <div className="row path-row">
+                    <input
+                      className="input"
+                      placeholder="/path/Results.csv"
+                      value={row.path}
+                      onChange={(e) => updateRow(idx, { path: e.target.value })}
+                    />
+                    <button
+                      className="ghost"
+                      onClick={async () => {
+                        setStatus("Opening file picker...");
+                        setStatusLevel("info");
+                        try {
+                          const res = await pickCsvPath();
+                          updateRow(idx, { path: res.path || "" });
+                          setStatus("Path selected.");
+                          setStatusLevel("success");
+                        } catch (err) {
+                          setStatus(err.message);
+                          setStatusLevel("error");
+                        }
+                      }}
+                    >
+                      Browse CSV
+                    </button>
+                  </div>
+                  <div className="row">
+                    <select
+                      className="input"
+                      value={row.area_col}
+                      onChange={(e) => updateRow(idx, { area_col: e.target.value })}
+                    >
+                      {(row.columns || ["Area"]).map((c) => (
+                        <option key={`area-${idx}-${c}`} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="input"
+                      value={row.nii_col}
+                      onChange={(e) => updateRow(idx, { nii_col: e.target.value })}
+                    >
+                      {(row.columns || ["NII"]).map((c) => (
+                        <option key={`nii-${idx}-${c}`} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="row row-right">
+                    <button
+                      className="ghost"
+                      onClick={async () => {
+                        setStatus("Loading columns...");
+                        setStatusLevel("info");
+                        try {
+                          const res = await callApi("/nma/datasets/columns", { path: row.path });
+                          const cols = res.columns || [];
+                          const areaGuess = cols.find((c) => c.toLowerCase().includes("area")) || cols[0] || "Area";
+                          const niiGuess = cols.find((c) => c.toLowerCase().includes("nii")) || cols[0] || "NII";
+                          updateRow(idx, { columns: cols, area_col: areaGuess, nii_col: niiGuess });
+                          setStatus("Columns loaded.");
+                          setStatusLevel("success");
+                        } catch (err) {
+                          setStatus(err.message);
+                          setStatusLevel("error");
+                        }
+                      }}
+                      disabled={!row.path.trim()}
+                    >
+                      Load columns
+                    </button>
+                    {rows.length > 1 && (
+                      <button className="ghost" onClick={() => removeRow(idx)}>Remove</button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           ))}
 
