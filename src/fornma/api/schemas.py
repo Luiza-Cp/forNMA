@@ -132,3 +132,45 @@ class NMASettingsUploadResponse(BaseModel):
     std_area: float
     graph_limits: List[float]
     thresholds: NMAThresholds
+
+
+class NMADotPlotConfig(BaseModel):
+    column1: Optional[str] = None
+    column2: Optional[str] = None
+    hue_min: Optional[float] = None
+    hue_max: Optional[float] = None
+    size_min: Optional[float] = None
+    size_max: Optional[float] = None
+    sample_size: Optional[int] = None
+    palette: Optional[str] = None
+    single: bool = False
+    overtime: bool = False
+
+
+class NMAHeatmapPlotConfig(BaseModel):
+    single: bool = False
+    overtime: bool = False
+    jointplot: bool = False
+
+
+class NMAPlotRunRequest(BaseModel):
+    params: NMAParams
+    output_dir: str
+    kind: str = "dot"
+    dot: NMADotPlotConfig = Field(default_factory=NMADotPlotConfig)
+    heatmap: NMAHeatmapPlotConfig = Field(default_factory=NMAHeatmapPlotConfig)
+
+
+class NMAPlotStartResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+class NMAPlotStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    message: str
+    output_dir: str
+    files: List[str]
+    error: Optional[str] = None

@@ -3,17 +3,20 @@ from __future__ import annotations
 from pathlib import Path
 import pickle
 from typing import Dict
+import threading
+import uuid
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.colors import qualitative as qual_colors
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
+from fornma.core.NMA.plot_NMA import plot_NMA as run_nma_plot, NMA as NMAClass
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
@@ -36,6 +39,9 @@ from .schemas import (
     DatasetColumnsRequest,
     DatasetColumnsResponse,
     NMASettingsUploadResponse,
+    NMAPlotRunRequest,
+    NMAPlotStartResponse,
+    NMAPlotStatusResponse,
 )
 
 
@@ -43,6 +49,8 @@ APP_ROOT = Path(__file__).resolve().parent
 NMA_SETTINGS_PATH = (APP_ROOT.parent / "core" / "NMA" / "control_parameters.pickle").resolve()
 
 app = FastAPI(title="forNMA API")
+PLOT_JOBS: Dict[str, Dict] = {}
+PLOT_JOBS_LOCK = threading.Lock()
 
 # Allow local dev frontends (Vite) to call the API
 app.add_middleware(
@@ -92,6 +100,164 @@ def system_pick_csv():
     if not path:
         raise HTTPException(status_code=400, detail="No file selected.")
     return {"path": path}
+
+
+@app.post("/system/pick-directory")
+def system_pick_directory():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        path = filedialog.askdirectory(title="Select output folder")
+        root.destroy()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to open directory picker: {e}")
+
+    if not path:
+        raise HTTPException(status_code=400, detail="No directory selected.")
+    return {"path": path}
+
+
+def _png_files_in_dir(output_dir: Path) -> list[str]:
+    return sorted([str(p.resolve()) for p in output_dir.glob("*.png") if p.is_file()])
+
+
+def _set_plot_job(job_id: str, **fields):
+    with PLOT_JOBS_LOCK:
+        if job_id not in PLOT_JOBS:
+            return
+        PLOT_JOBS[job_id].update(fields)
+
+
+def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
+    output_dir = Path(req.output_dir).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = [d.path for d in req.params.datasets if str(d.path).strip()]
+    if not paths:
+        _set_plot_job(job_id, status="failed", progress=100, error="No dataset paths provided.", message="No dataset paths provided.")
+        return
+
+    graph_type = "dot"
+    single = False
+    overtime = False
+    col1 = None
+    col2 = None
+    sample_size = None
+    palette = None
+    hue_norm = None
+    size_norm = None
+
+    if (req.kind or "dot") == "heatmap":
+        graph_type = "jointplot" if req.heatmap.jointplot else "heatmap"
+        single = bool(req.heatmap.single)
+        overtime = bool(req.heatmap.overtime)
+        palette = req.dot.palette or "viridis"
+    else:
+        graph_type = "dot"
+        single = bool(req.dot.single)
+        overtime = bool(req.dot.overtime)
+        col1 = req.dot.column1 or None
+        col2 = req.dot.column2 or None
+        sample_size = req.dot.sample_size if req.dot.sample_size and req.dot.sample_size > 0 else None
+        palette = req.dot.palette or "rainbow"
+        if req.dot.hue_min is not None and req.dot.hue_max is not None:
+            hue_norm = [float(req.dot.hue_min), float(req.dot.hue_max)]
+        if req.dot.size_min is not None and req.dot.size_max is not None:
+            size_norm = [float(req.dot.size_min), float(req.dot.size_max)]
+
+    _set_plot_job(job_id, status="running", progress=5, message="Starting NMA plotting...", output_dir=str(output_dir))
+
+    original_save_figs = NMAClass.save_figs
+
+    def _save_with_progress(self, fig, title):
+        original_save_figs(self, fig, title)
+        files = _png_files_in_dir(output_dir)
+        prev = PLOT_JOBS.get(job_id, {})
+        current = int(prev.get("progress", 5))
+        next_progress = min(95, current + 8)
+        _set_plot_job(
+            job_id,
+            progress=next_progress,
+            message=f"Plotting... ({len(files)} image(s) saved)",
+            files=files,
+        )
+
+    try:
+        # Force non-interactive backend for server-side rendering.
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        NMAClass.save_figs = _save_with_progress
+        run_nma_plot(
+            path_list=paths,
+            saving_path=str(output_dir),
+            graph_type=graph_type,
+            col1=col1,
+            col2=col2,
+            sample_size=sample_size,
+            single=single,
+            overtime=overtime,
+            palette=palette,
+            hue_norm=hue_norm,
+            size_norm=size_norm,
+        )
+        files = _png_files_in_dir(output_dir)
+        _set_plot_job(
+            job_id,
+            status="completed",
+            progress=100,
+            message=f"Completed. {len(files)} image(s) generated.",
+            files=files,
+            error=None,
+        )
+    except Exception as e:
+        _set_plot_job(job_id, status="failed", progress=100, error=str(e), message=f"Plot failed: {e}")
+    finally:
+        NMAClass.save_figs = original_save_figs
+
+
+@app.post("/nma/plots/start", response_model=NMAPlotStartResponse)
+def nma_plots_start(req: NMAPlotRunRequest):
+    output_dir = Path(req.output_dir).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not NMA_SETTINGS_PATH.exists():
+        raise HTTPException(status_code=400, detail="NMA settings not found. Complete NMA settings first.")
+
+    job_id = str(uuid.uuid4())
+    with PLOT_JOBS_LOCK:
+        PLOT_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "progress": 0,
+            "message": "Queued",
+            "output_dir": str(output_dir),
+            "files": [],
+            "error": None,
+        }
+
+    t = threading.Thread(target=_run_plot_job, args=(job_id, req), daemon=True)
+    t.start()
+    return NMAPlotStartResponse(job_id=job_id, status="queued")
+
+
+@app.get("/nma/plots/status/{job_id}", response_model=NMAPlotStatusResponse)
+def nma_plots_status(job_id: str):
+    with PLOT_JOBS_LOCK:
+        job = PLOT_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Plot job not found.")
+    return NMAPlotStatusResponse(**job)
+
+
+@app.get("/nma/plots/file")
+def nma_plots_file(path: str = Query(...)):
+    p = Path(path).expanduser().resolve()
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="Plot file not found.")
+    return FileResponse(path=p, filename=p.name)
 
 
 def _params_to_dict(req) -> Dict:

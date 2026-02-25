@@ -1,9 +1,30 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Plotly from "plotly.js-dist-min";
 
 const API_BASE = "http://127.0.0.1:8000";
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
 const makeRowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const csvCell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+const FORNMA_STAGES = [
+  "Home",
+  "Image Registration",
+  "Segmentation",
+  "Foci Overlay",
+  "NMA",
+  "Graphical Analysis",
+  "Clustering",
+  "Statistics",
+  "Tracking",
+];
+const PALETTE_OPTIONS = ["viridis", "plasma", "magma", "inferno", "cividis", "coolwarm", "Spectral", "RdBu"];
+
+function Tip({ text }) {
+  return (
+    <span className="tip-badge" title={text} aria-label={text}>
+      i
+    </span>
+  );
+}
 
 const emptyRow = () => ({
   id: makeRowId(),
@@ -363,9 +384,48 @@ export default function App() {
   const [finalMode, setFinalMode] = useState(false);
   const [downloadReady, setDownloadReady] = useState(false);
   const [step2Percentages, setStep2Percentages] = useState(null);
+  const [showPlotConfig, setShowPlotConfig] = useState(false);
+  const [plotConfig, setPlotConfig] = useState({
+    kind: "dot",
+    dot: {
+      column1: "",
+      column2: "",
+      hue_min: "",
+      hue_max: "",
+      size_min: "",
+      size_max: "",
+      sample_size: "",
+      palette: "",
+      single: false,
+      overtime: false,
+    },
+    heatmap: {
+      single: false,
+      overtime: false,
+      jointplot: false,
+    },
+  });
+  const [plotSavePath, setPlotSavePath] = useState("");
+  const [plotJob, setPlotJob] = useState({
+    job_id: null,
+    status: "idle",
+    progress: 0,
+    message: "",
+    files: [],
+    output_dir: "",
+    error: "",
+  });
+  const [currentPlotIndex, setCurrentPlotIndex] = useState(0);
+  const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
   const fileInputRef = React.useRef(null);
+  const attemptedColumnsRef = React.useRef(new Set());
+  const hasPlotRun = Boolean(plotJob.job_id);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
+  const allDetectedColumns = useMemo(
+    () => Array.from(new Set(rows.flatMap((r) => (r.columns || []).map((c) => String(c))))).sort(),
+    [rows]
+  );
   const hasControl = datasets.some((d) => d.is_control);
 
   const updateRow = (idx, patch) => {
@@ -396,6 +456,87 @@ export default function App() {
     return res.json();
   };
 
+  useEffect(() => {
+    if (!showPlotConfig) return;
+    const targets = rows
+      .map((row, idx) => ({ row, idx }))
+      .filter(({ row }) => {
+        const p = row.path?.trim();
+        if (!p) return false;
+        if ((row.columns || []).length > 0) return false;
+        return !attemptedColumnsRef.current.has(p);
+      });
+
+    if (targets.length === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      const loaded = await Promise.all(
+        targets.map(async ({ row, idx }) => {
+          const path = row.path.trim();
+          attemptedColumnsRef.current.add(path);
+          try {
+            const res = await callApi("/nma/datasets/columns", { path });
+            return { idx, columns: res.columns || [] };
+          } catch {
+            return { idx, columns: [] };
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setRows((prev) =>
+        prev.map((r, i) => {
+          const hit = loaded.find((x) => x.idx === i);
+          if (!hit || hit.columns.length === 0) return r;
+          const areaGuess = hit.columns.find((c) => c.toLowerCase().includes("area")) || hit.columns[0] || r.area_col || "Area";
+          const niiGuess = hit.columns.find((c) => c.toLowerCase().includes("nii")) || hit.columns[0] || r.nii_col || "NII";
+          return {
+            ...r,
+            columns: hit.columns,
+            area_col: r.area_col && hit.columns.includes(r.area_col) ? r.area_col : areaGuess,
+            nii_col: r.nii_col && hit.columns.includes(r.nii_col) ? r.nii_col : niiGuess,
+          };
+        })
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, showPlotConfig]);
+
+  const handleDownloadTable = () => {
+    if (!step2Percentages) return;
+    const quadrantOrder = ["LR", "LI", "N", "I", "SR", "S", "SI"];
+    const datasetNames = Array.from(
+      new Set(
+        Object.values(step2Percentages)
+          .flatMap((v) => Object.keys(v))
+          .concat((step2Traces || []).map((t) => t.name).filter(Boolean))
+      )
+    );
+    const header = ["Quadrant", ...datasetNames];
+    const lines = [header.map(csvCell).join(",")];
+    quadrantOrder.forEach((q) => {
+      const row = [q];
+      datasetNames.forEach((name) => {
+        const val = step2Percentages[q]?.[name];
+        row.push(val != null ? val.toFixed(1) : "");
+      });
+      lines.push(row.map(csvCell).join(","));
+    });
+    const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "quadrant_proportions.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const pickCsvPath = async () => {
     const res = await fetch(`${API_BASE}/system/pick-csv`, {
       method: "POST",
@@ -407,7 +548,19 @@ export default function App() {
     return res.json();
   };
 
+  const pickDirectoryPath = async () => {
+    const res = await fetch(`${API_BASE}/system/pick-directory`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    return res.json();
+  };
+
   const handleStep1 = async () => {
+    setShowPlotConfig(false);
     setStatus("Computing step 1...");
     setStatusLevel("info");
     try {
@@ -533,6 +686,7 @@ export default function App() {
         thresholds,
       });
       setDownloadReady(true);
+      setShowPlotConfig(true);
       setStatus("Completed. Final figure ready.");
       setStatusLevel("success");
     } catch (err) {
@@ -609,6 +763,7 @@ export default function App() {
         setStep2Percentages(computeQuadrantPercentages(traces, data.thresholds, stats, data.sd_area));
         setFinalMode(true);
         setDownloadReady(true);
+        setShowPlotConfig(true);
         setStep(2);
       } else {
         // No datasets: show final plot with no points
@@ -633,6 +788,7 @@ export default function App() {
         setStep2Figure(finalFig);
         setFinalMode(true);
         setDownloadReady(true);
+        setShowPlotConfig(true);
         setStep(2);
       }
 
@@ -643,6 +799,103 @@ export default function App() {
       setStatusLevel("error");
     }
   };
+
+  const updateDotConfig = (patch) => {
+    setPlotConfig((prev) => ({ ...prev, dot: { ...prev.dot, ...patch } }));
+  };
+
+  const updateHeatmapConfig = (patch) => {
+    setPlotConfig((prev) => ({ ...prev, heatmap: { ...prev.heatmap, ...patch } }));
+  };
+
+  const toOptionalNumber = (value) => {
+    if (value === "" || value == null) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handlePlotAll = async () => {
+    if (!plotSavePath.trim()) {
+      setStatus("Choose an output folder before plotting.");
+      setStatusLevel("error");
+      return;
+    }
+    setStatus("Starting plot generation...");
+    setStatusLevel("info");
+
+    try {
+      const payload = {
+        params: { datasets },
+        output_dir: plotSavePath.trim(),
+        kind: plotConfig.kind,
+        dot: {
+          column1: plotConfig.dot.column1 || null,
+          column2: plotConfig.dot.column2 || null,
+          hue_min: toOptionalNumber(plotConfig.dot.hue_min),
+          hue_max: toOptionalNumber(plotConfig.dot.hue_max),
+          size_min: toOptionalNumber(plotConfig.dot.size_min),
+          size_max: toOptionalNumber(plotConfig.dot.size_max),
+          sample_size: toOptionalNumber(plotConfig.dot.sample_size),
+          palette: plotConfig.dot.palette || null,
+          single: !!plotConfig.dot.single,
+          overtime: !!plotConfig.dot.overtime,
+        },
+        heatmap: {
+          single: !!plotConfig.heatmap.single,
+          overtime: !!plotConfig.heatmap.overtime,
+          jointplot: !!plotConfig.heatmap.jointplot,
+        },
+      };
+
+      const res = await callApi("/nma/plots/start", payload);
+      setPlotJob({
+        job_id: res.job_id,
+        status: res.status || "queued",
+        progress: 0,
+        message: "Queued",
+        files: [],
+        output_dir: plotSavePath.trim(),
+        error: "",
+      });
+    } catch (err) {
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
+  };
+
+  useEffect(() => {
+    if (!plotJob.job_id) return;
+    if (plotJob.status === "completed" || plotJob.status === "failed") return;
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/nma/plots/status/${plotJob.job_id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setPlotJob((prev) => ({ ...prev, ...data }));
+        if (data.status === "completed") {
+          setStatus(data.message || "Plots completed.");
+          setStatusLevel("success");
+        } else if (data.status === "failed") {
+          setStatus(data.error || data.message || "Plot failed.");
+          setStatusLevel("error");
+        }
+      } catch {
+        // keep polling
+      }
+    }, 1200);
+
+    return () => clearInterval(timer);
+  }, [plotJob.job_id, plotJob.status]);
+
+  useEffect(() => {
+    if (!plotJob.files || plotJob.files.length === 0) {
+      setCurrentPlotIndex(0);
+      return;
+    }
+    // Keep focus on the most recently generated figure.
+    setCurrentPlotIndex(plotJob.files.length - 1);
+  }, [plotJob.files]);
 
   const handleSave = async () => {
     setStatus("Saving settings...");
@@ -681,6 +934,23 @@ export default function App() {
           <div className={`chip ${step === 2 ? "active" : ""}`}>Step 2</div>
         </div>
       </header>
+      <nav className="module-menu" aria-label="forNMA stages">
+        {FORNMA_STAGES.map((stage) => (
+          <button
+            key={stage}
+            type="button"
+            className={`module-chip ${stage === "NMA" ? "active" : ""}`}
+            onClick={() => {
+              if (stage !== "NMA") {
+                setStatus(`${stage} está disponível na interface Dash. Nesta tela, o módulo ativo é NMA.`);
+                setStatusLevel("info");
+              }
+            }}
+          >
+            {stage}
+          </button>
+        ))}
+      </nav>
 
       <div className="layout">
         <aside className="panel">
@@ -800,43 +1070,263 @@ export default function App() {
           <button className="secondary" onClick={addRow}>Add dataset</button>
 
           <div className="section">
-            <h4>Control</h4>
-            <div className="row">
-              <div className="metric">
-                <label>Area SD</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={Number.isFinite(sdArea) ? sdArea.toFixed(2) : ""}
-                  onChange={(e) => {
-                    const v = round2(parseFloat(e.target.value || "0"));
-                    setSdArea(v);
-                    if (step1Stats) {
-                      setThresholds(computeThresholds(step1Stats, sdNii, v));
-                    }
-                  }}
-                />
-              </div>
-              <div className="metric">
-                <label>NII SD</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={Number.isFinite(sdNii) ? sdNii.toFixed(2) : ""}
-                  onChange={(e) => {
-                    const v = round2(parseFloat(e.target.value || "0"));
-                    setSdNii(v);
-                    if (step1Stats) {
-                      setThresholds(computeThresholds(step1Stats, v, sdArea));
-                    }
-                  }}
-                />
-              </div>
-            </div>
-            <button className="secondary" onClick={handleAutoDbscan}>Auto (DBSCAN)</button>
+            {!showPlotConfig ? (
+              <>
+                <h4>Control</h4>
+                <div className="row">
+                  <div className="metric">
+                    <label>Area SD</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={Number.isFinite(sdArea) ? sdArea.toFixed(2) : ""}
+                      onChange={(e) => {
+                        const v = round2(parseFloat(e.target.value || "0"));
+                        setSdArea(v);
+                        if (step1Stats) {
+                          setThresholds(computeThresholds(step1Stats, sdNii, v));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="metric">
+                    <label>NII SD</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={Number.isFinite(sdNii) ? sdNii.toFixed(2) : ""}
+                      onChange={(e) => {
+                        const v = round2(parseFloat(e.target.value || "0"));
+                        setSdNii(v);
+                        if (step1Stats) {
+                          setThresholds(computeThresholds(step1Stats, v, sdArea));
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                <button className="secondary" onClick={handleAutoDbscan}>Auto (DBSCAN)</button>
+              </>
+            ) : (
+              <>
+                <div className="row row-between">
+                  <h4 style={{ margin: 0 }}>NMA analysis</h4>
+                  <button className="ghost btn-small" onClick={() => setShowPlotConfig(false)}>
+                    Back to NMA settings
+                  </button>
+                </div>
+                <p className="hint">Choose how you want to plot NMA (dot plot or heatmap).</p>
+                <div className="row">
+                  <label
+                    className="radio"
+                  >
+                    <input
+                      type="radio"
+                      name="plot-kind"
+                      checked={plotConfig.kind === "dot"}
+                      onChange={() => setPlotConfig((prev) => ({ ...prev, kind: "dot" }))}
+                    />
+                    Dot plot
+                    <Tip text="Dot plot: each nucleus is displayed as an individual point." />
+                  </label>
+                  <label
+                    className="radio"
+                  >
+                    <input
+                      type="radio"
+                      name="plot-kind"
+                      checked={plotConfig.kind === "heatmap"}
+                      onChange={() => setPlotConfig((prev) => ({ ...prev, kind: "heatmap" }))}
+                    />
+                    Heatmap
+                    <Tip text="Heatmap: show density patterns, useful for larger datasets." />
+                  </label>
+                </div>
+                {plotConfig.kind === "dot" ? (
+                  <>
+                    <div className="hint">
+                      Dot plot options <Tip text="These selectors use columns detected from your loaded dataset tables." />
+                    </div>
+                    <div className="field-head">Color by (column1) <Tip text="Choose which dataset column controls marker color." /></div>
+                    <div className="row">
+                      <select
+                        className="input"
+                        value={plotConfig.dot.column1}
+                        onChange={(e) => updateDotConfig({ column1: e.target.value })}
+                        disabled={allDetectedColumns.length === 0}
+                      >
+                        <option value="">
+                          {allDetectedColumns.length ? "Color by (column1)" : "Load columns first"}
+                        </option>
+                        {allDetectedColumns.map((c) => (
+                          <option key={`dot-c1-${c}`} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field-head">Size by (column2) <Tip text="Choose which dataset column controls marker size." /></div>
+                    <div className="row">
+                      <select
+                        className="input"
+                        value={plotConfig.dot.column2}
+                        onChange={(e) => updateDotConfig({ column2: e.target.value })}
+                        disabled={allDetectedColumns.length === 0}
+                      >
+                        <option value="">
+                          {allDetectedColumns.length ? "Size by (column2)" : "Load columns first"}
+                        </option>
+                        {allDetectedColumns.map((c) => (
+                          <option key={`dot-c2-${c}`} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="row">
+                      <input
+                        className="input"
+                        type="number"
+                        placeholder="Hue min (optional)"
+                        value={plotConfig.dot.hue_min}
+                        onChange={(e) => updateDotConfig({ hue_min: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        type="number"
+                        placeholder="Hue max (optional)"
+                        value={plotConfig.dot.hue_max}
+                        onChange={(e) => updateDotConfig({ hue_max: e.target.value })}
+                      />
+                    </div>
+                    <div className="hint">
+                      Hue min/max are optional. <Tip text="Optional lower/upper bounds for the color scale. Leave empty for automatic scaling." />
+                    </div>
+                    <div className="row">
+                      <input
+                        className="input"
+                        type="number"
+                        placeholder="Size min (optional)"
+                        value={plotConfig.dot.size_min}
+                        onChange={(e) => updateDotConfig({ size_min: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        type="number"
+                        placeholder="Size max (optional)"
+                        value={plotConfig.dot.size_max}
+                        onChange={(e) => updateDotConfig({ size_max: e.target.value })}
+                      />
+                    </div>
+                    <div className="hint">
+                      Size min/max are optional. <Tip text="Optional lower/upper bounds for marker size scaling. Leave empty for automatic scaling." />
+                    </div>
+                    <div className="row">
+                      <input
+                        className="input"
+                        type="number"
+                        min="1"
+                        placeholder="Sample size (optional)"
+                        value={plotConfig.dot.sample_size}
+                        onChange={(e) => updateDotConfig({ sample_size: e.target.value })}
+                      />
+                      <select
+                        className="input"
+                        value={plotConfig.dot.palette}
+                        onChange={(e) => updateDotConfig({ palette: e.target.value })}
+                      >
+                        <option value="">Palette (optional)</option>
+                        {PALETTE_OPTIONS.map((p) => (
+                          <option key={`pal-${p}`} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="check-grid">
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={plotConfig.dot.single}
+                          onChange={(e) => updateDotConfig({ single: e.target.checked })}
+                        />
+                        Single plot
+                        <Tip text="Combine all datasets in one view." />
+                      </label>
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={plotConfig.dot.overtime}
+                          onChange={(e) => updateDotConfig({ overtime: e.target.checked })}
+                        />
+                        Overtime
+                        <Tip text="Use time-sequence style when temporal data is available." />
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <div className="check-grid">
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={plotConfig.heatmap.single}
+                        onChange={(e) => updateHeatmapConfig({ single: e.target.checked })}
+                      />
+                      Single plot
+                      <Tip text="Combine all datasets in one heatmap view." />
+                    </label>
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={plotConfig.heatmap.overtime}
+                        onChange={(e) => updateHeatmapConfig({ overtime: e.target.checked })}
+                      />
+                      Overtime
+                      <Tip text="Use time-sequence heatmap when temporal data is available." />
+                    </label>
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={plotConfig.heatmap.jointplot}
+                        onChange={(e) => updateHeatmapConfig({ jointplot: e.target.checked })}
+                      />
+                      Jointplot
+                      <Tip text="Include marginal histograms alongside the heatmap." />
+                    </label>
+                  </div>
+                )}
+                <div className="field-head">Saving path <Tip text="Directory where NMA plots and outputs will be saved." /></div>
+                <div className="row path-row">
+                  <input
+                    className="input"
+                    placeholder="Folder to save NMA results"
+                    value={plotSavePath}
+                    onChange={(e) => setPlotSavePath(e.target.value)}
+                  />
+                  <button
+                    className="ghost"
+                    onClick={async () => {
+                      try {
+                        const res = await pickDirectoryPath();
+                        setPlotSavePath(res.path || "");
+                      } catch (err) {
+                        setStatus(err.message);
+                        setStatusLevel("error");
+                      }
+                    }}
+                  >
+                    Browse
+                  </button>
+                </div>
+                <button
+                  className="primary"
+                  onClick={handlePlotAll}
+                  disabled={!plotSavePath.trim() || datasets.length === 0 || (plotJob.status === "running" || plotJob.status === "queued")}
+                >
+                  Plot all
+                </button>
+                <div className="hint">
+                  Generate plots with current settings and save them to the chosen folder.
+                </div>
+              </>
+            )}
           </div>
 
-          {step === 2 && (
+          {!showPlotConfig && step === 2 && (
             <div className="section">
               <h4>Thresholds</h4>
               {Object.keys(thresholds).map((k) => (
@@ -848,46 +1338,47 @@ export default function App() {
             </div>
           )}
 
-          <div className="section">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pkl,.pickle"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleLoadSettings(f);
-              }}
-            />
-            <button
-              className="secondary"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Load settings
-            </button>
-            {!step1Ready && (
-              <button className="primary" onClick={handleStep1} disabled={!hasControl}>Create Settings</button>
-            )}
-            {step1Ready && (
-              <div className="wizard-actions">
-                <button className="secondary" onClick={() => setStep(1)} disabled={step === 1}>Previous</button>
-                {step === 1 ? (
-                  <button
-                    className="primary"
-                    onClick={async () => {
-                      const ok = await handleStep2();
-                      if (ok) setStep(2);
-                    }}
-                  >
-                    Next
-                  </button>
-                ) : (
-                  <button className="primary" onClick={handleComplete}>Complete</button>
-                )}
-              </div>
-            )}
-          </div>
-
+          {!showPlotConfig && (
+            <div className="section">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pkl,.pickle"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleLoadSettings(f);
+                }}
+              />
+              <button
+                className="secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Load settings
+              </button>
+              {!step1Ready && (
+                <button className="primary" onClick={handleStep1} disabled={!hasControl}>Create Settings</button>
+              )}
+              {step1Ready && (
+                <div className="wizard-actions">
+                  <button className="secondary" onClick={() => setStep(1)} disabled={step === 1}>Previous</button>
+                  {step === 1 ? (
+                    <button
+                      className="primary"
+                      onClick={async () => {
+                        const ok = await handleStep2();
+                        if (ok) setStep(2);
+                      }}
+                    >
+                      Next
+                    </button>
+                  ) : (
+                    <button className="primary" onClick={handleComplete}>Complete</button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <Status level={statusLevel} text={status} />
         </aside>
 
@@ -943,75 +1434,100 @@ export default function App() {
           {step === 2 && (
             <section>
               <h2>Step 2 · Threshold lines</h2>
-              <p className="hint">Use additional datasets for reference.</p>
-              {step2Figure ? (
-                <PlotPanel
-                  figure={step2Figure}
-                  config={{ displayModeBar: false, editable: !finalMode, edits: { shapePosition: true } }}
-                  onRelayout={(ev) => {
-                    if (finalMode) return;
-                    if (!step2GraphLimits || !step2Stats || !step2Traces) return;
-                    const getShape = (idx) => {
-                      const x0 = ev[`shapes[${idx}].x0`];
-                      const x1 = ev[`shapes[${idx}].x1`];
-                      return x0 ?? x1;
-                    };
-                    const v_down = getShape(2);
-                    const v_down2 = getShape(3);
-                    const v_mid = getShape(4);
-                    const v_up = getShape(5);
-                    if (v_down == null && v_down2 == null && v_mid == null && v_up == null) return;
-                    const next = {
-                      ...thresholds,
-                      v_down: v_down ?? thresholds.v_down,
-                      v_down2: v_down2 ?? thresholds.v_down2,
-                      v_mid: v_mid ?? thresholds.v_mid,
-                      v_up: v_up ?? thresholds.v_up,
-                    };
-                    setThresholds(next);
-                    setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea, true));
-                    setStep2Percentages(computeQuadrantPercentages(step2Traces, next, step2Stats, sdArea));
-                    setFinalMode(false);
-                  }}
-                />
+              {!showPlotConfig && <p className="hint">Use additional datasets for reference.</p>}
+              {(showPlotConfig && hasPlotRun && !showNmaPreviewWhilePlotting) ? (
+                <div className="hint">
+                  NMA preview and quadrant table are minimized while plotting.
+                  <button
+                    className="ghost btn-small"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => setShowNmaPreviewWhilePlotting(true)}
+                  >
+                    Show preview
+                  </button>
+                </div>
               ) : (
-                <div className="hint">Click Next to generate the Step 2 figure.</div>
-              )}
-              {step2Percentages && (
-                (() => {
-                  const datasetNames = Array.from(
-                    new Set(
-                      Object.values(step2Percentages).flatMap((v) => Object.keys(v)).concat(
-                        (step2Traces || []).map((t) => t.name).filter(Boolean)
-                      )
-                    )
-                  );
-                  return (
-                    <div className="percentages">
-                      <h3>Quadrant distribution (%)</h3>
-                      <div className="percent-table">
-                        <div className="percent-row header">
-                          <div className="cell">Quadrant</div>
-                          {datasetNames.map((name) => (
-                            <div className="cell" key={`h-${name}`}>{name}</div>
-                          ))}
-                        </div>
-                        {["LR", "LI", "N", "I", "SR", "S", "SI"].map((q) => (
-                          <div className="percent-row" key={`q-${q}`}>
-                            <div className="cell">{q}</div>
-                            {datasetNames.map((name) => (
-                              <div className="cell" key={`${q}-${name}`}>
-                                {step2Percentages[q]?.[name] != null ? step2Percentages[q][name].toFixed(1) : "-"}
+                <>
+                  {showPlotConfig && hasPlotRun && (
+                    <div className="row row-right" style={{ marginBottom: 8 }}>
+                      <button
+                        className="ghost btn-small"
+                        onClick={() => setShowNmaPreviewWhilePlotting(false)}
+                      >
+                        Minimize preview
+                      </button>
+                    </div>
+                  )}
+                  {step2Figure ? (
+                    <PlotPanel
+                      figure={step2Figure}
+                      config={{ displayModeBar: false, editable: !finalMode, edits: { shapePosition: true } }}
+                      onRelayout={(ev) => {
+                        if (finalMode) return;
+                        if (!step2GraphLimits || !step2Stats || !step2Traces) return;
+                        const getShape = (idx) => {
+                          const x0 = ev[`shapes[${idx}].x0`];
+                          const x1 = ev[`shapes[${idx}].x1`];
+                          return x0 ?? x1;
+                        };
+                        const v_down = getShape(2);
+                        const v_down2 = getShape(3);
+                        const v_mid = getShape(4);
+                        const v_up = getShape(5);
+                        if (v_down == null && v_down2 == null && v_mid == null && v_up == null) return;
+                        const next = {
+                          ...thresholds,
+                          v_down: v_down ?? thresholds.v_down,
+                          v_down2: v_down2 ?? thresholds.v_down2,
+                          v_mid: v_mid ?? thresholds.v_mid,
+                          v_up: v_up ?? thresholds.v_up,
+                        };
+                        setThresholds(next);
+                        setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea, true));
+                        setStep2Percentages(computeQuadrantPercentages(step2Traces, next, step2Stats, sdArea));
+                        setFinalMode(false);
+                      }}
+                    />
+                  ) : (
+                    <div className="hint">Click Next to generate the Step 2 figure.</div>
+                  )}
+                  {step2Percentages && (
+                    (() => {
+                      const datasetNames = Array.from(
+                        new Set(
+                          Object.values(step2Percentages).flatMap((v) => Object.keys(v)).concat(
+                            (step2Traces || []).map((t) => t.name).filter(Boolean)
+                          )
+                        )
+                      );
+                      return (
+                        <div className="percentages">
+                          <h3>Quadrant distribution (%)</h3>
+                          <div className="percent-table">
+                            <div className="percent-row header">
+                              <div className="cell">Quadrant</div>
+                              {datasetNames.map((name) => (
+                                <div className="cell" key={`h-${name}`}>{name}</div>
+                              ))}
+                            </div>
+                            {["LR", "LI", "N", "I", "SR", "S", "SI"].map((q) => (
+                              <div className="percent-row" key={`q-${q}`}>
+                                <div className="cell">{q}</div>
+                                {datasetNames.map((name) => (
+                                  <div className="cell" key={`${q}-${name}`}>
+                                    {step2Percentages[q]?.[name] != null ? step2Percentages[q][name].toFixed(1) : "-"}
+                                  </div>
+                                ))}
                               </div>
                             ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()
+                        </div>
+                      );
+                    })()
+                  )}
+                </>
               )}
-              {finalMode && downloadReady && (
+              {(!showPlotConfig || !hasPlotRun || showNmaPreviewWhilePlotting) && finalMode && downloadReady && (
                 <div className="section">
                   <button
                     className="primary"
@@ -1021,6 +1537,60 @@ export default function App() {
                   >
                     Download settings
                   </button>
+                  <button
+                    className="secondary"
+                    onClick={handleDownloadTable}
+                    disabled={!step2Percentages}
+                  >
+                    Download table
+                  </button>
+                </div>
+              )}
+              {showPlotConfig && (
+                <div className="section">
+                  <h3>Plot progress</h3>
+                  <div className="progress-wrap">
+                    <div
+                      className={`progress-fill ${plotJob.status === "running" || plotJob.status === "queued" ? "running" : ""}`}
+                      style={{ width: `${Math.max(0, Math.min(100, plotJob.progress || 0))}%` }}
+                    />
+                  </div>
+                  <div className="hint">{plotJob.message || "Waiting to start."}</div>
+                  {plotJob.files?.length > 0 && (
+                    <div className="plot-viewer">
+                      <div className="viewer-toolbar">
+                        <button
+                          className="ghost btn-small"
+                          onClick={() => setCurrentPlotIndex((i) => Math.max(0, i - 1))}
+                          disabled={currentPlotIndex <= 0}
+                        >
+                          ◀
+                        </button>
+                        <span className="viewer-counter">
+                          {currentPlotIndex + 1} / {plotJob.files.length}
+                        </span>
+                        <button
+                          className="ghost btn-small"
+                          onClick={() => setCurrentPlotIndex((i) => Math.min(plotJob.files.length - 1, i + 1))}
+                          disabled={currentPlotIndex >= plotJob.files.length - 1}
+                        >
+                          ▶
+                        </button>
+                      </div>
+                      <a
+                        href={`${API_BASE}/nma/plots/file?path=${encodeURIComponent(plotJob.files[currentPlotIndex])}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="thumb-card viewer-single"
+                      >
+                        <img
+                          src={`${API_BASE}/nma/plots/file?path=${encodeURIComponent(plotJob.files[currentPlotIndex])}`}
+                          alt={plotJob.files[currentPlotIndex].split("/").pop()}
+                        />
+                        <span>{plotJob.files[currentPlotIndex].split("/").pop()}</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
