@@ -359,6 +359,7 @@ export default function App() {
   const [finalMode, setFinalMode] = useState(false);
   const [downloadReady, setDownloadReady] = useState(false);
   const [step2Percentages, setStep2Percentages] = useState(null);
+  const fileInputRef = React.useRef(null);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
   const hasControl = datasets.some((d) => d.is_control);
@@ -510,6 +511,109 @@ export default function App() {
       });
       setDownloadReady(true);
       setStatus("Completed. Final figure ready.");
+      setStatusLevel("success");
+    } catch (err) {
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
+  };
+
+  const handleLoadSettings = async (file) => {
+    setStatus("Loading settings...");
+    setStatusLevel("info");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API_BASE}/nma/settings/upload`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      const data = await res.json();
+
+      // Apply settings
+      setSdArea(data.sd_area);
+      setSdNii(data.sd_nii);
+      setThresholds(data.thresholds);
+      setStep1Stats({
+        mu_x: data.mean_nii,
+        sd_x: data.std_nii,
+        mu_y: data.mean_area,
+        sd_y: data.std_area,
+      });
+      setStep1GraphLimits(data.graph_limits);
+      setStep1Ready(true);
+
+      // If datasets exist, build step2 immediately
+      if (datasets.length > 0) {
+        const payload = {
+          params: { datasets },
+          include_sample: true,
+          include_all_datasets: true,
+          sd_nii: data.sd_nii,
+          sd_area: data.sd_area,
+          thresholds: data.thresholds,
+        };
+        const figRes = await callApi("/nma/settings/figure", payload);
+        const traces = (figRes.figure?.data || []).filter(
+          (t) => t?.mode?.includes("markers") || t?.type === "scattergl"
+        );
+        const stats = {
+          mu_x: data.mean_nii,
+          sd_x: data.std_nii,
+          mu_y: data.mean_area,
+          sd_y: data.std_area,
+        };
+        const graphLimits = figRes.graph_limits || data.graph_limits;
+        setStep2Traces(traces);
+        setStep2Stats(stats);
+        setStep2GraphLimits(graphLimits);
+        const finalFig = buildStep2Figure(
+          traces,
+          stats,
+          graphLimits,
+          data.thresholds,
+          data.sd_nii,
+          data.sd_area,
+          true,
+          "black",
+          "black"
+        );
+        setStep2Figure(finalFig);
+        setStep2Percentages(computeQuadrantPercentages(traces, data.thresholds, stats, data.sd_area));
+        setFinalMode(true);
+        setDownloadReady(true);
+        setStep(2);
+      } else {
+        // No datasets: show final plot with no points
+        const stats = {
+          mu_x: data.mean_nii,
+          sd_x: data.std_nii,
+          mu_y: data.mean_area,
+          sd_y: data.std_area,
+        };
+        const graphLimits = data.graph_limits;
+        const finalFig = buildStep2Figure(
+          [],
+          stats,
+          graphLimits,
+          data.thresholds,
+          data.sd_nii,
+          data.sd_area,
+          true,
+          "black",
+          "black"
+        );
+        setStep2Figure(finalFig);
+        setFinalMode(true);
+        setDownloadReady(true);
+        setStep(2);
+      }
+
+      setStatus("Settings loaded.");
       setStatusLevel("success");
     } catch (err) {
       setStatus(err.message);
@@ -686,6 +790,22 @@ export default function App() {
           )}
 
           <div className="section">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pkl,.pickle"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleLoadSettings(f);
+              }}
+            />
+            <button
+              className="secondary"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Load settings
+            </button>
             {!step1Ready && (
               <button className="primary" onClick={handleStep1} disabled={!hasControl}>Create Settings</button>
             )}

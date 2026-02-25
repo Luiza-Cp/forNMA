@@ -120,3 +120,15 @@ class DatasetColumnsRequest(BaseModel):
 
 class DatasetColumnsResponse(BaseModel):
     columns: List[str]
+
+
+class NMASettingsUploadResponse(BaseModel):
+    name: str
+    sd_area: float
+    sd_nii: float
+    mean_nii: float
+    std_nii: float
+    mean_area: float
+    std_area: float
+    graph_limits: List[float]
+    thresholds: NMAThresholds

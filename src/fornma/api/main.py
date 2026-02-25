@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.colors import qualitative as qual_colors
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.cluster import DBSCAN
@@ -35,6 +35,7 @@ from .schemas import (
     NMAFigureResponse,
     DatasetColumnsRequest,
     DatasetColumnsResponse,
+    NMASettingsUploadResponse,
 )
 
 
@@ -483,3 +484,50 @@ def nma_settings_download():
         filename="nma_settings.pickle",
         media_type="application/octet-stream",
     )
+
+
+@app.post("/nma/settings/upload", response_model=NMASettingsUploadResponse)
+async def nma_settings_upload(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        pkl = pickle.loads(content)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read settings file: {e}")
+
+    def _first(v, default=None):
+        try:
+            return float(v[0]) if isinstance(v, (list, tuple)) else float(v)
+        except Exception:
+            return default
+
+    thresholds = NMAThresholds(
+        v_up=_first(pkl.get("v_upx"), 0.0),
+        v_mid=_first(pkl.get("v_midx"), 0.0),
+        v_down=_first(pkl.get("v_downx"), 0.0),
+        v_down2=_first(pkl.get("v_downx2"), 0.0),
+        y_high=_first(pkl.get("h_y_up"), 0.0),
+        y_low=_first(pkl.get("h_y_down"), 0.0),
+    )
+
+    name = pkl.get("name") or (file.filename or "control")
+    resp = NMASettingsUploadResponse(
+        name=name,
+        sd_area=float(pkl.get("sd_area", 0.0)),
+        sd_nii=float(pkl.get("sd_NII", 0.0)),
+        mean_nii=float(pkl.get("mean_NII", 0.0)),
+        std_nii=float(pkl.get("std_NII", 0.0)),
+        mean_area=float(pkl.get("mean_a", 0.0)),
+        std_area=float(pkl.get("std_a", 0.0)),
+        graph_limits=[float(x) for x in (pkl.get("graph_limits") or [0, 0, 0, 0])],
+        thresholds=thresholds,
+    )
+
+    # Persist uploaded settings for download consistency
+    try:
+        NMA_SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(NMA_SETTINGS_PATH, "wb") as handle:
+            pickle.dump(pkl, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception:
+        pass
+
+    return resp
