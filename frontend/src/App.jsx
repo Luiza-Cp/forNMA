@@ -17,6 +17,40 @@ const FORNMA_STAGES = [
   "Tracking",
 ];
 const PALETTE_OPTIONS = ["viridis", "plasma", "magma", "inferno", "cividis", "coolwarm", "Spectral", "RdBu"];
+const STORAGE_KEYS = {
+  activeModule: "fornma.activeModule",
+  plotJob: "fornma.plotJob",
+  segJob: "fornma.segJob",
+};
+const DEFAULT_PLOT_JOB = {
+  job_id: null,
+  status: "idle",
+  progress: 0,
+  message: "",
+  files: [],
+  output_dir: "",
+  error: "",
+};
+const DEFAULT_SEG_JOB = {
+  job_id: null,
+  status: "idle",
+  progress: 0,
+  message: "",
+  log: "",
+  preview_path: "",
+  error: "",
+};
+
+function readStorage(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
 
 function Tip({ text }) {
   return (
@@ -1111,7 +1145,7 @@ function buildStep2Figure(
 }
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState("NMA");
+  const [activeModule, setActiveModule] = useState(() => readStorage(STORAGE_KEYS.activeModule, "NMA"));
   const [rows, setRows] = useState([{
     ...emptyRow(),
     name: "Control",
@@ -1171,30 +1205,29 @@ export default function App() {
     },
   });
   const [plotSavePath, setPlotSavePath] = useState("");
-  const [plotJob, setPlotJob] = useState({
-    job_id: null,
-    status: "idle",
-    progress: 0,
-    message: "",
-    files: [],
-    output_dir: "",
-    error: "",
-  });
+  const [plotJob, setPlotJob] = useState(() => ({ ...DEFAULT_PLOT_JOB, ...readStorage(STORAGE_KEYS.plotJob, {}) }));
   const [currentPlotIndex, setCurrentPlotIndex] = useState(0);
   const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
-  const [segJob, setSegJob] = useState({
-    job_id: null,
-    status: "idle",
-    progress: 0,
-    message: "",
-    log: "",
-    preview_path: "",
-    error: "",
-  });
+  const [segJob, setSegJob] = useState(() => ({ ...DEFAULT_SEG_JOB, ...readStorage(STORAGE_KEYS.segJob, {}) }));
   const [segPreviewNonce, setSegPreviewNonce] = useState(0);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const hasPlotRun = Boolean(plotJob.job_id);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEYS.activeModule, JSON.stringify(activeModule));
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEYS.plotJob, JSON.stringify(plotJob));
+  }, [plotJob]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEYS.segJob, JSON.stringify(segJob));
+  }, [segJob]);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
   const allDetectedColumns = useMemo(
@@ -1694,6 +1727,10 @@ export default function App() {
     const timer = setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE}/nma/plots/status/${plotJob.job_id}`);
+        if (res.status === 404) {
+          setPlotJob({ ...DEFAULT_PLOT_JOB });
+          return;
+        }
         if (!res.ok) return;
         const data = await res.json();
         setPlotJob((prev) => ({ ...prev, ...data }));
@@ -1728,6 +1765,10 @@ export default function App() {
     const timer = setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE}/segmentation/status/${segJob.job_id}`);
+        if (res.status === 404) {
+          setSegJob({ ...DEFAULT_SEG_JOB });
+          return;
+        }
         if (!res.ok) return;
         const data = await res.json();
         setSegJob((prev) => {
@@ -1761,6 +1802,48 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, [segJob.job_id, segJob.status]);
+
+  useEffect(() => {
+    if (plotJob.job_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/nma/plots/active`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.job?.job_id) {
+          setPlotJob((prev) => ({ ...DEFAULT_PLOT_JOB, ...prev, ...data.job }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [plotJob.job_id]);
+
+  useEffect(() => {
+    if (segJob.job_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/segmentation/active`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.job?.job_id) {
+          setSegJob((prev) => ({ ...DEFAULT_SEG_JOB, ...prev, ...data.job }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [segJob.job_id]);
 
   const handleSave = async () => {
     setStatus("Saving settings...");

@@ -191,6 +191,22 @@ def _safe_read_json(path: str | None) -> dict:
         return {}
 
 
+def _latest_active_job(jobs: Dict[str, Dict], active_states: set[str]) -> Dict | None:
+    latest = None
+    latest_started = ""
+    for job in jobs.values():
+        if job.get("status") not in active_states:
+            continue
+        pf = job.get("progress_file")
+        started = ""
+        if pf:
+            started = str(_safe_read_json(pf).get("started_at", "") or "")
+        if latest is None or started >= latest_started:
+            latest = job
+            latest_started = started
+    return latest
+
+
 def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
     output_dir = Path(req.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -315,6 +331,16 @@ def nma_plots_status(job_id: str):
     return NMAPlotStatusResponse(**job)
 
 
+@app.get("/nma/plots/active")
+def nma_plots_active():
+    with PLOT_JOBS_LOCK:
+        active = [j for j in PLOT_JOBS.values() if j.get("status") in {"queued", "running"}]
+    if not active:
+        return {"job": None}
+    # Keep deterministic behavior: latest inserted dict item from current memory snapshot.
+    return {"job": active[-1]}
+
+
 @app.get("/nma/plots/file")
 def nma_plots_file(path: str = Query(...)):
     p = Path(path).expanduser().resolve()
@@ -436,6 +462,16 @@ def segmentation_status(job_id: str):
             job = SEG_JOBS.get(job_id)
 
     return SegmentationStatusResponse(**job)
+
+
+@app.get("/segmentation/active")
+def segmentation_active():
+    with SEG_JOBS_LOCK:
+        job = _latest_active_job(SEG_JOBS, {"starting", "queued", "running", "canceling"})
+    if not job:
+        return {"job": None}
+    # Reuse status updater to make sure log/progress are fresh.
+    return {"job": segmentation_status(job["job_id"]).model_dump()}
 
 
 @app.post("/segmentation/stop/{job_id}")
