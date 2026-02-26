@@ -21,6 +21,7 @@ const STORAGE_KEYS = {
   activeModule: "fornma.activeModule",
   plotJob: "fornma.plotJob",
   segJob: "fornma.segJob",
+  regJob: "fornma.regJob",
 };
 const DEFAULT_PLOT_JOB = {
   job_id: null,
@@ -40,6 +41,16 @@ const DEFAULT_SEG_JOB = {
   preview_path: "",
   preview_paths: [],
   preview_index: null,
+  error: "",
+};
+const DEFAULT_REG_JOB = {
+  job_id: null,
+  status: "idle",
+  progress: 0,
+  done: 0,
+  total: 0,
+  message: "",
+  log: "",
   error: "",
 };
 
@@ -844,6 +855,270 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
   );
 }
 
+function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopRegistration, regJob }) {
+  const [savePath, setSavePath] = useState("");
+  const [imagesData, setImagesData] = useState({
+    channels: [{ id: "ch1", name: "Channel 1" }],
+    rows: [{ condition: "Control", ch1: "" }],
+  });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalError, setModalError] = useState("");
+  const [summaryText, setSummaryText] = useState("No images loaded yet.");
+  const [referenceChannel, setReferenceChannel] = useState("");
+  const [movingChannels, setMovingChannels] = useState([]);
+  const [cropOutput, setCropOutput] = useState(true);
+
+  const channels = imagesData.channels || [];
+  const channelIds = new Set(channels.map((c) => c.id));
+  const regRunning = ["starting", "queued", "running", "canceling"].includes(regJob?.status || "idle");
+
+  useEffect(() => {
+    if (channels.length === 0) return;
+    if (!channelIds.has(referenceChannel)) {
+      setReferenceChannel(channels[0].id);
+    }
+    setMovingChannels((prev) => prev.filter((id) => channelIds.has(id) && id !== referenceChannel));
+  }, [imagesData.channels, referenceChannel]);
+
+  const addCondition = () => {
+    setImagesData((prev) => {
+      const row = { condition: "" };
+      (prev.channels || []).forEach((ch) => { row[ch.id] = ""; });
+      return { ...prev, rows: [...(prev.rows || []), row] };
+    });
+  };
+
+  const addChannel = () => {
+    setImagesData((prev) => {
+      const maxIdx = Math.max(0, ...(prev.channels || []).map((ch) => Number((ch.id || "").replace("ch", "")) || 0));
+      const newId = `ch${maxIdx + 1}`;
+      const nextChannels = [...(prev.channels || []), { id: newId, name: `Channel ${maxIdx + 1}` }];
+      const nextRows = (prev.rows || []).map((r) => ({ ...r, [newId]: "" }));
+      return { ...prev, channels: nextChannels, rows: nextRows };
+    });
+  };
+
+  const removeCondition = (rowIdx) => {
+    setImagesData((prev) => ({ ...prev, rows: (prev.rows || []).filter((_, i) => i !== rowIdx) }));
+  };
+
+  const removeChannel = (chId) => {
+    setImagesData((prev) => {
+      const nextChannels = (prev.channels || []).filter((ch) => ch.id !== chId);
+      const nextRows = (prev.rows || []).map((r) => {
+        const copy = { ...r };
+        delete copy[chId];
+        return copy;
+      });
+      return { ...prev, channels: nextChannels, rows: nextRows };
+    });
+    if (referenceChannel === chId) setReferenceChannel("");
+    setMovingChannels((prev) => prev.filter((id) => id !== chId));
+  };
+
+  const updateChannelName = (chId, name) => {
+    setImagesData((prev) => ({
+      ...prev,
+      channels: (prev.channels || []).map((ch) => (ch.id === chId ? { ...ch, name } : ch)),
+    }));
+  };
+
+  const updateCondition = (rowIdx, condition) => {
+    setImagesData((prev) => ({
+      ...prev,
+      rows: (prev.rows || []).map((r, i) => (i === rowIdx ? { ...r, condition } : r)),
+    }));
+  };
+
+  const updatePathCell = (rowIdx, chId, path) => {
+    setImagesData((prev) => ({
+      ...prev,
+      rows: (prev.rows || []).map((r, i) => (i === rowIdx ? { ...r, [chId]: path } : r)),
+    }));
+  };
+
+  const browsePathCell = async (rowIdx, chId) => {
+    const picked = await onPickDirectory();
+    if (!picked) return;
+    updatePathCell(rowIdx, chId, picked);
+  };
+
+  const saveImagesTable = () => {
+    const errors = [];
+    const chs = imagesData.channels || [];
+    const rows = imagesData.rows || [];
+
+    const chNames = chs.map((c) => (c.name || "").trim());
+    if (chNames.some((n) => !n)) errors.push("There are channels without a name.");
+    if (new Set(chNames).size !== chNames.length) errors.push("Channel names must be unique.");
+
+    const conds = rows.map((r) => (r.condition || "").trim());
+    if (conds.some((c) => !c)) errors.push("There are conditions without a name.");
+    if (new Set(conds).size !== conds.length) errors.push("Condition names must be unique.");
+
+    rows.forEach((r, idx) => {
+      chs.forEach((ch) => {
+        const p = (r[ch.id] || "").trim();
+        if (!p) errors.push(`Row ${idx + 1} — ${ch.name}: empty path.`);
+      });
+    });
+
+    if (errors.length) {
+      setModalError(errors.join("\n"));
+      return;
+    }
+
+    const lines = [`Image selection OK:`, `Conditions: ${rows.length} | Channels: ${chs.length}`, ""];
+    rows.forEach((r) => {
+      lines.push(`- ${r.condition}:`);
+      chs.forEach((ch) => lines.push(`    ${ch.name}: ${r[ch.id] || ""}`));
+    });
+    setSummaryText(lines.join("\n"));
+    setModalError("");
+    setModalOpen(false);
+  };
+
+  const startRegistration = async () => {
+    await onStartRegistration({
+      images_data: imagesData,
+      reg_data: {
+        save_path: savePath,
+        reference: referenceChannel,
+        moving: movingChannels,
+        crop: !!cropOutput,
+      },
+    });
+  };
+
+  const counterText = `Channels: ${channels.length} | Conditions: ${(imagesData.rows || []).length}`;
+
+  return (
+    <>
+      <aside className="panel seg-panel">
+        <div className="seg-header">
+          <h3>Registration Inputs</h3>
+          <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
+          <div className="field-head">Saving path</div>
+          <div className="row path-row">
+            <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save results..." />
+            <button className="ghost" onClick={async () => {
+              const p = await onPickDirectory();
+              if (p) setSavePath(p);
+            }}>Browse</button>
+          </div>
+          <details className="seg-summary">
+            <summary>Image selection summary</summary>
+            <pre>{summaryText}</pre>
+          </details>
+        </div>
+
+        <div className="seg-scroll">
+          <details open className="seg-section">
+            <summary>Channel mapping</summary>
+            <div className="seg-body">
+              <div className="field-head">Reference channel</div>
+              <select className="input" value={referenceChannel} onChange={(e) => setReferenceChannel(e.target.value)}>
+                <option value="">Select reference...</option>
+                {channels.map((ch) => <option key={`reg-ref-${ch.id}`} value={ch.id}>{ch.name}</option>)}
+              </select>
+              <div className="field-head">Other channels to correct</div>
+              <div className="multi-picker">
+                {channels.filter((ch) => ch.id !== referenceChannel).map((ch) => (
+                  <label className="checkbox" key={`reg-m-${ch.id}`}>
+                    <input
+                      type="checkbox"
+                      checked={movingChannels.includes(ch.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setMovingChannels((prev) => Array.from(new Set([...prev, ch.id])));
+                        } else {
+                          setMovingChannels((prev) => prev.filter((id) => id !== ch.id));
+                        }
+                      }}
+                    />
+                    {ch.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </details>
+
+          <details open className="seg-section">
+            <summary>Options</summary>
+            <div className="seg-body">
+              <label className="checkbox">
+                <input type="checkbox" checked={cropOutput} onChange={(e) => setCropOutput(e.target.checked)} />
+                Crop output (keep common FOV)
+              </label>
+            </div>
+          </details>
+
+        </div>
+
+        <div className="seg-footer">
+          <button className="primary" onClick={startRegistration} disabled={regRunning}>Run Registration</button>
+          <button className="ghost" onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
+        </div>
+      </aside>
+
+      {modalOpen && (
+        <div className="seg-modal-backdrop" onClick={() => setModalOpen(false)}>
+          <div className="seg-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="seg-modal-header"><h4>Load images — conditions × channels</h4></div>
+            <div className="seg-modal-body">
+              {modalError && <div className="seg-modal-error">{modalError}</div>}
+              <div className="seg-load-table-wrap">
+                <table className="seg-load-table">
+                  <thead>
+                    <tr>
+                      <th>Condition</th>
+                      {channels.map((ch) => (
+                        <th key={`h-reg-${ch.id}`}>
+                          <div className="row row-between">
+                            <input className="input" value={ch.name} onChange={(e) => updateChannelName(ch.id, e.target.value)} placeholder="Channel name" />
+                            <button className="ghost btn-small" onClick={() => removeChannel(ch.id)} disabled={channels.length <= 1}>Remove</button>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(imagesData.rows || []).map((row, rIdx) => (
+                      <tr key={`reg-r-${rIdx}`}>
+                        <td>
+                          <div className="row row-between">
+                            <input className="input" value={row.condition || ""} onChange={(e) => updateCondition(rIdx, e.target.value)} placeholder="Condition name" />
+                            <button className="ghost btn-small" onClick={() => removeCondition(rIdx)} disabled={(imagesData.rows || []).length <= 1}>Remove</button>
+                          </div>
+                        </td>
+                        {channels.map((ch) => (
+                          <td key={`reg-c-${rIdx}-${ch.id}`}>
+                            <div className="row path-row">
+                              <input className="input" value={row[ch.id] || ""} onChange={(e) => updatePathCell(rIdx, ch.id, e.target.value)} placeholder={`Path to ${ch.name}`} />
+                              <button className="ghost btn-small" onClick={() => browsePathCell(rIdx, ch.id)}>Browse</button>
+                            </div>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="seg-modal-footer">
+              <span className="hint">{counterText}</span>
+              <button className="ghost" onClick={addCondition}>+ Add condition</button>
+              <button className="ghost" onClick={addChannel}>+ Add channel</button>
+              <button className="primary" onClick={saveImagesTable}>Save</button>
+              <button className="secondary" onClick={() => setModalOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const emptyRow = () => ({
   id: makeRowId(),
   name: "",
@@ -1230,6 +1505,7 @@ export default function App() {
   const [currentPlotIndex, setCurrentPlotIndex] = useState(0);
   const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
   const [segJob, setSegJob] = useState(() => ({ ...DEFAULT_SEG_JOB, ...readStorage(STORAGE_KEYS.segJob, {}) }));
+  const [regJob, setRegJob] = useState(() => ({ ...DEFAULT_REG_JOB, ...readStorage(STORAGE_KEYS.regJob, {}) }));
   const [segPreviewNonce, setSegPreviewNonce] = useState(0);
   const [segPreviewPage, setSegPreviewPage] = useState(0);
   const [lastSegPreviewPayload, setLastSegPreviewPayload] = useState(null);
@@ -1259,6 +1535,11 @@ export default function App() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEYS.segJob, JSON.stringify(segJob));
   }, [segJob]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEYS.regJob, JSON.stringify(regJob));
+  }, [regJob]);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
   const allDetectedColumns = useMemo(
@@ -1444,6 +1725,72 @@ export default function App() {
       }
       setSegJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
       setStatus("Stop requested...");
+      setStatusLevel("info");
+    } catch (err) {
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
+  };
+
+  const handleStartRegistration = async (payload) => {
+    if (["starting", "queued", "running", "canceling"].includes(regJob.status)) {
+      return;
+    }
+    const rows = payload?.images_data?.rows || [];
+    const channels = payload?.images_data?.channels || [];
+    const idToName = Object.fromEntries(channels.map((c) => [c.id, c.name || c.id]));
+    const savePath = String(payload?.reg_data?.save_path || "").trim();
+    const reference = payload?.reg_data?.reference;
+    const moving = payload?.reg_data?.moving || [];
+    const errs = [];
+    if (!savePath) errs.push("Please define an output path (Saving path).");
+    if (!reference) errs.push("Select a reference channel.");
+    if (!moving.length) errs.push("Select at least one moving channel.");
+    if (!rows.length) errs.push("No conditions loaded (use Load images).");
+    rows.forEach((r, idx) => {
+      [reference, ...moving].filter(Boolean).forEach((chId) => {
+        if (!String(r[chId] || "").trim()) {
+          errs.push(`Row ${idx + 1}: empty path for '${idToName[chId] || chId}'.`);
+        }
+      });
+    });
+    if (errs.length) {
+      setStatus(errs.join("\n"));
+      setStatusLevel("error");
+      return;
+    }
+    setStatus("Starting registration...");
+    setStatusLevel("info");
+    setRegJob((prev) => ({ ...prev, status: "starting", message: "Starting...", error: "" }));
+    try {
+      const res = await callApi("/registration/start", payload);
+      setRegJob({
+        job_id: res.job_id,
+        status: res.status || "queued",
+        progress: 0,
+        done: 0,
+        total: 0,
+        message: "Queued",
+        log: "",
+        error: "",
+      });
+    } catch (err) {
+      setRegJob((prev) => ({ ...prev, status: "idle" }));
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
+  };
+
+  const handleStopRegistration = async () => {
+    if (!regJob.job_id) return;
+    try {
+      const res = await fetch(`${API_BASE}/registration/stop/${regJob.job_id}`, { method: "POST" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      setRegJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
+      setStatus("Registration stop requested...");
       setStatusLevel("info");
     } catch (err) {
       setStatus(err.message);
@@ -1850,6 +2197,38 @@ export default function App() {
   }, [segJob.job_id, segJob.status]);
 
   useEffect(() => {
+    if (!regJob.job_id) return;
+    if (["completed", "failed", "canceled"].includes(regJob.status)) return;
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/registration/status/${regJob.job_id}`);
+        if (res.status === 404) {
+          setRegJob({ ...DEFAULT_REG_JOB });
+          return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        setRegJob((prev) => ({ ...prev, ...data }));
+        if (data.status === "completed") {
+          setStatus(data.message || "Registration completed.");
+          setStatusLevel("success");
+        } else if (data.status === "failed") {
+          setStatus(data.error || data.message || "Registration failed.");
+          setStatusLevel("error");
+        } else if (data.status === "canceled") {
+          setStatus(data.message || "Registration canceled.");
+          setStatusLevel("info");
+        }
+      } catch {
+        // keep polling
+      }
+    }, 900);
+
+    return () => clearInterval(timer);
+  }, [regJob.job_id, regJob.status]);
+
+  useEffect(() => {
     setSegPreviewPage(0);
   }, [segJob.preview_paths, segJob.preview_index, segJob.job_id]);
 
@@ -1894,6 +2273,27 @@ export default function App() {
       cancelled = true;
     };
   }, [segJob.job_id]);
+
+  useEffect(() => {
+    if (regJob.job_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/registration/active`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.job?.job_id) {
+          setRegJob((prev) => ({ ...DEFAULT_REG_JOB, ...prev, ...data.job }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [regJob.job_id]);
 
   const handleSave = async () => {
     setStatus("Saving settings...");
@@ -2082,6 +2482,57 @@ export default function App() {
                 ) : (
                   <div className="section">
                     <p className="hint">No execution started yet. Use Preview or Run to begin.</p>
+                  </div>
+                )}
+              </section>
+            </main>
+          </>
+        ) : activeModule === "Image Registration" ? (
+          <>
+            <RegistrationLeftPanel
+              onPickDirectory={async () => {
+                try {
+                  const res = await pickDirectoryPath();
+                  return res.path || "";
+                } catch {
+                  return "";
+                }
+              }}
+              onStartRegistration={handleStartRegistration}
+              onStopRegistration={handleStopRegistration}
+              regJob={regJob}
+            />
+            <main className="content">
+              <section>
+                <h2>Image Registration</h2>
+                {regJob.job_id ? (
+                  <div className="section">
+                    <div className="status info">
+                      Registration can be slow and memory-intensive. Keep this window open and avoid running other heavy tasks.
+                      If needed, reduce the number of images/channels per run.
+                    </div>
+                    <h3>Execution progress</h3>
+                    <div className="progress-wrap">
+                      <div
+                        className={`progress-fill ${["starting", "running", "queued", "canceling"].includes(regJob.status) ? "running" : ""}`}
+                        style={{ width: `${Math.max(0, Math.min(100, regJob.progress || 0))}%` }}
+                      />
+                    </div>
+                    <div className="hint">
+                      {regJob.message || "Waiting to start."}
+                    </div>
+                    {(regJob.total || 0) > 0 && (
+                      <div className="hint">{regJob.done || 0} / {regJob.total || 0} conditions</div>
+                    )}
+                    {regJob.error && <Status level="error" text={regJob.error} />}
+                    <div className="section">
+                      <h4>Log</h4>
+                      <pre className="seg-log">{regJob.log || "No logs yet."}</pre>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="section">
+                    <p className="hint">No registration started yet. Use Run Registration to begin.</p>
                   </div>
                 )}
               </section>

@@ -25,6 +25,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from fornma.core.NMA.plot_NMA import plot_NMA as run_nma_plot, NMA as NMAClass
 from fornma.core.Segmentation.run import run as run_segmentation_pipeline
+from fornma.core.Registration.registration import registration as run_registration_pipeline
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
@@ -53,6 +54,9 @@ from .schemas import (
     SegmentationStartRequest,
     SegmentationStartResponse,
     SegmentationStatusResponse,
+    RegistrationStartRequest,
+    RegistrationStartResponse,
+    RegistrationStatusResponse,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -66,6 +70,9 @@ PLOT_JOBS_LOCK = threading.Lock()
 SEG_JOBS: Dict[str, Dict] = {}
 SEG_JOBS_LOCK = threading.Lock()
 SEG_THREADS: Dict[str, threading.Thread] = {}
+REG_JOBS: Dict[str, Dict] = {}
+REG_JOBS_LOCK = threading.Lock()
+REG_THREADS: Dict[str, threading.Thread] = {}
 
 # Allow local dev frontends (Vite) to call the API
 app.add_middleware(
@@ -176,9 +183,22 @@ def _set_seg_job(job_id: str, **fields):
         SEG_JOBS[job_id].update(fields)
 
 
+def _set_reg_job(job_id: str, **fields):
+    with REG_JOBS_LOCK:
+        if job_id not in REG_JOBS:
+            return
+        REG_JOBS[job_id].update(fields)
+
+
 def _seg_thread_alive(job_id: str) -> bool:
     with SEG_JOBS_LOCK:
         t = SEG_THREADS.get(job_id)
+    return bool(t and t.is_alive())
+
+
+def _reg_thread_alive(job_id: str) -> bool:
+    with REG_JOBS_LOCK:
+        t = REG_THREADS.get(job_id)
     return bool(t and t.is_alive())
 
 
@@ -567,6 +587,211 @@ def segmentation_file(path: str = Query(...)):
     if not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail="File not found.")
     return FileResponse(path=p, filename=p.name)
+
+
+def _has_active_reg_job() -> bool:
+    active_states = {"starting", "queued", "running", "canceling"}
+    with REG_JOBS_LOCK:
+        snapshot = list(REG_JOBS.items())
+    return any((job.get("status") in active_states and _reg_thread_alive(job_id)) for job_id, job in snapshot)
+
+
+def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
+    rows = (images_data or {}).get("rows", []) or []
+    channels_meta = (images_data or {}).get("channels", []) or []
+    save_path = str((reg_data or {}).get("save_path") or "").strip()
+    reference = (reg_data or {}).get("reference")
+    moving = (reg_data or {}).get("moving") or []
+    crop = bool((reg_data or {}).get("crop", True))
+
+    id2name = {ch.get("id"): ch.get("name", ch.get("id")) for ch in channels_meta}
+
+    errs = []
+    if not save_path:
+        errs.append("Please define an output path (Saving path).")
+    if not reference:
+        errs.append("Select a reference channel.")
+    if not moving:
+        errs.append("Select at least one moving channel.")
+    if not rows:
+        errs.append("No conditions loaded (use 'Load images').")
+    selected_ids = [reference] + list(moving or [])
+    for idx, r in enumerate(rows, start=1):
+        for ch_id in selected_ids:
+            p = str(r.get(ch_id) or "").strip()
+            if not p:
+                errs.append(f"Row {idx}: empty path for '{id2name.get(ch_id, ch_id)}'.")
+
+    if errs:
+        _set_reg_job(
+            job_id,
+            status="failed",
+            progress=100,
+            message="Invalid parameters.",
+            log="\n".join(sorted(set(errs))),
+            error="\n".join(sorted(set(errs))),
+        )
+        return
+
+    os.makedirs(save_path, exist_ok=True)
+    progress_file = os.path.join(tempfile.gettempdir(), f"_fornma_reg_progress_{uuid.uuid4().hex}.json")
+    _set_reg_job(job_id, progress_file=progress_file, status="running", progress=0, done=0, total=len(rows), message="Starting...", log="")
+    try:
+        with open(progress_file, "w") as f:
+            json.dump(
+                {
+                    "status": "starting",
+                    "total": len(rows),
+                    "done": 0,
+                    "percent": 0,
+                    "cancel": False,
+                    "started_at": datetime.now().isoformat(timespec="seconds"),
+                    "log": "Starting registration...",
+                    "log_history": "Starting registration...",
+                },
+                f,
+            )
+    except Exception:
+        pass
+
+    done = 0
+    total = len(rows)
+    try:
+        for idx, r in enumerate(rows, start=1):
+            d = _safe_read_json(progress_file)
+            if d.get("cancel"):
+                d.update({"status": "canceled", "message": f"Canceled at condition {idx}/{total}."})
+                with open(progress_file, "w") as f:
+                    json.dump(d, f)
+                _set_reg_job(job_id, status="canceled", progress=int(d.get("percent", 0)), message=d.get("message", "Canceled"), log=d.get("log_history", ""))
+                return
+
+            cond_name = r.get("condition") or f"cond_{idx}"
+            folders_to_register = [str(r.get(reference) or "").strip()] + [str(r.get(mid) or "").strip() for mid in moving]
+            log_line = f"[{idx}/{total}] Registering '{cond_name}'..."
+            hist = str(d.get("log_history", "") or "")
+            d.update({"status": "running", "log": log_line, "log_history": f"{hist}\n{log_line}".strip() if hist else log_line})
+            with open(progress_file, "w") as f:
+                json.dump(d, f)
+
+            run_registration_pipeline(folders_to_register=folders_to_register, path_to_save=save_path, crop=crop)
+            done += 1
+            pct = int(done * 100 / total) if total else 100
+            done_line = f"[{idx}/{total}] Done '{cond_name}'."
+            hist = str(d.get("log_history", "") or "")
+            d.update({"done": done, "percent": pct, "log": done_line, "log_history": f"{hist}\n{done_line}".strip() if hist else done_line})
+            with open(progress_file, "w") as f:
+                json.dump(d, f)
+            _set_reg_job(job_id, progress=pct, done=done, total=total, message=done_line, log=d.get("log_history", ""))
+
+        d = _safe_read_json(progress_file)
+        hist = str(d.get("log_history", "") or "")
+        final_line = "Registration finished."
+        d.update({"status": "done", "done": total, "percent": 100, "log": final_line, "log_history": f"{hist}\n{final_line}".strip() if hist else final_line})
+        with open(progress_file, "w") as f:
+            json.dump(d, f)
+        _set_reg_job(job_id, status="completed", progress=100, done=total, total=total, message=final_line, log=d.get("log_history", ""))
+    except Exception as e:
+        d = _safe_read_json(progress_file)
+        hist = str(d.get("log_history", "") or "")
+        err_line = f"Error: {e}"
+        d.update({"status": "error", "log": err_line, "log_history": f"{hist}\n{err_line}".strip() if hist else err_line, "message": str(e)})
+        try:
+            with open(progress_file, "w") as f:
+                json.dump(d, f)
+        except Exception:
+            pass
+        _set_reg_job(job_id, status="failed", progress=int(d.get("percent", 100)), done=int(d.get("done", done)), total=total, message=err_line, log=d.get("log_history", ""), error=str(e))
+    finally:
+        with REG_JOBS_LOCK:
+            REG_THREADS.pop(job_id, None)
+
+
+@app.post("/registration/start", response_model=RegistrationStartResponse)
+def registration_start(req: RegistrationStartRequest):
+    if _has_active_reg_job():
+        raise HTTPException(status_code=409, detail="A registration job is already running. Please wait or stop it first.")
+    job_id = str(uuid.uuid4())
+    with REG_JOBS_LOCK:
+        REG_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "starting",
+            "progress": 0,
+            "done": 0,
+            "total": 0,
+            "message": "Starting",
+            "log": "",
+            "progress_file": None,
+            "error": None,
+        }
+        t = threading.Thread(target=_run_registration_job, args=(job_id, req.images_data or {}, req.reg_data or {}), daemon=True)
+        REG_THREADS[job_id] = t
+    t.start()
+    return RegistrationStartResponse(job_id=job_id, status="starting")
+
+
+@app.get("/registration/status/{job_id}", response_model=RegistrationStatusResponse)
+def registration_status(job_id: str):
+    with REG_JOBS_LOCK:
+        job = REG_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Registration job not found.")
+
+    d = _safe_read_json(job.get("progress_file"))
+    if d:
+        st = d.get("status", job.get("status", "running"))
+        mapped = {"starting": "running", "running": "running", "done": "completed", "error": "failed", "canceled": "canceled"}.get(st, job.get("status", "running"))
+        _set_reg_job(
+            job_id,
+            status=mapped,
+            progress=int(d.get("percent", job.get("progress", 0))),
+            done=int(d.get("done", job.get("done", 0))),
+            total=int(d.get("total", job.get("total", 0))),
+            message=d.get("message", d.get("log", job.get("message", ""))) or job.get("message", ""),
+            log=d.get("log_history") or d.get("log", "") or "",
+            error=d.get("message") if st == "error" else job.get("error"),
+        )
+        with REG_JOBS_LOCK:
+            job = REG_JOBS.get(job_id)
+
+    if not _reg_thread_alive(job_id) and job.get("status") in {"starting", "queued", "running", "canceling"}:
+        _set_reg_job(job_id, status="failed", message=job.get("message") or "Registration process ended unexpectedly.")
+        with REG_JOBS_LOCK:
+            job = REG_JOBS.get(job_id)
+
+    return RegistrationStatusResponse(**job)
+
+
+@app.post("/registration/stop/{job_id}")
+def registration_stop(job_id: str):
+    with REG_JOBS_LOCK:
+        job = REG_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Registration job not found.")
+    pf = job.get("progress_file")
+    if not _reg_thread_alive(job_id):
+        _set_reg_job(job_id, status="canceled", message="Canceled.")
+        return {"status": "canceled"}
+    if not pf or not os.path.exists(pf):
+        _set_reg_job(job_id, status="canceled", message="Canceled.")
+        return {"status": "canceled"}
+    d = _safe_read_json(pf)
+    d.update({"cancel": True, "status": d.get("status", "running")})
+    with open(pf, "w") as f:
+        json.dump(d, f)
+    _set_reg_job(job_id, status="canceling", message="Stop requested...")
+    return {"status": "canceling"}
+
+
+@app.get("/registration/active")
+def registration_active():
+    with REG_JOBS_LOCK:
+        snapshot = list(REG_JOBS.items())
+    active = [(job_id, j) for job_id, j in snapshot if j.get("status") in {"starting", "queued", "running", "canceling"} and _reg_thread_alive(job_id)]
+    job = active[-1][1] if active else None
+    if not job:
+        return {"job": None}
+    return {"job": registration_status(job["job_id"]).model_dump()}
 
 
 def _params_to_dict(req) -> Dict:

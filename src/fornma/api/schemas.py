@@ -200,3 +200,25 @@ class SegmentationStatusResponse(BaseModel):
     preview_index: Optional[int] = None
     progress_file: Optional[str] = None
     error: Optional[str] = None
+
+
+class RegistrationStartRequest(BaseModel):
+    images_data: Dict[str, Any]
+    reg_data: Dict[str, Any]
+
+
+class RegistrationStartResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+class RegistrationStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    message: str
+    log: str = ""
+    done: int = 0
+    total: int = 0
+    progress_file: Optional[str] = None
+    error: Optional[str] = None
