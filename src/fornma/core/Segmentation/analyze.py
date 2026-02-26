@@ -183,11 +183,9 @@ def draw_and_save(df: pd.DataFrame,
 
         prog = os.environ.get("FORNMA_PROGRESS_FILE")
         cv.imwrite(os.path.join(saving_dir, name), img)
-        out_path = os.path.join(saving_dir, name)
-        update_progress(prog, preview_path=out_path)
         preview_path = os.path.join(saving_dir, "_preview.png")
         cv.imwrite(preview_path, img)  # faz uma cópia em PNG só para a UI
-        update_progress(prog, preview_path=preview_path)
+        update_progress(prog, preview_path=preview_path, append_preview_path=preview_path)
 
     return None
 
@@ -230,7 +228,8 @@ def analyze_dict(
         path_to_save: str,
         wants_to_save: bool,
         subfolder_images_in: str,
-        progress_cb: Optional[Callable[[], None]] = None
+        progress_cb: Optional[Callable[[], None]] = None,
+        preview_indices: Optional[List[int]] = None,
 ) -> Union[bool, DataFrame]:
     """
     Given a dictionary containing information about each image channel analysis and the parameters used to perform cell
@@ -252,11 +251,14 @@ def analyze_dict(
 
     # número total de imagens nessa subpasta
     total_images = len(list(subfolder_dict.values())[0][0])
-    # aplica a mesma regra do preview (limite) para não desalinhar com o run.py
-    n_imgs_used = 5 if (preview and total_images > 10) else total_images
+    if preview and preview_indices is not None and len(preview_indices) > 0:
+        img_indices = [i for i in preview_indices if 0 <= i < total_images]
+    else:
+        n_imgs_used = 5 if (preview and total_images > 10) else total_images
+        img_indices = list(range(n_imgs_used))
 
     # se você usa rich.progress.track, mantém:
-    for img_n in track(range(n_imgs_used), description=f'Analyzing {subfolder_images_in} images...'):
+    for img_n in track(img_indices, description=f'Analyzing {subfolder_images_in} images...'):
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
 
         cellpose = segment_dict['use_cellpose']

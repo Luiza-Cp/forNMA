@@ -181,6 +181,7 @@ class SegmentationStartRequest(BaseModel):
     images_data: Dict[str, Any]
     seg_data: Dict[str, Any]
     preview: bool = False
+    preview_index: Optional[int] = None
 
 
 class SegmentationStartResponse(BaseModel):
@@ -195,5 +196,7 @@ class SegmentationStatusResponse(BaseModel):
     message: str
     log: str = ""
     preview_path: Optional[str] = None
+    preview_paths: List[str] = Field(default_factory=list)
+    preview_index: Optional[int] = None
     progress_file: Optional[str] = None
     error: Optional[str] = None

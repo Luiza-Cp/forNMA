@@ -10,7 +10,7 @@ import json
 import time
 import os
 import pandas as pd
-from typing import Any, Union, List, Tuple
+from typing import Any, Union, List, Tuple, Optional
 
 from .analyze import analyze_dict
 from .df_managing.organize import (
@@ -235,6 +235,7 @@ class _CanceledError(RuntimeError):
 
 def run(parameters_dict: dict,
         preview: bool = False,
+        preview_index: Optional[int] = None,
         ) -> None:
     """
     Gets all user inputs and applies them to analyze all folders and subfolders.
@@ -262,6 +263,7 @@ def run(parameters_dict: dict,
 
     # --- total de imagens (somando todas as subpastas) para progresso fino
     total_images = 0
+    selected_idx_by_subfolder: dict[int, list[int]] = {}
     for i_probe in range(len(subfolders)):
         if cancel_requested(prog):
             update_progress(prog, status="canceled", log="Canceled before counting images.")
@@ -271,7 +273,15 @@ def run(parameters_dict: dict,
             continue
         fk = next(iter(probe_dict.keys()))
         n_all = len(probe_dict[fk][0])
-        n_used = 5 if (preview and n_all > 10) else n_all
+        if preview and preview_index is not None:
+            idx = max(0, min(int(preview_index), max(0, n_all - 1)))
+            selected = [idx]
+        elif preview:
+            selected = list(range(5 if n_all > 10 else n_all))
+        else:
+            selected = list(range(n_all))
+        selected_idx_by_subfolder[i_probe] = selected
+        n_used = len(selected)
         total_images += n_used
 
     done = 0
@@ -283,6 +293,8 @@ def run(parameters_dict: dict,
         percent=0,
         log="Starting…",
         append_log="Starting segmentation...",
+        preview_paths=[],
+        preview_index=preview_index,
     )
 
     try:
@@ -313,7 +325,8 @@ def run(parameters_dict: dict,
             # número de imagens nessa subpasta (mesmo para todos os canais)
             first_key = next(iter(subfolder_dict.keys()))
             n_all = len(subfolder_dict[first_key][0])
-            n_imgs = 5 if (preview and n_all > 10) else n_all
+            sel_idx = selected_idx_by_subfolder.get(i, list(range(n_all)))
+            n_imgs = len(sel_idx)
 
             # callback chamado pelo analyze_dict após cada imagem processada
             sub_done = 0
@@ -345,7 +358,8 @@ def run(parameters_dict: dict,
                 analyze_dict(
                     subfolder_dict, segment_dict, overtime, conditions[i], preview, ch_name_list,
                     path_to_save, wants_to_save, subfolders[i],
-                    progress_cb=progress_cb  # <— versão nova com callback
+                    progress_cb=progress_cb,  # <— versão nova com callback
+                    preview_indices=sel_idx,
                 )
             except TypeError:
                 # Versão antiga do analyze_dict (sem progress_cb)

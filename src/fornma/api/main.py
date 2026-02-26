@@ -65,6 +65,7 @@ PLOT_JOBS: Dict[str, Dict] = {}
 PLOT_JOBS_LOCK = threading.Lock()
 SEG_JOBS: Dict[str, Dict] = {}
 SEG_JOBS_LOCK = threading.Lock()
+SEG_THREADS: Dict[str, threading.Thread] = {}
 
 # Allow local dev frontends (Vite) to call the API
 app.add_middleware(
@@ -175,10 +176,22 @@ def _set_seg_job(job_id: str, **fields):
         SEG_JOBS[job_id].update(fields)
 
 
-def _has_active_seg_job() -> bool:
-    active_states = {"queued", "running", "canceling", "starting"}
+def _seg_thread_alive(job_id: str) -> bool:
     with SEG_JOBS_LOCK:
-        return any((job.get("status") in active_states) for job in SEG_JOBS.values())
+        t = SEG_THREADS.get(job_id)
+    return bool(t and t.is_alive())
+
+
+def _seg_job_is_active(job_id: str, job: Dict) -> bool:
+    if job.get("status") not in {"queued", "running", "canceling", "starting"}:
+        return False
+    return _seg_thread_alive(job_id)
+
+
+def _has_active_seg_job() -> bool:
+    with SEG_JOBS_LOCK:
+        snapshot = list(SEG_JOBS.items())
+    return any(_seg_job_is_active(job_id, job) for job_id, job in snapshot)
 
 
 def _safe_read_json(path: str | None) -> dict:
@@ -349,7 +362,7 @@ def nma_plots_file(path: str = Query(...)):
     return FileResponse(path=p, filename=p.name)
 
 
-def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, preview: bool):
+def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, preview: bool, preview_index: int | None):
     # Force headless plotting in API worker threads (avoid Tk/Tcl backend usage).
     try:
         import matplotlib
@@ -369,7 +382,16 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
         return
 
     progress_file = os.path.join(tempfile.gettempdir(), f"_fornma_progress_{uuid.uuid4().hex}.json")
-    _set_seg_job(job_id, progress_file=progress_file, status="running", progress=0, message="Starting...", log="")
+    _set_seg_job(
+        job_id,
+        progress_file=progress_file,
+        status="running",
+        progress=0,
+        message="Starting...",
+        log="",
+        preview_paths=[],
+        preview_index=preview_index,
+    )
     try:
         with open(progress_file, "w") as f:
             json.dump(
@@ -380,6 +402,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
                     "percent": 0,
                     "cancel": False,
                     "started_at": datetime.now().isoformat(timespec="seconds"),
+                    "preview_index": preview_index,
                 },
                 f,
             )
@@ -388,7 +411,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
 
     try:
         os.environ["FORNMA_PROGRESS_FILE"] = progress_file
-        run_segmentation_pipeline(params, preview=bool(preview))
+        run_segmentation_pipeline(params, preview=bool(preview), preview_index=preview_index)
         d = _safe_read_json(progress_file)
         st = d.get("status", "done")
         percent = int(d.get("percent", 100 if st == "done" else 0))
@@ -399,10 +422,23 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             message="Finished." if st == "done" else (d.get("message") or st),
             log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path"),
+            preview_paths=d.get("preview_paths", []),
+            preview_index=d.get("preview_index", preview_index),
             error=d.get("message") if st == "error" else None,
         )
     except Exception as e:
+        try:
+            if progress_file:
+                d = _safe_read_json(progress_file)
+                d.update({"status": "error", "message": str(e)})
+                with open(progress_file, "w") as f:
+                    json.dump(d, f)
+        except Exception:
+            pass
         _set_seg_job(job_id, status="failed", progress=100, message=f"Segmentation failed: {e}", error=str(e))
+    finally:
+        with SEG_JOBS_LOCK:
+            SEG_THREADS.pop(job_id, None)
 
 
 @app.post("/segmentation/start", response_model=SegmentationStartResponse)
@@ -419,14 +455,17 @@ def segmentation_start(req: SegmentationStartRequest):
             "message": "Starting",
             "log": "",
             "preview_path": None,
+            "preview_paths": [],
+            "preview_index": req.preview_index,
             "progress_file": None,
             "error": None,
         }
-    t = threading.Thread(
-        target=_run_segmentation_job,
-        args=(job_id, req.images_data or {}, req.seg_data or {}, bool(req.preview)),
-        daemon=True,
-    )
+        t = threading.Thread(
+            target=_run_segmentation_job,
+            args=(job_id, req.images_data or {}, req.seg_data or {}, bool(req.preview), req.preview_index),
+            daemon=True,
+        )
+        SEG_THREADS[job_id] = t
     t.start()
     return SegmentationStartResponse(job_id=job_id, status="starting")
 
@@ -456,7 +495,29 @@ def segmentation_status(job_id: str):
             message=d.get("message", job.get("message", "")) or job.get("message", ""),
             log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path", job.get("preview_path")),
+            preview_paths=d.get("preview_paths", job.get("preview_paths", [])),
+            preview_index=d.get("preview_index", job.get("preview_index")),
             error=d.get("message") if st == "error" else job.get("error"),
+        )
+        with SEG_JOBS_LOCK:
+            job = SEG_JOBS.get(job_id)
+    elif _seg_job_is_active(job_id, job):
+        # no progress file yet; keep current state while thread is alive
+        pass
+
+    if _seg_job_is_active(job_id, job) is False and job.get("status") in {"starting", "queued", "running", "canceling"}:
+        cancel_flag = bool(d.get("cancel")) if d else False
+        forced_status = "canceled" if cancel_flag else "failed"
+        forced_message = (
+            "Canceled."
+            if cancel_flag
+            else (job.get("message") or "Segmentation process ended unexpectedly.")
+        )
+        _set_seg_job(
+            job_id,
+            status=forced_status,
+            message=forced_message,
+            error=None if cancel_flag else (job.get("error") or forced_message),
         )
         with SEG_JOBS_LOCK:
             job = SEG_JOBS.get(job_id)
@@ -467,7 +528,9 @@ def segmentation_status(job_id: str):
 @app.get("/segmentation/active")
 def segmentation_active():
     with SEG_JOBS_LOCK:
-        job = _latest_active_job(SEG_JOBS, {"starting", "queued", "running", "canceling"})
+        snapshot = list(SEG_JOBS.items())
+    active = [(job_id, j) for job_id, j in snapshot if _seg_job_is_active(job_id, j)]
+    job = active[-1][1] if active else None
     if not job:
         return {"job": None}
     # Reuse status updater to make sure log/progress are fresh.
@@ -481,8 +544,12 @@ def segmentation_stop(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Segmentation job not found.")
     pf = job.get("progress_file")
+    if not _seg_thread_alive(job_id):
+        _set_seg_job(job_id, status="canceled", message="Canceled.")
+        return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        return {"status": "not_running"}
+        _set_seg_job(job_id, status="canceled", message="Canceled.")
+        return {"status": "canceled"}
     d = _safe_read_json(pf)
     d.update({"cancel": True, "status": d.get("status", "running")})
     try:
