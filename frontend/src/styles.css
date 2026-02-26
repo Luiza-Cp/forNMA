@@ -129,6 +129,11 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.seg-header .row button,
+.seg-footer button {
+  margin-bottom: 0;
+}
+
 .seg-summary {
   margin-top: 8px;
 }

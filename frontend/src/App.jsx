@@ -69,7 +69,13 @@ function previewMeta(path) {
   return { channel, condition };
 }
 
-function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSegmentation, segJob }) {
+function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSegmentation, onResetSegmentation, segJob }) {
+  const resetSegForm = () => {
+    const ok = window.confirm("Reset all segmentation settings to defaults?");
+    if (!ok) return;
+    onResetSegmentation?.();
+  };
+
   const [savePath, setSavePath] = useState("");
   const [imagesData, setImagesData] = useState({
     channels: [{ id: "ch1", name: "Channel 1" }],
@@ -358,8 +364,11 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     <>
     <aside className="panel seg-panel">
       <div className="seg-header">
-        <h3>Segmentation — Inputs</h3>
-        <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
+        <h3>Segmentation — Settings</h3>
+        <div className="row">
+          <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
+          <button className="ghost" onClick={resetSegForm} disabled={segRunning}>Reset settings</button>
+        </div>
         <div className="field-head">Saving path <Tip text="Where outputs (tables, images, logs) will be written." /></div>
         <div className="row path-row">
           <input
@@ -1224,9 +1233,17 @@ export default function App() {
   const [segPreviewNonce, setSegPreviewNonce] = useState(0);
   const [segPreviewPage, setSegPreviewPage] = useState(0);
   const [lastSegPreviewPayload, setLastSegPreviewPayload] = useState(null);
+  const [segPanelResetKey, setSegPanelResetKey] = useState(0);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const hasPlotRun = Boolean(plotJob.job_id);
+  const hasSegSession =
+    Boolean(segJob.job_id) ||
+    (segJob.status && segJob.status !== "idle") ||
+    Boolean(segJob.error) ||
+    Boolean(segJob.log) ||
+    Boolean(segJob.preview_path) ||
+    ((segJob.preview_paths || []).length > 0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1432,6 +1449,16 @@ export default function App() {
       setStatus(err.message);
       setStatusLevel("error");
     }
+  };
+
+  const handleResetSegmentationUi = () => {
+    setSegJob({ ...DEFAULT_SEG_JOB });
+    setSegPreviewPage(0);
+    setSegPreviewNonce((n) => n + 1);
+    setLastSegPreviewPayload(null);
+    setStatus("");
+    setStatusLevel("info");
+    setSegPanelResetKey((k) => k + 1);
   };
 
   const handleStep1 = async () => {
@@ -1926,6 +1953,7 @@ export default function App() {
         {activeModule === "Segmentation" ? (
           <>
             <SegmentationLeftPanel
+              key={`seg-panel-${segPanelResetKey}`}
               onPickDirectory={async () => {
                 try {
                   const res = await pickDirectoryPath();
@@ -1936,119 +1964,126 @@ export default function App() {
               }}
               onStartSegmentation={handleStartSegmentation}
               onStopSegmentation={handleStopSegmentation}
+              onResetSegmentation={handleResetSegmentationUi}
               segJob={segJob}
             />
             <main className="content">
               <section>
                 <h2>Segmentation</h2>
                 <p className="hint">Run segmentation and monitor progress in real time.</p>
-                <div className="section">
-                  <h3>Execution progress</h3>
-                  <div className="progress-wrap">
-                    <div
-                      className={`progress-fill ${segJob.status === "starting" || segJob.status === "running" || segJob.status === "queued" || segJob.status === "canceling" ? "running" : ""}`}
-                      style={{ width: `${Math.max(0, Math.min(100, segJob.progress || 0))}%` }}
-                    />
-                  </div>
-                  <div className="hint">
-                    {segJob.message || "Waiting to start."}
-                  </div>
-                  {segJob.error && <Status level="error" text={segJob.error} />}
+                {hasSegSession ? (
                   <div className="section">
-                    <h4>
-                      Segmentation preview{Number.isInteger(segJob.preview_index) ? ` (image ${segJob.preview_index + 1})` : ""}
-                    </h4>
-                    {lastSegPreviewPayload && Number.isInteger(segJob.preview_index) && (
-                      <div className="row row-right">
-                        <button
-                          className="secondary btn-small"
-                          onClick={() =>
-                            handleStartSegmentation({
-                              ...lastSegPreviewPayload,
-                              preview: true,
-                              preview_index: (Number(segJob.preview_index) || 0) + 1,
-                            })
-                          }
-                          disabled={["starting", "queued", "running", "canceling"].includes(segJob.status)}
+                    <h3>Execution progress</h3>
+                    <div className="progress-wrap">
+                      <div
+                        className={`progress-fill ${segJob.status === "starting" || segJob.status === "running" || segJob.status === "queued" || segJob.status === "canceling" ? "running" : ""}`}
+                        style={{ width: `${Math.max(0, Math.min(100, segJob.progress || 0))}%` }}
+                      />
+                    </div>
+                    <div className="hint">
+                      {segJob.message || "Waiting to start."}
+                    </div>
+                    {segJob.error && <Status level="error" text={segJob.error} />}
+                    <div className="section">
+                      <h4>
+                        Segmentation preview{Number.isInteger(segJob.preview_index) ? ` (image ${segJob.preview_index + 1})` : ""}
+                      </h4>
+                      {lastSegPreviewPayload && Number.isInteger(segJob.preview_index) && (
+                        <div className="row row-right">
+                          <button
+                            className="secondary btn-small"
+                            onClick={() =>
+                              handleStartSegmentation({
+                                ...lastSegPreviewPayload,
+                                preview: true,
+                                preview_index: (Number(segJob.preview_index) || 0) + 1,
+                              })
+                            }
+                            disabled={["starting", "queued", "running", "canceling"].includes(segJob.status)}
+                          >
+                            Preview next image
+                          </button>
+                        </div>
+                      )}
+                      {(segJob.preview_paths || []).length > 0 ? (
+                        <>
+                          <div className="viewer-toolbar">
+                            <button
+                              className="ghost btn-small"
+                              onClick={() => setSegPreviewPage((p) => Math.max(0, p - 1))}
+                              disabled={segPreviewPage <= 0}
+                            >
+                              ◀
+                            </button>
+                            <span className="viewer-counter">
+                              {Math.min((segPreviewPage * 2) + 1, segJob.preview_paths.length)}-{Math.min((segPreviewPage * 2) + 2, segJob.preview_paths.length)} / {segJob.preview_paths.length}
+                            </span>
+                            <button
+                              className="ghost btn-small"
+                              onClick={() => setSegPreviewPage((p) => {
+                                const maxPage = Math.max(0, Math.ceil((segJob.preview_paths.length || 0) / 2) - 1);
+                                return Math.min(maxPage, p + 1);
+                              })}
+                              disabled={((segPreviewPage + 1) * 2) >= segJob.preview_paths.length}
+                            >
+                              ▶
+                            </button>
+                          </div>
+                          <div className="plot-thumbs plot-thumbs-right">
+                            {(segJob.preview_paths || []).slice(segPreviewPage * 2, segPreviewPage * 2 + 2).map((path) => (
+                              (() => {
+                                const meta = previewMeta(path);
+                                return (
+                                  <a
+                                    key={path}
+                                    href={`${API_BASE}/segmentation/file?path=${encodeURIComponent(path)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="thumb-card"
+                                  >
+                                    <span>
+                                      {meta.condition ? `Condition: ${meta.condition}` : ""}
+                                      {meta.condition && meta.channel ? " | " : ""}
+                                      {meta.channel ? `Channel: ${meta.channel}` : ""}
+                                    </span>
+                                    <img
+                                      src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(path)}&v=${segPreviewNonce}`}
+                                      alt={path.split("/").pop()}
+                                    />
+                                    <span>{path.split("/").pop()}</span>
+                                  </a>
+                                );
+                              })()
+                            ))}
+                          </div>
+                        </>
+                      ) : segJob.preview_path ? (
+                        <a
+                          href={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="thumb-card viewer-single"
                         >
-                          Preview next image
-                        </button>
-                      </div>
-                    )}
-                    {(segJob.preview_paths || []).length > 0 ? (
-                      <>
-                        <div className="viewer-toolbar">
-                          <button
-                            className="ghost btn-small"
-                            onClick={() => setSegPreviewPage((p) => Math.max(0, p - 1))}
-                            disabled={segPreviewPage <= 0}
-                          >
-                            ◀
-                          </button>
-                          <span className="viewer-counter">
-                            {Math.min((segPreviewPage * 2) + 1, segJob.preview_paths.length)}-{Math.min((segPreviewPage * 2) + 2, segJob.preview_paths.length)} / {segJob.preview_paths.length}
-                          </span>
-                          <button
-                            className="ghost btn-small"
-                            onClick={() => setSegPreviewPage((p) => {
-                              const maxPage = Math.max(0, Math.ceil((segJob.preview_paths.length || 0) / 2) - 1);
-                              return Math.min(maxPage, p + 1);
-                            })}
-                            disabled={((segPreviewPage + 1) * 2) >= segJob.preview_paths.length}
-                          >
-                            ▶
-                          </button>
-                        </div>
-                        <div className="plot-thumbs plot-thumbs-right">
-                          {(segJob.preview_paths || []).slice(segPreviewPage * 2, segPreviewPage * 2 + 2).map((path) => (
-                            (() => {
-                              const meta = previewMeta(path);
-                              return (
-                                <a
-                                  key={path}
-                                  href={`${API_BASE}/segmentation/file?path=${encodeURIComponent(path)}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="thumb-card"
-                                >
-                                  <span>
-                                    {meta.condition ? `Condition: ${meta.condition}` : ""}
-                                    {meta.condition && meta.channel ? " | " : ""}
-                                    {meta.channel ? `Channel: ${meta.channel}` : ""}
-                                  </span>
-                                  <img
-                                    src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(path)}&v=${segPreviewNonce}`}
-                                    alt={path.split("/").pop()}
-                                  />
-                                  <span>{path.split("/").pop()}</span>
-                                </a>
-                              );
-                            })()
-                          ))}
-                        </div>
-                      </>
-                    ) : segJob.preview_path ? (
-                      <a
-                        href={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="thumb-card viewer-single"
-                      >
-                        <img
-                          src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}&v=${segPreviewNonce}`}
-                          alt={segJob.preview_path.split("/").pop()}
-                        />
-                        <span>{segJob.preview_path.split("/").pop()}</span>
-                      </a>
-                    ) : (
-                      <p className="hint">No preview image yet.</p>
-                    )}
+                          <img
+                            src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}&v=${segPreviewNonce}`}
+                            alt={segJob.preview_path.split("/").pop()}
+                          />
+                          <span>{segJob.preview_path.split("/").pop()}</span>
+                        </a>
+                      ) : (
+                        <p className="hint">No preview image yet.</p>
+                      )}
+                    </div>
+                    <div className="section">
+                      <h4>Log</h4>
+                      <pre className="seg-log">{segJob.log || "No logs yet."}</pre>
+                    </div>
                   </div>
+                ) : (
                   <div className="section">
-                    <h4>Log</h4>
-                    <pre className="seg-log">{segJob.log || "No logs yet."}</pre>
+                    <p className="hint">No execution started yet. Use Preview or Run to begin.</p>
                   </div>
-                </div>
+                )}
               </section>
             </main>
           </>
