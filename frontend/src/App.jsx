@@ -26,7 +26,7 @@ function Tip({ text }) {
   );
 }
 
-function SegmentationLeftPanel({ onPickDirectory }) {
+function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSegmentation, segJob }) {
   const [savePath, setSavePath] = useState("");
   const [imagesData, setImagesData] = useState({
     channels: [{ id: "ch1", name: "Channel 1" }],
@@ -41,6 +41,25 @@ function SegmentationLeftPanel({ onPickDirectory }) {
   const [cytoEnabled, setCytoEnabled] = useState(false);
   const [cytoChannels, setCytoChannels] = useState([]);
   const [segMethod, setSegMethod] = useState("fornma");
+  const [overtime, setOvertime] = useState(false);
+  const [magnification, setMagnification] = useState(20);
+  const [pixelSize, setPixelSize] = useState(0.6);
+  const [rescaleIntensity, setRescaleIntensity] = useState(false);
+  const [removeBackground, setRemoveBackground] = useState(false);
+  const [rollingRadius, setRollingRadius] = useState(50);
+  const [fornmaThreshold, setFornmaThreshold] = useState("triangle");
+  const [fornmaOffset, setFornmaOffset] = useState(5);
+  const [fornmaSmooth, setFornmaSmooth] = useState(12);
+  const [fornmaAdjustSize, setFornmaAdjustSize] = useState(0);
+  const [fornmaCutEdges, setFornmaCutEdges] = useState(0.7);
+  const [fornmaFindLow, setFornmaFindLow] = useState(false);
+  const [fornmaWeakly, setFornmaWeakly] = useState(false);
+  const [cellposeDiameter, setCellposeDiameter] = useState(25);
+  const [cellposeFlow, setCellposeFlow] = useState(0.4);
+  const [cellposeMask, setCellposeMask] = useState(0);
+  const [cellposeCellprob, setCellposeCellprob] = useState(-3);
+  const [cellposeUseGpu, setCellposeUseGpu] = useState(true);
+  const [cellposeInvert, setCellposeInvert] = useState(true);
   const [advEnable, setAdvEnable] = useState({
     shape: true,
     eccentricity: false,
@@ -208,6 +227,85 @@ function SegmentationLeftPanel({ onPickDirectory }) {
 
   const counterText = `Channels: ${channels.length} | Conditions: ${(imagesData.rows || []).length}`;
 
+  const buildSegDataPayload = () => {
+    const channelsMap = {};
+    channels.forEach((ch) => {
+      const cfg = channelCfg[ch.id] || {};
+      channelsMap[ch.id] = {
+        rescale_intensity: !!cfg.rescale_intensity,
+        remove_background: !!cfg.remove_background,
+        rolling_ball_radius: Number(cfg.rolling_ball_radius ?? 40),
+        match_histograms: !!cfg.match_histograms,
+        ring_size: showNumber(cfg.ring_size, 3),
+        use_ellipse: !!cfg.use_ellipse,
+        wants_foci: fociEnabled && fociChannels.includes(ch.id),
+        foci_min_size: showNumber(cfg.foci_min_size, 7),
+        foci_max_size: cfg.foci_max_size_enable ? showNumber(cfg.foci_max_size, 20) : false,
+        foci_min_int: cfg.foci_min_int_enable ? showNumber(cfg.foci_min_int, 0) : false,
+        foci_max_int: cfg.foci_max_int_enable ? showNumber(cfg.foci_max_int, 1) : false,
+        foci_prominence: showNumber(cfg.foci_prominence, 1.2),
+      };
+    });
+
+    return {
+      general: {
+        path_to_save: savePath,
+        channel_with_nuclei: nuclearChannel || null,
+        overtime: !!overtime,
+      },
+      segmentation: {
+        magnification: showNumber(magnification, 20),
+        "pixel-size": showNumber(pixelSize, 0.6),
+        "rescale-intensity": !!rescaleIntensity,
+        "remove-bg": !!removeBackground,
+        "rolling-radius": showNumber(rollingRadius, 50),
+        seg_method: segMethod,
+      },
+      fornma: {
+        threshold: fornmaThreshold,
+        offset: showNumber(fornmaOffset, 5),
+        smooth: showNumber(fornmaSmooth, 12),
+        adjust_size: showNumber(fornmaAdjustSize, 0),
+        cut_edges: showNumber(fornmaCutEdges, 0.7),
+        find_low_intensity_nucleus: !!fornmaFindLow,
+        weakly_labeled: !!fornmaWeakly,
+      },
+      cellpose: {
+        diameter: showNumber(cellposeDiameter, 25),
+        flow_threshold: showNumber(cellposeFlow, 0.4),
+        mask_threshold: showNumber(cellposeMask, 0),
+        cellprob_threshold: showNumber(cellposeCellprob, -3),
+        use_gpu: !!cellposeUseGpu,
+        invert: !!cellposeInvert,
+      },
+      filters: {
+        shape: advEnable.shape ? showNumber(advValues.shape, 0.88) : null,
+        eccentricity: advEnable.eccentricity ? showNumber(advValues.eccentricity, 0.8) : null,
+        minimum_size: advEnable.min_size ? showNumber(advValues.min_size, 100) : null,
+        maximum_size: advEnable.max_size ? showNumber(advValues.max_size, 10000) : null,
+        minimum_radius: advEnable.min_radius ? showNumber(advValues.min_radius, 4) : null,
+        maximum_radius: advEnable.max_radius ? showNumber(advValues.max_radius, 120) : null,
+      },
+      channels: channelsMap,
+    };
+  };
+
+  const showNumber = (v, fallback) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const startSeg = async (preview) => {
+    const payload = {
+      images_data: imagesData,
+      seg_data: buildSegDataPayload(),
+      preview: !!preview,
+    };
+    await onStartSegmentation(payload);
+  };
+
+  const segRunning = segJob?.status === "running" || segJob?.status === "queued" || segJob?.status === "canceling";
+
   return (
     <>
     <aside className="panel seg-panel">
@@ -247,7 +345,10 @@ function SegmentationLeftPanel({ onPickDirectory }) {
               <option value="">Select one channel...</option>
               {channels.map((ch) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
             </select>
-            <label className="checkbox"><input type="checkbox" /> Overtime <Tip text="Check this if images represent time sequence." /></label>
+            <label className="checkbox">
+              <input type="checkbox" checked={overtime} onChange={(e) => setOvertime(e.target.checked)} />
+              Overtime <Tip text="Check this if images represent time sequence." />
+            </label>
             <label className="checkbox">
               <input type="checkbox" checked={fociEnabled} onChange={(e) => setFociEnabled(e.target.checked)} />
               Foci <Tip text="Enable spot (foci) detection and extra foci parameters for selected channels." />
@@ -311,17 +412,23 @@ function SegmentationLeftPanel({ onPickDirectory }) {
           <summary>Segmentation Settings</summary>
           <div className="seg-body">
             <div className="row">
-              <div className="metric">
-                <label>Magnification <Tip text="Numeric objective magnification used for acquisition (e.g. 20x)." /></label>
-                <input type="number" className="input" defaultValue={20} />
-              </div>
-              <div className="metric">
-                <label>Pixel Size <Tip text="Real sample distance represented by each pixel." /></label>
-                <input type="number" className="input" defaultValue={0.6} step="0.1" />
-              </div>
+                <div className="metric">
+                  <label>Magnification <Tip text="Numeric objective magnification used for acquisition (e.g. 20x)." /></label>
+                  <input type="number" className="input" value={magnification} onChange={(e) => setMagnification(e.target.value)} />
+                </div>
+                <div className="metric">
+                  <label>Pixel Size <Tip text="Real sample distance represented by each pixel." /></label>
+                  <input type="number" className="input" value={pixelSize} onChange={(e) => setPixelSize(e.target.value)} step="0.1" />
+                </div>
             </div>
-            <label className="checkbox"><input type="checkbox" /> Rescale Intensity <Tip text="Normalize intensity values to improve contrast for segmentation." /></label>
-            <label className="checkbox"><input type="checkbox" /> Remove Background <Tip text="Subtract smooth background before segmentation." /></label>
+            <label className="checkbox">
+              <input type="checkbox" checked={rescaleIntensity} onChange={(e) => setRescaleIntensity(e.target.checked)} />
+              Rescale Intensity <Tip text="Normalize intensity values to improve contrast for segmentation." />
+            </label>
+            <label className="checkbox">
+              <input type="checkbox" checked={removeBackground} onChange={(e) => setRemoveBackground(e.target.checked)} />
+              Remove Background <Tip text="Subtract smooth background before segmentation." />
+            </label>
             <div className="field-head">Segmentation Method <Tip text="Choose forNMA (faster) or Cellpose (more robust) pipeline." /></div>
             <div className="row">
               <label className="radio"><input type="radio" checked={segMethod === "fornma"} onChange={() => setSegMethod("fornma")} /> forNMA</label>
@@ -332,7 +439,7 @@ function SegmentationLeftPanel({ onPickDirectory }) {
                 <h4 className="seg-subtitle">forNMA Parameters</h4>
                 <div className="field-head">Threshold <Tip text="Threshold strategy used to separate nuclei from background." /></div>
                 <div className="seg-threshold-wrap">
-                <select className="input seg-threshold-input" defaultValue="triangle">
+                <select className="input seg-threshold-input" value={fornmaThreshold} onChange={(e) => setFornmaThreshold(e.target.value)}>
                   <option value="isodata">Isodata</option>
                   <option value="li">Li</option>
                   <option value="mean">Mean</option>
@@ -346,22 +453,34 @@ function SegmentationLeftPanel({ onPickDirectory }) {
                   <option value="local_gaussian">Local Gaussian</option>
                 </select>
                 </div>
-                <label className="checkbox"><input type="checkbox" /> Find low-intensity nuclei <Tip text="Extra pass to recover missed nuclei in low-intensity regions." /></label>
-                <label className="checkbox"><input type="checkbox" /> Weakly labeled images <Tip text="Enable additional handling for weak staining/unclear contours." /></label>
+                <label className="checkbox">
+                  <input type="checkbox" checked={fornmaFindLow} onChange={(e) => setFornmaFindLow(e.target.checked)} />
+                  Find low-intensity nuclei <Tip text="Extra pass to recover missed nuclei in low-intensity regions." />
+                </label>
+                <label className="checkbox">
+                  <input type="checkbox" checked={fornmaWeakly} onChange={(e) => setFornmaWeakly(e.target.checked)} />
+                  Weakly labeled images <Tip text="Enable additional handling for weak staining/unclear contours." />
+                </label>
               </>
             ) : (
               <>
                 <h4 className="seg-subtitle">Cellpose Parameters</h4>
                 <div className="field-head">Diameter (px) <Tip text="Typical cell diameter in pixels for Cellpose scale normalization." /></div>
-                <input className="input" type="number" defaultValue={25} />
+                <input className="input" type="number" value={cellposeDiameter} onChange={(e) => setCellposeDiameter(e.target.value)} />
                 <div className="field-head">Flow Threshold <Tip text="Maximum flow error allowed; lower values are stricter." /></div>
-                <input className="input" type="number" defaultValue={0.4} step="0.05" />
+                <input className="input" type="number" value={cellposeFlow} onChange={(e) => setCellposeFlow(e.target.value)} step="0.05" />
                 <div className="field-head">Mask Threshold <Tip text="Threshold for mask inclusion from probability maps." /></div>
-                <input className="input" type="number" defaultValue={0} step="0.5" />
+                <input className="input" type="number" value={cellposeMask} onChange={(e) => setCellposeMask(e.target.value)} step="0.5" />
                 <div className="field-head">Cellprob Threshold <Tip text="Cell probability threshold; lower values include more cells." /></div>
-                <input className="input" type="number" defaultValue={-3} step="0.5" />
-                <label className="checkbox"><input type="checkbox" defaultChecked /> Use GPU <Tip text="Enable GPU acceleration if available." /></label>
-                <label className="checkbox"><input type="checkbox" defaultChecked /> Invert Intensities <Tip text="Invert image values before segmentation when needed." /></label>
+                <input className="input" type="number" value={cellposeCellprob} onChange={(e) => setCellposeCellprob(e.target.value)} step="0.5" />
+                <label className="checkbox">
+                  <input type="checkbox" checked={cellposeUseGpu} onChange={(e) => setCellposeUseGpu(e.target.checked)} />
+                  Use GPU <Tip text="Enable GPU acceleration if available." />
+                </label>
+                <label className="checkbox">
+                  <input type="checkbox" checked={cellposeInvert} onChange={(e) => setCellposeInvert(e.target.checked)} />
+                  Invert Intensities <Tip text="Invert image values before segmentation when needed." />
+                </label>
               </>
             )}
           </div>
@@ -572,9 +691,9 @@ function SegmentationLeftPanel({ onPickDirectory }) {
       </div>
 
       <div className="seg-footer">
-        <button className="secondary">Preview</button>
-        <button className="primary">Run</button>
-        <button className="ghost">Stop</button>
+        <button className="secondary" onClick={() => startSeg(true)} disabled={segRunning}>Preview</button>
+        <button className="primary" onClick={() => startSeg(false)} disabled={segRunning}>Run</button>
+        <button className="ghost" onClick={() => onStopSegmentation()} disabled={!segRunning}>Stop</button>
       </div>
     </aside>
     {modalOpen && (
@@ -1059,6 +1178,16 @@ export default function App() {
   });
   const [currentPlotIndex, setCurrentPlotIndex] = useState(0);
   const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
+  const [segJob, setSegJob] = useState({
+    job_id: null,
+    status: "idle",
+    progress: 0,
+    message: "",
+    log: "",
+    preview_path: "",
+    error: "",
+  });
+  const [segPreviewNonce, setSegPreviewNonce] = useState(0);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const hasPlotRun = Boolean(plotJob.job_id);
@@ -1199,6 +1328,44 @@ export default function App() {
       throw new Error(text || res.statusText);
     }
     return res.json();
+  };
+
+  const handleStartSegmentation = async (payload) => {
+    setStatus("Starting segmentation...");
+    setStatusLevel("info");
+    try {
+      const res = await callApi("/segmentation/start", payload);
+      setSegJob({
+        job_id: res.job_id,
+        status: res.status || "queued",
+        progress: 0,
+        message: "Queued",
+        log: "",
+        preview_path: "",
+        error: "",
+      });
+      setSegPreviewNonce((n) => n + 1);
+    } catch (err) {
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
+  };
+
+  const handleStopSegmentation = async () => {
+    if (!segJob.job_id) return;
+    try {
+      const res = await fetch(`${API_BASE}/segmentation/stop/${segJob.job_id}`, { method: "POST" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      setSegJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
+      setStatus("Stop requested...");
+      setStatusLevel("info");
+    } catch (err) {
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
   };
 
   const handleStep1 = async () => {
@@ -1540,6 +1707,47 @@ export default function App() {
     setCurrentPlotIndex(plotJob.files.length - 1);
   }, [plotJob.files]);
 
+  useEffect(() => {
+    if (!segJob.job_id) return;
+    if (["completed", "failed", "canceled"].includes(segJob.status)) return;
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/segmentation/status/${segJob.job_id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setSegJob((prev) => {
+          const next = { ...prev, ...data };
+          if (
+            next.preview_path &&
+            (
+              next.preview_path !== prev.preview_path ||
+              next.progress !== prev.progress ||
+              next.status !== prev.status
+            )
+          ) {
+            setSegPreviewNonce((n) => n + 1);
+          }
+          return next;
+        });
+        if (data.status === "completed") {
+          setStatus(data.message || "Segmentation completed.");
+          setStatusLevel("success");
+        } else if (data.status === "failed") {
+          setStatus(data.error || data.message || "Segmentation failed.");
+          setStatusLevel("error");
+        } else if (data.status === "canceled") {
+          setStatus(data.message || "Segmentation canceled.");
+          setStatusLevel("info");
+        }
+      } catch {
+        // keep polling
+      }
+    }, 900);
+
+    return () => clearInterval(timer);
+  }, [segJob.job_id, segJob.status]);
+
   const handleSave = async () => {
     setStatus("Saving settings...");
     setStatusLevel("info");
@@ -1606,11 +1814,50 @@ export default function App() {
                   return "";
                 }
               }}
+              onStartSegmentation={handleStartSegmentation}
+              onStopSegmentation={handleStopSegmentation}
+              segJob={segJob}
             />
             <main className="content">
               <section>
                 <h2>Segmentation</h2>
-                <p className="hint">Left panel replicated from Dash segmentation settings.</p>
+                <p className="hint">Run segmentation and monitor progress in real time.</p>
+                <div className="section">
+                  <h3>Execution progress</h3>
+                  <div className="progress-wrap">
+                    <div
+                      className={`progress-fill ${segJob.status === "running" || segJob.status === "queued" || segJob.status === "canceling" ? "running" : ""}`}
+                      style={{ width: `${Math.max(0, Math.min(100, segJob.progress || 0))}%` }}
+                    />
+                  </div>
+                  <div className="hint">
+                    {segJob.message || "Waiting to start."}
+                  </div>
+                  {segJob.error && <Status level="error" text={segJob.error} />}
+                  <div className="section">
+                    <h4>Latest segmented preview</h4>
+                    {segJob.preview_path ? (
+                      <a
+                        href={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="thumb-card viewer-single"
+                      >
+                        <img
+                          src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}&v=${segPreviewNonce}`}
+                          alt={segJob.preview_path.split("/").pop()}
+                        />
+                        <span>{segJob.preview_path.split("/").pop()}</span>
+                      </a>
+                    ) : (
+                      <p className="hint">No preview image yet.</p>
+                    )}
+                  </div>
+                  <div className="section">
+                    <h4>Log</h4>
+                    <pre className="seg-log">{segJob.log || "No logs yet."}</pre>
+                  </div>
+                </div>
               </section>
             </main>
           </>

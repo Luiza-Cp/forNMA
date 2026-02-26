@@ -5,6 +5,13 @@ import pickle
 from typing import Dict
 import threading
 import uuid
+import os
+import json
+import tempfile
+from datetime import datetime
+import subprocess
+import sys
+import textwrap
 
 import numpy as np
 import pandas as pd
@@ -17,6 +24,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from fornma.core.NMA.plot_NMA import plot_NMA as run_nma_plot, NMA as NMAClass
+from fornma.core.Segmentation.run import run as run_segmentation_pipeline
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
@@ -42,7 +50,11 @@ from .schemas import (
     NMAPlotRunRequest,
     NMAPlotStartResponse,
     NMAPlotStatusResponse,
+    SegmentationStartRequest,
+    SegmentationStartResponse,
+    SegmentationStatusResponse,
 )
+from fornma.gui.utils.params_builder import build_interface_params
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -51,6 +63,8 @@ NMA_SETTINGS_PATH = (APP_ROOT.parent / "core" / "NMA" / "control_parameters.pick
 app = FastAPI(title="forNMA API")
 PLOT_JOBS: Dict[str, Dict] = {}
 PLOT_JOBS_LOCK = threading.Lock()
+SEG_JOBS: Dict[str, Dict] = {}
+SEG_JOBS_LOCK = threading.Lock()
 
 # Allow local dev frontends (Vite) to call the API
 app.add_middleware(
@@ -82,18 +96,29 @@ def nma_datasets_columns(req: DatasetColumnsRequest):
 
 @app.post("/system/pick-csv")
 def system_pick_csv():
-    try:
+    script = textwrap.dedent(
+        """
         import tkinter as tk
         from tkinter import filedialog
-
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
         path = filedialog.askopenfilename(
             title="Select dataset CSV",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
         )
         root.destroy()
+        print(path or "", end="")
+        """
+    )
+    try:
+        res = subprocess.run(
+            [sys.executable, "-c", script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        path = (res.stdout or "").strip()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to open file picker: {e}")
 
@@ -104,15 +129,26 @@ def system_pick_csv():
 
 @app.post("/system/pick-directory")
 def system_pick_directory():
-    try:
+    script = textwrap.dedent(
+        """
         import tkinter as tk
         from tkinter import filedialog
-
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
         path = filedialog.askdirectory(title="Select output folder")
         root.destroy()
+        print(path or "", end="")
+        """
+    )
+    try:
+        res = subprocess.run(
+            [sys.executable, "-c", script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        path = (res.stdout or "").strip()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to open directory picker: {e}")
 
@@ -130,6 +166,23 @@ def _set_plot_job(job_id: str, **fields):
         if job_id not in PLOT_JOBS:
             return
         PLOT_JOBS[job_id].update(fields)
+
+
+def _set_seg_job(job_id: str, **fields):
+    with SEG_JOBS_LOCK:
+        if job_id not in SEG_JOBS:
+            return
+        SEG_JOBS[job_id].update(fields)
+
+
+def _safe_read_json(path: str | None) -> dict:
+    if not path:
+        return {}
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
@@ -261,6 +314,146 @@ def nma_plots_file(path: str = Query(...)):
     p = Path(path).expanduser().resolve()
     if not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail="Plot file not found.")
+    return FileResponse(path=p, filename=p.name)
+
+
+def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, preview: bool):
+    # Force headless plotting in API worker threads (avoid Tk/Tcl backend usage).
+    try:
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+    except Exception:
+        pass
+
+    params, errs = build_interface_params(images_data, seg_data)
+    if errs:
+        _set_seg_job(
+            job_id,
+            status="failed",
+            progress=100,
+            message="Invalid parameters.",
+            error="\n".join(sorted(set(errs))),
+        )
+        return
+
+    progress_file = os.path.join(tempfile.gettempdir(), f"_fornma_progress_{uuid.uuid4().hex}.json")
+    _set_seg_job(job_id, progress_file=progress_file, status="running", progress=0, message="Starting...", log="")
+    try:
+        with open(progress_file, "w") as f:
+            json.dump(
+                {
+                    "status": "starting",
+                    "total": 0,
+                    "done": 0,
+                    "percent": 0,
+                    "cancel": False,
+                    "started_at": datetime.now().isoformat(timespec="seconds"),
+                },
+                f,
+            )
+    except Exception:
+        pass
+
+    try:
+        os.environ["FORNMA_PROGRESS_FILE"] = progress_file
+        run_segmentation_pipeline(params, preview=bool(preview))
+        d = _safe_read_json(progress_file)
+        st = d.get("status", "done")
+        percent = int(d.get("percent", 100 if st == "done" else 0))
+        _set_seg_job(
+            job_id,
+            status="completed" if st == "done" else ("canceled" if st == "canceled" else st),
+            progress=percent,
+            message="Finished." if st == "done" else (d.get("message") or st),
+            log=d.get("log", "") or "",
+            preview_path=d.get("preview_path"),
+            error=d.get("message") if st == "error" else None,
+        )
+    except Exception as e:
+        _set_seg_job(job_id, status="failed", progress=100, message=f"Segmentation failed: {e}", error=str(e))
+
+
+@app.post("/segmentation/start", response_model=SegmentationStartResponse)
+def segmentation_start(req: SegmentationStartRequest):
+    job_id = str(uuid.uuid4())
+    with SEG_JOBS_LOCK:
+        SEG_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "progress": 0,
+            "message": "Queued",
+            "log": "",
+            "preview_path": None,
+            "progress_file": None,
+            "error": None,
+        }
+    t = threading.Thread(
+        target=_run_segmentation_job,
+        args=(job_id, req.images_data or {}, req.seg_data or {}, bool(req.preview)),
+        daemon=True,
+    )
+    t.start()
+    return SegmentationStartResponse(job_id=job_id, status="queued")
+
+
+@app.get("/segmentation/status/{job_id}", response_model=SegmentationStatusResponse)
+def segmentation_status(job_id: str):
+    with SEG_JOBS_LOCK:
+        job = SEG_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Segmentation job not found.")
+
+    progress_file = job.get("progress_file")
+    d = _safe_read_json(progress_file)
+    if d:
+        st = d.get("status", job.get("status", "running"))
+        mapped = {
+            "starting": "running",
+            "running": "running",
+            "done": "completed",
+            "error": "failed",
+            "canceled": "canceled",
+        }.get(st, job.get("status", "running"))
+        _set_seg_job(
+            job_id,
+            status=mapped,
+            progress=int(d.get("percent", job.get("progress", 0))),
+            message=d.get("message", job.get("message", "")) or job.get("message", ""),
+            log=d.get("log", "") or "",
+            preview_path=d.get("preview_path", job.get("preview_path")),
+            error=d.get("message") if st == "error" else job.get("error"),
+        )
+        with SEG_JOBS_LOCK:
+            job = SEG_JOBS.get(job_id)
+
+    return SegmentationStatusResponse(**job)
+
+
+@app.post("/segmentation/stop/{job_id}")
+def segmentation_stop(job_id: str):
+    with SEG_JOBS_LOCK:
+        job = SEG_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Segmentation job not found.")
+    pf = job.get("progress_file")
+    if not pf or not os.path.exists(pf):
+        return {"status": "not_running"}
+    d = _safe_read_json(pf)
+    d.update({"cancel": True, "status": d.get("status", "running")})
+    try:
+        with open(pf, "w") as f:
+            json.dump(d, f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to request stop: {e}")
+    _set_seg_job(job_id, message="Stop requested...", status="canceling")
+    return {"status": "canceling"}
+
+
+@app.get("/segmentation/file")
+def segmentation_file(path: str = Query(...)):
+    p = Path(path).expanduser().resolve()
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found.")
     return FileResponse(path=p, filename=p.name)
 
 

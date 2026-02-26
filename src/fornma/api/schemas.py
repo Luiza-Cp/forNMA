@@ -175,3 +175,25 @@ class NMAPlotStatusResponse(BaseModel):
     output_dir: str
     files: List[str]
     error: Optional[str] = None
+
+
+class SegmentationStartRequest(BaseModel):
+    images_data: Dict[str, Any]
+    seg_data: Dict[str, Any]
+    preview: bool = False
+
+
+class SegmentationStartResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+class SegmentationStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    message: str
+    log: str = ""
+    preview_path: Optional[str] = None
+    progress_file: Optional[str] = None
+    error: Optional[str] = None
