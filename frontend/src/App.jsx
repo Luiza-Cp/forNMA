@@ -22,6 +22,7 @@ const STORAGE_KEYS = {
   plotJob: "fornma.plotJob",
   segJob: "fornma.segJob",
   regJob: "fornma.regJob",
+  fociJob: "fornma.fociJob",
 };
 const DEFAULT_PLOT_JOB = {
   job_id: null,
@@ -49,6 +50,14 @@ const DEFAULT_REG_JOB = {
   progress: 0,
   done: 0,
   total: 0,
+  message: "",
+  log: "",
+  error: "",
+};
+const DEFAULT_FOCI_JOB = {
+  job_id: null,
+  status: "idle",
+  progress: 0,
   message: "",
   log: "",
   error: "",
@@ -1119,6 +1128,136 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
   );
 }
 
+function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoadFociChannels, fociJob }) {
+  const [pklPath, setPklPath] = useState("");
+  const [savePath, setSavePath] = useState("");
+  const [channelsOptions, setChannelsOptions] = useState([]);
+  const [channels, setChannels] = useState([]);
+  const [actions, setActions] = useState(["overlay"]);
+  const [saveImages, setSaveImages] = useState(true);
+  const running = ["starting", "queued", "running", "canceling"].includes(fociJob?.status || "idle");
+
+  const loadChannels = async (path) => {
+    if (!path?.trim()) {
+      setChannelsOptions([]);
+      setChannels([]);
+      return;
+    }
+    try {
+      const opts = await onLoadFociChannels(path.trim());
+      setChannelsOptions(opts);
+      setChannels(opts.map((o) => o.value));
+    } catch {
+      setChannelsOptions([]);
+      setChannels([]);
+    }
+  };
+
+  return (
+    <aside className="panel seg-panel">
+      <div className="seg-header">
+        <h3>Foci Overlay — Inputs</h3>
+        <div className="field-head">Pickle (.pkl) folder</div>
+        <div className="row path-row">
+          <input className="input" value={pklPath} onChange={(e) => setPklPath(e.target.value)} placeholder="Folder with .pkl result files..." />
+          <button className="ghost" onClick={async () => {
+            const p = await onPickDirectory();
+            if (p) {
+              setPklPath(p);
+              await loadChannels(p);
+            }
+          }}>Browse</button>
+        </div>
+        <div className="field-head">Saving path</div>
+        <div className="row path-row">
+          <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save overlay outputs..." />
+          <button className="ghost" onClick={async () => {
+            const p = await onPickDirectory();
+            if (p) setSavePath(p);
+          }}>Browse</button>
+        </div>
+      </div>
+
+      <div className="seg-scroll">
+        <details open className="seg-section">
+          <summary>Channels</summary>
+          <div className="seg-body">
+            {channelsOptions.length === 0 ? (
+              <p className="hint">Point to a .pkl folder to load channels automatically.</p>
+            ) : (
+              <div className="multi-picker">
+                {channelsOptions.map((opt) => (
+                  <label className="checkbox" key={`foci-ch-${opt.value}`}>
+                    <input
+                      type="checkbox"
+                      checked={channels.includes(opt.value)}
+                      onChange={(e) => {
+                        if (e.target.checked) setChannels((prev) => Array.from(new Set([...prev, opt.value])));
+                        else setChannels((prev) => prev.filter((v) => v !== opt.value));
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Actions</summary>
+          <div className="seg-body">
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={actions.includes("overlay")}
+                onChange={(e) => {
+                  if (e.target.checked) setActions((prev) => Array.from(new Set([...prev, "overlay"])));
+                  else setActions((prev) => prev.filter((a) => a !== "overlay"));
+                }}
+              />
+              Overlay
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={actions.includes("profiles")}
+                onChange={(e) => {
+                  if (e.target.checked) setActions((prev) => Array.from(new Set([...prev, "profiles"])));
+                  else setActions((prev) => prev.filter((a) => a !== "profiles"));
+                }}
+              />
+              Plot profiles
+            </label>
+            <label className="checkbox">
+              <input type="checkbox" checked={saveImages} onChange={(e) => setSaveImages(e.target.checked)} />
+              Save overlay images
+            </label>
+          </div>
+        </details>
+
+      </div>
+
+      <div className="seg-footer">
+        <button
+          className="primary"
+          onClick={() => onStartFoci({
+            pkl_path: pklPath.trim(),
+            save_path: (savePath.trim() || pklPath.trim()),
+            channels,
+            actions,
+            save_images: !!saveImages,
+          })}
+          disabled={running}
+        >
+          Run Overlay
+        </button>
+        <button className="ghost" onClick={() => onStopFoci()} disabled={!running}>Stop</button>
+      </div>
+    </aside>
+  );
+}
+
 const emptyRow = () => ({
   id: makeRowId(),
   name: "",
@@ -1506,6 +1645,7 @@ export default function App() {
   const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
   const [segJob, setSegJob] = useState(() => ({ ...DEFAULT_SEG_JOB, ...readStorage(STORAGE_KEYS.segJob, {}) }));
   const [regJob, setRegJob] = useState(() => ({ ...DEFAULT_REG_JOB, ...readStorage(STORAGE_KEYS.regJob, {}) }));
+  const [fociJob, setFociJob] = useState(() => ({ ...DEFAULT_FOCI_JOB, ...readStorage(STORAGE_KEYS.fociJob, {}) }));
   const [segPreviewNonce, setSegPreviewNonce] = useState(0);
   const [segPreviewPage, setSegPreviewPage] = useState(0);
   const [lastSegPreviewPayload, setLastSegPreviewPayload] = useState(null);
@@ -1540,6 +1680,11 @@ export default function App() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEYS.regJob, JSON.stringify(regJob));
   }, [regJob]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEYS.fociJob, JSON.stringify(fociJob));
+  }, [fociJob]);
 
   const datasets = useMemo(() => buildDatasets(rows), [rows]);
   const allDetectedColumns = useMemo(
@@ -1791,6 +1936,50 @@ export default function App() {
       }
       setRegJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
       setStatus("Registration stop requested...");
+      setStatusLevel("info");
+    } catch (err) {
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
+  };
+
+  const loadFociChannels = async (pkl_path) => {
+    const res = await callApi("/foci/channels", { pkl_path });
+    return (res.channels || []).map((c) => ({ label: c, value: c }));
+  };
+
+  const handleStartFoci = async (payload) => {
+    if (["starting", "queued", "running", "canceling"].includes(fociJob.status)) return;
+    setStatus("Starting foci overlay...");
+    setStatusLevel("info");
+    setFociJob((prev) => ({ ...prev, status: "starting", message: "Starting...", error: "" }));
+    try {
+      const res = await callApi("/foci/start", payload);
+      setFociJob({
+        job_id: res.job_id,
+        status: res.status || "queued",
+        progress: 0,
+        message: "Queued",
+        log: "",
+        error: "",
+      });
+    } catch (err) {
+      setFociJob((prev) => ({ ...prev, status: "idle" }));
+      setStatus(err.message);
+      setStatusLevel("error");
+    }
+  };
+
+  const handleStopFoci = async () => {
+    if (!fociJob.job_id) return;
+    try {
+      const res = await fetch(`${API_BASE}/foci/stop/${fociJob.job_id}`, { method: "POST" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      setFociJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
+      setStatus("Foci stop requested...");
       setStatusLevel("info");
     } catch (err) {
       setStatus(err.message);
@@ -2229,6 +2418,36 @@ export default function App() {
   }, [regJob.job_id, regJob.status]);
 
   useEffect(() => {
+    if (!fociJob.job_id) return;
+    if (["completed", "failed", "canceled"].includes(fociJob.status)) return;
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/foci/status/${fociJob.job_id}`);
+        if (res.status === 404) {
+          setFociJob({ ...DEFAULT_FOCI_JOB });
+          return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        setFociJob((prev) => ({ ...prev, ...data }));
+        if (data.status === "completed") {
+          setStatus(data.message || "Foci overlay completed.");
+          setStatusLevel("success");
+        } else if (data.status === "failed") {
+          setStatus(data.error || data.message || "Foci overlay failed.");
+          setStatusLevel("error");
+        } else if (data.status === "canceled") {
+          setStatus(data.message || "Foci overlay canceled.");
+          setStatusLevel("info");
+        }
+      } catch {
+        // keep polling
+      }
+    }, 900);
+    return () => clearInterval(timer);
+  }, [fociJob.job_id, fociJob.status]);
+
+  useEffect(() => {
     setSegPreviewPage(0);
   }, [segJob.preview_paths, segJob.preview_index, segJob.job_id]);
 
@@ -2294,6 +2513,27 @@ export default function App() {
       cancelled = true;
     };
   }, [regJob.job_id]);
+
+  useEffect(() => {
+    if (fociJob.job_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/foci/active`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.job?.job_id) {
+          setFociJob((prev) => ({ ...DEFAULT_FOCI_JOB, ...prev, ...data.job }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fociJob.job_id]);
 
   const handleSave = async () => {
     setStatus("Saving settings...");
@@ -2482,6 +2722,49 @@ export default function App() {
                 ) : (
                   <div className="section">
                     <p className="hint">No execution started yet. Use Preview or Run to begin.</p>
+                  </div>
+                )}
+              </section>
+            </main>
+          </>
+        ) : activeModule === "Foci Overlay" ? (
+          <>
+            <FociOverlayLeftPanel
+              onPickDirectory={async () => {
+                try {
+                  const res = await pickDirectoryPath();
+                  return res.path || "";
+                } catch {
+                  return "";
+                }
+              }}
+              onStartFoci={handleStartFoci}
+              onStopFoci={handleStopFoci}
+              onLoadFociChannels={loadFociChannels}
+              fociJob={fociJob}
+            />
+            <main className="content">
+              <section>
+                <h2>Foci Overlay</h2>
+                {fociJob.job_id ? (
+                  <div className="section">
+                    <h3>Execution progress</h3>
+                    <div className="progress-wrap">
+                      <div
+                        className={`progress-fill ${["starting", "running", "queued", "canceling"].includes(fociJob.status) ? "running" : ""}`}
+                        style={{ width: `${Math.max(0, Math.min(100, fociJob.progress || 0))}%` }}
+                      />
+                    </div>
+                    <div className="hint">{fociJob.message || "Waiting to start."}</div>
+                    {fociJob.error && <Status level="error" text={fociJob.error} />}
+                    <div className="section">
+                      <h4>Log</h4>
+                      <pre className="seg-log">{fociJob.log || "No logs yet."}</pre>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="section">
+                    <p className="hint">No foci overlay started yet. Use Run Overlay to begin.</p>
                   </div>
                 )}
               </section>

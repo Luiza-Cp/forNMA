@@ -57,6 +57,11 @@ from .schemas import (
     RegistrationStartRequest,
     RegistrationStartResponse,
     RegistrationStatusResponse,
+    FociChannelsRequest,
+    FociChannelsResponse,
+    FociStartRequest,
+    FociStartResponse,
+    FociStatusResponse,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -73,6 +78,9 @@ SEG_THREADS: Dict[str, threading.Thread] = {}
 REG_JOBS: Dict[str, Dict] = {}
 REG_JOBS_LOCK = threading.Lock()
 REG_THREADS: Dict[str, threading.Thread] = {}
+FOCI_JOBS: Dict[str, Dict] = {}
+FOCI_JOBS_LOCK = threading.Lock()
+FOCI_THREADS: Dict[str, threading.Thread] = {}
 
 # Allow local dev frontends (Vite) to call the API
 app.add_middleware(
@@ -190,6 +198,13 @@ def _set_reg_job(job_id: str, **fields):
         REG_JOBS[job_id].update(fields)
 
 
+def _set_foci_job(job_id: str, **fields):
+    with FOCI_JOBS_LOCK:
+        if job_id not in FOCI_JOBS:
+            return
+        FOCI_JOBS[job_id].update(fields)
+
+
 def _seg_thread_alive(job_id: str) -> bool:
     with SEG_JOBS_LOCK:
         t = SEG_THREADS.get(job_id)
@@ -199,6 +214,12 @@ def _seg_thread_alive(job_id: str) -> bool:
 def _reg_thread_alive(job_id: str) -> bool:
     with REG_JOBS_LOCK:
         t = REG_THREADS.get(job_id)
+    return bool(t and t.is_alive())
+
+
+def _foci_thread_alive(job_id: str) -> bool:
+    with FOCI_JOBS_LOCK:
+        t = FOCI_THREADS.get(job_id)
     return bool(t and t.is_alive())
 
 
@@ -792,6 +813,243 @@ def registration_active():
     if not job:
         return {"job": None}
     return {"job": registration_status(job["job_id"]).model_dump()}
+
+
+def _extract_df_columns_from_pkl(pkl_path: str) -> list[str]:
+    try:
+        obj = pd.read_pickle(pkl_path)
+    except Exception:
+        return []
+
+    if isinstance(obj, pd.DataFrame):
+        return list(obj.columns)
+    if isinstance(obj, dict):
+        for key in ("df", "data", "table"):
+            val = obj.get(key)
+            if isinstance(val, pd.DataFrame):
+                return list(val.columns)
+        for val in obj.values():
+            if isinstance(val, pd.DataFrame):
+                return list(val.columns)
+    if isinstance(obj, (list, tuple)) and obj and isinstance(obj[0], pd.DataFrame):
+        return list(obj[0].columns)
+    return []
+
+
+@app.post("/foci/channels", response_model=FociChannelsResponse)
+def foci_channels(req: FociChannelsRequest):
+    p = Path(req.pkl_path).expanduser().resolve()
+    if not p.exists() or not p.is_dir():
+        raise HTTPException(status_code=400, detail="Invalid .pkl folder path.")
+    pkl_files = sorted([str(x) for x in p.glob("*.pkl") if x.is_file()])
+    if not pkl_files:
+        return FociChannelsResponse(channels=[])
+    cols = _extract_df_columns_from_pkl(pkl_files[0])
+    image_name_cols = [c for c in cols if str(c).startswith("Image_name_")]
+    channels = [str(c).split("Image_name_")[-1] for c in image_name_cols]
+    return FociChannelsResponse(channels=channels)
+
+
+def _has_active_foci_job() -> bool:
+    active_states = {"starting", "queued", "running", "canceling"}
+    with FOCI_JOBS_LOCK:
+        snapshot = list(FOCI_JOBS.items())
+    return any((job.get("status") in active_states and _foci_thread_alive(job_id)) for job_id, job in snapshot)
+
+
+def _run_foci_job(job_id: str, req: FociStartRequest):
+    pkl_path = str(req.pkl_path or "").strip()
+    save_path = str(req.save_path or "").strip() or pkl_path
+    actions = list(req.actions or [])
+    channels = list(req.channels or [])
+    save_images = bool(req.save_images)
+
+    errs = []
+    if not pkl_path or not os.path.isdir(pkl_path):
+        errs.append("Please select a valid Pickles folder.")
+    if not actions:
+        errs.append("Select at least one action (overlay and/or profiles).")
+    if errs:
+        _set_foci_job(job_id, status="failed", progress=100, message="Invalid parameters.", error="\n".join(errs), log="\n".join(errs))
+        return
+
+    os.makedirs(save_path, exist_ok=True)
+    progress_file = os.path.join(tempfile.gettempdir(), f"_fornma_foci_progress_{uuid.uuid4().hex}.json")
+    _set_foci_job(job_id, progress_file=progress_file, status="running", progress=0, message="Starting...", log="")
+    try:
+        with open(progress_file, "w") as f:
+            json.dump(
+                {
+                    "status": "running",
+                    "percent": 0,
+                    "cancel": False,
+                    "started_at": datetime.now().isoformat(timespec="seconds"),
+                    "log": "Starting...",
+                    "log_history": "Starting...",
+                },
+                f,
+            )
+    except Exception:
+        pass
+
+    try:
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+    except Exception:
+        pass
+
+    try:
+        import importlib
+        mod = importlib.import_module("fornma.core.Foci_overlay.foci_overlay")
+        run_overlay_func = getattr(mod, "foci_overlay")
+        plot_profiles_func = getattr(mod, "plot_profile")
+
+        n = max(1, len(actions))
+        span = max(1, 100 // n)
+        base = 0
+        for action in actions:
+            d = _safe_read_json(progress_file)
+            if d.get("cancel"):
+                d.update({"status": "canceled", "log": "Canceled by user."})
+                with open(progress_file, "w") as f:
+                    json.dump(d, f)
+                _set_foci_job(job_id, status="canceled", progress=int(d.get("percent", base)), message="Canceled by user.", log=d.get("log_history", "") or d.get("log", ""))
+                return
+
+            hist = str(d.get("log_history", "") or "")
+            log_line = f"Running {action}..."
+            d.update({"status": "running", "percent": base, "log": log_line, "log_history": f"{hist}\n{log_line}".strip() if hist else log_line})
+            with open(progress_file, "w") as f:
+                json.dump(d, f)
+            _set_foci_job(job_id, progress=base, message=log_line, log=d.get("log_history", ""))
+
+            if action == "overlay":
+                run_overlay_func(
+                    pkl_results_folder_path=pkl_path,
+                    path_to_save=save_path,
+                    channel_list=(channels or None),
+                    save_images=save_images,
+                    progress_file=progress_file,
+                    pct_base=base,
+                    pct_span=span,
+                )
+            elif action == "profiles":
+                plot_profiles_func(
+                    path_pickle_data=pkl_path,
+                    path_save=save_path,
+                    columns=(channels or None),
+                    progress_file=progress_file,
+                    pct_base=base,
+                    pct_span=span,
+                )
+            base = min(100, base + span)
+            d = _safe_read_json(progress_file)
+            _set_foci_job(job_id, progress=int(d.get("percent", base)), message=d.get("log", f"Finished {action}"), log=d.get("log_history") or d.get("log", ""))
+
+        d = _safe_read_json(progress_file)
+        hist = str(d.get("log_history", "") or "")
+        final_line = "Finished all actions."
+        d.update({"status": "done", "percent": 100, "log": final_line, "log_history": f"{hist}\n{final_line}".strip() if hist else final_line})
+        with open(progress_file, "w") as f:
+            json.dump(d, f)
+        _set_foci_job(job_id, status="completed", progress=100, message=final_line, log=d.get("log_history", ""))
+    except Exception as e:
+        d = _safe_read_json(progress_file)
+        hist = str(d.get("log_history", "") or "")
+        err_line = f"ERROR: {e}"
+        d.update({"status": "error", "log": err_line, "message": str(e), "log_history": f"{hist}\n{err_line}".strip() if hist else err_line})
+        try:
+            with open(progress_file, "w") as f:
+                json.dump(d, f)
+        except Exception:
+            pass
+        _set_foci_job(job_id, status="failed", progress=int(d.get("percent", 100)), message=err_line, log=d.get("log_history", ""), error=str(e))
+    finally:
+        with FOCI_JOBS_LOCK:
+            FOCI_THREADS.pop(job_id, None)
+
+
+@app.post("/foci/start", response_model=FociStartResponse)
+def foci_start(req: FociStartRequest):
+    if _has_active_foci_job():
+        raise HTTPException(status_code=409, detail="A foci overlay job is already running. Please wait or stop it first.")
+    job_id = str(uuid.uuid4())
+    with FOCI_JOBS_LOCK:
+        FOCI_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "starting",
+            "progress": 0,
+            "message": "Starting",
+            "log": "",
+            "progress_file": None,
+            "error": None,
+        }
+        t = threading.Thread(target=_run_foci_job, args=(job_id, req), daemon=True)
+        FOCI_THREADS[job_id] = t
+    t.start()
+    return FociStartResponse(job_id=job_id, status="starting")
+
+
+@app.get("/foci/status/{job_id}", response_model=FociStatusResponse)
+def foci_status(job_id: str):
+    with FOCI_JOBS_LOCK:
+        job = FOCI_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Foci job not found.")
+
+    d = _safe_read_json(job.get("progress_file"))
+    if d:
+        st = d.get("status", job.get("status", "running"))
+        mapped = {"starting": "running", "running": "running", "done": "completed", "error": "failed", "canceled": "canceled"}.get(st, job.get("status", "running"))
+        _set_foci_job(
+            job_id,
+            status=mapped,
+            progress=int(d.get("percent", job.get("progress", 0))),
+            message=d.get("message", d.get("log", job.get("message", ""))) or job.get("message", ""),
+            log=d.get("log_history") or d.get("log", "") or "",
+            error=d.get("message") if st == "error" else job.get("error"),
+        )
+        with FOCI_JOBS_LOCK:
+            job = FOCI_JOBS.get(job_id)
+
+    if not _foci_thread_alive(job_id) and job.get("status") in {"starting", "queued", "running", "canceling"}:
+        _set_foci_job(job_id, status="failed", message=job.get("message") or "Foci process ended unexpectedly.")
+        with FOCI_JOBS_LOCK:
+            job = FOCI_JOBS.get(job_id)
+
+    return FociStatusResponse(**job)
+
+
+@app.post("/foci/stop/{job_id}")
+def foci_stop(job_id: str):
+    with FOCI_JOBS_LOCK:
+        job = FOCI_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Foci job not found.")
+    pf = job.get("progress_file")
+    if not _foci_thread_alive(job_id):
+        _set_foci_job(job_id, status="canceled", message="Canceled.")
+        return {"status": "canceled"}
+    if not pf or not os.path.exists(pf):
+        _set_foci_job(job_id, status="canceled", message="Canceled.")
+        return {"status": "canceled"}
+    d = _safe_read_json(pf)
+    d.update({"cancel": True, "status": d.get("status", "running")})
+    with open(pf, "w") as f:
+        json.dump(d, f)
+    _set_foci_job(job_id, status="canceling", message="Stop requested...")
+    return {"status": "canceling"}
+
+
+@app.get("/foci/active")
+def foci_active():
+    with FOCI_JOBS_LOCK:
+        snapshot = list(FOCI_JOBS.items())
+    active = [(job_id, j) for job_id, j in snapshot if j.get("status") in {"starting", "queued", "running", "canceling"} and _foci_thread_alive(job_id)]
+    job = active[-1][1] if active else None
+    if not job:
+        return {"job": None}
+    return {"job": foci_status(job["job_id"]).model_dump()}
 
 
 def _params_to_dict(req) -> Dict:

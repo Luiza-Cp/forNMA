@@ -222,3 +222,34 @@ class RegistrationStatusResponse(BaseModel):
     total: int = 0
     progress_file: Optional[str] = None
     error: Optional[str] = None
+
+
+class FociChannelsRequest(BaseModel):
+    pkl_path: str
+
+
+class FociChannelsResponse(BaseModel):
+    channels: List[str]
+
+
+class FociStartRequest(BaseModel):
+    pkl_path: str
+    save_path: str
+    channels: List[str] = Field(default_factory=list)
+    actions: List[str] = Field(default_factory=lambda: ["overlay"])
+    save_images: bool = True
+
+
+class FociStartResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+class FociStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    message: str
+    log: str = ""
+    progress_file: Optional[str] = None
+    error: Optional[str] = None

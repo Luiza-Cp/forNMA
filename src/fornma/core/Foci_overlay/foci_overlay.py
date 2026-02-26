@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import pandas as pd
 import cv2 as cv
 import numpy as np
@@ -262,6 +262,7 @@ def foci_overlay(
     pkl_results_folder_path: str,
     path_to_save: str,
     channel_list: Optional[List[str]] = None,
+    save_images: bool = True,
     *,
     progress_file: str = None,
     pct_base: int = 0,
@@ -330,7 +331,7 @@ def foci_overlay(
         perform_foci_overlay(
             dfs=dfs,
             df_names=df_names,
-            save_images=True,
+            save_images=save_images,
             path_save=path_to_save,
             progress_cb=progress_cb,
             cancel_check=(lambda: cancel_requested(progress_file) if progress_file else False),
@@ -535,4 +536,3 @@ def plot_profile(path_pickle_data: str,
         percent=min(100, pct_base + pct_span),
         log=f"Profiles finished: {done}/{total}"
     )
-
