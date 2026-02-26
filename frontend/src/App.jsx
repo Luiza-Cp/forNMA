@@ -1267,6 +1267,11 @@ const emptyRow = () => ({
   is_control: false,
   columns: null,
 });
+const initialNmaRows = () => ([{
+  ...emptyRow(),
+  name: "Control",
+  is_control: true,
+}]);
 
 function buildDatasets(rows) {
   return rows
@@ -1581,11 +1586,7 @@ function buildStep2Figure(
 
 export default function App() {
   const [activeModule, setActiveModule] = useState(() => readStorage(STORAGE_KEYS.activeModule, "NMA"));
-  const [rows, setRows] = useState([{
-    ...emptyRow(),
-    name: "Control",
-    is_control: true,
-  }]);
+  const [rows, setRows] = useState(initialNmaRows());
   const [collapsedById, setCollapsedById] = useState({});
 
   const [step, setStep] = useState(1);
@@ -2560,6 +2561,65 @@ export default function App() {
     }
   };
 
+  const handleResetNma = () => {
+    const ok = window.confirm("Reset NMA settings and return to initial state?");
+    if (!ok) return;
+    setRows(initialNmaRows());
+    setCollapsedById({});
+    setStep(1);
+    setStep1Ready(false);
+    setStatus("");
+    setStatusLevel("info");
+    setStep1Figure(null);
+    setStep1Stats(null);
+    setStep1GraphLimits(null);
+    setStep1Sample(null);
+    setSdArea(1.0);
+    setSdNii(1.0);
+    setThresholds({
+      v_up: 0,
+      v_mid: 0,
+      v_down: 0,
+      v_down2: 0,
+      y_high: 0,
+      y_low: 0,
+    });
+    setStep2Figure(null);
+    setStep2Traces(null);
+    setStep2Stats(null);
+    setStep2GraphLimits(null);
+    setFinalMode(false);
+    setDownloadReady(false);
+    setStep2Percentages(null);
+    setShowPlotConfig(false);
+    setPlotConfig({
+      kind: "dot",
+      dot: {
+        column1: "",
+        column2: "",
+        hue_min: "",
+        hue_max: "",
+        size_min: "",
+        size_max: "",
+        sample_size: "",
+        palette: "",
+        single: false,
+        overtime: false,
+      },
+      heatmap: {
+        single: false,
+        overtime: false,
+        jointplot: false,
+        palette: "",
+      },
+    });
+    setPlotSavePath("");
+    setPlotJob({ ...DEFAULT_PLOT_JOB });
+    setCurrentPlotIndex(0);
+    setShowNmaPreviewWhilePlotting(false);
+    attemptedColumnsRef.current = new Set();
+  };
+
   return (
     <div className="app">
       <header className="topbar">
@@ -2567,7 +2627,7 @@ export default function App() {
           <div className="logo">forNMA</div>
           <div className="subtitle">{activeModule === "NMA" ? "NMA Settings" : `${activeModule} Settings`}</div>
         </div>
-        {activeModule === "NMA" && (
+        {activeModule === "NMA" && step1Ready && (
           <div className="stepper">
             <div className={`chip ${step === 1 ? "active" : ""}`}>Step 1</div>
             <div className={`chip ${step === 2 ? "active" : ""}`}>Step 2</div>
@@ -2825,10 +2885,17 @@ export default function App() {
           <>
         <aside className="panel">
           <h3>Datasets</h3>
-          <p className="hint">Mark at least one control. Paths must be local.</p>
+          <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
           <div className="row row-right">
             <button className="ghost btn-small" onClick={() => setAllCollapsed(true)}>Minimize all</button>
             <button className="ghost btn-small" onClick={() => setAllCollapsed(false)}>Expand all</button>
+            <button
+              className="ghost btn-small"
+              onClick={handleResetNma}
+              disabled={plotJob.status === "running" || plotJob.status === "queued"}
+            >
+              Reset NMA
+            </button>
           </div>
 
           {rows.map((row, idx) => (
@@ -3238,6 +3305,7 @@ export default function App() {
               <button
                 className="secondary"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={step1Ready}
               >
                 Load settings
               </button>
@@ -3268,6 +3336,13 @@ export default function App() {
         </aside>
 
         <main className="content">
+          {!step1Ready ? (
+            <section>
+              <h2>NMA</h2>
+              <p className="hint">No settings loaded yet. Use `Load settings` or `Create Settings` to start.</p>
+            </section>
+          ) : (
+            <>
           {step === 1 && (
             <section>
               <h2>Step 1 · Control ellipse</h2>
@@ -3479,6 +3554,8 @@ export default function App() {
                 </div>
               )}
             </section>
+          )}
+            </>
           )}
         </main>
           </>
