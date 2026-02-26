@@ -19,6 +19,13 @@ def update_progress(path: str, **updates) -> None:
     if not path:
         return
     d = _read(path)
+    # Optional append-only log stream for UI consoles.
+    append_log = updates.pop("append_log", None)
+    if append_log:
+        prev = str(d.get("log_history", "") or "")
+        line = str(append_log).rstrip()
+        if line:
+            d["log_history"] = f"{prev}\n{line}".strip() if prev else line
     d.update(updates)
     _write(path, d)
 

@@ -304,7 +304,11 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     await onStartSegmentation(payload);
   };
 
-  const segRunning = segJob?.status === "running" || segJob?.status === "queued" || segJob?.status === "canceling";
+  const segRunning =
+    segJob?.status === "starting" ||
+    segJob?.status === "running" ||
+    segJob?.status === "queued" ||
+    segJob?.status === "canceling";
 
   return (
     <>
@@ -1331,8 +1335,17 @@ export default function App() {
   };
 
   const handleStartSegmentation = async (payload) => {
+    if (["starting", "queued", "running", "canceling"].includes(segJob.status)) {
+      return;
+    }
     setStatus("Starting segmentation...");
     setStatusLevel("info");
+    setSegJob((prev) => ({
+      ...prev,
+      status: "starting",
+      message: "Starting...",
+      error: "",
+    }));
     try {
       const res = await callApi("/segmentation/start", payload);
       setSegJob({
@@ -1346,6 +1359,7 @@ export default function App() {
       });
       setSegPreviewNonce((n) => n + 1);
     } catch (err) {
+      setSegJob((prev) => ({ ...prev, status: "idle" }));
       setStatus(err.message);
       setStatusLevel("error");
     }
@@ -1826,7 +1840,7 @@ export default function App() {
                   <h3>Execution progress</h3>
                   <div className="progress-wrap">
                     <div
-                      className={`progress-fill ${segJob.status === "running" || segJob.status === "queued" || segJob.status === "canceling" ? "running" : ""}`}
+                      className={`progress-fill ${segJob.status === "starting" || segJob.status === "running" || segJob.status === "queued" || segJob.status === "canceling" ? "running" : ""}`}
                       style={{ width: `${Math.max(0, Math.min(100, segJob.progress || 0))}%` }}
                     />
                   </div>

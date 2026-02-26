@@ -275,7 +275,15 @@ def run(parameters_dict: dict,
         total_images += n_used
 
     done = 0
-    update_progress(prog, status="running", total=int(total_images), done=int(done), percent=0, log="Starting…")
+    update_progress(
+        prog,
+        status="running",
+        total=int(total_images),
+        done=int(done),
+        percent=0,
+        log="Starting…",
+        append_log="Starting segmentation...",
+    )
 
     try:
         for i in range(len(subfolders)):
@@ -357,12 +365,24 @@ def run(parameters_dict: dict,
                 )
 
         # finaliza progresso com sucesso
-        update_progress(prog, status="done", done=int(total_images), percent=100, log="Finished.")
+        update_progress(
+            prog,
+            status="done",
+            done=int(total_images),
+            percent=100,
+            log="Finished.",
+            append_log="Finished segmentation.",
+        )
         print("finished!")
         return None
 
     except _CanceledError:
         # encerramento limpo quando o usuário clica Stop
-        update_progress(prog, status="canceled", done=int(done), log=f"Canceled at subfolder '{subfolders[i]}'")
+        update_progress(
+            prog,
+            status="canceled",
+            done=int(done),
+            log=f"Canceled at subfolder '{subfolders[i]}'",
+            append_log=f"Canceled at subfolder '{subfolders[i]}'",
+        )
         return None
-

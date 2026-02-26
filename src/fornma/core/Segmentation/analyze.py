@@ -308,6 +308,8 @@ def analyze_dict(
             # imagem “vazia”: mesmo assim contamos 1 passo de progresso
             message = f'Image {os.path.basename(img_to_segment)} has no objects.'
             print(message)
+            prog = os.environ.get("FORNMA_PROGRESS_FILE")
+            update_progress(prog, append_log=message, message=message)
             if progress_cb is not None:
                 progress_cb()
             continue

@@ -175,6 +175,12 @@ def _set_seg_job(job_id: str, **fields):
         SEG_JOBS[job_id].update(fields)
 
 
+def _has_active_seg_job() -> bool:
+    active_states = {"queued", "running", "canceling", "starting"}
+    with SEG_JOBS_LOCK:
+        return any((job.get("status") in active_states) for job in SEG_JOBS.values())
+
+
 def _safe_read_json(path: str | None) -> dict:
     if not path:
         return {}
@@ -365,7 +371,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             status="completed" if st == "done" else ("canceled" if st == "canceled" else st),
             progress=percent,
             message="Finished." if st == "done" else (d.get("message") or st),
-            log=d.get("log", "") or "",
+            log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path"),
             error=d.get("message") if st == "error" else None,
         )
@@ -375,13 +381,16 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
 
 @app.post("/segmentation/start", response_model=SegmentationStartResponse)
 def segmentation_start(req: SegmentationStartRequest):
+    if _has_active_seg_job():
+        raise HTTPException(status_code=409, detail="A segmentation job is already running. Please wait or stop it first.")
+
     job_id = str(uuid.uuid4())
     with SEG_JOBS_LOCK:
         SEG_JOBS[job_id] = {
             "job_id": job_id,
-            "status": "queued",
+            "status": "starting",
             "progress": 0,
-            "message": "Queued",
+            "message": "Starting",
             "log": "",
             "preview_path": None,
             "progress_file": None,
@@ -393,7 +402,7 @@ def segmentation_start(req: SegmentationStartRequest):
         daemon=True,
     )
     t.start()
-    return SegmentationStartResponse(job_id=job_id, status="queued")
+    return SegmentationStartResponse(job_id=job_id, status="starting")
 
 
 @app.get("/segmentation/status/{job_id}", response_model=SegmentationStatusResponse)
@@ -419,7 +428,7 @@ def segmentation_status(job_id: str):
             status=mapped,
             progress=int(d.get("percent", job.get("progress", 0))),
             message=d.get("message", job.get("message", "")) or job.get("message", ""),
-            log=d.get("log", "") or "",
+            log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path", job.get("preview_path")),
             error=d.get("message") if st == "error" else job.get("error"),
         )
