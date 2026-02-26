@@ -26,6 +26,646 @@ function Tip({ text }) {
   );
 }
 
+function SegmentationLeftPanel({ onPickDirectory }) {
+  const [savePath, setSavePath] = useState("");
+  const [imagesData, setImagesData] = useState({
+    channels: [{ id: "ch1", name: "Channel 1" }],
+    rows: [{ condition: "Control", ch1: "" }],
+  });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalError, setModalError] = useState("");
+  const [summaryText, setSummaryText] = useState("No images loaded yet.");
+  const [nuclearChannel, setNuclearChannel] = useState("ch1");
+  const [fociEnabled, setFociEnabled] = useState(false);
+  const [fociChannels, setFociChannels] = useState([]);
+  const [cytoEnabled, setCytoEnabled] = useState(false);
+  const [cytoChannels, setCytoChannels] = useState([]);
+  const [segMethod, setSegMethod] = useState("fornma");
+  const [advEnable, setAdvEnable] = useState({
+    shape: true,
+    eccentricity: false,
+    min_size: false,
+    max_size: false,
+    min_radius: false,
+    max_radius: false,
+  });
+  const [advValues, setAdvValues] = useState({
+    shape: 0.88,
+    eccentricity: 0.8,
+    min_size: 100,
+    max_size: 10000,
+    min_radius: 4,
+    max_radius: 120,
+  });
+  const [channelCfg, setChannelCfg] = useState({});
+  const channels = imagesData.channels || [];
+  const channelIds = new Set(channels.map((c) => c.id));
+
+  useEffect(() => {
+    if (channels.length === 0) return;
+    if (!channelIds.has(nuclearChannel)) {
+      setNuclearChannel(channels[0].id);
+    }
+    setFociChannels((prev) => prev.filter((id) => channelIds.has(id)));
+    setCytoChannels((prev) => prev.filter((id) => channelIds.has(id)));
+  }, [imagesData.channels]);
+
+  useEffect(() => {
+    setChannelCfg((prev) => {
+      const next = { ...prev };
+      channels.forEach((ch) => {
+        if (next[ch.id]) return;
+        next[ch.id] = {
+          rescale_intensity: true,
+          remove_background: true,
+          rolling_ball_radius: 40,
+          match_histograms: false,
+          ring_size: 3,
+          use_ellipse: true,
+          foci_min_size: 7,
+          foci_max_size_enable: false,
+          foci_max_size: 20,
+          foci_min_int_enable: false,
+          foci_min_int: 0,
+          foci_max_int_enable: false,
+          foci_max_int: 1,
+          foci_prominence: 1.2,
+        };
+      });
+      Object.keys(next).forEach((k) => {
+        if (!channelIds.has(k)) delete next[k];
+      });
+      return next;
+    });
+  }, [imagesData.channels]);
+
+  const setAdvToggle = (key, value) => setAdvEnable((prev) => ({ ...prev, [key]: value }));
+  const setAdvValue = (key, value) => setAdvValues((prev) => ({ ...prev, [key]: value }));
+  const setChCfg = (chId, patch) => {
+    setChannelCfg((prev) => ({ ...prev, [chId]: { ...(prev[chId] || {}), ...patch } }));
+  };
+
+  const addCondition = () => {
+    setImagesData((prev) => {
+      const row = { condition: "" };
+      (prev.channels || []).forEach((ch) => { row[ch.id] = ""; });
+      return { ...prev, rows: [...(prev.rows || []), row] };
+    });
+  };
+
+  const addChannel = () => {
+    setImagesData((prev) => {
+      const maxIdx = Math.max(0, ...(prev.channels || []).map((ch) => Number((ch.id || "").replace("ch", "")) || 0));
+      const newId = `ch${maxIdx + 1}`;
+      const nextChannels = [...(prev.channels || []), { id: newId, name: `Channel ${maxIdx + 1}` }];
+      const nextRows = (prev.rows || []).map((r) => ({ ...r, [newId]: "" }));
+      return { ...prev, channels: nextChannels, rows: nextRows };
+    });
+  };
+
+  const removeCondition = (rowIdx) => {
+    setImagesData((prev) => ({
+      ...prev,
+      rows: (prev.rows || []).filter((_, i) => i !== rowIdx),
+    }));
+  };
+
+  const removeChannel = (chId) => {
+    setImagesData((prev) => {
+      const nextChannels = (prev.channels || []).filter((ch) => ch.id !== chId);
+      const nextRows = (prev.rows || []).map((r) => {
+        const copy = { ...r };
+        delete copy[chId];
+        return copy;
+      });
+      return { ...prev, channels: nextChannels, rows: nextRows };
+    });
+    setFociChannels((prev) => prev.filter((id) => id !== chId));
+    setCytoChannels((prev) => prev.filter((id) => id !== chId));
+  };
+
+  const updateChannelName = (chId, name) => {
+    setImagesData((prev) => ({
+      ...prev,
+      channels: (prev.channels || []).map((ch) => (ch.id === chId ? { ...ch, name } : ch)),
+    }));
+  };
+
+  const updateCondition = (rowIdx, condition) => {
+    setImagesData((prev) => ({
+      ...prev,
+      rows: (prev.rows || []).map((r, i) => (i === rowIdx ? { ...r, condition } : r)),
+    }));
+  };
+
+  const updatePathCell = (rowIdx, chId, path) => {
+    setImagesData((prev) => ({
+      ...prev,
+      rows: (prev.rows || []).map((r, i) => (i === rowIdx ? { ...r, [chId]: path } : r)),
+    }));
+  };
+
+  const browsePathCell = async (rowIdx, chId) => {
+    const picked = await onPickDirectory();
+    if (!picked) return;
+    updatePathCell(rowIdx, chId, picked);
+  };
+
+  const saveImagesTable = () => {
+    const errors = [];
+    const chs = imagesData.channels || [];
+    const rows = imagesData.rows || [];
+
+    const chNames = chs.map((c) => (c.name || "").trim());
+    if (chNames.some((n) => !n)) errors.push("There are channels without a name.");
+    if (new Set(chNames).size !== chNames.length) errors.push("Channel names must be unique.");
+
+    const conds = rows.map((r) => (r.condition || "").trim());
+    if (conds.some((c) => !c)) errors.push("There are conditions without a name.");
+    if (new Set(conds).size !== conds.length) errors.push("Condition names must be unique.");
+
+    rows.forEach((r, idx) => {
+      chs.forEach((ch) => {
+        const p = (r[ch.id] || "").trim();
+        if (!p) errors.push(`Row ${idx + 1} — ${ch.name}: empty path.`);
+      });
+    });
+
+    if (errors.length) {
+      setModalError(errors.join("\n"));
+      return;
+    }
+
+    const lines = [`Image selection OK:`, `Conditions: ${rows.length} | Channels: ${chs.length}`, ""];
+    rows.forEach((r) => {
+      lines.push(`- ${r.condition}:`);
+      chs.forEach((ch) => lines.push(`    ${ch.name}: ${r[ch.id] || ""}`));
+    });
+    setSummaryText(lines.join("\n"));
+    setModalError("");
+    setModalOpen(false);
+  };
+
+  const counterText = `Channels: ${channels.length} | Conditions: ${(imagesData.rows || []).length}`;
+
+  return (
+    <>
+    <aside className="panel seg-panel">
+      <div className="seg-header">
+        <h3>Segmentation — Inputs</h3>
+        <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
+        <div className="field-head">Saving path <Tip text="Where outputs (tables, images, logs) will be written." /></div>
+        <div className="row path-row">
+          <input
+            className="input"
+            value={savePath}
+            onChange={(e) => setSavePath(e.target.value)}
+            placeholder="Folder to save results..."
+          />
+          <button
+            className="ghost"
+            onClick={async () => {
+              const p = await onPickDirectory();
+              if (p) setSavePath(p);
+            }}
+          >
+            Browse
+          </button>
+        </div>
+        <details className="seg-summary">
+          <summary>Image selection summary</summary>
+          <pre>{summaryText}</pre>
+        </details>
+      </div>
+
+      <div className="seg-scroll">
+        <details open className="seg-section">
+          <summary>General Settings</summary>
+          <div className="seg-body">
+            <div className="field-head">Nuclear Detection <Tip text="Pick the channel that contains nuclei for detection." /></div>
+            <select className="input" value={nuclearChannel} onChange={(e) => setNuclearChannel(e.target.value)}>
+              <option value="">Select one channel...</option>
+              {channels.map((ch) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
+            </select>
+            <label className="checkbox"><input type="checkbox" /> Overtime <Tip text="Check this if images represent time sequence." /></label>
+            <label className="checkbox">
+              <input type="checkbox" checked={fociEnabled} onChange={(e) => setFociEnabled(e.target.checked)} />
+              Foci <Tip text="Enable spot (foci) detection and extra foci parameters for selected channels." />
+            </label>
+            {fociEnabled && (
+              <>
+                <div className="field-head">Channels for Foci</div>
+                <div className="multi-picker">
+                  {channels.map((ch) => (
+                    <label className="checkbox" key={`f-${ch.id}`}>
+                      <input
+                        type="checkbox"
+                        checked={fociChannels.includes(ch.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFociChannels((prev) => Array.from(new Set([...prev, ch.id])));
+                          } else {
+                            setFociChannels((prev) => prev.filter((id) => id !== ch.id));
+                          }
+                        }}
+                      />
+                      {ch.name}
+                    </label>
+                  ))}
+                </div>
+                <p className="hint">You can select multiple channels.</p>
+              </>
+            )}
+            <label className="checkbox">
+              <input type="checkbox" checked={cytoEnabled} onChange={(e) => setCytoEnabled(e.target.checked)} />
+              Cytoplasmatic Ring <Tip text="Enable translocation (cytoplasmatic ring) parameters for selected channels." />
+            </label>
+            {cytoEnabled && (
+              <>
+                <div className="field-head">Channels for Cytoplasmatic Ring</div>
+                <div className="multi-picker">
+                  {channels.map((ch) => (
+                    <label className="checkbox" key={`c-${ch.id}`}>
+                      <input
+                        type="checkbox"
+                        checked={cytoChannels.includes(ch.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setCytoChannels((prev) => Array.from(new Set([...prev, ch.id])));
+                          } else {
+                            setCytoChannels((prev) => prev.filter((id) => id !== ch.id));
+                          }
+                        }}
+                      />
+                      {ch.name}
+                    </label>
+                  ))}
+                </div>
+                <p className="hint">You can select multiple channels.</p>
+              </>
+            )}
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Segmentation Settings</summary>
+          <div className="seg-body">
+            <div className="row">
+              <div className="metric">
+                <label>Magnification <Tip text="Numeric objective magnification used for acquisition (e.g. 20x)." /></label>
+                <input type="number" className="input" defaultValue={20} />
+              </div>
+              <div className="metric">
+                <label>Pixel Size <Tip text="Real sample distance represented by each pixel." /></label>
+                <input type="number" className="input" defaultValue={0.6} step="0.1" />
+              </div>
+            </div>
+            <label className="checkbox"><input type="checkbox" /> Rescale Intensity <Tip text="Normalize intensity values to improve contrast for segmentation." /></label>
+            <label className="checkbox"><input type="checkbox" /> Remove Background <Tip text="Subtract smooth background before segmentation." /></label>
+            <div className="field-head">Segmentation Method <Tip text="Choose forNMA (faster) or Cellpose (more robust) pipeline." /></div>
+            <div className="row">
+              <label className="radio"><input type="radio" checked={segMethod === "fornma"} onChange={() => setSegMethod("fornma")} /> forNMA</label>
+              <label className="radio"><input type="radio" checked={segMethod === "cellpose"} onChange={() => setSegMethod("cellpose")} /> Cellpose</label>
+            </div>
+            {segMethod === "fornma" ? (
+              <>
+                <h4 className="seg-subtitle">forNMA Parameters</h4>
+                <div className="field-head">Threshold <Tip text="Threshold strategy used to separate nuclei from background." /></div>
+                <div className="seg-threshold-wrap">
+                <select className="input seg-threshold-input" defaultValue="triangle">
+                  <option value="isodata">Isodata</option>
+                  <option value="li">Li</option>
+                  <option value="mean">Mean</option>
+                  <option value="minimum">Minimum</option>
+                  <option value="median">Median</option>
+                  <option value="multi_otsu">Multi-Otsu</option>
+                  <option value="otsu">Otsu</option>
+                  <option value="triangle">Triangle</option>
+                  <option value="yen">Yen</option>
+                  <option value="local_mean">Local Mean</option>
+                  <option value="local_gaussian">Local Gaussian</option>
+                </select>
+                </div>
+                <label className="checkbox"><input type="checkbox" /> Find low-intensity nuclei <Tip text="Extra pass to recover missed nuclei in low-intensity regions." /></label>
+                <label className="checkbox"><input type="checkbox" /> Weakly labeled images <Tip text="Enable additional handling for weak staining/unclear contours." /></label>
+              </>
+            ) : (
+              <>
+                <h4 className="seg-subtitle">Cellpose Parameters</h4>
+                <div className="field-head">Diameter (px) <Tip text="Typical cell diameter in pixels for Cellpose scale normalization." /></div>
+                <input className="input" type="number" defaultValue={25} />
+                <div className="field-head">Flow Threshold <Tip text="Maximum flow error allowed; lower values are stricter." /></div>
+                <input className="input" type="number" defaultValue={0.4} step="0.05" />
+                <div className="field-head">Mask Threshold <Tip text="Threshold for mask inclusion from probability maps." /></div>
+                <input className="input" type="number" defaultValue={0} step="0.5" />
+                <div className="field-head">Cellprob Threshold <Tip text="Cell probability threshold; lower values include more cells." /></div>
+                <input className="input" type="number" defaultValue={-3} step="0.5" />
+                <label className="checkbox"><input type="checkbox" defaultChecked /> Use GPU <Tip text="Enable GPU acceleration if available." /></label>
+                <label className="checkbox"><input type="checkbox" defaultChecked /> Invert Intensities <Tip text="Invert image values before segmentation when needed." /></label>
+              </>
+            )}
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Advanced Settings</summary>
+          <div className="seg-body">
+            <label className="checkbox">
+              <input type="checkbox" checked={advEnable.shape} onChange={(e) => setAdvToggle("shape", e.target.checked)} />
+              Shape <Tip text="Filter by irregularity/shape metric. Enable to set a threshold." />
+            </label>
+            {advEnable.shape && <input className="input" type="number" step="0.01" value={advValues.shape} onChange={(e) => setAdvValue("shape", e.target.value)} />}
+
+            <label className="checkbox">
+              <input type="checkbox" checked={advEnable.eccentricity} onChange={(e) => setAdvToggle("eccentricity", e.target.checked)} />
+              Eccentricity <Tip text="0 = circle, closer to 1 = elongated nuclei." />
+            </label>
+            {advEnable.eccentricity && <input className="input" type="number" step="0.01" value={advValues.eccentricity} onChange={(e) => setAdvValue("eccentricity", e.target.value)} />}
+
+            <label className="checkbox">
+              <input type="checkbox" checked={advEnable.min_size} onChange={(e) => setAdvToggle("min_size", e.target.checked)} />
+              Min Size <Tip text="Minimum nucleus area (px²)." />
+            </label>
+            {advEnable.min_size && <input className="input" type="number" step="1" value={advValues.min_size} onChange={(e) => setAdvValue("min_size", e.target.value)} />}
+
+            <label className="checkbox">
+              <input type="checkbox" checked={advEnable.max_size} onChange={(e) => setAdvToggle("max_size", e.target.checked)} />
+              Max Size <Tip text="Maximum nucleus area (px²)." />
+            </label>
+            {advEnable.max_size && <input className="input" type="number" step="1" value={advValues.max_size} onChange={(e) => setAdvValue("max_size", e.target.value)} />}
+
+            <label className="checkbox">
+              <input type="checkbox" checked={advEnable.min_radius} onChange={(e) => setAdvToggle("min_radius", e.target.checked)} />
+              Min Radius <Tip text="Minimum nucleus radius (px)." />
+            </label>
+            {advEnable.min_radius && <input className="input" type="number" step="1" value={advValues.min_radius} onChange={(e) => setAdvValue("min_radius", e.target.value)} />}
+
+            <label className="checkbox">
+              <input type="checkbox" checked={advEnable.max_radius} onChange={(e) => setAdvToggle("max_radius", e.target.checked)} />
+              Max Radius <Tip text="Maximum nucleus radius (px)." />
+            </label>
+            {advEnable.max_radius && <input className="input" type="number" step="1" value={advValues.max_radius} onChange={(e) => setAdvValue("max_radius", e.target.value)} />}
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Channel Settings</summary>
+          <div className="seg-body">
+            {channels.length === 0 ? (
+              <p className="hint">No channels loaded yet. Use Load images and save the table.</p>
+            ) : (
+              channels.map((ch) => {
+                const cfg = channelCfg[ch.id] || {};
+                const showRing = cytoEnabled && cytoChannels.includes(ch.id);
+                const showFoci = fociEnabled && fociChannels.includes(ch.id);
+                return (
+                  <details key={`ch-settings-${ch.id}`} className="seg-section">
+                    <summary>{ch.name}</summary>
+                    <div className="seg-body">
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={!!cfg.rescale_intensity}
+                          onChange={(e) => setChCfg(ch.id, { rescale_intensity: e.target.checked })}
+                        />
+                        Rescale intensity <Tip text="Re-distributes channel intensity values to improve contrast." />
+                      </label>
+
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={!!cfg.remove_background}
+                          onChange={(e) => setChCfg(ch.id, { remove_background: e.target.checked })}
+                        />
+                        Remove background <Tip text="Apply rolling-ball background subtraction in this channel." />
+                      </label>
+                      {cfg.remove_background && (
+                        <input
+                          className="input"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={cfg.rolling_ball_radius ?? 40}
+                          onChange={(e) => setChCfg(ch.id, { rolling_ball_radius: e.target.value })}
+                          placeholder="Rolling-ball radius (px)"
+                        />
+                      )}
+
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={!!cfg.match_histograms}
+                          onChange={(e) => setChCfg(ch.id, { match_histograms: e.target.checked })}
+                        />
+                        Match histograms <Tip text="Normalize histogram across images for this channel." />
+                      </label>
+
+                      {showRing && (
+                        <>
+                          <h4 className="seg-subtitle">Cytoplasmatic Ring</h4>
+                          <div className="field-head">Ring size (px) <Tip text="Width of cytoplasmatic ring for translocation measurement." /></div>
+                          <input
+                            className="input"
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={cfg.ring_size ?? 3}
+                            onChange={(e) => setChCfg(ch.id, { ring_size: e.target.value })}
+                          />
+                          <label className="checkbox">
+                            <input
+                              type="checkbox"
+                              checked={!!cfg.use_ellipse}
+                              onChange={(e) => setChCfg(ch.id, { use_ellipse: e.target.checked })}
+                            />
+                            Use ellipse <Tip text="Use ellipse approximation for ring calculation." />
+                          </label>
+                        </>
+                      )}
+
+                      {showFoci && (
+                        <>
+                          <h4 className="seg-subtitle">Foci Detection</h4>
+                          <div className="field-head">Min foci size (px²) <Tip text="Minimum foci area to keep." /></div>
+                          <input
+                            className="input"
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={cfg.foci_min_size ?? 7}
+                            onChange={(e) => setChCfg(ch.id, { foci_min_size: e.target.value })}
+                          />
+
+                          <label className="checkbox">
+                            <input
+                              type="checkbox"
+                              checked={!!cfg.foci_max_size_enable}
+                              onChange={(e) => setChCfg(ch.id, { foci_max_size_enable: e.target.checked })}
+                            />
+                            Max foci size <Tip text="Enable to cap foci maximum area." />
+                          </label>
+                          {cfg.foci_max_size_enable && (
+                            <input
+                              className="input"
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={cfg.foci_max_size ?? 20}
+                              onChange={(e) => setChCfg(ch.id, { foci_max_size: e.target.value })}
+                            />
+                          )}
+
+                          <label className="checkbox">
+                            <input
+                              type="checkbox"
+                              checked={!!cfg.foci_min_int_enable}
+                              onChange={(e) => setChCfg(ch.id, { foci_min_int_enable: e.target.checked })}
+                            />
+                            Min foci intensity <Tip text="Enable to enforce minimum spot intensity." />
+                          </label>
+                          {cfg.foci_min_int_enable && (
+                            <input
+                              className="input"
+                              type="number"
+                              step="0.1"
+                              value={cfg.foci_min_int ?? 0}
+                              onChange={(e) => setChCfg(ch.id, { foci_min_int: e.target.value })}
+                            />
+                          )}
+
+                          <label className="checkbox">
+                            <input
+                              type="checkbox"
+                              checked={!!cfg.foci_max_int_enable}
+                              onChange={(e) => setChCfg(ch.id, { foci_max_int_enable: e.target.checked })}
+                            />
+                            Max foci intensity <Tip text="Enable to cap spot intensity." />
+                          </label>
+                          {cfg.foci_max_int_enable && (
+                            <input
+                              className="input"
+                              type="number"
+                              step="0.1"
+                              value={cfg.foci_max_int ?? 1}
+                              onChange={(e) => setChCfg(ch.id, { foci_max_int: e.target.value })}
+                            />
+                          )}
+
+                          <div className="field-head">Foci prominence <Tip text="How much a spot must stand out from background." /></div>
+                          <input
+                            className="input"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={cfg.foci_prominence ?? 1.2}
+                            onChange={(e) => setChCfg(ch.id, { foci_prominence: e.target.value })}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </details>
+                );
+              })
+            )}
+          </div>
+        </details>
+      </div>
+
+      <div className="seg-footer">
+        <button className="secondary">Preview</button>
+        <button className="primary">Run</button>
+        <button className="ghost">Stop</button>
+      </div>
+    </aside>
+    {modalOpen && (
+      <div className="seg-modal-backdrop" onClick={() => setModalOpen(false)}>
+        <div className="seg-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="seg-modal-header">
+            <h4>Load images — conditions × channels</h4>
+          </div>
+          <div className="seg-modal-body">
+            {modalError && <div className="seg-modal-error">{modalError}</div>}
+            <div className="seg-load-table-wrap">
+              <table className="seg-load-table">
+                <thead>
+                  <tr>
+                    <th>Condition</th>
+                    {channels.map((ch) => (
+                      <th key={`h-${ch.id}`}>
+                        <div className="row row-between">
+                          <input
+                            className="input"
+                            value={ch.name}
+                            onChange={(e) => updateChannelName(ch.id, e.target.value)}
+                            placeholder="Channel name"
+                          />
+                          <button
+                            className="ghost btn-small"
+                            onClick={() => removeChannel(ch.id)}
+                            disabled={channels.length <= 1}
+                            title="Remove channel"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(imagesData.rows || []).map((row, rIdx) => (
+                    <tr key={`r-${rIdx}`}>
+                      <td>
+                        <div className="row row-between">
+                          <input
+                            className="input"
+                            value={row.condition || ""}
+                            onChange={(e) => updateCondition(rIdx, e.target.value)}
+                            placeholder="Condition name"
+                          />
+                          <button
+                            className="ghost btn-small"
+                            onClick={() => removeCondition(rIdx)}
+                            disabled={(imagesData.rows || []).length <= 1}
+                            title="Remove condition"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </td>
+                      {channels.map((ch) => (
+                        <td key={`c-${rIdx}-${ch.id}`}>
+                          <div className="row path-row">
+                            <input
+                              className="input"
+                              value={row[ch.id] || ""}
+                              onChange={(e) => updatePathCell(rIdx, ch.id, e.target.value)}
+                              placeholder={`Path to ${ch.name}`}
+                            />
+                            <button className="ghost btn-small" onClick={() => browsePathCell(rIdx, ch.id)}>Browse</button>
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="seg-modal-footer">
+            <span className="hint">{counterText}</span>
+            <button className="ghost" onClick={addCondition}>+ Add condition</button>
+            <button className="ghost" onClick={addChannel}>+ Add channel</button>
+            <button className="primary" onClick={saveImagesTable}>Save</button>
+            <button className="secondary" onClick={() => setModalOpen(false)}>Close</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}
+
 const emptyRow = () => ({
   id: makeRowId(),
   name: "",
@@ -348,6 +988,7 @@ function buildStep2Figure(
 }
 
 export default function App() {
+  const [activeModule, setActiveModule] = useState("NMA");
   const [rows, setRows] = useState([{
     ...emptyRow(),
     name: "Control",
@@ -929,24 +1570,23 @@ export default function App() {
       <header className="topbar">
         <div>
           <div className="logo">forNMA</div>
-          <div className="subtitle">NMA Settings</div>
+          <div className="subtitle">{activeModule === "NMA" ? "NMA Settings" : `${activeModule} Settings`}</div>
         </div>
-        <div className="stepper">
-          <div className={`chip ${step === 1 ? "active" : ""}`}>Step 1</div>
-          <div className={`chip ${step === 2 ? "active" : ""}`}>Step 2</div>
-        </div>
+        {activeModule === "NMA" && (
+          <div className="stepper">
+            <div className={`chip ${step === 1 ? "active" : ""}`}>Step 1</div>
+            <div className={`chip ${step === 2 ? "active" : ""}`}>Step 2</div>
+          </div>
+        )}
       </header>
       <nav className="module-menu" aria-label="forNMA stages">
         {FORNMA_STAGES.map((stage) => (
           <button
             key={stage}
             type="button"
-            className={`module-chip ${stage === "NMA" ? "active" : ""}`}
+            className={`module-chip ${stage === activeModule ? "active" : ""}`}
             onClick={() => {
-              if (stage !== "NMA") {
-                setStatus(`${stage} está disponível na interface Dash. Nesta tela, o módulo ativo é NMA.`);
-                setStatusLevel("info");
-              }
+              setActiveModule(stage);
             }}
           >
             {stage}
@@ -955,6 +1595,27 @@ export default function App() {
       </nav>
 
       <div className="layout">
+        {activeModule === "Segmentation" ? (
+          <>
+            <SegmentationLeftPanel
+              onPickDirectory={async () => {
+                try {
+                  const res = await pickDirectoryPath();
+                  return res.path || "";
+                } catch {
+                  return "";
+                }
+              }}
+            />
+            <main className="content">
+              <section>
+                <h2>Segmentation</h2>
+                <p className="hint">Left panel replicated from Dash segmentation settings.</p>
+              </section>
+            </main>
+          </>
+        ) : (
+          <>
         <aside className="panel">
           <h3>Datasets</h3>
           <p className="hint">Mark at least one control. Paths must be local.</p>
@@ -1613,6 +2274,8 @@ export default function App() {
             </section>
           )}
         </main>
+          </>
+        )}
       </div>
     </div>
   );
