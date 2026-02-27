@@ -11,12 +11,13 @@ const FORNMA_STAGES = [
   "Segmentation",
   "Foci Overlay",
   "NMA",
-  "Graphical Analysis",
+  "Plot Data",
   "Clustering",
   "Statistics",
   "Tracking",
 ];
 const PALETTE_OPTIONS = ["viridis", "plasma", "magma", "inferno", "cividis", "coolwarm", "Spectral", "RdBu"];
+const sameArray = (a = [], b = []) => a.length === b.length && a.every((v, i) => v === b[i]);
 const STORAGE_KEYS = {
   activeModule: "fornma.activeModule",
   plotJob: "fornma.plotJob",
@@ -62,6 +63,11 @@ const DEFAULT_FOCI_JOB = {
   log: "",
   error: "",
 };
+const PLOT_TYPES_REQUIRE_XY = new Set(["scatter"]);
+const PLOT_TYPES_REQUIRE_Y = new Set(["scatter", "violin", "box", "dot", "bar", "line", "rolling-average"]);
+const PLOT_TYPES_SUPPORT_DOT = new Set(["box"]);
+const PLOT_TYPES_SUPPORT_SIZE = new Set(["scatter"]);
+const PLOT_TYPES_SUPPORT_X = new Set(["scatter", "violin"]);
 
 function readStorage(key, fallback) {
   if (typeof window === "undefined") return fallback;
@@ -1258,6 +1264,205 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
   );
 }
 
+function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, graphState, setGraphState }) {
+  const graphTypes = ["scatter", "violin", "box", "dot", "bar", "line", "rolling-average"];
+
+  const setField = (k, v) => setGraphState((prev) => ({ ...prev, [k]: v }));
+  const addDataset = () => setField("datasets", [...(graphState.datasets || []), { id: makeRowId(), name: `Dataset ${(graphState.datasets || []).length + 1}`, path: "", columns: null, enabled: true }]);
+  const removeDataset = (id) => setField("datasets", (graphState.datasets || []).filter((d) => d.id !== id));
+  const updateDataset = (id, patch) => setField("datasets", (graphState.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+
+  const cols = graphState.columns || [];
+  const categoricalCols = graphState.categoricalColumns || [];
+  const canPreview = (graphState.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim()) && !graphState.columnsWarning;
+  const graphType = graphState.graph_type || "scatter";
+  const requiresXY = PLOT_TYPES_REQUIRE_XY.has(graphType);
+  const requiresY = PLOT_TYPES_REQUIRE_Y.has(graphType);
+  const supportsDot = PLOT_TYPES_SUPPORT_DOT.has(graphType);
+  const supportsSize = PLOT_TYPES_SUPPORT_SIZE.has(graphType);
+  const supportsX = PLOT_TYPES_SUPPORT_X.has(graphType);
+  const xOptions = graphType === "violin" ? categoricalCols : cols;
+
+  return (
+    <aside className="panel seg-panel">
+      <div className="seg-header">
+        <h3>Plot Data — Settings</h3>
+        <p className="hint">Use CSV outputs to build interactive plots.</p>
+      </div>
+      <div className="seg-scroll">
+        <details open className="seg-section">
+          <summary>Data</summary>
+          <div className="seg-body">
+            {(graphState.datasets || []).map((d, idx) => (
+              <div className="dataset" key={d.id}>
+                <div className="row">
+                  <label className="checkbox" style={{ minWidth: 62 }}>
+                    <input
+                      type="checkbox"
+                      checked={d.enabled !== false}
+                      onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
+                    />
+                    plot
+                  </label>
+                  <input
+                    className="input"
+                    value={d.name || ""}
+                    onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                    placeholder={`Dataset ${idx + 1} name`}
+                  />
+                  {(graphState.datasets || []).length > 1 && (
+                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                  )}
+                </div>
+                <div className="row path-row">
+                  <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  <button
+                    className="ghost"
+                    onClick={async () => {
+                      try {
+                        const picked = await onPickCsv();
+                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                      } catch (err) {
+                        setStatusExternal(err.message || "Failed to pick CSV.", "error");
+                      }
+                    }}
+                  >
+                    Browse CSV
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button className="secondary" onClick={addDataset}>Add CSV</button>
+            {graphState.columnsWarning && (
+              <Status level="error" text={graphState.columnsWarning} />
+            )}
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Plot options</summary>
+          <div className="seg-body">
+            <div className="field-head">Graph type</div>
+            <select
+              className="input"
+              value={graphState.graph_type}
+              onChange={(e) => {
+                const nextType = e.target.value;
+                setGraphState((prev) => ({
+                  ...prev,
+                  graph_type: nextType,
+                  x: PLOT_TYPES_SUPPORT_X.has(nextType) ? prev.x : "",
+                  size: PLOT_TYPES_SUPPORT_SIZE.has(nextType) ? prev.size : "",
+                }));
+              }}
+            >
+              {graphTypes.map((g) => <option key={`gt-${g}`} value={g}>{g}</option>)}
+            </select>
+            {supportsX && (
+              <div className="row">
+                <select className="input" value={graphState.x} onChange={(e) => setField("x", e.target.value)}>
+                  <option value="">
+                    {graphType === "violin"
+                      ? "Category axis (optional)"
+                      : (requiresXY ? "Select X axis (required)" : "Select X axis")}
+                  </option>
+                  {xOptions.map((c) => <option key={`x-${c}`} value={c}>{c}</option>)}
+                </select>
+                <select className="input" value={graphState.y} onChange={(e) => setField("y", e.target.value)}>
+                  <option value="">{requiresY ? "Select Y axis (required)" : "Select Y axis"}</option>
+                  {cols.map((c) => <option key={`y-${c}`} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            {!supportsX && (
+              <div className="row">
+                <select className="input" value={graphState.y} onChange={(e) => setField("y", e.target.value)}>
+                  <option value="">{requiresY ? "Select Y axis (required)" : "Select Y axis"}</option>
+                  {cols.map((c) => <option key={`y-${c}`} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="row">
+              <select
+                className="input"
+                value={graphState.hue}
+                onChange={(e) => setField("hue", e.target.value)}
+              >
+                <option value="">Hue (optional)</option>
+                {cols.map((c) => <option key={`h-${c}`} value={c}>{c}</option>)}
+              </select>
+              {supportsSize && (
+                <select className="input" value={graphState.size} onChange={(e) => setField("size", e.target.value)}>
+                  <option value="">Size (optional)</option>
+                  {cols.map((c) => <option key={`s-${c}`} value={c}>{c}</option>)}
+                </select>
+              )}
+            </div>
+            {graphType === "violin" && (
+              <>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={!!graphState.violin_box}
+                    onChange={(e) => setField("violin_box", e.target.checked)}
+                  />
+                  Show box inside violin
+                </label>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={!!graphState.violin_points}
+                    onChange={(e) => setField("violin_points", e.target.checked)}
+                  />
+                  Show dots
+                </label>
+              </>
+            )}
+            {(graphType === "line" || graphType === "rolling-average") && (
+              <div className="row">
+                <input
+                  className="input"
+                  value={graphState.framesText || ""}
+                  onChange={(e) => setField("framesText", e.target.value)}
+                  placeholder="Frames (optional, empty = all)"
+                />
+              </div>
+            )}
+            {graphType === "rolling-average" && (
+              <div className="row">
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  value={graphState.n ?? ""}
+                  onChange={(e) => setField("n", e.target.value)}
+                  placeholder="Rolling window n"
+                />
+              </div>
+            )}
+            {supportsDot && (
+              <label className="checkbox">
+                <input type="checkbox" checked={!!graphState.dot} onChange={(e) => setField("dot", e.target.checked)} />
+                Dot overlay (box)
+              </label>
+            )}
+          </div>
+        </details>
+      </div>
+      <div className="seg-footer">
+        <button
+          className="primary"
+          onClick={onPreview}
+          disabled={!canPreview}
+        >
+          Plot preview
+        </button>
+      </div>
+      <Status level={status.level} text={status.text} />
+    </aside>
+  );
+}
+
 const emptyRow = () => ({
   id: makeRowId(),
   name: "",
@@ -1292,19 +1497,37 @@ function Status({ level = "info", text }) {
 
 function PlotPanel({ figure, config, onRelayout }) {
   const ref = React.useRef(null);
+  const requestedWidth = Number(figure?.layout?.width);
+  const panelWidth = Number.isFinite(requestedWidth) && requestedWidth > 0 ? Math.round(requestedWidth) : 640;
+  const effectiveWidth = Math.min(panelWidth, Math.max(640, (typeof window !== "undefined" ? window.innerWidth - 500 : panelWidth)));
+  const defaultConfig = {
+    displayModeBar: true,
+    displaylogo: false,
+    responsive: true,
+    scrollZoom: true,
+    toImageButtonOptions: {
+      format: "png",
+      filename: "fornma-plot",
+      scale: 2,
+    },
+  };
 
   React.useEffect(() => {
     if (!ref.current || !figure) return;
-    Plotly.react(ref.current, figure.data, figure.layout, config || { displayModeBar: false });
+    Plotly.react(ref.current, figure.data, figure.layout, config || defaultConfig);
     if (onRelayout && ref.current?.on) {
       if (ref.current.removeAllListeners) {
         ref.current.removeAllListeners("plotly_relayout");
       }
       ref.current.on("plotly_relayout", onRelayout);
     }
-  }, [figure]);
+  }, [figure, config, onRelayout]);
 
-  return <div className="plot" ref={ref} />;
+  return (
+    <div className="plot-host">
+      <div className="plot" style={{ "--plot-width": `${effectiveWidth}px` }} ref={ref} />
+    </div>
+  );
 }
 
 function ellipseTrace(xc, yc, rx, ry, n = 256) {
@@ -1651,8 +1874,33 @@ export default function App() {
   const [segPreviewPage, setSegPreviewPage] = useState(0);
   const [lastSegPreviewPayload, setLastSegPreviewPayload] = useState(null);
   const [segPanelResetKey, setSegPanelResetKey] = useState(0);
+  const [plotData, setPlotData] = useState({
+    datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", columns: null, enabled: true }],
+    graph_type: "scatter",
+    x: "",
+    y: "",
+    hue: "",
+    size: "",
+    violin_box: true,
+    violin_points: true,
+    conditionsText: "",
+    framesText: "",
+    dot: false,
+    n: "",
+    columns: [],
+    categoricalColumns: [],
+    columnsWarning: "",
+    figure: null,
+    message: "",
+  });
+  const [plotDataStatus, setPlotDataStatus] = useState({ level: "info", text: "" });
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
+  const plotDataColsCacheRef = React.useRef({});
+  const plotDataPathsKey = useMemo(
+    () => (plotData.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
+    [plotData.datasets]
+  );
   const hasPlotRun = Boolean(plotJob.job_id);
   const hasSegSession =
     Boolean(segJob.job_id) ||
@@ -1710,16 +1958,28 @@ export default function App() {
   };
 
   const callApi = async (path, payload) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    let res;
+    try {
+      res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error("Failed to fetch API. Check if backend is running at http://127.0.0.1:8000.");
+      }
+      throw err;
+    }
     if (!res.ok) {
       const text = await res.text();
       throw new Error(text || res.statusText);
     }
     return res.json();
+  };
+
+  const setPlotDataStatusMsg = (text, level = "info") => {
+    setPlotDataStatus({ text, level });
   };
 
   useEffect(() => {
@@ -1771,6 +2031,85 @@ export default function App() {
       cancelled = true;
     };
   }, [rows, showPlotConfig]);
+
+  useEffect(() => {
+    const datasets = plotData.datasets || [];
+    const targets = datasets
+      .map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => String(d.path || "").trim());
+    if (targets.length === 0) {
+      setPlotData((prev) => {
+        if ((prev.columns || []).length === 0 && (prev.categoricalColumns || []).length === 0 && !prev.columnsWarning) return prev;
+        return { ...prev, columns: [], categoricalColumns: [], columnsWarning: "" };
+      });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const loaded = await Promise.all(
+        targets.map(async ({ d, idx }) => {
+          const path = String(d.path || "").trim();
+          if (plotDataColsCacheRef.current[path]) {
+            return { idx, path, ...plotDataColsCacheRef.current[path] };
+          }
+          try {
+            const res = await callApi("/nma/datasets/columns", { path });
+            const cols = res.columns || [];
+            const categorical = res.categorical_columns || [];
+            plotDataColsCacheRef.current[path] = { columns: cols, categorical };
+            return { idx, path, columns: cols, categorical };
+          } catch {
+            return { idx, path, columns: [], categorical: [] };
+          }
+        })
+      );
+      if (cancelled) return;
+      const valid = loaded.filter((x) => x.columns.length > 0);
+      const firstCols = valid[0]?.columns || [];
+      const firstCategorical = valid[0]?.categorical || [];
+      const mismatch = valid.some((x) =>
+        x.columns.length !== firstCols.length ||
+        x.columns.some((c, i) => c !== firstCols[i])
+      );
+      setPlotData((prev) => {
+        const nextDatasets = (prev.datasets || []).map((d, i) => {
+          const hit = loaded.find((x) => x.idx === i);
+          if (!hit) return d;
+          if (sameArray(d.columns || [], hit.columns || [])) return d;
+          return { ...d, columns: hit.columns };
+        });
+        const keepIfExists = (key) => (firstCols.includes(prev[key]) ? prev[key] : "");
+        const nextWarning = mismatch
+          ? "CSV columns are not identical. Use files with exactly the same columns and order."
+          : "";
+        const didDatasetsChange = nextDatasets.some((d, i) => d !== (prev.datasets || [])[i]);
+        const sameColumns = sameArray(prev.columns || [], firstCols || []);
+        const sameCategorical = sameArray(prev.categoricalColumns || [], firstCategorical || []);
+        const sameAxes =
+          keepIfExists("x") === prev.x &&
+          keepIfExists("y") === prev.y &&
+          keepIfExists("hue") === prev.hue &&
+          keepIfExists("size") === prev.size;
+        if (!didDatasetsChange && sameColumns && sameCategorical && sameAxes && nextWarning === (prev.columnsWarning || "")) {
+          return prev;
+        }
+        return {
+          ...prev,
+          datasets: nextDatasets,
+          columns: firstCols,
+          categoricalColumns: firstCategorical,
+          x: keepIfExists("x"),
+          y: keepIfExists("y"),
+          hue: keepIfExists("hue"),
+          size: keepIfExists("size"),
+          columnsWarning: nextWarning,
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [plotDataPathsKey]);
 
   const handleDownloadTable = () => {
     if (!step2Percentages) return;
@@ -2561,6 +2900,87 @@ export default function App() {
     }
   };
 
+  const parseCommaList = (txt) => String(txt || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const parseIntList = (txt) => parseCommaList(txt)
+    .map((s) => Number(s))
+    .filter((n) => Number.isFinite(n))
+    .map((n) => Math.trunc(n));
+
+  const handlePlotDataPreview = async () => {
+    const datasets = (plotData.datasets || [])
+      .filter((d) => d.enabled !== false)
+      .map((d) => ({
+        name: String(d.name || "").trim(),
+        path: String(d.path || "").trim(),
+      }))
+      .filter((d) => d.path);
+    if (!datasets.length) {
+      setPlotDataStatusMsg("Select at least one dataset with a valid CSV path.", "error");
+      return;
+    }
+    if (plotData.columnsWarning) {
+      setPlotDataStatusMsg(plotData.columnsWarning, "error");
+      return;
+    }
+    const gt = plotData.graph_type || "scatter";
+    if (PLOT_TYPES_REQUIRE_XY.has(gt) && (!plotData.x || !plotData.y)) {
+      setPlotDataStatusMsg("Select X and Y for this plot type.", "error");
+      return;
+    }
+    if (!PLOT_TYPES_REQUIRE_XY.has(gt) && PLOT_TYPES_REQUIRE_Y.has(gt) && !plotData.y) {
+      setPlotDataStatusMsg("Select Y for this plot type.", "error");
+      return;
+    }
+    if (gt === "rolling-average") {
+      const nVal = plotData.n === "" ? null : Number(plotData.n);
+      if (!Number.isFinite(nVal) || nVal <= 0) {
+        setPlotDataStatusMsg("Rolling average requires n > 0.", "error");
+        return;
+      }
+    }
+    if (gt === "violin" && plotData.x && !(plotData.categoricalColumns || []).includes(plotData.x)) {
+      setPlotDataStatusMsg("For violin, choose a categorical column on X (or leave it empty).", "error");
+      return;
+    }
+    setPlotDataStatusMsg("Generating interactive preview...", "info");
+    try {
+      const payload = {
+        datasets,
+        graph_type: plotData.graph_type,
+        x: PLOT_TYPES_SUPPORT_X.has(gt) ? (plotData.x || null) : null,
+        y: plotData.y || null,
+        hue: plotData.hue || null,
+        size: plotData.size || null,
+        violin_box: !!plotData.violin_box,
+        violin_points: !!plotData.violin_points,
+        conditions: [],
+        frames: parseIntList(plotData.framesText),
+        dot: !!plotData.dot,
+        n: plotData.n === "" ? null : Number(plotData.n),
+      };
+      const res = await callApi("/graphs/preview", payload);
+      setPlotData((prev) => ({
+        ...prev,
+        figure: res.figure || null,
+        columns: res.columns || prev.columns || [],
+        message: res.message || "",
+      }));
+      if (res.columns?.length) {
+        setPlotData((prev) => {
+          const safe = (k) => (prev[k] && res.columns.includes(prev[k]) ? prev[k] : "");
+          return { ...prev, x: safe("x"), y: safe("y"), hue: safe("hue"), size: safe("size") };
+        });
+      }
+      setPlotDataStatusMsg(res.message || "Preview ready.", "success");
+    } catch (err) {
+      setPlotDataStatusMsg(err.message, "error");
+    }
+  };
+
   const handleResetNma = () => {
     const ok = window.confirm("Reset NMA settings and return to initial state?");
     if (!ok) return;
@@ -2826,6 +3246,30 @@ export default function App() {
                   <div className="section">
                     <p className="hint">No foci overlay started yet. Use Run Overlay to begin.</p>
                   </div>
+                )}
+              </section>
+            </main>
+          </>
+        ) : activeModule === "Plot Data" ? (
+          <>
+            <PlotDataLeftPanel
+              onPickCsv={async () => {
+                const res = await pickCsvPath();
+                return res.path || "";
+              }}
+              onPreview={handlePlotDataPreview}
+              status={plotDataStatus}
+              setStatusExternal={setPlotDataStatusMsg}
+              graphState={plotData}
+              setGraphState={setPlotData}
+            />
+            <main className="content">
+              <section>
+                <h2>Plot Data</h2>
+                {plotData.figure ? (
+                  <PlotPanel figure={plotData.figure} />
+                ) : (
+                  <p className="hint">Configure data and click `Plot preview` to render an interactive graph.</p>
                 )}
               </section>
             </main>

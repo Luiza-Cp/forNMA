@@ -16,6 +16,7 @@ import textwrap
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.colors import qualitative as qual_colors
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
@@ -62,6 +63,8 @@ from .schemas import (
     FociStartRequest,
     FociStartResponse,
     FociStatusResponse,
+    GraphPreviewRequest,
+    GraphPreviewResponse,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -103,11 +106,20 @@ def health():
 @app.post("/nma/datasets/columns", response_model=DatasetColumnsResponse)
 def nma_datasets_columns(req: DatasetColumnsRequest):
     try:
-        df = pd.read_csv(req.path, nrows=0)
+        df = pd.read_csv(req.path, nrows=2000)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read CSV header: {e}")
     cols = [str(c) for c in df.columns.tolist()]
-    return DatasetColumnsResponse(columns=cols)
+    categorical_cols = []
+    for c in cols:
+        s = df[c]
+        if pd.api.types.is_object_dtype(s) or pd.api.types.is_categorical_dtype(s) or pd.api.types.is_bool_dtype(s):
+            categorical_cols.append(c)
+            continue
+        nun = int(s.nunique(dropna=True))
+        if nun > 0 and nun <= 20:
+            categorical_cols.append(c)
+    return DatasetColumnsResponse(columns=cols, categorical_columns=categorical_cols)
 
 
 @app.post("/system/pick-csv")
@@ -1071,6 +1083,140 @@ def _compute_stats(pool: pd.DataFrame, xcol: str, ycol: str) -> Dict[str, float]
     sd_x = float(pool[xcol].std(ddof=1) or 1.0)
     sd_y = float(pool[ycol].std(ddof=1) or 1.0)
     return {"mu_x": mu_x, "mu_y": mu_y, "sd_x": sd_x, "sd_y": sd_y}
+
+
+@app.post("/graphs/preview", response_model=GraphPreviewResponse)
+def graphs_preview(req: GraphPreviewRequest):
+    datasets = req.datasets or [{"path": p, "name": Path(p).stem} for p in (req.paths or [])]
+    datasets = [d for d in datasets if str(d.get("path", "")).strip()]
+    if not datasets:
+        raise HTTPException(status_code=400, detail="Provide at least one CSV path.")
+    dfs = []
+    base_cols = None
+    for ds in datasets:
+        p = str(ds.get("path", "")).strip()
+        ds_name = str(ds.get("name", "")).strip() or Path(p).stem
+        pth = Path(p).expanduser().resolve()
+        if not pth.exists() or not pth.is_file():
+            raise HTTPException(status_code=400, detail=f"CSV not found: {p}")
+        try:
+            df = pd.read_csv(pth)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read CSV '{p}': {e}")
+        if "Condition" not in df.columns:
+            df["Condition"] = ds_name
+        else:
+            cond = df["Condition"].astype(str)
+            empty = cond.isna() | (cond.str.strip() == "") | (cond.str.lower() == "nan")
+            if empty.any():
+                df.loc[empty, "Condition"] = ds_name
+        cols = tuple(str(c) for c in df.columns)
+        if base_cols is None:
+            base_cols = cols
+        elif cols != base_cols:
+            raise HTTPException(
+                status_code=400,
+                detail="All CSVs must have exactly the same columns (same names and order).",
+            )
+        df["__source__"] = ds_name
+        dfs.append(df)
+    df = pd.concat(dfs, ignore_index=True)
+
+    gt = (req.graph_type or "scatter").lower()
+    x, y, hue, size = req.x, req.y, req.hue, req.size
+    plot_overtime = bool(req.plot_overtime)
+    if x and x not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Column '{x}' was not found in CSV columns.")
+
+    needs_xy = {"scatter"}
+    needs_y = {"violin", "box", "dot", "bar", "line", "rolling-average"}
+    if gt in needs_xy and (not x or not y):
+        raise HTTPException(status_code=400, detail=f"{gt.title()} requires X and Y.")
+    if gt in needs_y and not y:
+        raise HTTPException(status_code=400, detail=f"{gt.title()} requires Y.")
+
+    if req.conditions and "Condition" in df.columns:
+        df = df[df["Condition"].isin(req.conditions)]
+    if req.frames and "Frame" in df.columns:
+        df = df[df["Frame"].isin(req.frames)]
+    if df.empty:
+        raise HTTPException(status_code=400, detail="No data left after filters.")
+
+    def _category_x_col() -> str:
+        if plot_overtime and "Frame" in df.columns:
+            return "Frame"
+        if "Condition" in df.columns:
+            return "Condition"
+        return "__source__"
+
+    def _dynamic_width_for_categories(col_name: str | None) -> int | None:
+        if not col_name or col_name not in df.columns:
+            return None
+        ncat = int(df[col_name].nunique(dropna=True))
+        if ncat <= 0:
+            return None
+        # Grow width with category count, but keep bounded to viewport-friendly sizes.
+        return max(700, min(1700, 220 + 75 * ncat))
+
+    try:
+        dynamic_width = None
+        if gt == "scatter":
+            fig = px.scatter(df, x=x, y=y, color=hue, size=size, hover_data=["__source__"] if "__source__" in df.columns else None)
+        elif gt == "violin":
+            x_col = req.x if req.x and req.x in df.columns else None
+            dynamic_width = _dynamic_width_for_categories(x_col)
+            fig = px.violin(
+                df,
+                x=x_col,
+                y=y,
+                color=hue,
+                box=bool(req.violin_box),
+                points="all" if req.violin_points else False,
+            )
+        elif gt == "box":
+            x_col = _category_x_col()
+            dynamic_width = _dynamic_width_for_categories(x_col)
+            fig = px.box(df, x=x_col, y=y, color=hue, points="all" if req.dot else False)
+        elif gt == "dot":
+            x_col = _category_x_col()
+            dynamic_width = _dynamic_width_for_categories(x_col)
+            fig = px.strip(df, x=x_col, y=y, color=hue)
+        elif gt == "bar":
+            x_col = _category_x_col()
+            agg = df.groupby([x_col] + ([hue] if hue else []), dropna=False)[y].mean().reset_index()
+            dynamic_width = _dynamic_width_for_categories(x_col)
+            fig = px.bar(agg, x=x_col, y=y, color=hue)
+        elif gt == "line":
+            if "Frame" not in df.columns:
+                raise HTTPException(status_code=400, detail="Line plot requires 'Frame' column.")
+            group_cols = ["Frame"] + ([hue] if hue else [])
+            agg = df.groupby(group_cols, dropna=False)[y].mean().reset_index()
+            dynamic_width = _dynamic_width_for_categories("Frame")
+            fig = px.line(agg, x="Frame", y=y, color=hue)
+        elif gt == "rolling-average":
+            if "Frame" not in df.columns:
+                raise HTTPException(status_code=400, detail="Rolling average requires 'Frame' column.")
+            window = int(req.n or 5)
+            key = hue if hue and hue in df.columns else ("Condition" if "Condition" in df.columns else "__source__")
+            agg = df.groupby([key, "Frame"], dropna=False)[y].mean().reset_index().sort_values(["Frame"])
+            agg["rolling"] = agg.groupby(key)[y].transform(lambda s: s.rolling(window=window, min_periods=1).mean())
+            dynamic_width = _dynamic_width_for_categories("Frame")
+            fig = px.line(agg, x="Frame", y="rolling", color=key)
+        else:
+            raise HTTPException(status_code=400, detail=f"Graph type '{gt}' not implemented yet for interactive preview.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    fig.update_layout(margin=dict(l=50, r=20, t=50, b=50), template="plotly_white")
+    if dynamic_width:
+        fig.update_layout(width=dynamic_width)
+    return GraphPreviewResponse(
+        figure=json.loads(fig.to_json()),
+        columns=[str(c) for c in df.columns if c != "__source__"],
+        message=f"Preview generated for {len(df)} rows.",
+    )
 
 
 def _default_thresholds(mean_nii: float, std_nii: float, mean_area: float, std_area: float,

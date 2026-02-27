@@ -120,6 +120,7 @@ class DatasetColumnsRequest(BaseModel):
 
 class DatasetColumnsResponse(BaseModel):
     columns: List[str]
+    categorical_columns: List[str] = Field(default_factory=list)
 
 
 class NMASettingsUploadResponse(BaseModel):
@@ -253,3 +254,26 @@ class FociStatusResponse(BaseModel):
     log: str = ""
     progress_file: Optional[str] = None
     error: Optional[str] = None
+
+
+class GraphPreviewRequest(BaseModel):
+    datasets: List[Dict[str, str]] = Field(default_factory=list)
+    paths: List[str] = Field(default_factory=list)
+    graph_type: str = "scatter"
+    plot_overtime: bool = False
+    x: Optional[str] = None
+    y: Optional[str] = None
+    hue: Optional[str] = None
+    size: Optional[str] = None
+    violin_box: bool = True
+    violin_points: bool = True
+    conditions: List[str] = Field(default_factory=list)
+    frames: List[int] = Field(default_factory=list)
+    dot: bool = False
+    n: Optional[int] = None
+
+
+class GraphPreviewResponse(BaseModel):
+    figure: Dict[str, Any]
+    columns: List[str] = Field(default_factory=list)
+    message: str = ""
