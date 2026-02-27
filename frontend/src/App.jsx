@@ -67,7 +67,7 @@ const PLOT_TYPES_REQUIRE_XY = new Set(["scatter"]);
 const PLOT_TYPES_REQUIRE_Y = new Set(["scatter", "violin", "box", "dot", "bar", "line", "rolling-average"]);
 const PLOT_TYPES_SUPPORT_DOT = new Set(["box"]);
 const PLOT_TYPES_SUPPORT_SIZE = new Set(["scatter"]);
-const PLOT_TYPES_SUPPORT_X = new Set(["scatter", "violin"]);
+const PLOT_TYPES_SUPPORT_X = new Set(["scatter", "violin", "box"]);
 
 function readStorage(key, fallback) {
   if (typeof window === "undefined") return fallback;
@@ -1281,7 +1281,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
   const supportsDot = PLOT_TYPES_SUPPORT_DOT.has(graphType);
   const supportsSize = PLOT_TYPES_SUPPORT_SIZE.has(graphType);
   const supportsX = PLOT_TYPES_SUPPORT_X.has(graphType);
-  const xOptions = graphType === "violin" ? categoricalCols : cols;
+  const xOptions = (graphType === "violin" || graphType === "box") ? categoricalCols : cols;
 
   return (
     <aside className="panel seg-panel">
@@ -1362,7 +1362,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
               <div className="row">
                 <select className="input" value={graphState.x} onChange={(e) => setField("x", e.target.value)}>
                   <option value="">
-                    {graphType === "violin"
+                    {(graphType === "violin" || graphType === "box")
                       ? "Category axis (optional)"
                       : (requiresXY ? "Select X axis (required)" : "Select X axis")}
                   </option>
@@ -1441,10 +1441,20 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
               </div>
             )}
             {supportsDot && (
-              <label className="checkbox">
-                <input type="checkbox" checked={!!graphState.dot} onChange={(e) => setField("dot", e.target.checked)} />
-                Dot overlay (box)
-              </label>
+              <>
+                <label className="checkbox">
+                  <input type="checkbox" checked={!!graphState.dot} onChange={(e) => setField("dot", e.target.checked)} />
+                  Dot (box)
+                </label>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={!!graphState.box_outliers}
+                    onChange={(e) => setField("box_outliers", e.target.checked)}
+                  />
+                  Show outliers
+                </label>
+              </>
             )}
           </div>
         </details>
@@ -1883,6 +1893,7 @@ export default function App() {
     size: "",
     violin_box: true,
     violin_points: true,
+    box_outliers: false,
     conditionsText: "",
     framesText: "",
     dot: false,
@@ -2942,8 +2953,8 @@ export default function App() {
         return;
       }
     }
-    if (gt === "violin" && plotData.x && !(plotData.categoricalColumns || []).includes(plotData.x)) {
-      setPlotDataStatusMsg("For violin, choose a categorical column on X (or leave it empty).", "error");
+    if ((gt === "violin" || gt === "box") && plotData.x && !(plotData.categoricalColumns || []).includes(plotData.x)) {
+      setPlotDataStatusMsg("For violin/box, choose a categorical column on X (or leave it empty).", "error");
       return;
     }
     setPlotDataStatusMsg("Generating interactive preview...", "info");
@@ -2957,6 +2968,7 @@ export default function App() {
         size: plotData.size || null,
         violin_box: !!plotData.violin_box,
         violin_points: !!plotData.violin_points,
+        box_outliers: !!plotData.box_outliers,
         conditions: [],
         frames: parseIntList(plotData.framesText),
         dot: !!plotData.dot,

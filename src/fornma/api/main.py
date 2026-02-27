@@ -1174,9 +1174,10 @@ def graphs_preview(req: GraphPreviewRequest):
                 points="all" if req.violin_points else False,
             )
         elif gt == "box":
-            x_col = _category_x_col()
+            x_col = req.x if req.x and req.x in df.columns else None
             dynamic_width = _dynamic_width_for_categories(x_col)
-            fig = px.box(df, x=x_col, y=y, color=hue, points="all" if req.dot else False)
+            box_points = "all" if req.dot else ("outliers" if req.box_outliers else False)
+            fig = px.box(df, x=x_col, y=y, color=hue, points=box_points)
         elif gt == "dot":
             x_col = _category_x_col()
             dynamic_width = _dynamic_width_for_categories(x_col)

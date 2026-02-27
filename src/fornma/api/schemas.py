@@ -267,6 +267,7 @@ class GraphPreviewRequest(BaseModel):
     size: Optional[str] = None
     violin_box: bool = True
     violin_points: bool = True
+    box_outliers: bool = False
     conditions: List[str] = Field(default_factory=list)
     frames: List[int] = Field(default_factory=list)
     dot: bool = False
