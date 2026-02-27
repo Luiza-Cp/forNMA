@@ -268,6 +268,8 @@ class GraphPreviewRequest(BaseModel):
     violin_box: bool = True
     violin_points: bool = True
     box_outliers: bool = False
+    compute_auc: bool = False
+    control: Optional[str] = None
     conditions: List[str] = Field(default_factory=list)
     frames: List[int] = Field(default_factory=list)
     dot: bool = False
@@ -278,3 +280,12 @@ class GraphPreviewResponse(BaseModel):
     figure: Dict[str, Any]
     columns: List[str] = Field(default_factory=list)
     message: str = ""
+
+
+class GraphConditionsRequest(BaseModel):
+    datasets: List[Dict[str, str]] = Field(default_factory=list)
+    paths: List[str] = Field(default_factory=list)
+
+
+class GraphConditionsResponse(BaseModel):
+    conditions: List[str] = Field(default_factory=list)

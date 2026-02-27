@@ -65,6 +65,8 @@ from .schemas import (
     FociStatusResponse,
     GraphPreviewRequest,
     GraphPreviewResponse,
+    GraphConditionsRequest,
+    GraphConditionsResponse,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -1160,6 +1162,8 @@ def graphs_preview(req: GraphPreviewRequest):
 
     try:
         dynamic_width = None
+        auc_summary = ""
+        auc_lines: list[str] = []
         if gt == "scatter":
             fig = px.scatter(df, x=x, y=y, color=hue, size=size, hover_data=["__source__"] if "__source__" in df.columns else None)
         elif gt == "violin":
@@ -1179,21 +1183,53 @@ def graphs_preview(req: GraphPreviewRequest):
             box_points = "all" if req.dot else ("outliers" if req.box_outliers else False)
             fig = px.box(df, x=x_col, y=y, color=hue, points=box_points)
         elif gt == "dot":
-            x_col = _category_x_col()
+            x_col = req.x if req.x and req.x in df.columns else None
             dynamic_width = _dynamic_width_for_categories(x_col)
-            fig = px.strip(df, x=x_col, y=y, color=hue)
+            if size and size in df.columns:
+                dot_df = df.copy()
+                if not x_col:
+                    dot_df["__dot_x__"] = "All"
+                    x_col = "__dot_x__"
+                fig = px.scatter(dot_df, x=x_col, y=y, color=hue, size=size)
+            else:
+                fig = px.strip(df, x=x_col, y=y, color=hue)
         elif gt == "bar":
-            x_col = _category_x_col()
-            agg = df.groupby([x_col] + ([hue] if hue else []), dropna=False)[y].mean().reset_index()
-            dynamic_width = _dynamic_width_for_categories(x_col)
-            fig = px.bar(agg, x=x_col, y=y, color=hue)
+            x_col = req.x if req.x and req.x in df.columns else None
+            if not pd.api.types.is_numeric_dtype(df[y]):
+                raise HTTPException(status_code=400, detail="Bar plot requires a numeric Y column.")
+            if x_col:
+                group_cols = [x_col] + ([hue] if hue else [])
+                agg = df.groupby(group_cols, dropna=False)[y].mean().reset_index()
+                dynamic_width = _dynamic_width_for_categories(x_col)
+                fig = px.bar(agg, x=x_col, y=y, color=hue)
+            elif hue and hue in df.columns:
+                agg = df.groupby([hue], dropna=False)[y].mean().reset_index()
+                dynamic_width = _dynamic_width_for_categories(hue)
+                fig = px.bar(agg, x=hue, y=y, color=hue)
+            else:
+                agg = pd.DataFrame({"__bar_x__": ["All"], y: [float(df[y].mean())]})
+                dynamic_width = 700
+                fig = px.bar(agg, x="__bar_x__", y=y)
         elif gt == "line":
-            if "Frame" not in df.columns:
-                raise HTTPException(status_code=400, detail="Line plot requires 'Frame' column.")
-            group_cols = ["Frame"] + ([hue] if hue else [])
-            agg = df.groupby(group_cols, dropna=False)[y].mean().reset_index()
-            dynamic_width = _dynamic_width_for_categories("Frame")
-            fig = px.line(agg, x="Frame", y=y, color=hue)
+            x_col = req.x if req.x and req.x in df.columns else "Frame"
+            if x_col not in df.columns:
+                raise HTTPException(status_code=400, detail=f"Line plot requires '{x_col}' column.")
+            group_cols = [x_col] + ([hue] if hue else [])
+            agg = df.groupby(group_cols, dropna=False)[y].mean().reset_index().sort_values([x_col])
+            dynamic_width = _dynamic_width_for_categories(x_col)
+            fig = px.line(agg, x=x_col, y=y, color=hue)
+            if req.compute_auc:
+                x_num = pd.to_numeric(agg[x_col], errors="coerce")
+                if x_num.isna().any():
+                    raise HTTPException(status_code=400, detail="AUC requires a numeric X axis.")
+                tmp = agg.assign(__x_num__=x_num)
+                key_col = hue if hue else "__all__"
+                if key_col == "__all__":
+                    tmp[key_col] = "all"
+                for g, gdf in tmp.groupby(key_col, dropna=False):
+                    auc_val = float(np.trapz(gdf[y].to_numpy(), gdf["__x_num__"].to_numpy()))
+                    auc_lines.append(f"{g}: {auc_val:.3f}")
+                auc_summary = " | AUC: " + "; ".join(auc_lines)
         elif gt == "rolling-average":
             if "Frame" not in df.columns:
                 raise HTTPException(status_code=400, detail="Rolling average requires 'Frame' column.")
@@ -1203,6 +1239,48 @@ def graphs_preview(req: GraphPreviewRequest):
             agg["rolling"] = agg.groupby(key)[y].transform(lambda s: s.rolling(window=window, min_periods=1).mean())
             dynamic_width = _dynamic_width_for_categories("Frame")
             fig = px.line(agg, x="Frame", y="rolling", color=key)
+            if req.compute_auc:
+                for g, gdf in agg.groupby(key, dropna=False):
+                    auc_val = float(np.trapz(gdf["rolling"].to_numpy(), gdf["Frame"].to_numpy()))
+                    auc_lines.append(f"{g}: {auc_val:.3f}")
+                auc_summary = " | AUC (rolling): " + "; ".join(auc_lines)
+        elif gt == "cpd":
+            if "Frame" not in df.columns:
+                raise HTTPException(status_code=400, detail="CPD requires 'Frame' column.")
+            if "Condition" not in df.columns:
+                raise HTTPException(status_code=400, detail="CPD requires 'Condition' column.")
+            frames = [int(f) for f in req.frames] if req.frames else []
+            if len(frames) < 2:
+                raise HTTPException(status_code=400, detail="CPD requires at least 2 frames.")
+            frames = sorted(dict.fromkeys(frames))
+            df_cpd = df[df["Frame"].isin(frames)].copy()
+            if df_cpd.empty:
+                raise HTTPException(status_code=400, detail="No rows for selected frames.")
+            conds = sorted(df_cpd["Condition"].dropna().astype(str).unique().tolist())
+            if req.control and req.control in conds:
+                conds.remove(req.control)
+                conds.insert(0, req.control)
+            out = []
+            skipped = []
+            for c in conds:
+                sub = df_cpd[df_cpd["Condition"].astype(str) == c]
+                counts = sub["Frame"].value_counts().reindex(frames, fill_value=0).astype(float).to_numpy()
+                cpd_vals = [0.0]
+                acc = 0.0
+                for i in range(len(counts) - 1):
+                    n0, n1 = counts[i], counts[i + 1]
+                    if n0 <= 0 or n1 <= 0:
+                        skipped.append(f"{c}[{frames[i]}->{frames[i + 1]}]")
+                        cpd_vals.append(acc)
+                        continue
+                    acc += float(np.log2(n1 / n0))
+                    cpd_vals.append(acc)
+                out.extend({"Condition": c, "Frame": fr, "CPD": val} for fr, val in zip(frames, cpd_vals))
+            cpd_df = pd.DataFrame(out)
+            dynamic_width = _dynamic_width_for_categories("Frame")
+            fig = px.line(cpd_df, x="Frame", y="CPD", color="Condition", markers=True)
+            if skipped:
+                auc_summary = " | CPD warnings: skipped intervals with zero counts: " + ", ".join(skipped[:8]) + ("..." if len(skipped) > 8 else "")
         else:
             raise HTTPException(status_code=400, detail=f"Graph type '{gt}' not implemented yet for interactive preview.")
     except HTTPException:
@@ -1213,11 +1291,67 @@ def graphs_preview(req: GraphPreviewRequest):
     fig.update_layout(margin=dict(l=50, r=20, t=50, b=50), template="plotly_white")
     if dynamic_width:
         fig.update_layout(width=dynamic_width)
+    if auc_lines:
+        fig.update_layout(margin=dict(l=50, r=20, t=110, b=50))
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            x=0.01,
+            y=1.18,
+            showarrow=False,
+            align="left",
+            text="AUC: " + " | ".join(auc_lines),
+            font=dict(size=12, color="#0c1b2a"),
+            bgcolor="rgba(245,248,251,0.92)",
+            bordercolor="#dde6ef",
+            borderwidth=1,
+        )
     return GraphPreviewResponse(
         figure=json.loads(fig.to_json()),
         columns=[str(c) for c in df.columns if c != "__source__"],
-        message=f"Preview generated for {len(df)} rows.",
+        message=f"Preview generated for {len(df)} rows.{auc_summary}",
     )
+
+
+@app.post("/graphs/conditions", response_model=GraphConditionsResponse)
+def graphs_conditions(req: GraphConditionsRequest):
+    datasets = req.datasets or [{"path": p, "name": Path(p).stem} for p in (req.paths or [])]
+    datasets = [d for d in datasets if str(d.get("path", "")).strip()]
+    if not datasets:
+        return GraphConditionsResponse(conditions=[])
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for ds in datasets:
+        p = str(ds.get("path", "")).strip()
+        ds_name = str(ds.get("name", "")).strip() or Path(p).stem
+        pth = Path(p).expanduser().resolve()
+        if not pth.exists() or not pth.is_file():
+            raise HTTPException(status_code=400, detail=f"CSV not found: {p}")
+
+        conds: list[str] = []
+        try:
+            dfc = pd.read_csv(pth, usecols=["Condition"])
+            vals = (
+                dfc["Condition"]
+                .dropna()
+                .astype(str)
+                .map(lambda s: s.strip())
+                .tolist()
+            )
+            conds = [v for v in vals if v and v.lower() != "nan"]
+        except Exception:
+            conds = []
+
+        if not conds:
+            conds = [ds_name]
+
+        for c in conds:
+            if c not in seen:
+                seen.add(c)
+                out.append(c)
+
+    return GraphConditionsResponse(conditions=out)
 
 
 def _default_thresholds(mean_nii: float, std_nii: float, mean_area: float, std_area: float,

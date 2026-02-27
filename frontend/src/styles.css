@@ -616,6 +616,26 @@ button:not(:disabled):hover {
   overflow-x: auto;
 }
 
+.preview-loading {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid #dbe7f3;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .plot {
   width: min(100%, var(--plot-width, 640px));
   min-height: 640px;

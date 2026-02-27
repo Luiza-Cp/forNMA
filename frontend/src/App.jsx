@@ -66,8 +66,8 @@ const DEFAULT_FOCI_JOB = {
 const PLOT_TYPES_REQUIRE_XY = new Set(["scatter"]);
 const PLOT_TYPES_REQUIRE_Y = new Set(["scatter", "violin", "box", "dot", "bar", "line", "rolling-average"]);
 const PLOT_TYPES_SUPPORT_DOT = new Set(["box"]);
-const PLOT_TYPES_SUPPORT_SIZE = new Set(["scatter"]);
-const PLOT_TYPES_SUPPORT_X = new Set(["scatter", "violin", "box"]);
+const PLOT_TYPES_SUPPORT_SIZE = new Set(["scatter", "dot"]);
+const PLOT_TYPES_SUPPORT_X = new Set(["scatter", "violin", "box", "dot", "bar", "line"]);
 
 function readStorage(key, fallback) {
   if (typeof window === "undefined") return fallback;
@@ -1264,8 +1264,8 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
   );
 }
 
-function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, graphState, setGraphState }) {
-  const graphTypes = ["scatter", "violin", "box", "dot", "bar", "line", "rolling-average"];
+function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, graphState, setGraphState, loading }) {
+  const graphTypes = ["scatter", "violin", "box", "dot", "bar", "line", "cpd"];
 
   const setField = (k, v) => setGraphState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(graphState.datasets || []), { id: makeRowId(), name: `Dataset ${(graphState.datasets || []).length + 1}`, path: "", columns: null, enabled: true }]);
@@ -1281,7 +1281,10 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
   const supportsDot = PLOT_TYPES_SUPPORT_DOT.has(graphType);
   const supportsSize = PLOT_TYPES_SUPPORT_SIZE.has(graphType);
   const supportsX = PLOT_TYPES_SUPPORT_X.has(graphType);
-  const xOptions = (graphType === "violin" || graphType === "box") ? categoricalCols : cols;
+  const xOptions = (graphType === "violin" || graphType === "box" || graphType === "dot" || graphType === "bar") ? categoricalCols : cols;
+  const lineRolling = graphType === "line" && !!graphState.line_rolling;
+  const isCpd = graphType === "cpd";
+  const shouldShowFrames = isCpd || (graphType === "line" && (!graphState.x || graphState.x === "Frame"));
 
   return (
     <aside className="panel seg-panel">
@@ -1353,18 +1356,21 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                   graph_type: nextType,
                   x: PLOT_TYPES_SUPPORT_X.has(nextType) ? prev.x : "",
                   size: PLOT_TYPES_SUPPORT_SIZE.has(nextType) ? prev.size : "",
+                  line_rolling: nextType === "line" ? prev.line_rolling : false,
                 }));
               }}
             >
               {graphTypes.map((g) => <option key={`gt-${g}`} value={g}>{g}</option>)}
             </select>
-            {supportsX && (
+            {!isCpd && supportsX && (
               <div className="row">
                 <select className="input" value={graphState.x} onChange={(e) => setField("x", e.target.value)}>
                   <option value="">
-                    {(graphType === "violin" || graphType === "box")
+                    {(graphType === "violin" || graphType === "box" || graphType === "dot" || graphType === "bar")
                       ? "Category axis (optional)"
-                      : (requiresXY ? "Select X axis (required)" : "Select X axis")}
+                      : (graphType === "line"
+                        ? "X axis (default: Frame)"
+                        : (requiresXY ? "Select X axis (required)" : "Select X axis"))}
                   </option>
                   {xOptions.map((c) => <option key={`x-${c}`} value={c}>{c}</option>)}
                 </select>
@@ -1374,7 +1380,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 </select>
               </div>
             )}
-            {!supportsX && (
+            {!isCpd && !supportsX && (
               <div className="row">
                 <select className="input" value={graphState.y} onChange={(e) => setField("y", e.target.value)}>
                   <option value="">{requiresY ? "Select Y axis (required)" : "Select Y axis"}</option>
@@ -1382,6 +1388,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 </select>
               </div>
             )}
+            {!isCpd && (
             <div className="row">
               <select
                 className="input"
@@ -1398,6 +1405,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 </select>
               )}
             </div>
+            )}
             {graphType === "violin" && (
               <>
                 <label className="checkbox">
@@ -1418,17 +1426,47 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 </label>
               </>
             )}
-            {(graphType === "line" || graphType === "rolling-average") && (
+            {isCpd && (
+              <div className="hint">
+                CPD (Cumulative Population Doubling) estimates cumulative growth by summing doublings between consecutive frames:
+                CPD = sum(log2(Nt+1 / Nt)). Use frames from different days/timepoints.
+              </div>
+            )}
+            {shouldShowFrames && (
               <div className="row">
                 <input
                   className="input"
                   value={graphState.framesText || ""}
                   onChange={(e) => setField("framesText", e.target.value)}
-                  placeholder="Frames (optional, empty = all)"
+                  placeholder={isCpd ? "Frames (required, e.g. 0,1,2,3)" : "Frames (optional, empty = all)"}
                 />
               </div>
             )}
-            {graphType === "rolling-average" && (
+            {isCpd && (
+              <div className="row">
+                <select
+                  className="input"
+                  value={graphState.control || ""}
+                  onChange={(e) => setField("control", e.target.value)}
+                >
+                  <option value="">Control condition (optional)</option>
+                  {(graphState.controlOptions || []).map((c) => (
+                    <option key={`ctrl-${c}`} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {graphType === "line" && (
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={!!graphState.line_rolling}
+                  onChange={(e) => setField("line_rolling", e.target.checked)}
+                />
+                Rolling average
+              </label>
+            )}
+            {lineRolling && (
               <div className="row">
                 <input
                   className="input"
@@ -1456,6 +1494,16 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 </label>
               </>
             )}
+            {graphType === "line" && (
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={!!graphState.compute_auc}
+                  onChange={(e) => setField("compute_auc", e.target.checked)}
+                />
+                Compute AUC
+              </label>
+            )}
           </div>
         </details>
       </div>
@@ -1463,9 +1511,9 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
         <button
           className="primary"
           onClick={onPreview}
-          disabled={!canPreview}
+          disabled={!canPreview || loading}
         >
-          Plot preview
+          {loading ? "Generating..." : "Plot"}
         </button>
       </div>
       <Status level={status.level} text={status.text} />
@@ -1894,6 +1942,10 @@ export default function App() {
     violin_box: true,
     violin_points: true,
     box_outliers: false,
+    line_rolling: false,
+    compute_auc: false,
+    control: "",
+    controlOptions: [],
     conditionsText: "",
     framesText: "",
     dot: false,
@@ -1905,6 +1957,7 @@ export default function App() {
     message: "",
   });
   const [plotDataStatus, setPlotDataStatus] = useState({ level: "info", text: "" });
+  const [plotDataLoading, setPlotDataLoading] = useState(false);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const plotDataColsCacheRef = React.useRef({});
@@ -2050,8 +2103,8 @@ export default function App() {
       .filter(({ d }) => String(d.path || "").trim());
     if (targets.length === 0) {
       setPlotData((prev) => {
-        if ((prev.columns || []).length === 0 && (prev.categoricalColumns || []).length === 0 && !prev.columnsWarning) return prev;
-        return { ...prev, columns: [], categoricalColumns: [], columnsWarning: "" };
+        if ((prev.columns || []).length === 0 && (prev.categoricalColumns || []).length === 0 && (prev.controlOptions || []).length === 0 && !prev.columnsWarning) return prev;
+        return { ...prev, columns: [], categoricalColumns: [], controlOptions: [], columnsWarning: "" };
       });
       return;
     }
@@ -2116,6 +2169,23 @@ export default function App() {
           columnsWarning: nextWarning,
         };
       });
+      try {
+        const condRes = await callApi("/graphs/conditions", {
+          datasets: targets.map(({ d }) => ({
+            name: String(d.name || "").trim(),
+            path: String(d.path || "").trim(),
+          })),
+        });
+        if (cancelled) return;
+        const nextConditions = condRes.conditions || [];
+        setPlotData((prev) => {
+          const validControl = prev.control && nextConditions.includes(prev.control) ? prev.control : "";
+          if (sameArray(prev.controlOptions || [], nextConditions) && prev.control === validControl) return prev;
+          return { ...prev, controlOptions: nextConditions, control: validControl };
+        });
+      } catch {
+        if (cancelled) return;
+      }
     })();
     return () => {
       cancelled = true;
@@ -2946,33 +3016,45 @@ export default function App() {
       setPlotDataStatusMsg("Select Y for this plot type.", "error");
       return;
     }
-    if (gt === "rolling-average") {
+    const effectiveGraphType = (gt === "line" && !!plotData.line_rolling) ? "rolling-average" : gt;
+    if (effectiveGraphType === "rolling-average") {
       const nVal = plotData.n === "" ? null : Number(plotData.n);
       if (!Number.isFinite(nVal) || nVal <= 0) {
         setPlotDataStatusMsg("Rolling average requires n > 0.", "error");
         return;
       }
     }
-    if ((gt === "violin" || gt === "box") && plotData.x && !(plotData.categoricalColumns || []).includes(plotData.x)) {
-      setPlotDataStatusMsg("For violin/box, choose a categorical column on X (or leave it empty).", "error");
+    if (effectiveGraphType === "cpd") {
+      const fs = parseIntList(plotData.framesText);
+      if (fs.length < 2) {
+        setPlotDataStatusMsg("CPD requires at least 2 frames.", "error");
+        return;
+      }
+    }
+    if ((gt === "violin" || gt === "box" || gt === "dot" || gt === "bar") && plotData.x && !(plotData.categoricalColumns || []).includes(plotData.x)) {
+      setPlotDataStatusMsg("For violin/box/dot/bar, choose a categorical column on X (or leave it empty).", "error");
       return;
     }
     setPlotDataStatusMsg("Generating interactive preview...", "info");
+    setPlotDataLoading(true);
     try {
+      const shouldUseFrames = effectiveGraphType === "cpd" || effectiveGraphType === "rolling-average" || (gt === "line" && (!plotData.x || plotData.x === "Frame"));
       const payload = {
         datasets,
-        graph_type: plotData.graph_type,
-        x: PLOT_TYPES_SUPPORT_X.has(gt) ? (plotData.x || null) : null,
-        y: plotData.y || null,
-        hue: plotData.hue || null,
-        size: plotData.size || null,
+        graph_type: effectiveGraphType,
+        x: effectiveGraphType === "cpd" ? null : (PLOT_TYPES_SUPPORT_X.has(gt) ? (plotData.x || null) : null),
+        y: effectiveGraphType === "cpd" ? null : (plotData.y || null),
+        hue: effectiveGraphType === "cpd" ? null : (plotData.hue || null),
+        size: effectiveGraphType === "cpd" ? null : (plotData.size || null),
         violin_box: !!plotData.violin_box,
         violin_points: !!plotData.violin_points,
         box_outliers: !!plotData.box_outliers,
+        compute_auc: !!plotData.compute_auc,
+        control: effectiveGraphType === "cpd" ? (String(plotData.control || "").trim() || null) : null,
         conditions: [],
-        frames: parseIntList(plotData.framesText),
+        frames: shouldUseFrames ? parseIntList(plotData.framesText) : [],
         dot: !!plotData.dot,
-        n: plotData.n === "" ? null : Number(plotData.n),
+        n: effectiveGraphType === "rolling-average" ? (plotData.n === "" ? null : Number(plotData.n)) : null,
       };
       const res = await callApi("/graphs/preview", payload);
       setPlotData((prev) => ({
@@ -2990,6 +3072,8 @@ export default function App() {
       setPlotDataStatusMsg(res.message || "Preview ready.", "success");
     } catch (err) {
       setPlotDataStatusMsg(err.message, "error");
+    } finally {
+      setPlotDataLoading(false);
     }
   };
 
@@ -3271,6 +3355,7 @@ export default function App() {
               }}
               onPreview={handlePlotDataPreview}
               status={plotDataStatus}
+              loading={plotDataLoading}
               setStatusExternal={setPlotDataStatusMsg}
               graphState={plotData}
               setGraphState={setPlotData}
@@ -3278,6 +3363,12 @@ export default function App() {
             <main className="content">
               <section>
                 <h2>Plot Data</h2>
+                {plotDataLoading && (
+                  <div className="preview-loading">
+                    <div className="spinner" />
+                    <div className="hint">Generating preview...</div>
+                  </div>
+                )}
                 {plotData.figure ? (
                   <PlotPanel figure={plotData.figure} />
                 ) : (
