@@ -260,6 +260,34 @@ body {
   font-size: 12px;
 }
 
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.results-table th,
+.results-table td {
+  border-bottom: 1px solid #edf2f7;
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.results-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fbff;
+  z-index: 1;
+}
+
 .seg-load-table-wrap {
   overflow: auto;
 }

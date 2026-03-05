@@ -18,6 +18,10 @@ const FORNMA_STAGES = [
 ];
 const PALETTE_OPTIONS = ["viridis", "plasma", "magma", "inferno", "cividis", "coolwarm", "Spectral", "RdBu"];
 const sameArray = (a = [], b = []) => a.length === b.length && a.every((v, i) => v === b[i]);
+const scrollToTopSmooth = () => {
+  if (typeof window === "undefined") return;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
 const STORAGE_KEYS = {
   activeModule: "fornma.activeModule",
   plotJob: "fornma.plotJob",
@@ -68,6 +72,89 @@ const PLOT_TYPES_REQUIRE_Y = new Set(["scatter", "violin", "box", "dot", "bar", 
 const PLOT_TYPES_SUPPORT_DOT = new Set(["box"]);
 const PLOT_TYPES_SUPPORT_SIZE = new Set(["scatter", "dot"]);
 const PLOT_TYPES_SUPPORT_X = new Set(["scatter", "violin", "box", "dot", "bar", "line"]);
+const initialPlotConfig = () => ({
+  kind: "dot",
+  dot: {
+    column1: "",
+    column2: "",
+    hue_min: "",
+    hue_max: "",
+    size_min: "",
+    size_max: "",
+    sample_size: "",
+    palette: "",
+    single: false,
+    overtime: false,
+  },
+  heatmap: {
+    single: false,
+    overtime: false,
+    jointplot: false,
+    palette: "",
+  },
+});
+const initialPlotDataState = () => ({
+  datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", columns: null, enabled: true }],
+  graph_type: "scatter",
+  x: "",
+  y: "",
+  hue: "",
+  size: "",
+  violin_box: true,
+  violin_points: true,
+  box_outliers: false,
+  line_rolling: false,
+  compute_auc: false,
+  control: "",
+  controlOptions: [],
+  conditionsText: "",
+  framesText: "",
+  dot: false,
+  n: "",
+  columns: [],
+  categoricalColumns: [],
+  columnsWarning: "",
+  figure: null,
+  message: "",
+});
+const initialClusteringState = () => ({
+  datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", enabled: true }],
+  columnsAll: [],
+  numericColumns: [],
+  columns: [],
+  n_neighbors: 15,
+  min_dist: 0.1,
+  metric: "euclidean",
+  method: "umap",
+  scale: true,
+  max_points: 12000,
+  use_clusters: false,
+  n_clusters: 8,
+  k_min: 2,
+  k_max: 12,
+  color_by: "",
+  figure: null,
+  elbowFigure: null,
+  message: "",
+});
+const initialStatsState = () => ({
+  datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", enabled: true }],
+  method: "oneway",
+  columns: [],
+  numeric_col: "",
+  group_col: "",
+  group_col1: "",
+  group_col2: "",
+  category_col: "",
+  condition_col: "",
+  alpha: 0.05,
+  expected_min: 5.0,
+  correction_method: "auto",
+  pairs_text: "",
+  tables: [],
+  log: "",
+  message: "",
+});
 
 function readStorage(key, fallback) {
   if (typeof window === "undefined") return fallback;
@@ -1521,6 +1608,410 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
   );
 }
 
+function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, elbowLoading, state, setState }) {
+  const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
+  const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
+  const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
+  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+
+  const numeric = state.numericColumns || [];
+  const selectedSet = new Set(state.columns || []);
+  const canRun = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim()) && (state.columns || []).length > 0 && !loading;
+
+  return (
+    <aside className="panel seg-panel">
+      <div className="seg-header">
+        <h3>Clustering</h3>
+        <p className="hint">Interactive embedding preview with optional KMeans coloring.</p>
+      </div>
+      <div className="seg-scroll">
+        <details open className="seg-section">
+          <summary>Data</summary>
+          <div className="seg-body">
+            {(state.datasets || []).map((d, idx) => (
+              <div className="dataset" key={d.id}>
+                <div className="row">
+                  <label className="checkbox" style={{ minWidth: 62 }}>
+                    <input
+                      type="checkbox"
+                      checked={d.enabled !== false}
+                      onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
+                    />
+                    use
+                  </label>
+                  <input
+                    className="input"
+                    value={d.name || ""}
+                    onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                    placeholder={`Dataset ${idx + 1} name`}
+                  />
+                  {(state.datasets || []).length > 1 && (
+                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                  )}
+                </div>
+                <div className="row path-row">
+                  <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  <button
+                    className="ghost"
+                    onClick={async () => {
+                      try {
+                        const picked = await onPickCsv();
+                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                      } catch {
+                        // no-op
+                      }
+                    }}
+                  >
+                    Browse CSV
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button className="secondary" onClick={addDataset}>Add CSV</button>
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Features</summary>
+          <div className="seg-body">
+            <div className="hint">Select numeric columns used by UMAP.</div>
+            <select
+              className="input"
+              multiple
+              size={Math.min(10, Math.max(4, numeric.length || 4))}
+              value={state.columns || []}
+              onChange={(e) => {
+                const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
+                setField("columns", vals);
+              }}
+            >
+              {numeric.map((c) => <option key={`umap-col-${c}`} value={c}>{c}</option>)}
+            </select>
+            <div className="row row-right">
+              <button className="ghost btn-small" onClick={() => setField("columns", numeric.slice())}>Select all</button>
+              <button className="ghost btn-small" onClick={() => setField("columns", [])}>Clear</button>
+            </div>
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Embedding options</summary>
+          <div className="seg-body">
+            <select className="input" value={state.method || "umap"} onChange={(e) => setField("method", e.target.value)}>
+              <option value="umap">UMAP</option>
+              <option value="pca">PCA</option>
+            </select>
+            {state.method !== "pca" && (
+              <>
+            <div className="row">
+              <input className="input" type="number" min="2" value={state.n_neighbors ?? 15} onChange={(e) => setField("n_neighbors", Number(e.target.value || 15))} placeholder="n_neighbors" />
+              <input className="input" type="number" min="0" max="0.99" step="0.01" value={state.min_dist ?? 0.1} onChange={(e) => setField("min_dist", Number(e.target.value || 0.1))} placeholder="min_dist" />
+            </div>
+            <div className="row">
+              <select className="input" value={state.metric || "euclidean"} onChange={(e) => setField("metric", e.target.value)}>
+                {["euclidean", "manhattan", "cosine", "chebyshev", "canberra", "correlation"].map((m) => (
+                  <option key={`metric-${m}`} value={m}>{m}</option>
+                ))}
+              </select>
+              <input className="input" type="number" min="500" step="500" value={state.max_points ?? 12000} onChange={(e) => setField("max_points", Number(e.target.value || 12000))} placeholder="max points" />
+            </div>
+              </>
+            )}
+            {state.method === "pca" && (
+              <div className="row">
+                <input className="input" type="number" min="500" step="500" value={state.max_points ?? 12000} onChange={(e) => setField("max_points", Number(e.target.value || 12000))} placeholder="max points" />
+              </div>
+            )}
+            <label className="checkbox">
+              <input type="checkbox" checked={!!state.scale} onChange={(e) => setField("scale", e.target.checked)} />
+              Standardize features (z-score)
+            </label>
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Coloring</summary>
+          <div className="seg-body">
+            <label className="checkbox">
+              <input type="checkbox" checked={!!state.use_clusters} onChange={(e) => setField("use_clusters", e.target.checked)} />
+              Use KMeans clusters
+            </label>
+            {state.use_clusters ? (
+              <>
+                <div className="field-head">Number of clusters (k)</div>
+                <input className="input" type="number" min="2" value={state.n_clusters ?? 8} onChange={(e) => setField("n_clusters", Number(e.target.value || 8))} placeholder="k for KMeans coloring" />
+                <div className="field-head">Elbow range</div>
+                <div className="row">
+                  <input className="input" type="number" min="2" value={state.k_min ?? 2} onChange={(e) => setField("k_min", Number(e.target.value || 2))} placeholder="Minimum k" />
+                  <input className="input" type="number" min="3" value={state.k_max ?? 12} onChange={(e) => setField("k_max", Number(e.target.value || 12))} placeholder="Maximum k" />
+                </div>
+                <button className="ghost" onClick={onElbow} disabled={loading || elbowLoading}>
+                  {elbowLoading ? "Generating elbow..." : "Generate elbow plot"}
+                </button>
+              </>
+            ) : (
+              <select className="input" value={state.color_by || ""} onChange={(e) => setField("color_by", e.target.value)}>
+                <option value="">Color by default (Condition)</option>
+                {(state.columnsAll || []).map((c) => <option key={`color-${c}`} value={c}>{c}</option>)}
+              </select>
+            )}
+          </div>
+        </details>
+      </div>
+
+      <div className="seg-footer">
+        <button className="primary" onClick={onPreview} disabled={!canRun}>
+          {loading ? "Running..." : "Run"}
+        </button>
+      </div>
+      <Status level={status.level} text={status.text} />
+    </aside>
+  );
+}
+
+function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) {
+  const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
+  const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
+  const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
+  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const cols = state.columns || [];
+  const method = state.method || "oneway";
+  const canRun = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim()) && !loading;
+  const methodHelp = {
+    oneway: "Compares one numeric variable across multiple groups (e.g., Control vs Treatments).",
+    twoway: "Evaluates two factors simultaneously and their possible interaction effect.",
+    chi2: "Tests association between two categorical variables using a contingency table.",
+    "chi2-subgroups": "Compares conditions within each categorical subgroup (2x2 tests per subgroup).",
+  };
+
+  return (
+    <aside className="panel seg-panel">
+      <div className="seg-header">
+        <h3>Statistics</h3>
+        <p className="hint">Run statistical tests and inspect result tables.</p>
+      </div>
+      <div className="seg-scroll">
+        <details open className="seg-section">
+          <summary>Data</summary>
+          <div className="seg-body">
+            {(state.datasets || []).map((d, idx) => (
+              <div className="dataset" key={d.id}>
+                <div className="row">
+                  <label className="checkbox" style={{ minWidth: 62 }}>
+                    <input
+                      type="checkbox"
+                      checked={d.enabled !== false}
+                      onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
+                    />
+                    use
+                  </label>
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">Dataset name <Tip text="Friendly name used to identify this file in the analysis." /></div>
+                    <input
+                      className="input"
+                      value={d.name || ""}
+                      onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                      placeholder={`Dataset ${idx + 1} name`}
+                    />
+                  </div>
+                  {(state.datasets || []).length > 1 && (
+                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                  )}
+                </div>
+                <div className="row path-row">
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">CSV path <Tip text="Local path to the CSV file containing your data." /></div>
+                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  </div>
+                  <button
+                    className="ghost"
+                    onClick={async () => {
+                      try {
+                        const picked = await onPickCsv();
+                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                      } catch {
+                        // noop
+                      }
+                    }}
+                  >
+                    Browse CSV
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button className="secondary" onClick={addDataset}>Add CSV</button>
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Test</summary>
+          <div className="seg-body">
+            <div className="field-head">Test method <Tip text="Choose the statistical test you want to run." /></div>
+            <select className="input" value={method} onChange={(e) => setField("method", e.target.value)}>
+              <option value="oneway">One-way</option>
+              <option value="twoway">Two-way</option>
+              <option value="chi2">Chi-square</option>
+              <option value="chi2-subgroups">Chi-square subgroups</option>
+            </select>
+            <div className="hint">{methodHelp[method]}</div>
+
+            {(method === "oneway" || method === "twoway") && (
+              <div className="row">
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Numeric column <Tip text="Numeric variable to compare across groups." /></div>
+                <select className="input" value={state.numeric_col || ""} onChange={(e) => setField("numeric_col", e.target.value)}>
+                  <option value="">Numeric column</option>
+                  {cols.map((c) => <option key={`sn-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+              </div>
+            )}
+
+            {method === "oneway" && (
+              <div className="row">
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Group column <Tip text="Categorical column that defines the groups to compare." /></div>
+                <select className="input" value={state.group_col || ""} onChange={(e) => setField("group_col", e.target.value)}>
+                  <option value="">Group column</option>
+                  {cols.map((c) => <option key={`sg-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+              </div>
+            )}
+
+            {method === "twoway" && (
+              <div className="row">
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Factor A <Tip text="First categorical factor in the two-way analysis." /></div>
+                <select className="input" value={state.group_col1 || ""} onChange={(e) => setField("group_col1", e.target.value)}>
+                  <option value="">Factor A</option>
+                  {cols.map((c) => <option key={`sga-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Factor B <Tip text="Second categorical factor in the two-way analysis." /></div>
+                <select className="input" value={state.group_col2 || ""} onChange={(e) => setField("group_col2", e.target.value)}>
+                  <option value="">Factor B</option>
+                  {cols.map((c) => <option key={`sgb-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+              </div>
+            )}
+
+            {method === "chi2" && (
+              <div className="row">
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Group column <Tip text="Row groups in the contingency table." /></div>
+                <select className="input" value={state.group_col || ""} onChange={(e) => setField("group_col", e.target.value)}>
+                  <option value="">Group column</option>
+                  {cols.map((c) => <option key={`scg-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Category column <Tip text="Category levels represented as columns in the contingency table." /></div>
+                <select className="input" value={state.category_col || ""} onChange={(e) => setField("category_col", e.target.value)}>
+                  <option value="">Category column</option>
+                  {cols.map((c) => <option key={`scc-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+              </div>
+            )}
+
+            {method === "chi2-subgroups" && (
+              <div className="row">
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Subgroup column <Tip text="Base category used to split subgroup comparisons." /></div>
+                <select className="input" value={state.group_col || ""} onChange={(e) => setField("group_col", e.target.value)}>
+                  <option value="">Group column</option>
+                  {cols.map((c) => <option key={`ssg-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Condition column <Tip text="Conditions that will be compared within each subgroup." /></div>
+                <select className="input" value={state.condition_col || ""} onChange={(e) => setField("condition_col", e.target.value)}>
+                  <option value="">Condition column</option>
+                  {cols.map((c) => <option key={`ssc-${c}`} value={c}>{c}</option>)}
+                </select>
+                </div>
+              </div>
+            )}
+
+            {(method === "oneway" || method === "twoway") && (
+              <div>
+                <div className="field-head">Alpha <Tip text="Significance threshold. Default: 0.05." /></div>
+                <input className="input" type="number" step="0.001" min="0" max="1" value={state.alpha ?? 0.05} onChange={(e) => setField("alpha", Number(e.target.value || 0.05))} placeholder="alpha" />
+              </div>
+            )}
+
+            {(method === "chi2" || method === "chi2-subgroups") && (
+              <div className="row">
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Expected minimum <Tip text="Minimum expected count threshold used to trigger fallback methods (e.g., Fisher/Monte Carlo)." /></div>
+                  <input className="input" type="number" step="0.1" min="0" value={state.expected_min ?? 5.0} onChange={(e) => setField("expected_min", Number(e.target.value || 5.0))} placeholder="expected min" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Correction method <Tip text="Multiple-comparison correction used in post-hoc results." /></div>
+                <select className="input" value={state.correction_method || "auto"} onChange={(e) => setField("correction_method", e.target.value)}>
+                  <option value="auto">Correction: auto</option>
+                  <option value="bonferroni">Correction: bonferroni</option>
+                  <option value="fdr_bh">Correction: fdr_bh</option>
+                </select>
+                </div>
+              </div>
+            )}
+
+            {(method === "oneway" || method === "twoway") && (
+              <div>
+                <div className="field-head">Pairs of interest (optional) <Tip text="Specific pairs for post-hoc testing. Example: A|B; A|C." /></div>
+                <input className="input" value={state.pairs_text || ""} onChange={(e) => setField("pairs_text", e.target.value)} placeholder="Pairs (optional): A|B; A|C" />
+              </div>
+            )}
+          </div>
+        </details>
+      </div>
+      <div className="seg-footer">
+        <button className="primary" onClick={onRun} disabled={!canRun}>
+          {loading ? "Running..." : "Run"}
+        </button>
+      </div>
+      <Status level={status.level} text={status.text} />
+    </aside>
+  );
+}
+
+function StatsTableView({ table, onDownload }) {
+  const cols = table?.columns || [];
+  const rows = table?.rows || [];
+  return (
+    <div className="section">
+      <div className="row row-between">
+        <h3>{table?.name || "Table"}</h3>
+        <button className="ghost btn-small" onClick={() => onDownload?.(table)} disabled={!rows.length}>
+          Download CSV
+        </button>
+      </div>
+      {!rows.length ? (
+        <p className="hint">No rows.</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="results-table">
+            <thead>
+              <tr>{cols.map((c) => <th key={`th-${table.name}-${c}`}>{c}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 2000).map((r, i) => (
+                <tr key={`tr-${table.name}-${i}`}>
+                  {cols.map((c) => <td key={`td-${table.name}-${i}-${c}`}>{r[c] == null ? "" : String(r[c])}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const emptyRow = () => ({
   id: makeRowId(),
   name: "",
@@ -1901,25 +2392,7 @@ export default function App() {
   const [step2Percentages, setStep2Percentages] = useState(null);
   const [showPlotConfig, setShowPlotConfig] = useState(false);
   const [plotConfig, setPlotConfig] = useState({
-    kind: "dot",
-    dot: {
-      column1: "",
-      column2: "",
-      hue_min: "",
-      hue_max: "",
-      size_min: "",
-      size_max: "",
-      sample_size: "",
-      palette: "",
-      single: false,
-      overtime: false,
-    },
-    heatmap: {
-      single: false,
-      overtime: false,
-      jointplot: false,
-      palette: "",
-    },
+    ...initialPlotConfig(),
   });
   const [plotSavePath, setPlotSavePath] = useState("");
   const [plotJob, setPlotJob] = useState(() => ({ ...DEFAULT_PLOT_JOB, ...readStorage(STORAGE_KEYS.plotJob, {}) }));
@@ -1932,38 +2405,34 @@ export default function App() {
   const [segPreviewPage, setSegPreviewPage] = useState(0);
   const [lastSegPreviewPayload, setLastSegPreviewPayload] = useState(null);
   const [segPanelResetKey, setSegPanelResetKey] = useState(0);
-  const [plotData, setPlotData] = useState({
-    datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", columns: null, enabled: true }],
-    graph_type: "scatter",
-    x: "",
-    y: "",
-    hue: "",
-    size: "",
-    violin_box: true,
-    violin_points: true,
-    box_outliers: false,
-    line_rolling: false,
-    compute_auc: false,
-    control: "",
-    controlOptions: [],
-    conditionsText: "",
-    framesText: "",
-    dot: false,
-    n: "",
-    columns: [],
-    categoricalColumns: [],
-    columnsWarning: "",
-    figure: null,
-    message: "",
-  });
+  const [regPanelResetKey, setRegPanelResetKey] = useState(0);
+  const [fociPanelResetKey, setFociPanelResetKey] = useState(0);
+  const [plotData, setPlotData] = useState(initialPlotDataState);
   const [plotDataStatus, setPlotDataStatus] = useState({ level: "info", text: "" });
   const [plotDataLoading, setPlotDataLoading] = useState(false);
+  const [clustering, setClustering] = useState(initialClusteringState);
+  const [clusteringStatus, setClusteringStatus] = useState({ level: "info", text: "" });
+  const [clusteringLoading, setClusteringLoading] = useState(false);
+  const [clusteringElbowLoading, setClusteringElbowLoading] = useState(false);
+  const [statsState, setStatsState] = useState(initialStatsState);
+  const [statsStatus, setStatsStatus] = useState({ level: "info", text: "" });
+  const [statsLoading, setStatsLoading] = useState(false);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const plotDataColsCacheRef = React.useRef({});
+  const clusteringColsCacheRef = React.useRef({});
+  const statsColsCacheRef = React.useRef({});
   const plotDataPathsKey = useMemo(
     () => (plotData.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
     [plotData.datasets]
+  );
+  const clusteringPathsKey = useMemo(
+    () => (clustering.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
+    [clustering.datasets]
+  );
+  const statsPathsKey = useMemo(
+    () => (statsState.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
+    [statsState.datasets]
   );
   const hasPlotRun = Boolean(plotJob.job_id);
   const hasSegSession =
@@ -2192,6 +2661,131 @@ export default function App() {
     };
   }, [plotDataPathsKey]);
 
+  useEffect(() => {
+    const datasets = clustering.datasets || [];
+    const targets = datasets
+      .map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => String(d.path || "").trim());
+    if (targets.length === 0) {
+      setClustering((prev) => {
+        if ((prev.columnsAll || []).length === 0 && (prev.numericColumns || []).length === 0 && (prev.columns || []).length === 0) return prev;
+        return { ...prev, columnsAll: [], numericColumns: [], columns: [] };
+      });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const loaded = await Promise.all(
+        targets.map(async ({ d, idx }) => {
+          const path = String(d.path || "").trim();
+          if (clusteringColsCacheRef.current[path]) {
+            return { idx, ...clusteringColsCacheRef.current[path] };
+          }
+          try {
+            const res = await callApi("/nma/datasets/columns", { path });
+            const payload = {
+              columns: res.columns || [],
+              numeric: res.numeric_columns || [],
+            };
+            clusteringColsCacheRef.current[path] = payload;
+            return { idx, ...payload };
+          } catch {
+            return { idx, columns: [], numeric: [] };
+          }
+        })
+      );
+      if (cancelled) return;
+      const valid = loaded.filter((x) => x.columns.length > 0);
+      const firstCols = valid[0]?.columns || [];
+      const firstNumeric = valid[0]?.numeric || [];
+      setClustering((prev) => {
+        const keepNumeric = (prev.columns || []).filter((c) => firstNumeric.includes(c));
+        const changed =
+          !sameArray(prev.columnsAll || [], firstCols) ||
+          !sameArray(prev.numericColumns || [], firstNumeric) ||
+          !sameArray(prev.columns || [], keepNumeric);
+        if (!changed) return prev;
+        return {
+          ...prev,
+          columnsAll: firstCols,
+          numericColumns: firstNumeric,
+          columns: keepNumeric.length ? keepNumeric : firstNumeric.slice(0, Math.min(8, firstNumeric.length)),
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clusteringPathsKey]);
+
+  useEffect(() => {
+    const datasets = statsState.datasets || [];
+    const targets = datasets
+      .map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => String(d.path || "").trim());
+    if (targets.length === 0) {
+      setStatsState((prev) => {
+        if ((prev.columns || []).length === 0) return prev;
+        return {
+          ...prev,
+          columns: [],
+          numeric_col: "",
+          group_col: "",
+          group_col1: "",
+          group_col2: "",
+          category_col: "",
+          condition_col: "",
+        };
+      });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const loaded = await Promise.all(
+        targets.map(async ({ d, idx }) => {
+          const path = String(d.path || "").trim();
+          if (statsColsCacheRef.current[path]) {
+            return { idx, columns: statsColsCacheRef.current[path] };
+          }
+          try {
+            const res = await callApi("/nma/datasets/columns", { path });
+            const cols = res.columns || [];
+            statsColsCacheRef.current[path] = cols;
+            return { idx, columns: cols };
+          } catch {
+            return { idx, columns: [] };
+          }
+        })
+      );
+      if (cancelled) return;
+      const valid = loaded.filter((x) => x.columns.length > 0);
+      const firstCols = valid[0]?.columns || [];
+      setStatsState((prev) => {
+        const keep = (k) => (prev[k] && firstCols.includes(prev[k]) ? prev[k] : "");
+        if (sameArray(prev.columns || [], firstCols || [])
+          && keep("numeric_col") === prev.numeric_col
+          && keep("group_col") === prev.group_col
+          && keep("group_col1") === prev.group_col1
+          && keep("group_col2") === prev.group_col2
+          && keep("category_col") === prev.category_col
+          && keep("condition_col") === prev.condition_col) return prev;
+        return {
+          ...prev,
+          columns: firstCols,
+          numeric_col: keep("numeric_col"),
+          group_col: keep("group_col"),
+          group_col1: keep("group_col1"),
+          group_col2: keep("group_col2"),
+          category_col: keep("category_col"),
+          condition_col: keep("condition_col"),
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [statsPathsKey]);
+
   const handleDownloadTable = () => {
     if (!step2Percentages) return;
     const quadrantOrder = ["LR", "LI", "N", "I", "SR", "S", "SI"];
@@ -2217,6 +2811,40 @@ export default function App() {
     const a = document.createElement("a");
     a.href = url;
     a.download = "quadrant_proportions.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadStatsTableCsv = (table) => {
+    if (!table?.columns?.length) return;
+    const cols = table.columns.map((c) => String(c));
+    const lines = [cols.map(csvCell).join(",")];
+    (table.rows || []).forEach((row) => {
+      const vals = cols.map((c) => csvCell(row?.[c] ?? ""));
+      lines.push(vals.join(","));
+    });
+    const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const name = String(table.name || "stats_result").replace(/\s+/g, "_").toLowerCase();
+    a.href = url;
+    a.download = `${name}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadStatsLogTxt = () => {
+    const text = String(statsState.log || "");
+    if (!text.trim()) return;
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "statistics_log.txt";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -2249,6 +2877,7 @@ export default function App() {
     if (["starting", "queued", "running", "canceling"].includes(segJob.status)) {
       return;
     }
+    scrollToTopSmooth();
     setStatus("Starting segmentation...");
     setStatusLevel("info");
     setSegJob((prev) => ({
@@ -2325,6 +2954,7 @@ export default function App() {
       setStatusLevel("error");
       return;
     }
+    scrollToTopSmooth();
     setStatus("Starting registration...");
     setStatusLevel("info");
     setRegJob((prev) => ({ ...prev, status: "starting", message: "Starting...", error: "" }));
@@ -2371,6 +3001,7 @@ export default function App() {
 
   const handleStartFoci = async (payload) => {
     if (["starting", "queued", "running", "canceling"].includes(fociJob.status)) return;
+    scrollToTopSmooth();
     setStatus("Starting foci overlay...");
     setStatusLevel("info");
     setFociJob((prev) => ({ ...prev, status: "starting", message: "Starting...", error: "" }));
@@ -2679,6 +3310,7 @@ export default function App() {
       setStatusLevel("error");
       return;
     }
+    scrollToTopSmooth();
     setStatus("Starting plot generation...");
     setStatusLevel("info");
 
@@ -3035,6 +3667,7 @@ export default function App() {
       setPlotDataStatusMsg("For violin/box/dot/bar, choose a categorical column on X (or leave it empty).", "error");
       return;
     }
+    scrollToTopSmooth();
     setPlotDataStatusMsg("Generating interactive preview...", "info");
     setPlotDataLoading(true);
     try {
@@ -3077,6 +3710,162 @@ export default function App() {
     }
   };
 
+  const handleClusteringPreview = async () => {
+    const datasets = (clustering.datasets || [])
+      .filter((d) => d.enabled !== false)
+      .map((d) => ({
+        name: String(d.name || "").trim(),
+        path: String(d.path || "").trim(),
+      }))
+      .filter((d) => d.path);
+    if (!datasets.length) {
+      setClusteringStatus({ level: "error", text: "Select at least one dataset." });
+      return;
+    }
+    if (!(clustering.columns || []).length) {
+      setClusteringStatus({ level: "error", text: "Select at least one numeric feature." });
+      return;
+    }
+    scrollToTopSmooth();
+    setClusteringLoading(true);
+    setClusteringStatus({ level: "info", text: "Running UMAP preview..." });
+    try {
+      const payload = {
+        datasets,
+        columns: clustering.columns,
+        method: clustering.method || "umap",
+        n_neighbors: Number(clustering.n_neighbors || 15),
+        min_dist: Number(clustering.min_dist ?? 0.1),
+        metric: clustering.metric || "euclidean",
+        scale: !!clustering.scale,
+        max_points: Number(clustering.max_points || 12000),
+        color_by: clustering.use_clusters ? null : (clustering.color_by || null),
+        use_clusters: !!clustering.use_clusters,
+        n_clusters: clustering.use_clusters ? Number(clustering.n_clusters || 8) : null,
+      };
+      const res = await callApi("/clustering/umap/preview", payload);
+      setClustering((prev) => ({
+        ...prev,
+        figure: res.figure || null,
+        columnsAll: res.columns || prev.columnsAll || [],
+        numericColumns: res.numeric_columns || prev.numericColumns || [],
+        message: res.message || "",
+      }));
+      setClusteringStatus({ level: "success", text: res.message || "Preview ready." });
+    } catch (err) {
+      setClusteringStatus({ level: "error", text: err.message || "UMAP preview failed." });
+    } finally {
+      setClusteringLoading(false);
+    }
+  };
+
+  const handleClusteringElbow = async () => {
+    const datasets = (clustering.datasets || [])
+      .filter((d) => d.enabled !== false)
+      .map((d) => ({
+        name: String(d.name || "").trim(),
+        path: String(d.path || "").trim(),
+      }))
+      .filter((d) => d.path);
+    if (!datasets.length) {
+      setClusteringStatus({ level: "error", text: "Select at least one dataset." });
+      return;
+    }
+    if (!(clustering.columns || []).length) {
+      setClusteringStatus({ level: "error", text: "Select at least one numeric feature." });
+      return;
+    }
+    scrollToTopSmooth();
+    setClusteringElbowLoading(true);
+    setClusteringStatus({ level: "info", text: "Generating elbow plot..." });
+    try {
+      const payload = {
+        datasets,
+        columns: clustering.columns,
+        method: clustering.method || "umap",
+        n_neighbors: Number(clustering.n_neighbors || 15),
+        min_dist: Number(clustering.min_dist ?? 0.1),
+        metric: clustering.metric || "euclidean",
+        scale: !!clustering.scale,
+        max_points: Number(clustering.max_points || 12000),
+        k_min: Number(clustering.k_min || 2),
+        k_max: Number(clustering.k_max || 12),
+      };
+      const res = await callApi("/clustering/elbow/preview", payload);
+      setClustering((prev) => ({ ...prev, elbowFigure: res.figure || null }));
+      setClusteringStatus({ level: "success", text: res.message || "Elbow plot ready." });
+    } catch (err) {
+      setClusteringStatus({ level: "error", text: err.message || "Elbow plot failed." });
+    } finally {
+      setClusteringElbowLoading(false);
+    }
+  };
+
+  const handleStatsRun = async () => {
+    const method = statsState.method || "oneway";
+    const datasets = (statsState.datasets || [])
+      .filter((d) => d.enabled !== false)
+      .map((d) => String(d.path || "").trim())
+      .filter(Boolean);
+    if (!datasets.length) {
+      setStatsStatus({ level: "error", text: "Select at least one dataset." });
+      return;
+    }
+    if (method === "oneway" && (!statsState.numeric_col || !statsState.group_col)) {
+      setStatsStatus({ level: "error", text: "One-way requires numeric and group columns." });
+      return;
+    }
+    if (method === "twoway" && (!statsState.numeric_col || !statsState.group_col1 || !statsState.group_col2)) {
+      setStatsStatus({ level: "error", text: "Two-way requires numeric, factor A and factor B." });
+      return;
+    }
+    if (method === "chi2" && (!statsState.group_col || !statsState.category_col)) {
+      setStatsStatus({ level: "error", text: "Chi-square requires group and category columns." });
+      return;
+    }
+    if (method === "chi2-subgroups" && (!statsState.group_col || !statsState.condition_col)) {
+      setStatsStatus({ level: "error", text: "Chi-square subgroups requires group and condition columns." });
+      return;
+    }
+
+    const pairs = String(statsState.pairs_text || "")
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    scrollToTopSmooth();
+    setStatsLoading(true);
+    setStatsStatus({ level: "info", text: "Running statistical analysis..." });
+    try {
+      const payload = {
+        paths: datasets,
+        method,
+        numeric_col: statsState.numeric_col || null,
+        group_col: statsState.group_col || null,
+        group_col1: statsState.group_col1 || null,
+        group_col2: statsState.group_col2 || null,
+        category_col: statsState.category_col || null,
+        condition_col: statsState.condition_col || null,
+        alpha: Number(statsState.alpha || 0.05),
+        expected_min: Number(statsState.expected_min || 5.0),
+        correction_method: statsState.correction_method || "auto",
+        pairs_of_interest: pairs,
+      };
+      const res = await callApi("/stats/run", payload);
+      setStatsState((prev) => ({
+        ...prev,
+        tables: res.tables || [],
+        log: res.log || "",
+        message: res.message || "",
+      }));
+      setStatsStatus({ level: "success", text: res.message || "Analysis complete." });
+    } catch (err) {
+      setStatsStatus({ level: "error", text: err.message || "Stats run failed." });
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   const handleResetNma = () => {
     const ok = window.confirm("Reset NMA settings and return to initial state?");
     if (!ok) return;
@@ -3108,32 +3897,63 @@ export default function App() {
     setDownloadReady(false);
     setStep2Percentages(null);
     setShowPlotConfig(false);
-    setPlotConfig({
-      kind: "dot",
-      dot: {
-        column1: "",
-        column2: "",
-        hue_min: "",
-        hue_max: "",
-        size_min: "",
-        size_max: "",
-        sample_size: "",
-        palette: "",
-        single: false,
-        overtime: false,
-      },
-      heatmap: {
-        single: false,
-        overtime: false,
-        jointplot: false,
-        palette: "",
-      },
-    });
+    setPlotConfig(initialPlotConfig());
     setPlotSavePath("");
     setPlotJob({ ...DEFAULT_PLOT_JOB });
     setCurrentPlotIndex(0);
     setShowNmaPreviewWhilePlotting(false);
     attemptedColumnsRef.current = new Set();
+  };
+
+  const handleResetRegistrationUi = () => {
+    if (["starting", "queued", "running", "canceling"].includes(regJob.status || "idle")) return;
+    const ok = window.confirm("Reset Image Registration screen to a clean state?");
+    if (!ok) return;
+    setRegJob({ ...DEFAULT_REG_JOB });
+    setRegPanelResetKey((k) => k + 1);
+    setStatus("");
+    setStatusLevel("info");
+  };
+
+  const handleResetFociUi = () => {
+    if (["starting", "queued", "running", "canceling"].includes(fociJob.status || "idle")) return;
+    const ok = window.confirm("Reset Foci Overlay screen to a clean state?");
+    if (!ok) return;
+    setFociJob({ ...DEFAULT_FOCI_JOB });
+    setFociPanelResetKey((k) => k + 1);
+    setStatus("");
+    setStatusLevel("info");
+  };
+
+  const handleResetPlotDataUi = () => {
+    if (plotDataLoading) return;
+    const ok = window.confirm("Reset Plot Data screen to a clean state?");
+    if (!ok) return;
+    setPlotData(initialPlotDataState());
+    setPlotDataStatus({ level: "info", text: "" });
+    setPlotDataLoading(false);
+    plotDataColsCacheRef.current = {};
+  };
+
+  const handleResetClusteringUi = () => {
+    if (clusteringLoading || clusteringElbowLoading) return;
+    const ok = window.confirm("Reset Clustering screen to a clean state?");
+    if (!ok) return;
+    setClustering(initialClusteringState());
+    setClusteringStatus({ level: "info", text: "" });
+    setClusteringLoading(false);
+    setClusteringElbowLoading(false);
+    clusteringColsCacheRef.current = {};
+  };
+
+  const handleResetStatisticsUi = () => {
+    if (statsLoading) return;
+    const ok = window.confirm("Reset Statistics screen to a clean state?");
+    if (!ok) return;
+    setStatsState(initialStatsState());
+    setStatsStatus({ level: "info", text: "" });
+    setStatsLoading(false);
+    statsColsCacheRef.current = {};
   };
 
   return (
@@ -3185,7 +4005,16 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <h2>Segmentation</h2>
+                <div className="row row-between">
+                  <h2>Segmentation</h2>
+                  <button
+                    className="ghost btn-small"
+                    onClick={handleResetSegmentationUi}
+                    disabled={["starting", "queued", "running", "canceling"].includes(segJob.status || "idle")}
+                  >
+                    Reset
+                  </button>
+                </div>
                 <p className="hint">Run segmentation and monitor progress in real time.</p>
                 {hasSegSession ? (
                   <div className="section">
@@ -3306,6 +4135,7 @@ export default function App() {
         ) : activeModule === "Foci Overlay" ? (
           <>
             <FociOverlayLeftPanel
+              key={`foci-panel-${fociPanelResetKey}`}
               onPickDirectory={async () => {
                 try {
                   const res = await pickDirectoryPath();
@@ -3321,7 +4151,16 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <h2>Foci Overlay</h2>
+                <div className="row row-between">
+                  <h2>Foci Overlay</h2>
+                  <button
+                    className="ghost btn-small"
+                    onClick={handleResetFociUi}
+                    disabled={["starting", "queued", "running", "canceling"].includes(fociJob.status || "idle")}
+                  >
+                    Reset
+                  </button>
+                </div>
                 {fociJob.job_id ? (
                   <div className="section">
                     <h3>Execution progress</h3>
@@ -3346,6 +4185,97 @@ export default function App() {
               </section>
             </main>
           </>
+        ) : activeModule === "Statistics" ? (
+          <>
+            <StatsLeftPanel
+              onPickCsv={async () => {
+                const res = await pickCsvPath();
+                return res.path || "";
+              }}
+              onRun={handleStatsRun}
+              status={statsStatus}
+              loading={statsLoading}
+              state={statsState}
+              setState={setStatsState}
+            />
+            <main className="content">
+              <section>
+                <div className="row row-between">
+                  <h2>Statistics</h2>
+                  <button className="ghost btn-small" onClick={handleResetStatisticsUi} disabled={statsLoading}>
+                    Reset
+                  </button>
+                </div>
+                {statsLoading && (
+                  <div className="preview-loading">
+                    <div className="spinner" />
+                    <div className="hint">Running analysis...</div>
+                  </div>
+                )}
+                {(statsState.tables || []).length ? (
+                  <>
+                    {(statsState.tables || []).map((t) => (
+                      <StatsTableView key={`stats-${t.name}`} table={t} onDownload={downloadStatsTableCsv} />
+                    ))}
+                    <div className="section">
+                      <div className="row row-between">
+                        <h3>Log</h3>
+                        <button className="ghost btn-small" onClick={downloadStatsLogTxt} disabled={!String(statsState.log || "").trim()}>
+                          Download TXT
+                        </button>
+                      </div>
+                      <pre className="seg-log">{statsState.log || "No logs yet."}</pre>
+                    </div>
+                  </>
+                ) : (
+                  <p className="hint">Select datasets, configure a test, and click Run.</p>
+                )}
+              </section>
+            </main>
+          </>
+        ) : activeModule === "Clustering" ? (
+          <>
+            <ClusteringLeftPanel
+              onPickCsv={async () => {
+                const res = await pickCsvPath();
+                return res.path || "";
+              }}
+              onPreview={handleClusteringPreview}
+              onElbow={handleClusteringElbow}
+              status={clusteringStatus}
+              loading={clusteringLoading}
+              elbowLoading={clusteringElbowLoading}
+              state={clustering}
+              setState={setClustering}
+            />
+            <main className="content">
+              <section>
+                <div className="row row-between">
+                  <h2>Clustering</h2>
+                  <button className="ghost btn-small" onClick={handleResetClusteringUi} disabled={clusteringLoading || clusteringElbowLoading}>
+                    Reset
+                  </button>
+                </div>
+                {(clusteringLoading || clusteringElbowLoading) && (
+                  <div className="preview-loading">
+                    <div className="spinner" />
+                    <div className="hint">{clusteringLoading ? "Running embedding..." : "Generating elbow..."}</div>
+                  </div>
+                )}
+                {clustering.figure ? (
+                  <PlotPanel figure={clustering.figure} />
+                ) : (
+                  <p className="hint">Select datasets and numeric features, then run UMAP.</p>
+                )}
+                {clustering.elbowFigure && (
+                  <div className="section">
+                    <h3>Elbow Plot</h3>
+                    <PlotPanel figure={clustering.elbowFigure} />
+                  </div>
+                )}
+              </section>
+            </main>
+          </>
         ) : activeModule === "Plot Data" ? (
           <>
             <PlotDataLeftPanel
@@ -3362,7 +4292,12 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <h2>Plot Data</h2>
+                <div className="row row-between">
+                  <h2>Plot Data</h2>
+                  <button className="ghost btn-small" onClick={handleResetPlotDataUi} disabled={plotDataLoading}>
+                    Reset
+                  </button>
+                </div>
                 {plotDataLoading && (
                   <div className="preview-loading">
                     <div className="spinner" />
@@ -3380,6 +4315,7 @@ export default function App() {
         ) : activeModule === "Image Registration" ? (
           <>
             <RegistrationLeftPanel
+              key={`reg-panel-${regPanelResetKey}`}
               onPickDirectory={async () => {
                 try {
                   const res = await pickDirectoryPath();
@@ -3394,7 +4330,16 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <h2>Image Registration</h2>
+                <div className="row row-between">
+                  <h2>Image Registration</h2>
+                  <button
+                    className="ghost btn-small"
+                    onClick={handleResetRegistrationUi}
+                    disabled={["starting", "queued", "running", "canceling"].includes(regJob.status || "idle")}
+                  >
+                    Reset
+                  </button>
+                </div>
                 {regJob.job_id ? (
                   <div className="section">
                     <div className="status info">

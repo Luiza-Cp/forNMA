@@ -8,6 +8,7 @@ import uuid
 import os
 import json
 import tempfile
+import hashlib
 from datetime import datetime
 import subprocess
 import sys
@@ -22,8 +23,10 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.cluster import DBSCAN
+from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 from fornma.core.NMA.plot_NMA import plot_NMA as run_nma_plot, NMA as NMAClass
 from fornma.core.Segmentation.run import run as run_segmentation_pipeline
 from fornma.core.Registration.registration import registration as run_registration_pipeline
@@ -67,6 +70,12 @@ from .schemas import (
     GraphPreviewResponse,
     GraphConditionsRequest,
     GraphConditionsResponse,
+    UMAPPreviewRequest,
+    UMAPPreviewResponse,
+    ClusteringElbowResponse,
+    StatsRunRequest,
+    StatsRunResponse,
+    StatsTable,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -86,6 +95,9 @@ REG_THREADS: Dict[str, threading.Thread] = {}
 FOCI_JOBS: Dict[str, Dict] = {}
 FOCI_JOBS_LOCK = threading.Lock()
 FOCI_THREADS: Dict[str, threading.Thread] = {}
+CLUSTER_CACHE: Dict[str, Dict] = {}
+CLUSTER_CACHE_LOCK = threading.Lock()
+CLUSTER_CACHE_MAX_ITEMS = 6
 
 # Allow local dev frontends (Vite) to call the API
 app.add_middleware(
@@ -105,13 +117,17 @@ def health():
     return {"status": "ok"}
 
 
+def _is_display_column(name: str) -> bool:
+    return "unnamed" not in str(name).strip().lower()
+
+
 @app.post("/nma/datasets/columns", response_model=DatasetColumnsResponse)
 def nma_datasets_columns(req: DatasetColumnsRequest):
     try:
         df = pd.read_csv(req.path, nrows=2000)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read CSV header: {e}")
-    cols = [str(c) for c in df.columns.tolist()]
+    cols = [str(c) for c in df.columns.tolist() if _is_display_column(c)]
     categorical_cols = []
     for c in cols:
         s = df[c]
@@ -121,7 +137,8 @@ def nma_datasets_columns(req: DatasetColumnsRequest):
         nun = int(s.nunique(dropna=True))
         if nun > 0 and nun <= 20:
             categorical_cols.append(c)
-    return DatasetColumnsResponse(columns=cols, categorical_columns=categorical_cols)
+    numeric_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
+    return DatasetColumnsResponse(columns=cols, categorical_columns=categorical_cols, numeric_columns=numeric_cols)
 
 
 @app.post("/system/pick-csv")
@@ -1308,7 +1325,7 @@ def graphs_preview(req: GraphPreviewRequest):
         )
     return GraphPreviewResponse(
         figure=json.loads(fig.to_json()),
-        columns=[str(c) for c in df.columns if c != "__source__"],
+        columns=[str(c) for c in df.columns if c != "__source__" and _is_display_column(c)],
         message=f"Preview generated for {len(df)} rows.{auc_summary}",
     )
 
@@ -1352,6 +1369,434 @@ def graphs_conditions(req: GraphConditionsRequest):
                 out.append(c)
 
     return GraphConditionsResponse(conditions=out)
+
+
+def _prepare_clustering_input(req: UMAPPreviewRequest):
+    datasets = req.datasets or [{"path": p, "name": Path(p).stem} for p in (req.paths or [])]
+    datasets = [d for d in datasets if str(d.get("path", "")).strip()]
+    if not datasets:
+        raise HTTPException(status_code=400, detail="Provide at least one CSV path.")
+
+    dfs = []
+    base_cols = None
+    for ds in datasets:
+        p = str(ds.get("path", "")).strip()
+        ds_name = str(ds.get("name", "")).strip() or Path(p).stem
+        pth = Path(p).expanduser().resolve()
+        if not pth.exists() or not pth.is_file():
+            raise HTTPException(status_code=400, detail=f"CSV not found: {p}")
+        try:
+            df = pd.read_csv(pth)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read CSV '{p}': {e}")
+
+        if "Condition" not in df.columns:
+            df["Condition"] = ds_name
+        else:
+            cond = df["Condition"].astype(str)
+            empty = cond.isna() | (cond.str.strip() == "") | (cond.str.lower() == "nan")
+            if empty.any():
+                df.loc[empty, "Condition"] = ds_name
+
+        cols = tuple(str(c) for c in df.columns)
+        if base_cols is None:
+            base_cols = cols
+        elif cols != base_cols:
+            raise HTTPException(status_code=400, detail="All CSVs must have exactly the same columns (same names and order).")
+
+        df["__source__"] = ds_name
+        dfs.append(df)
+
+    df_all = pd.concat(dfs, ignore_index=True)
+    numeric_cols = [c for c in df_all.columns if c != "__source__" and pd.api.types.is_numeric_dtype(df_all[c])]
+    if not numeric_cols:
+        raise HTTPException(status_code=400, detail="No numeric columns available for clustering.")
+
+    feat_cols = req.columns or numeric_cols
+    missing = [c for c in feat_cols if c not in df_all.columns]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Selected columns not found: {missing}")
+    non_numeric = [c for c in feat_cols if not pd.api.types.is_numeric_dtype(df_all[c])]
+    if non_numeric:
+        raise HTTPException(status_code=400, detail=f"Clustering features must be numeric. Invalid: {non_numeric}")
+
+    valid = ~df_all[feat_cols].isna().any(axis=1)
+    df_valid = df_all.loc[valid].copy()
+    if df_valid.empty:
+        raise HTTPException(status_code=400, detail="No valid rows after dropping NaN in selected features.")
+
+    max_points = max(500, int(req.max_points or 12000))
+    if len(df_valid) > max_points:
+        df_valid = df_valid.sample(n=max_points, random_state=42)
+
+    X = df_valid[feat_cols].to_numpy(dtype=float)
+    if req.scale:
+        X = StandardScaler().fit_transform(X)
+
+    return df_all, df_valid, X, feat_cols, numeric_cols
+
+
+def _compute_embedding(X: np.ndarray, req: UMAPPreviewRequest):
+    method = (req.method or "umap").strip().lower()
+    if method == "pca":
+        pca = PCA(n_components=2, random_state=42)
+        emb = pca.fit_transform(X)
+        vr = getattr(pca, "explained_variance_ratio_", None)
+        if vr is not None and len(vr) >= 2:
+            c1 = f"PC1 ({float(vr[0]) * 100:.1f}%)"
+            c2 = f"PC2 ({float(vr[1]) * 100:.1f}%)"
+        else:
+            c1, c2 = "PC1", "PC2"
+        return emb, (c1, c2), "PCA"
+    if method != "umap":
+        raise HTTPException(status_code=400, detail=f"Unknown method '{req.method}'. Use 'umap' or 'pca'.")
+    try:
+        import umap
+    except Exception:
+        raise HTTPException(status_code=400, detail="Package 'umap-learn' is not installed in this environment.")
+    reducer = umap.UMAP(
+        n_neighbors=max(2, int(req.n_neighbors)),
+        min_dist=float(req.min_dist),
+        n_components=2,
+        metric=(req.metric or "euclidean").lower(),
+        random_state=42,
+    )
+    emb = reducer.fit_transform(X)
+    return emb, ("UMAP1", "UMAP2"), "UMAP"
+
+
+def _clustering_cache_key(req: UMAPPreviewRequest) -> str:
+    datasets = req.datasets or [{"path": p, "name": Path(p).stem} for p in (req.paths or [])]
+    normalized = []
+    for ds in datasets:
+        p = str(ds.get("path", "")).strip()
+        if not p:
+            continue
+        pth = Path(p).expanduser().resolve()
+        name = str(ds.get("name", "")).strip() or pth.stem
+        try:
+            st = pth.stat()
+            sig = (str(pth), name, int(st.st_size), int(st.st_mtime))
+        except Exception:
+            sig = (str(pth), name, 0, 0)
+        normalized.append(sig)
+    normalized.sort()
+    payload = {
+        "datasets": normalized,
+        "columns": sorted(req.columns or []),
+        "method": (req.method or "umap").lower(),
+        "n_neighbors": int(req.n_neighbors),
+        "min_dist": float(req.min_dist),
+        "metric": (req.metric or "euclidean").lower(),
+        "scale": bool(req.scale),
+        "max_points": int(req.max_points or 12000),
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha1(raw).hexdigest()
+
+
+def _cache_put_embedding(key: str, value: Dict):
+    with CLUSTER_CACHE_LOCK:
+        if key in CLUSTER_CACHE:
+            CLUSTER_CACHE.pop(key, None)
+        CLUSTER_CACHE[key] = value
+        while len(CLUSTER_CACHE) > CLUSTER_CACHE_MAX_ITEMS:
+            oldest = next(iter(CLUSTER_CACHE.keys()))
+            CLUSTER_CACHE.pop(oldest, None)
+
+
+def _df_to_stats_table(name: str, df: pd.DataFrame | None) -> StatsTable | None:
+    if df is None:
+        return None
+    if not isinstance(df, pd.DataFrame):
+        return None
+    tmp = df.copy()
+    tmp.columns = [str(c) for c in tmp.columns]
+    rows = json.loads(tmp.to_json(orient="records", date_format="iso"))
+    return StatsTable(name=name, columns=[str(c) for c in tmp.columns], rows=rows)
+
+
+@app.post("/clustering/umap/preview", response_model=UMAPPreviewResponse)
+def clustering_umap_preview(req: UMAPPreviewRequest):
+    key = _clustering_cache_key(req)
+    with CLUSTER_CACHE_LOCK:
+        cached = CLUSTER_CACHE.get(key)
+
+    reused = bool(cached)
+    if cached:
+        df_valid = cached["df_valid"].copy()
+        c1, c2 = cached["axes"]
+        label = cached["label"]
+        feat_cols = cached["feat_cols"]
+        numeric_cols = cached["numeric_cols"]
+        columns_all = cached["columns_all"]
+        emb = df_valid[[c1, c2]].to_numpy(dtype=float)
+    else:
+        df_all, df_valid, X, feat_cols, numeric_cols = _prepare_clustering_input(req)
+        emb, (c1, c2), label = _compute_embedding(X, req)
+        df_valid[c1] = emb[:, 0]
+        df_valid[c2] = emb[:, 1]
+        columns_all = [str(c) for c in df_all.columns if c != "__source__" and _is_display_column(c)]
+        _cache_put_embedding(
+            key,
+            {
+                "df_valid": df_valid,
+                "axes": (c1, c2),
+                "label": label,
+                "feat_cols": feat_cols,
+                "numeric_cols": numeric_cols,
+                "columns_all": columns_all,
+            },
+        )
+
+    color_col = None
+    if req.use_clusters:
+        k = int(req.n_clusters or 8)
+        if k < 1:
+            raise HTTPException(status_code=400, detail="n_clusters must be >= 1.")
+        labels = KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(emb)
+        df_valid["cluster"] = labels.astype(str)
+        color_col = "cluster"
+    elif req.color_by and req.color_by in df_valid.columns:
+        color_col = req.color_by
+    elif "Condition" in df_valid.columns:
+        color_col = "Condition"
+    elif "__source__" in df_valid.columns:
+        color_col = "__source__"
+
+    fig = px.scatter(
+        df_valid,
+        x=c1,
+        y=c2,
+        color=color_col,
+        hover_data=["Condition", "__source__"] if "Condition" in df_valid.columns else ["__source__"],
+    )
+    fig.update_layout(
+        template="plotly_white",
+        margin=dict(l=45, r=20, t=45, b=45),
+        width=max(760, min(1400, 700 + int(len(df_valid) / 40))),
+    )
+    return UMAPPreviewResponse(
+        figure=json.loads(fig.to_json()),
+        columns=columns_all,
+        numeric_columns=[c for c in numeric_cols if _is_display_column(c)],
+        message=f"{label} ready with {len(df_valid)} points and {len(feat_cols)} features." + (" Reused cached embedding." if reused else ""),
+    )
+
+
+@app.post("/clustering/elbow/preview", response_model=ClusteringElbowResponse)
+def clustering_elbow_preview(req: UMAPPreviewRequest):
+    key = _clustering_cache_key(req)
+    with CLUSTER_CACHE_LOCK:
+        cached = CLUSTER_CACHE.get(key)
+    if cached:
+        c1, c2 = cached["axes"]
+        emb = cached["df_valid"][[c1, c2]].to_numpy(dtype=float)
+        feat_cols = cached["feat_cols"]
+        label = cached["label"]
+    else:
+        _, df_valid, X, feat_cols, numeric_cols = _prepare_clustering_input(req)
+        emb, (c1, c2), label = _compute_embedding(X, req)
+        df_valid[c1] = emb[:, 0]
+        df_valid[c2] = emb[:, 1]
+        _cache_put_embedding(
+            key,
+            {
+                "df_valid": df_valid,
+                "axes": (c1, c2),
+                "label": label,
+                "feat_cols": feat_cols,
+                "numeric_cols": numeric_cols,
+                "columns_all": [c for c in df_valid.columns if c != "__source__" and _is_display_column(c)],
+            },
+        )
+    k_min = max(2, int(req.k_min or 2))
+    k_max = max(k_min, int(req.k_max or 12))
+    k_max = min(k_max, max(k_min, emb.shape[0] - 1))
+    if k_min >= emb.shape[0]:
+        raise HTTPException(status_code=400, detail="Not enough points to compute elbow for requested k range.")
+
+    ks = list(range(k_min, k_max + 1))
+    inertias = []
+    for k in ks:
+        km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(emb)
+        inertias.append(float(km.inertia_))
+
+    fig = px.line(x=ks, y=inertias, markers=True, labels={"x": "k", "y": "Inertia"})
+    fig.update_layout(
+        template="plotly_white",
+        title=f"Elbow Plot ({label})",
+        margin=dict(l=45, r=20, t=55, b=45),
+        width=860,
+    )
+    return ClusteringElbowResponse(
+        figure=json.loads(fig.to_json()),
+        message=f"Elbow ready using {label} embedding with {len(feat_cols)} features.",
+    )
+
+
+@app.post("/stats/run", response_model=StatsRunResponse)
+def stats_run(req: StatsRunRequest):
+    paths = [str(p).strip() for p in (req.paths or []) if str(p).strip()]
+    if not paths:
+        raise HTTPException(status_code=400, detail="Provide at least one CSV path.")
+
+    # Lazy imports to keep API startup light.
+    from fornma.core.Statistics.Helpers import AnalysisHelper
+
+    tmp_log = tempfile.NamedTemporaryFile(prefix="fornma-stats-", suffix=".log", delete=False)
+    tmp_log_path = tmp_log.name
+    tmp_log.close()
+    helper = AnalysisHelper(alpha=float(req.alpha), log_file=tmp_log_path)
+    df = helper.load_and_concat(paths)
+    method = (req.method or "oneway").strip().lower()
+    tables: list[StatsTable] = []
+
+    def _parse_pairs(raw_pairs: list[str]) -> list[tuple[str, str]]:
+        out = []
+        for item in raw_pairs or []:
+            txt = str(item).strip()
+            if not txt:
+                continue
+            if "|" in txt:
+                a, b = txt.split("|", 1)
+            elif "," in txt:
+                a, b = txt.split(",", 1)
+            else:
+                parts = txt.split()
+                if len(parts) >= 2:
+                    a, b = parts[0], parts[1]
+                else:
+                    continue
+            out.append((a.strip(), b.strip()))
+        return out
+
+    if method == "oneway":
+        if not req.numeric_col or not req.group_col:
+            raise HTTPException(status_code=400, detail="oneway requires numeric_col and group_col.")
+        norm_ok = helper.normality_ok(df=df, factors=[req.group_col], y=req.numeric_col)
+        homo_ok = helper.homoscedasticity_ok(df=df, factors=[req.group_col], y=req.numeric_col)
+        helper.log(f"\nAssumption summary (oneway):")
+        helper.log(f"- Normality (Shapiro): {'OK' if norm_ok else 'NOT OK'}")
+        helper.log(f"- Homoscedasticity (Levene): {'OK' if homo_ok else 'NOT OK'}")
+        helper.log(f"- Decision: {'ANOVA' if (norm_ok and homo_ok) else 'Kruskal-Wallis'}")
+        from fornma.core.Statistics.OneWayAnalysis import OneWayAnalysis
+        ana = OneWayAnalysis(
+            df=df,
+            numeric_col=req.numeric_col,
+            group_col=req.group_col,
+            alpha=float(req.alpha),
+            pairs_of_interest=_parse_pairs(req.pairs_of_interest),
+            helper=helper,
+        )
+        results = ana.run()
+        main = results.get("main_result")
+        test_used = "One-way ANOVA" if isinstance(main, pd.DataFrame) else "Kruskal-Wallis"
+        if isinstance(main, tuple) and len(main) == 2:
+            main_df = pd.DataFrame([{"test_used": test_used, "stat": float(main[0]), "p_value": float(main[1])}])
+        else:
+            if isinstance(main, pd.DataFrame):
+                main_df = main.copy()
+                main_df.insert(0, "test_used", test_used)
+            else:
+                main_df = None
+        for t in [
+            _df_to_stats_table("main_result", main_df),
+            _df_to_stats_table("posthoc", results.get("posthoc")),
+            _df_to_stats_table("summary", results.get("summary")),
+        ]:
+            if t:
+                tables.append(t)
+
+    elif method == "twoway":
+        if not req.numeric_col or not req.group_col1 or not req.group_col2:
+            raise HTTPException(status_code=400, detail="twoway requires numeric_col, group_col1 and group_col2.")
+        norm_ok = helper.normality_ok(df=df, factors=[req.group_col1, req.group_col2], y=req.numeric_col)
+        homo_ok = helper.homoscedasticity_ok(df=df, factors=[req.group_col1, req.group_col2], y=req.numeric_col)
+        helper.log(f"\nAssumption summary (twoway):")
+        helper.log(f"- Normality (Shapiro): {'OK' if norm_ok else 'NOT OK'}")
+        helper.log(f"- Homoscedasticity (Levene): {'OK' if homo_ok else 'NOT OK'}")
+        helper.log(f"- Decision: {'Two-way ANOVA' if (norm_ok and homo_ok) else 'Scheirer-Ray-Hare'}")
+        from fornma.core.Statistics.TwoWayAnalysis import TwoWayAnalysis
+        ana = TwoWayAnalysis(
+            df=df,
+            numeric_col=req.numeric_col,
+            group_col1=req.group_col1,
+            group_col2=req.group_col2,
+            alpha=float(req.alpha),
+            pairs_of_interest=_parse_pairs(req.pairs_of_interest),
+            helper=helper,
+        )
+        results = ana.run()
+        main_obj = results.get("main_result")
+        test_used = "Two-way ANOVA"
+        if isinstance(main_obj, pd.DataFrame):
+            cols_lower = [str(c).lower() for c in main_obj.columns]
+            if "h_adj" in cols_lower or "p_chi2" in cols_lower:
+                test_used = "Scheirer-Ray-Hare"
+        main_df = main_obj.copy() if isinstance(main_obj, pd.DataFrame) else None
+        if main_df is not None:
+            main_df.insert(0, "test_used", test_used)
+        for t in [
+            _df_to_stats_table("main_result", main_df),
+            _df_to_stats_table("posthoc", results.get("posthoc")),
+            _df_to_stats_table("summary", results.get("summary")),
+        ]:
+            if t:
+                tables.append(t)
+
+    elif method == "chi2":
+        if not req.group_col or not req.category_col:
+            raise HTTPException(status_code=400, detail="chi2 requires group_col and category_col.")
+        from fornma.core.Statistics.ChiSquareAnalyzer import ChiSquareAnalyzer
+        ana = ChiSquareAnalyzer(expected_min=float(req.expected_min), use_exact=True, helper=helper)
+        g = ana.global_test(df, req.group_col, req.category_col)
+        post = ana.pairwise_posthoc(g.contingency_table, correction_method=req.correction_method or "auto")
+        main_df = pd.DataFrame([{"test_used": "Chi-square / exact fallback", "chi2": float(g.chi2), "p_value": float(g.p_value)}])
+        exp_df = None
+        if g.expected is not None:
+            exp_df = pd.DataFrame(g.expected, index=g.contingency_table.index, columns=g.contingency_table.columns).reset_index()
+        for t in [
+            _df_to_stats_table("main_result", main_df),
+            _df_to_stats_table("contingency", g.contingency_table.reset_index()),
+            _df_to_stats_table("percentages", g.percentages.reset_index()),
+            _df_to_stats_table("expected", exp_df),
+            _df_to_stats_table("posthoc", post),
+        ]:
+            if t:
+                tables.append(t)
+
+    elif method == "chi2-subgroups":
+        if not req.group_col or not req.condition_col:
+            raise HTTPException(status_code=400, detail="chi2-subgroups requires group_col and condition_col.")
+        from fornma.core.Statistics.ChiSquareSubgroupComparator import ChiSquareSubgroupComparator
+        ana = ChiSquareSubgroupComparator(
+            expected_min=float(req.expected_min),
+            correction_method=req.correction_method or "bonferroni",
+            helper=helper,
+        )
+        df_results, prop_table = ana.compare(df=df, group_col=req.group_col, condition_col=req.condition_col)
+        for t in [
+            _df_to_stats_table("subgroup_results", df_results),
+            _df_to_stats_table("proportions", prop_table.reset_index()),
+        ]:
+            if t:
+                tables.append(t)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown stats method '{req.method}'.")
+
+    log_text = ""
+    try:
+        log_text = Path(tmp_log_path).read_text(encoding="utf-8")
+    except Exception:
+        log_text = ""
+    finally:
+        try:
+            Path(tmp_log_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    return StatsRunResponse(method=method, message=f"{method} analysis complete.", log=log_text, tables=tables)
 
 
 def _default_thresholds(mean_nii: float, std_nii: float, mean_area: float, std_area: float,

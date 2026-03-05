@@ -121,6 +121,7 @@ class DatasetColumnsRequest(BaseModel):
 class DatasetColumnsResponse(BaseModel):
     columns: List[str]
     categorical_columns: List[str] = Field(default_factory=list)
+    numeric_columns: List[str] = Field(default_factory=list)
 
 
 class NMASettingsUploadResponse(BaseModel):
@@ -289,3 +290,60 @@ class GraphConditionsRequest(BaseModel):
 
 class GraphConditionsResponse(BaseModel):
     conditions: List[str] = Field(default_factory=list)
+
+
+class UMAPPreviewRequest(BaseModel):
+    datasets: List[Dict[str, str]] = Field(default_factory=list)
+    paths: List[str] = Field(default_factory=list)
+    columns: List[str] = Field(default_factory=list)
+    n_neighbors: int = 15
+    min_dist: float = 0.1
+    metric: str = "euclidean"
+    method: str = "umap"
+    scale: bool = True
+    max_points: int = 12000
+    color_by: Optional[str] = None
+    use_clusters: bool = False
+    n_clusters: Optional[int] = None
+    k_min: int = 2
+    k_max: int = 12
+
+
+class UMAPPreviewResponse(BaseModel):
+    figure: Dict[str, Any]
+    columns: List[str] = Field(default_factory=list)
+    numeric_columns: List[str] = Field(default_factory=list)
+    message: str = ""
+
+
+class ClusteringElbowResponse(BaseModel):
+    figure: Dict[str, Any]
+    message: str = ""
+
+
+class StatsTable(BaseModel):
+    name: str
+    columns: List[str] = Field(default_factory=list)
+    rows: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class StatsRunRequest(BaseModel):
+    paths: List[str] = Field(default_factory=list)
+    method: str = "oneway"  # oneway | twoway | chi2 | chi2-subgroups
+    numeric_col: Optional[str] = None
+    group_col: Optional[str] = None
+    group_col1: Optional[str] = None
+    group_col2: Optional[str] = None
+    category_col: Optional[str] = None
+    condition_col: Optional[str] = None
+    alpha: float = 0.05
+    expected_min: float = 5.0
+    correction_method: str = "auto"
+    pairs_of_interest: List[str] = Field(default_factory=list)
+
+
+class StatsRunResponse(BaseModel):
+    method: str
+    message: str = ""
+    log: str = ""
+    tables: List[StatsTable] = Field(default_factory=list)
