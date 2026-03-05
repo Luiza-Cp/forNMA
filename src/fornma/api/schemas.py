@@ -347,3 +347,44 @@ class StatsRunResponse(BaseModel):
     message: str = ""
     log: str = ""
     tables: List[StatsTable] = Field(default_factory=list)
+
+
+class GatingBounds(BaseModel):
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+
+
+class GatingPreviewRequest(BaseModel):
+    datasets: List[Dict[str, str]] = Field(default_factory=list)
+    paths: List[str] = Field(default_factory=list)
+    x_col: str = "Area"
+    y_col: str = "NII"
+    x_min: Optional[float] = None
+    x_max: Optional[float] = None
+    y_min: Optional[float] = None
+    y_max: Optional[float] = None
+    q_low: float = 0.05
+    q_high: float = 0.95
+    max_points: int = 12000
+    color_by_dataset: bool = False
+
+
+class GatingPreviewResponse(BaseModel):
+    figure: Dict[str, Any]
+    bounds: GatingBounds
+    tables: List[StatsTable] = Field(default_factory=list)
+    message: str = ""
+
+
+class GatingApplyRequest(GatingPreviewRequest):
+    output_dir: str
+
+
+class GatingApplyResponse(BaseModel):
+    bounds: GatingBounds
+    tables: List[StatsTable] = Field(default_factory=list)
+    output_dir: str
+    files: List[str] = Field(default_factory=list)
+    message: str = ""

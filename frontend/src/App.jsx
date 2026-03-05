@@ -9,6 +9,7 @@ const FORNMA_STAGES = [
   "Home",
   "Image Registration",
   "Segmentation",
+  "Gating",
   "Foci Overlay",
   "NMA",
   "Plot Data",
@@ -153,6 +154,26 @@ const initialStatsState = () => ({
   pairs_text: "",
   tables: [],
   log: "",
+  message: "",
+});
+const initialGatingState = () => ({
+  datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", enabled: true }],
+  columns: [],
+  numericColumns: [],
+  x_col: "",
+  y_col: "",
+  x_min: "",
+  x_max: "",
+  y_min: "",
+  y_max: "",
+  q_low: 0.05,
+  q_high: 0.95,
+  max_points: 12000,
+  color_by_dataset: false,
+  output_dir: "",
+  figure: null,
+  tables: [],
+  files: [],
   message: "",
 });
 
@@ -1979,6 +2000,129 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   );
 }
 
+function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, status, loading, applying, state, setState }) {
+  const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
+  const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
+  const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
+  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const numeric = state.numericColumns || [];
+  const busy = !!loading || !!applying;
+  const hasDatasets = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim());
+  const canPreview = hasDatasets && !!state.x_col && !!state.y_col && !busy;
+  const canApply = canPreview && !!String(state.output_dir || "").trim();
+
+  return (
+    <aside className="panel seg-panel">
+      <div className="seg-header">
+        <h3>Gating</h3>
+        <p className="hint">Filter populations by rectangular gates on two numeric columns, including cleanup of segmentation errors/debris.</p>
+      </div>
+      <div className="seg-scroll">
+        <details open className="seg-section">
+          <summary>Data</summary>
+          <div className="seg-body">
+            {(state.datasets || []).map((d, idx) => (
+              <div className="dataset" key={d.id}>
+                <div className="row">
+                  <label className="checkbox" style={{ minWidth: 62 }}>
+                    <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
+                    use
+                  </label>
+                  <input className="input" value={d.name || ""} onChange={(e) => updateDataset(d.id, { name: e.target.value })} placeholder={`Dataset ${idx + 1} name`} />
+                  {(state.datasets || []).length > 1 && (
+                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                  )}
+                </div>
+                <div className="row path-row">
+                  <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  <button
+                    className="ghost"
+                    onClick={async () => {
+                      try {
+                        const picked = await onPickCsv();
+                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                      } catch {
+                        // no-op
+                      }
+                    }}
+                  >
+                    Browse CSV
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button className="secondary" onClick={addDataset}>Add CSV</button>
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Gate setup</summary>
+          <div className="seg-body">
+            <div className="row">
+              <select className="input" value={state.x_col || ""} onChange={(e) => setField("x_col", e.target.value)}>
+                <option value="">X column</option>
+                {numeric.map((c) => <option key={`gx-${c}`} value={c}>{c}</option>)}
+              </select>
+              <select className="input" value={state.y_col || ""} onChange={(e) => setField("y_col", e.target.value)}>
+                <option value="">Y column</option>
+                {numeric.map((c) => <option key={`gy-${c}`} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="row">
+              <input className="input" type="number" value={state.x_min} onChange={(e) => setField("x_min", e.target.value)} placeholder="X minimum (optional)" />
+              <input className="input" type="number" value={state.x_max} onChange={(e) => setField("x_max", e.target.value)} placeholder="X maximum (optional)" />
+            </div>
+            <div className="row">
+              <input className="input" type="number" value={state.y_min} onChange={(e) => setField("y_min", e.target.value)} placeholder="Y minimum (optional)" />
+              <input className="input" type="number" value={state.y_max} onChange={(e) => setField("y_max", e.target.value)} placeholder="Y maximum (optional)" />
+            </div>
+            <div className="row">
+              <input className="input" type="number" min="0" max="0.49" step="0.01" value={state.q_low ?? 0.05} onChange={(e) => setField("q_low", Number(e.target.value || 0.05))} placeholder="Low quantile" />
+              <input className="input" type="number" min="0.51" max="1" step="0.01" value={state.q_high ?? 0.95} onChange={(e) => setField("q_high", Number(e.target.value || 0.95))} placeholder="High quantile" />
+            </div>
+            <label className="checkbox">
+              <input type="checkbox" checked={!!state.color_by_dataset} onChange={(e) => setField("color_by_dataset", e.target.checked)} />
+              Color by dataset
+            </label>
+            <div className="hint">If bounds are empty, they are estimated from quantiles (legacy filters behavior).</div>
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Output</summary>
+          <div className="seg-body">
+            <div className="row path-row">
+              <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save gated CSV files" />
+              <button
+                className="ghost"
+                onClick={async () => {
+                  try {
+                    const picked = await onPickDirectory();
+                    if (picked) setField("output_dir", picked);
+                  } catch {
+                    // no-op
+                  }
+                }}
+              >
+                Browse
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div className="seg-footer">
+        <button className="secondary" onClick={onPreview} disabled={!canPreview}>
+          {loading ? "Previewing..." : "Preview gate"}
+        </button>
+        <button className="primary" onClick={onApply} disabled={!canApply}>
+          {applying ? "Applying..." : "Apply and save"}
+        </button>
+      </div>
+      <Status level={status.level} text={status.text} />
+    </aside>
+  );
+}
+
 function StatsTableView({ table, onDownload }) {
   const cols = table?.columns || [];
   const rows = table?.rows || [];
@@ -2417,11 +2561,17 @@ export default function App() {
   const [statsState, setStatsState] = useState(initialStatsState);
   const [statsStatus, setStatsStatus] = useState({ level: "info", text: "" });
   const [statsLoading, setStatsLoading] = useState(false);
+  const [gatingState, setGatingState] = useState(initialGatingState);
+  const [gatingStatus, setGatingStatus] = useState({ level: "info", text: "" });
+  const [gatingLoading, setGatingLoading] = useState(false);
+  const [gatingApplying, setGatingApplying] = useState(false);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const plotDataColsCacheRef = React.useRef({});
   const clusteringColsCacheRef = React.useRef({});
   const statsColsCacheRef = React.useRef({});
+  const gatingColsCacheRef = React.useRef({});
+  const gatingRelayoutTimerRef = React.useRef(null);
   const plotDataPathsKey = useMemo(
     () => (plotData.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
     [plotData.datasets]
@@ -2433,6 +2583,10 @@ export default function App() {
   const statsPathsKey = useMemo(
     () => (statsState.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
     [statsState.datasets]
+  );
+  const gatingPathsKey = useMemo(
+    () => (gatingState.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
+    [gatingState.datasets]
   );
   const hasPlotRun = Boolean(plotJob.job_id);
   const hasSegSession =
@@ -2785,6 +2939,65 @@ export default function App() {
       cancelled = true;
     };
   }, [statsPathsKey]);
+
+  useEffect(() => {
+    const datasets = gatingState.datasets || [];
+    const targets = datasets
+      .map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => String(d.path || "").trim());
+    if (targets.length === 0) {
+      setGatingState((prev) => {
+        if ((prev.columns || []).length === 0 && (prev.numericColumns || []).length === 0) return prev;
+        return { ...prev, columns: [], numericColumns: [], x_col: "", y_col: "" };
+      });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const loaded = await Promise.all(
+        targets.map(async ({ d, idx }) => {
+          const path = String(d.path || "").trim();
+          if (gatingColsCacheRef.current[path]) {
+            return { idx, ...gatingColsCacheRef.current[path] };
+          }
+          try {
+            const res = await callApi("/nma/datasets/columns", { path });
+            const payload = {
+              columns: res.columns || [],
+              numeric: res.numeric_columns || [],
+            };
+            gatingColsCacheRef.current[path] = payload;
+            return { idx, ...payload };
+          } catch {
+            return { idx, columns: [], numeric: [] };
+          }
+        })
+      );
+      if (cancelled) return;
+      const valid = loaded.filter((x) => x.columns.length > 0);
+      const firstCols = valid[0]?.columns || [];
+      const firstNumeric = valid[0]?.numeric || [];
+      setGatingState((prev) => {
+        const keep = (k) => (prev[k] && firstNumeric.includes(prev[k]) ? prev[k] : "");
+        if (
+          sameArray(prev.columns || [], firstCols) &&
+          sameArray(prev.numericColumns || [], firstNumeric) &&
+          keep("x_col") === prev.x_col &&
+          keep("y_col") === prev.y_col
+        ) return prev;
+        return {
+          ...prev,
+          columns: firstCols,
+          numericColumns: firstNumeric,
+          x_col: keep("x_col"),
+          y_col: keep("y_col"),
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gatingPathsKey]);
 
   const handleDownloadTable = () => {
     if (!step2Percentages) return;
@@ -3588,6 +3801,20 @@ export default function App() {
     };
   }, [fociJob.job_id]);
 
+  useEffect(() => () => {
+    if (gatingRelayoutTimerRef.current) {
+      clearTimeout(gatingRelayoutTimerRef.current);
+      gatingRelayoutTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!gatingState.figure) return;
+    if (gatingLoading || gatingApplying) return;
+    handleGatingPreview({ fromDrag: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gatingState.color_by_dataset]);
+
   const handleSave = async () => {
     setStatus("Saving settings...");
     setStatusLevel("info");
@@ -3866,6 +4093,177 @@ export default function App() {
     }
   };
 
+  const parseOptNumber = (v) => {
+    if (v === "" || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handleGatingPreview = async ({ overrideBounds = null, fromDrag = false } = {}) => {
+    const datasets = (gatingState.datasets || [])
+      .filter((d) => d.enabled !== false)
+      .map((d) => ({
+        name: String(d.name || "").trim(),
+        path: String(d.path || "").trim(),
+      }))
+      .filter((d) => d.path);
+    if (!datasets.length) {
+      setGatingStatus({ level: "error", text: "Select at least one dataset." });
+      return;
+    }
+    if (!gatingState.x_col || !gatingState.y_col) {
+      setGatingStatus({ level: "error", text: "Select X and Y columns." });
+      return;
+    }
+    if (!fromDrag) {
+      scrollToTopSmooth();
+    }
+    setGatingLoading(true);
+    setGatingStatus({ level: "info", text: fromDrag ? "Updating gate preview..." : "Generating gating preview..." });
+    try {
+      const payload = {
+        datasets,
+        x_col: gatingState.x_col,
+        y_col: gatingState.y_col,
+        x_min: overrideBounds?.x_min ?? parseOptNumber(gatingState.x_min),
+        x_max: overrideBounds?.x_max ?? parseOptNumber(gatingState.x_max),
+        y_min: overrideBounds?.y_min ?? parseOptNumber(gatingState.y_min),
+        y_max: overrideBounds?.y_max ?? parseOptNumber(gatingState.y_max),
+        q_low: Number(gatingState.q_low ?? 0.05),
+        q_high: Number(gatingState.q_high ?? 0.95),
+        max_points: Number(gatingState.max_points || 12000),
+        color_by_dataset: !!gatingState.color_by_dataset,
+      };
+      const res = await callApi("/filters/preview", payload);
+      setGatingState((prev) => ({
+        ...prev,
+        figure: res.figure || null,
+        tables: res.tables || [],
+        message: res.message || "",
+        x_min: String(res.bounds?.x_min ?? prev.x_min ?? ""),
+        x_max: String(res.bounds?.x_max ?? prev.x_max ?? ""),
+        y_min: String(res.bounds?.y_min ?? prev.y_min ?? ""),
+        y_max: String(res.bounds?.y_max ?? prev.y_max ?? ""),
+      }));
+      setGatingStatus({ level: "success", text: res.message || "Preview ready." });
+    } catch (err) {
+      setGatingStatus({ level: "error", text: err.message || "Gating preview failed." });
+    } finally {
+      setGatingLoading(false);
+    }
+  };
+
+  const handleGatingApply = async () => {
+    const datasets = (gatingState.datasets || [])
+      .filter((d) => d.enabled !== false)
+      .map((d) => ({
+        name: String(d.name || "").trim(),
+        path: String(d.path || "").trim(),
+      }))
+      .filter((d) => d.path);
+    if (!datasets.length) {
+      setGatingStatus({ level: "error", text: "Select at least one dataset." });
+      return;
+    }
+    if (!gatingState.x_col || !gatingState.y_col) {
+      setGatingStatus({ level: "error", text: "Select X and Y columns." });
+      return;
+    }
+    if (!String(gatingState.output_dir || "").trim()) {
+      setGatingStatus({ level: "error", text: "Choose an output directory to save gated CSVs." });
+      return;
+    }
+    scrollToTopSmooth();
+    setGatingApplying(true);
+    setGatingStatus({ level: "info", text: "Applying gate and writing files..." });
+    try {
+      const payload = {
+        datasets,
+        x_col: gatingState.x_col,
+        y_col: gatingState.y_col,
+        x_min: parseOptNumber(gatingState.x_min),
+        x_max: parseOptNumber(gatingState.x_max),
+        y_min: parseOptNumber(gatingState.y_min),
+        y_max: parseOptNumber(gatingState.y_max),
+        q_low: Number(gatingState.q_low ?? 0.05),
+        q_high: Number(gatingState.q_high ?? 0.95),
+        max_points: Number(gatingState.max_points || 12000),
+        color_by_dataset: !!gatingState.color_by_dataset,
+        output_dir: String(gatingState.output_dir || "").trim(),
+      };
+      const res = await callApi("/filters/apply", payload);
+      setGatingState((prev) => ({
+        ...prev,
+        tables: res.tables || prev.tables || [],
+        files: res.files || [],
+        message: res.message || "",
+        output_dir: res.output_dir || prev.output_dir || "",
+        x_min: String(res.bounds?.x_min ?? prev.x_min ?? ""),
+        x_max: String(res.bounds?.x_max ?? prev.x_max ?? ""),
+        y_min: String(res.bounds?.y_min ?? prev.y_min ?? ""),
+        y_max: String(res.bounds?.y_max ?? prev.y_max ?? ""),
+      }));
+      setGatingStatus({ level: "success", text: res.message || "Gating complete." });
+    } catch (err) {
+      setGatingStatus({ level: "error", text: err.message || "Gating apply failed." });
+    } finally {
+      setGatingApplying(false);
+    }
+  };
+
+  const handleGatingRelayout = (evt) => {
+    if (!evt) return;
+    const shape0 = evt["shapes[0]"];
+    const pick = (keyA, keyB, fallback) => {
+      const a = evt[keyA];
+      const b = evt[keyB];
+      if (a != null) return a;
+      if (b != null) return b;
+      return fallback;
+    };
+    const nextX0 = shape0?.x0 ?? pick("shapes[0].x0", "shapes[0].x1", null);
+    const nextX1 = shape0?.x1 ?? pick("shapes[0].x1", "shapes[0].x0", null);
+    const nextY0 = shape0?.y0 ?? pick("shapes[0].y0", "shapes[0].y1", null);
+    const nextY1 = shape0?.y1 ?? pick("shapes[0].y1", "shapes[0].y0", null);
+    if (nextX0 == null || nextX1 == null || nextY0 == null || nextY1 == null) return;
+
+    const xMin = Math.min(Number(nextX0), Number(nextX1));
+    const xMax = Math.max(Number(nextX0), Number(nextX1));
+    const yMin = Math.min(Number(nextY0), Number(nextY1));
+    const yMax = Math.max(Number(nextY0), Number(nextY1));
+    if (![xMin, xMax, yMin, yMax].every((n) => Number.isFinite(n))) return;
+
+    const prevXMin = Number(gatingState.x_min);
+    const prevXMax = Number(gatingState.x_max);
+    const prevYMin = Number(gatingState.y_min);
+    const prevYMax = Number(gatingState.y_max);
+    if (
+      Number.isFinite(prevXMin) && Number.isFinite(prevXMax) && Number.isFinite(prevYMin) && Number.isFinite(prevYMax) &&
+      Math.abs(prevXMin - xMin) < 1e-9 &&
+      Math.abs(prevXMax - xMax) < 1e-9 &&
+      Math.abs(prevYMin - yMin) < 1e-9 &&
+      Math.abs(prevYMax - yMax) < 1e-9
+    ) return;
+
+    setGatingState((prev) => ({
+      ...prev,
+      x_min: String(xMin),
+      x_max: String(xMax),
+      y_min: String(yMin),
+      y_max: String(yMax),
+    }));
+    if (gatingRelayoutTimerRef.current) {
+      clearTimeout(gatingRelayoutTimerRef.current);
+      gatingRelayoutTimerRef.current = null;
+    }
+    gatingRelayoutTimerRef.current = setTimeout(() => {
+      handleGatingPreview({
+        overrideBounds: { x_min: xMin, x_max: xMax, y_min: yMin, y_max: yMax },
+        fromDrag: true,
+      });
+    }, 220);
+  };
+
   const handleResetNma = () => {
     const ok = window.confirm("Reset NMA settings and return to initial state?");
     if (!ok) return;
@@ -3954,6 +4352,17 @@ export default function App() {
     setStatsStatus({ level: "info", text: "" });
     setStatsLoading(false);
     statsColsCacheRef.current = {};
+  };
+
+  const handleResetGatingUi = () => {
+    if (gatingLoading || gatingApplying) return;
+    const ok = window.confirm("Reset Gating screen to a clean state?");
+    if (!ok) return;
+    setGatingState(initialGatingState());
+    setGatingStatus({ level: "info", text: "" });
+    setGatingLoading(false);
+    setGatingApplying(false);
+    gatingColsCacheRef.current = {};
   };
 
   return (
@@ -4129,6 +4538,70 @@ export default function App() {
                     <p className="hint">No execution started yet. Use Preview or Run to begin.</p>
                   </div>
                 )}
+              </section>
+            </main>
+          </>
+        ) : activeModule === "Gating" ? (
+          <>
+            <GatingLeftPanel
+              onPickCsv={async () => {
+                const res = await pickCsvPath();
+                return res.path || "";
+              }}
+              onPickDirectory={async () => {
+                const res = await pickDirectoryPath();
+                return res.path || "";
+              }}
+              onPreview={handleGatingPreview}
+              onApply={handleGatingApply}
+              status={gatingStatus}
+              loading={gatingLoading}
+              applying={gatingApplying}
+              state={gatingState}
+              setState={setGatingState}
+            />
+            <main className="content">
+              <section>
+                <div className="row row-between">
+                  <h2>Gating</h2>
+                  <button className="ghost btn-small" onClick={handleResetGatingUi} disabled={gatingLoading || gatingApplying}>
+                    Reset
+                  </button>
+                </div>
+                {(gatingLoading || gatingApplying) && (
+                  <div className="preview-loading">
+                    <div className="spinner" />
+                    <div className="hint">{gatingLoading ? "Generating preview..." : "Applying gate..."}</div>
+                  </div>
+                )}
+                {gatingState.figure ? (
+                  <PlotPanel
+                    figure={gatingState.figure}
+                    onRelayout={handleGatingRelayout}
+                    config={{
+                      displayModeBar: false,
+                      displaylogo: false,
+                      responsive: true,
+                      scrollZoom: false,
+                      edits: { shapePosition: true },
+                    }}
+                  />
+                ) : (
+                  <p className="hint">Select datasets, set gate axes, and run Preview gate.</p>
+                )}
+                {(gatingState.tables || []).length ? (
+                  <>
+                    {(gatingState.tables || []).map((t) => (
+                      <StatsTableView key={`gating-${t.name}`} table={t} onDownload={downloadStatsTableCsv} />
+                    ))}
+                  </>
+                ) : null}
+                {(gatingState.files || []).length ? (
+                  <div className="section">
+                    <h3>Saved files</h3>
+                    <pre className="seg-log">{(gatingState.files || []).join("\n")}</pre>
+                  </div>
+                ) : null}
               </section>
             </main>
           </>

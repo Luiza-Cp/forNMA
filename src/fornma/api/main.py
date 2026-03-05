@@ -76,6 +76,11 @@ from .schemas import (
     StatsRunRequest,
     StatsRunResponse,
     StatsTable,
+    GatingPreviewRequest,
+    GatingPreviewResponse,
+    GatingApplyRequest,
+    GatingApplyResponse,
+    GatingBounds,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -1369,6 +1374,206 @@ def graphs_conditions(req: GraphConditionsRequest):
                 out.append(c)
 
     return GraphConditionsResponse(conditions=out)
+
+
+def _normalize_gate_datasets(datasets: list[dict] | None, paths: list[str] | None) -> list[dict]:
+    raw = datasets or [{"path": p, "name": Path(p).stem} for p in (paths or [])]
+    cleaned = []
+    for ds in raw:
+        p = str(ds.get("path", "")).strip()
+        if not p:
+            continue
+        name = str(ds.get("name", "")).strip() or Path(p).stem
+        cleaned.append({"path": p, "name": name})
+    return cleaned
+
+
+def _load_gate_dataframe(req: GatingPreviewRequest):
+    datasets = _normalize_gate_datasets(req.datasets, req.paths)
+    if not datasets:
+        raise HTTPException(status_code=400, detail="Provide at least one CSV path.")
+
+    frames = []
+    for ds in datasets:
+        pth = Path(ds["path"]).expanduser().resolve()
+        if not pth.exists() or not pth.is_file():
+            raise HTTPException(status_code=400, detail=f"CSV not found: {ds['path']}")
+        try:
+            df = pd.read_csv(pth)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read CSV '{ds['path']}': {e}")
+        if req.x_col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Column '{req.x_col}' was not found in {pth.name}.")
+        if req.y_col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Column '{req.y_col}' was not found in {pth.name}.")
+        if not pd.api.types.is_numeric_dtype(df[req.x_col]):
+            raise HTTPException(status_code=400, detail=f"Column '{req.x_col}' must be numeric.")
+        if not pd.api.types.is_numeric_dtype(df[req.y_col]):
+            raise HTTPException(status_code=400, detail=f"Column '{req.y_col}' must be numeric.")
+
+        tmp = df.copy()
+        tmp["__source__"] = ds["name"]
+        tmp["__source_path__"] = str(pth)
+        frames.append(tmp)
+
+    df_all = pd.concat(frames, ignore_index=True)
+    valid = ~(df_all[req.x_col].isna() | df_all[req.y_col].isna())
+    df_all = df_all.loc[valid].copy()
+    if df_all.empty:
+        raise HTTPException(status_code=400, detail="No valid rows after removing NaN in gating columns.")
+    return df_all
+
+
+def _resolve_gate_bounds(req: GatingPreviewRequest, df: pd.DataFrame) -> tuple[float, float, float, float]:
+    q_low = float(req.q_low if req.q_low is not None else 0.05)
+    q_high = float(req.q_high if req.q_high is not None else 0.95)
+    q_low = max(0.0, min(0.49, q_low))
+    q_high = max(0.51, min(1.0, q_high))
+    if q_low >= q_high:
+        raise HTTPException(status_code=400, detail="q_low must be lower than q_high.")
+
+    x_min = float(req.x_min) if req.x_min is not None else float(df[req.x_col].quantile(q_low))
+    x_max = float(req.x_max) if req.x_max is not None else float(df[req.x_col].quantile(q_high))
+    y_min = float(req.y_min) if req.y_min is not None else float(df[req.y_col].quantile(q_low))
+    y_max = float(req.y_max) if req.y_max is not None else float(df[req.y_col].quantile(q_high))
+    if x_min >= x_max:
+        raise HTTPException(status_code=400, detail="Invalid X bounds: x_min must be lower than x_max.")
+    if y_min >= y_max:
+        raise HTTPException(status_code=400, detail="Invalid Y bounds: y_min must be lower than y_max.")
+    return x_min, x_max, y_min, y_max
+
+
+def _apply_gate(df: pd.DataFrame, x_col: str, y_col: str, x_min: float, x_max: float, y_min: float, y_max: float) -> pd.Series:
+    # Mirrors the legacy filter behavior (strict interval on both axes).
+    return (df[x_col] > x_min) & (df[x_col] < x_max) & (df[y_col] > y_min) & (df[y_col] < y_max)
+
+
+def _gate_summary_table(df: pd.DataFrame) -> StatsTable:
+    grouped = (
+        df.groupby("__source__", as_index=False)
+        .agg(
+            total=("__gate_keep__", "size"),
+            kept=("__gate_keep__", "sum"),
+        )
+    )
+    grouped["removed"] = grouped["total"] - grouped["kept"]
+    grouped["kept_pct"] = np.where(grouped["total"] > 0, grouped["kept"] * 100.0 / grouped["total"], 0.0)
+    grouped["removed_pct"] = 100.0 - grouped["kept_pct"]
+
+    total = int(df["__gate_keep__"].shape[0])
+    kept = int(df["__gate_keep__"].sum())
+    overall = pd.DataFrame(
+        [{
+            "__source__": "All datasets",
+            "total": total,
+            "kept": kept,
+            "removed": total - kept,
+            "kept_pct": (kept * 100.0 / total) if total > 0 else 0.0,
+            "removed_pct": ((total - kept) * 100.0 / total) if total > 0 else 0.0,
+        }]
+    )
+    full = pd.concat([grouped, overall], ignore_index=True)
+    rows = json.loads(full.to_json(orient="records"))
+    return StatsTable(name="gating_summary", columns=[str(c) for c in full.columns], rows=rows)
+
+
+def _gate_preview_figure(df: pd.DataFrame, req: GatingPreviewRequest, x_min: float, x_max: float, y_min: float, y_max: float) -> dict:
+    max_points = max(1000, int(req.max_points or 12000))
+    df_plot = df.sample(n=max_points, random_state=42) if len(df) > max_points else df
+    df_plot = df_plot.copy()
+    df_plot["Gate"] = np.where(df_plot["__gate_keep__"], "kept", "removed")
+    if req.color_by_dataset:
+        fig = px.scatter(
+            df_plot,
+            x=req.x_col,
+            y=req.y_col,
+            color="__source__",
+            symbol="Gate",
+            hover_data=["__source__"],
+            symbol_map={"kept": "circle", "removed": "x"},
+        )
+    else:
+        fig = px.scatter(
+            df_plot,
+            x=req.x_col,
+            y=req.y_col,
+            color="Gate",
+            symbol="__source__",
+            hover_data=["__source__"],
+            color_discrete_map={"kept": "#1e8449", "removed": "#c0392b"},
+        )
+    fig.add_shape(type="rect", x0=x_min, x1=x_max, y0=y_min, y1=y_max, line=dict(color="#0f5b96", width=2), fillcolor="rgba(15,91,150,0.08)")
+    fig.update_layout(
+        template="plotly_white",
+        margin=dict(l=45, r=20, t=45, b=45),
+        width=max(760, min(1400, 700 + int(len(df_plot) / 40))),
+        legend_title_text="Gate result",
+        dragmode=False,
+    )
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
+    return json.loads(fig.to_json())
+
+
+@app.post("/filters/preview", response_model=GatingPreviewResponse)
+def filters_preview(req: GatingPreviewRequest):
+    df = _load_gate_dataframe(req)
+    x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
+    df["__gate_keep__"] = _apply_gate(df, req.x_col, req.y_col, x_min, x_max, y_min, y_max)
+    summary = _gate_summary_table(df)
+    total = int(df["__gate_keep__"].shape[0])
+    kept = int(df["__gate_keep__"].sum())
+    return GatingPreviewResponse(
+        figure=_gate_preview_figure(df, req, x_min, x_max, y_min, y_max),
+        bounds=GatingBounds(x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max),
+        tables=[summary],
+        message=f"Gating preview ready. Kept {kept}/{total} rows ({(kept * 100.0 / total):.1f}%).",
+    )
+
+
+@app.post("/filters/apply", response_model=GatingApplyResponse)
+def filters_apply(req: GatingApplyRequest):
+    out_dir = Path(req.output_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    df = _load_gate_dataframe(req)
+    x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
+    df["__gate_keep__"] = _apply_gate(df, req.x_col, req.y_col, x_min, x_max, y_min, y_max)
+    summary = _gate_summary_table(df)
+
+    files = []
+    kept = df.loc[df["__gate_keep__"]].copy()
+    combined = kept.drop(columns=["__gate_keep__", "__source_path__"], errors="ignore")
+    combined_path = (out_dir / "Gated results.csv").resolve()
+    combined.to_csv(combined_path, index=False)
+    files.append(str(combined_path))
+
+    for src, part in kept.groupby("__source__", sort=True):
+        safe_name = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(src)).strip("_") or "dataset"
+        p = (out_dir / f"{safe_name}_gated_results.csv").resolve()
+        part.drop(columns=["__gate_keep__", "__source_path__"], errors="ignore").to_csv(p, index=False)
+        files.append(str(p))
+
+    dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    log = (
+        f"\n\n{dt} - Gating filter applied:\n"
+        f"{req.x_col} minimum: {x_min}\n"
+        f"{req.x_col} maximum: {x_max}\n"
+        f"{req.y_col} minimum: {y_min}\n"
+        f"{req.y_col} maximum: {y_max}\n"
+    )
+    with open(out_dir / "logs-fornma.txt", "a", encoding="utf-8") as logs:
+        logs.write(log)
+
+    total = int(df["__gate_keep__"].shape[0])
+    kept_n = int(df["__gate_keep__"].sum())
+    return GatingApplyResponse(
+        bounds=GatingBounds(x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max),
+        tables=[summary],
+        output_dir=str(out_dir),
+        files=files,
+        message=f"Gating applied. Saved {len(files)} file(s). Kept {kept_n}/{total} rows ({(kept_n * 100.0 / total):.1f}%).",
+    )
 
 
 def _prepare_clustering_input(req: UMAPPreviewRequest):
