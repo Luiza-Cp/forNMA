@@ -388,3 +388,59 @@ class GatingApplyResponse(BaseModel):
     output_dir: str
     files: List[str] = Field(default_factory=list)
     message: str = ""
+
+
+class TrackingRunRequest(BaseModel):
+    path_to_table: str
+    output_dir: str
+    image_dir: str
+    image_col: str
+    max_distance: int = 30
+    time_window: int = 5
+    max_split_distance: int = 10
+    max_gap_closing_distance: int = 30
+
+
+class TrackingFrameRequest(BaseModel):
+    table_path: str
+    frame: int = 0
+    image_dir: Optional[str] = None
+    image_col: Optional[str] = None
+    preview_cache_dir: Optional[str] = None
+    trail_window: int = 7
+    show_complete_trail: bool = False
+
+
+class TrackingSelection(BaseModel):
+    frame: int
+    cell: int
+    track_id: int
+
+
+class TrackingDeleteRequest(TrackingFrameRequest):
+    selections: List[TrackingSelection] = Field(default_factory=list)
+
+
+class TrackingLinkRequest(TrackingFrameRequest):
+    selections: List[TrackingSelection] = Field(default_factory=list)
+
+
+class TrackingPreviewResponse(BaseModel):
+    table_path: str
+    image_col: str
+    preview_cache_dir: Optional[str] = None
+    preview_image_path: Optional[str] = None
+    frame: int
+    max_frame: int
+    total_rows: int
+    total_tracks: int
+    figure: Dict[str, Any]
+    message: str = ""
+
+
+class TrackingRunResponse(TrackingPreviewResponse):
+    output_dir: str
+
+
+class TrackingEditResponse(TrackingPreviewResponse):
+    edited_rows: int = 0

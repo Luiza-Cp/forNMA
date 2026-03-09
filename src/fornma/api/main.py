@@ -9,6 +9,8 @@ import os
 import json
 import tempfile
 import hashlib
+import base64
+import mimetypes
 from datetime import datetime
 import subprocess
 import sys
@@ -20,7 +22,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.colors import qualitative as qual_colors
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
@@ -30,6 +32,12 @@ from sklearn.decomposition import PCA
 from fornma.core.NMA.plot_NMA import plot_NMA as run_nma_plot, NMA as NMAClass
 from fornma.core.Segmentation.run import run as run_segmentation_pipeline
 from fornma.core.Registration.registration import registration as run_registration_pipeline
+from fornma.core.Tracking.tracking import (
+    run_laptracker as run_tracking_laptracker,
+    find_family as find_tracking_family,
+    create_tree_nomenclature as create_tracking_nomenclature,
+    draw_track as draw_tracking_frames,
+)
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
@@ -81,6 +89,13 @@ from .schemas import (
     GatingApplyRequest,
     GatingApplyResponse,
     GatingBounds,
+    TrackingRunRequest,
+    TrackingFrameRequest,
+    TrackingDeleteRequest,
+    TrackingLinkRequest,
+    TrackingRunResponse,
+    TrackingPreviewResponse,
+    TrackingEditResponse,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -643,6 +658,28 @@ def segmentation_file(path: str = Query(...)):
     p = Path(path).expanduser().resolve()
     if not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail="File not found.")
+    return FileResponse(path=p, filename=p.name)
+
+
+@app.get("/tracking/file")
+def tracking_file(path: str = Query(...)):
+    p = Path(path).expanduser().resolve()
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found.")
+    if p.suffix.lower() in {".tif", ".tiff"}:
+        try:
+            import cv2 as cv
+            img = cv.imread(str(p), cv.IMREAD_UNCHANGED)
+            if img is None:
+                raise HTTPException(status_code=500, detail="Failed to read image file.")
+            ok, buf = cv.imencode(".png", img)
+            if not ok:
+                raise HTTPException(status_code=500, detail="Failed to encode image for preview.")
+            return Response(content=buf.tobytes(), media_type="image/png")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to serve tracking preview image: {e}")
     return FileResponse(path=p, filename=p.name)
 
 
@@ -1574,6 +1611,486 @@ def filters_apply(req: GatingApplyRequest):
         files=files,
         message=f"Gating applied. Saved {len(files)} file(s). Kept {kept_n}/{total} rows ({(kept_n * 100.0 / total):.1f}%).",
     )
+
+
+def _tracking_image_col(df: pd.DataFrame, override: str | None = None) -> str:
+    cols = [str(c) for c in df.columns]
+    if override:
+        ov = str(override)
+        if ov in cols:
+            return ov
+        ov_norm = ov.strip().casefold()
+        for c in cols:
+            if str(c).strip().casefold() == ov_norm:
+                return c
+    img_cols = [c for c in cols if "image_name" in str(c).strip().casefold()]
+    if not img_cols:
+        raise HTTPException(status_code=400, detail="Tracking table is missing image column (e.g., Image_name_*).")
+    return img_cols[0]
+
+
+def _tracking_basename(raw: str) -> str:
+    return str(raw or "").strip().replace("\\", "/").split("/")[-1]
+
+
+def _tracking_validate_image_mapping(df: pd.DataFrame, image_col: str, image_dir: str) -> None:
+    if image_col not in df.columns:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image column '{image_col}' was not found in the CSV table.",
+        )
+
+    img_dir = Path(image_dir).expanduser().resolve()
+    if not img_dir.exists() or not img_dir.is_dir():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image folder not found or invalid: {image_dir}",
+        )
+
+    image_names = {
+        p.name for p in img_dir.rglob("*")
+        if p.is_file()
+    }
+    if not image_names:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No image files found in folder: {img_dir}",
+        )
+
+    raw_values = df[image_col].dropna().astype(str).map(str.strip)
+    csv_names = sorted({_tracking_basename(v) for v in raw_values.tolist() if v})
+    if not csv_names:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Column '{image_col}' is empty. It must contain image file names that match files in '{img_dir}'."
+            ),
+        )
+
+    missing = [name for name in csv_names if name not in image_names]
+    if missing:
+        preview = ", ".join(missing[:5])
+        suffix = "" if len(missing) <= 5 else f" ... (+{len(missing) - 5} more)"
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Image name mismatch: column '{image_col}' must match file names in '{img_dir}'. "
+                f"Missing example(s): {preview}{suffix}"
+            ),
+        )
+
+
+def _tracking_color_for_family(family) -> tuple[int, int, int]:
+    seed = hash(str(family)) & 0xFFFFFFFF
+    rng = np.random.default_rng(seed)
+    # keep away from too-dark colors for readability
+    rgb = rng.integers(50, 240, size=3).tolist()
+    return int(rgb[0]), int(rgb[1]), int(rgb[2])
+
+
+def _tracking_ensure_columns(df: pd.DataFrame) -> pd.DataFrame:
+    needed = {"Frame", "Cell", "X", "Y", "track_id"}
+    miss = needed - set(df.columns)
+    if miss:
+        raise HTTPException(status_code=400, detail=f"Tracking table missing required columns: {sorted(miss)}")
+
+    out = df.copy()
+    out["Frame"] = pd.to_numeric(out["Frame"], errors="coerce")
+    out["Cell"] = pd.to_numeric(out["Cell"], errors="coerce")
+    out["X"] = pd.to_numeric(out["X"], errors="coerce")
+    out["Y"] = pd.to_numeric(out["Y"], errors="coerce")
+    out["track_id"] = pd.to_numeric(out["track_id"], errors="coerce")
+    out = out.dropna(subset=["Frame", "Cell", "X", "Y", "track_id"]).copy()
+    out["Frame"] = out["Frame"].astype(int)
+    out["Cell"] = out["Cell"].astype(int)
+    out["track_id"] = out["track_id"].astype(int)
+
+    if "family" not in out.columns:
+        out["family"] = out["track_id"]
+    if "family_name" not in out.columns:
+        out["family_name"] = out["family"].astype(str) + "."
+    if "previous_x" not in out.columns:
+        out["previous_x"] = np.nan
+    if "previous_y" not in out.columns:
+        out["previous_y"] = np.nan
+    if "family_color" not in out.columns:
+        out["family_color"] = out["family"].map(lambda f: str(_tracking_color_for_family(f)))
+    else:
+        out["family_color"] = out["family_color"].fillna(out["family"].map(lambda f: str(_tracking_color_for_family(f))))
+    return out
+
+
+def _tracking_df_load(path: str) -> pd.DataFrame:
+    p = Path(path).expanduser().resolve()
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=400, detail=f"Tracking table not found: {path}")
+    try:
+        df = pd.read_csv(p)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read tracking table: {e}")
+    return _tracking_ensure_columns(df)
+
+
+def _tracking_df_save(path: str, df: pd.DataFrame) -> None:
+    p = Path(path).expanduser().resolve()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    save_df = df.copy()
+    save_df["family_color"] = save_df["family_color"].astype(str)
+    save_df.to_csv(p, index=False)
+
+
+def _tracking_resolve_image_path(row: pd.Series, image_col: str, image_dir: str | None) -> Path | None:
+    raw = str(row.get(image_col, "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw).expanduser()
+    if p.is_absolute() and p.exists() and p.is_file():
+        return p.resolve()
+    if image_dir:
+        pp = (Path(image_dir).expanduser().resolve() / raw)
+        if pp.exists() and pp.is_file():
+            return pp.resolve()
+    # fallback relative to cwd
+    pp = Path(raw).resolve()
+    if pp.exists() and pp.is_file():
+        return pp
+    return None
+
+
+def _tracking_draw_preview_image(
+    df: pd.DataFrame,
+    frame: int,
+    image_col: str,
+    image_dir: str | None,
+    trail_window: int,
+    show_complete_trail: bool,
+    preview_cache_dir: str | None = None,
+):
+    try:
+        import cv2 as cv
+    except Exception:
+        return None, None
+
+    if not image_dir:
+        return None, None
+
+    if preview_cache_dir:
+        cache_dir = Path(preview_cache_dir).expanduser().resolve()
+    else:
+        cache_root = Path(tempfile.gettempdir()) / "fornma_tracking_preview"
+        cache_root.mkdir(parents=True, exist_ok=True)
+        key_raw = "||".join(
+            [
+                str(Path(image_dir).expanduser().resolve()),
+                str(image_col),
+                str(max(1, int(trail_window))),
+                "complete" if show_complete_trail else "window",
+                str(int(df["Frame"].min())),
+                str(int(df["Frame"].max())),
+                str(int(len(df))),
+                str(int(df["track_id"].nunique())),
+                str(int(pd.util.hash_pandas_object(df[["Frame", "Cell", "X", "Y", "track_id"]], index=False).sum())),
+            ]
+        )
+        cache_key = hashlib.sha1(key_raw.encode("utf-8")).hexdigest()[:16]
+        cache_dir = cache_root / cache_key
+
+    # Pre-render all tracked frames once into temp cache to keep frame navigation fast.
+    if not cache_dir.exists() or not any(cache_dir.glob("*.tiff")):
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        draw_tracking_frames(
+            df=df.copy(),
+            folder=str(Path(image_dir).expanduser().resolve()),
+            save=str(cache_dir),
+            img_col=image_col,
+            trail_window=max(1, int(trail_window)),
+        )
+
+    # Build PNG mirrors once so browser viewer behaves consistently across environments.
+    png_exists = any(cache_dir.glob("*.png"))
+    if not png_exists:
+        for tif in cache_dir.glob("*.tif*"):
+            try:
+                import cv2 as cv
+                im = cv.imread(str(tif), cv.IMREAD_UNCHANGED)
+                if im is None:
+                    continue
+                out_png = tif.with_suffix(".png")
+                cv.imwrite(str(out_png), im)
+            except Exception:
+                continue
+
+    frame_path = cache_dir / f"{int(frame):05d}.png"
+    if not frame_path.exists():
+        frame_path = cache_dir / f"{int(frame):05d}.tiff"
+    if not frame_path.exists():
+        return None, str(cache_dir)
+    img = cv.imread(str(frame_path))
+    if img is None:
+        return None, str(cache_dir)
+    return cv.cvtColor(img, cv.COLOR_BGR2RGB), str(cache_dir)
+
+
+def _tracking_preview_figure(
+    df: pd.DataFrame,
+    frame: int,
+    image_col: str,
+    image_dir: str | None,
+    preview_cache_dir: str | None,
+    trail_window: int,
+    show_complete_trail: bool,
+) -> tuple[dict, str | None]:
+    frame = int(frame)
+    fr_min = int(df["Frame"].min())
+    fr_max = int(df["Frame"].max())
+    frame = max(fr_min, min(fr_max, frame))
+    df_frame = df[df["Frame"] == frame].copy()
+
+    fig = go.Figure()
+    rendered, preview_cache_dir = _tracking_draw_preview_image(
+        df=df,
+        frame=frame,
+        image_col=image_col,
+        image_dir=image_dir,
+        preview_cache_dir=preview_cache_dir,
+        trail_window=trail_window,
+        show_complete_trail=show_complete_trail,
+    )
+    if rendered is not None:
+        fig.add_trace(go.Image(z=rendered))
+
+    if not df_frame.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=df_frame["X"].astype(float),
+                y=df_frame["Y"].astype(float),
+                mode="markers",
+                marker=dict(size=16, color="rgba(0,0,0,0.01)", line=dict(width=0)),
+                customdata=np.stack(
+                    [df_frame["Frame"].to_numpy(), df_frame["Cell"].to_numpy(), df_frame["track_id"].to_numpy()],
+                    axis=1,
+                ),
+                hovertemplate="Frame=%{customdata[0]} Cell=%{customdata[1]} Track=%{customdata[2]}<extra></extra>",
+                name="cells-hitbox",
+                showlegend=False,
+            )
+        )
+
+    fig.update_layout(
+        template="plotly_white",
+        margin=dict(l=20, r=20, t=35, b=20),
+        title=f"Tracking preview - frame {frame}",
+        dragmode="pan",
+        showlegend=False,
+    )
+    fig.update_yaxes(autorange="reversed")
+    return json.loads(fig.to_json()), preview_cache_dir
+
+
+def _tracking_preview_response(
+    table_path: str,
+    frame: int,
+    image_dir: str | None,
+    image_col: str | None,
+    trail_window: int,
+    show_complete_trail: bool,
+    message: str = "",
+    preview_cache_dir: str | None = None,
+):
+    df = _tracking_df_load(table_path)
+    img_col = _tracking_image_col(df, image_col)
+    fr_min = int(df["Frame"].min())
+    fr_max = int(df["Frame"].max())
+    frame = max(fr_min, min(fr_max, int(frame)))
+    fig, cache_dir = _tracking_preview_figure(
+        df,
+        frame,
+        img_col,
+        image_dir,
+        preview_cache_dir,
+        trail_window,
+        show_complete_trail,
+    )
+    preview_image_path = None
+    if cache_dir:
+        base = Path(cache_dir).expanduser().resolve()
+        candidate = base / f"{int(frame):05d}.png"
+        if not candidate.exists() or not candidate.is_file():
+            candidate = base / f"{int(frame):05d}.tiff"
+        if candidate.exists() and candidate.is_file():
+            preview_image_path = str(candidate)
+
+    return TrackingPreviewResponse(
+        table_path=str(Path(table_path).expanduser().resolve()),
+        image_col=img_col,
+        preview_cache_dir=preview_cache_dir or cache_dir,
+        preview_image_path=preview_image_path,
+        frame=frame,
+        max_frame=fr_max,
+        total_rows=int(len(df)),
+        total_tracks=int(df["track_id"].nunique()),
+        figure=fig,
+        message=message or f"Loaded frame {frame}.",
+    )
+
+
+def _tracking_find_rows_by_selection(df: pd.DataFrame, selections: list) -> pd.DataFrame:
+    picked = []
+    for s in selections:
+        frame = int(s.frame)
+        cell = int(s.cell)
+        track_id = int(s.track_id)
+        hit = df[(df["Frame"] == frame) & (df["Cell"] == cell) & (df["track_id"] == track_id)]
+        if not hit.empty:
+            picked.append(hit.iloc[0])
+    if not picked:
+        return pd.DataFrame(columns=df.columns)
+    return pd.DataFrame(picked).sort_values(by=["Frame", "X", "Y"])
+
+
+@app.post("/tracking/run", response_model=TrackingRunResponse)
+def tracking_run(req: TrackingRunRequest):
+    source_path = Path(req.path_to_table).expanduser().resolve()
+    if not source_path.exists() or not source_path.is_file():
+        raise HTTPException(status_code=400, detail=f"CSV not found: {req.path_to_table}")
+    out_dir = Path(req.output_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    original_df = pd.read_csv(source_path)
+    img_col = _tracking_image_col(original_df, req.image_col)
+    _tracking_validate_image_mapping(original_df, img_col, req.image_dir)
+
+    tracked_df = run_tracking_laptracker(
+        str(source_path),
+        image_col=img_col,
+        max_distance=int(req.max_distance),
+        time_window=int(req.time_window),
+        max_split_distance=int(req.max_split_distance),
+        max_gap_closing_distance=int(req.max_gap_closing_distance),
+    )
+    min_frame = int(tracked_df["Frame"].min())
+    tracked_df = find_tracking_family(tracked_df, min_frame=min_frame, max_distance=int(req.max_distance))
+    tracked_df = create_tracking_nomenclature(tracked_df, int(req.max_gap_closing_distance))
+
+    if img_col not in tracked_df.columns:
+        tcols = [str(c) for c in tracked_df.columns]
+        tgt_norm = str(img_col).strip().casefold()
+        alt = next((c for c in tcols if str(c).strip().casefold() == tgt_norm), None)
+        if alt:
+            tracked_df = tracked_df.rename(columns={alt: img_col})
+    merged = tracked_df.merge(original_df, on=["Frame", "Cell", "X", "Y", img_col], how="left")
+    merged = _tracking_ensure_columns(merged)
+    # Warm up preview cache right after automatic run to avoid first-view delay.
+    _, warmed_cache_dir = _tracking_draw_preview_image(
+        df=merged,
+        frame=int(merged["Frame"].min()),
+        image_col=img_col,
+        image_dir=req.image_dir,
+        trail_window=7,
+        show_complete_trail=False,
+        preview_cache_dir=None,
+    )
+    table_path = out_dir / "Tracked Results.csv"
+    _tracking_df_save(str(table_path), merged)
+
+    preview = _tracking_preview_response(
+        table_path=str(table_path),
+        frame=min_frame,
+        image_dir=req.image_dir,
+        image_col=img_col,
+        trail_window=7,
+        show_complete_trail=False,
+        preview_cache_dir=warmed_cache_dir,
+        message=f"Automatic tracking complete. {merged['track_id'].nunique()} tracks found.",
+    )
+    return TrackingRunResponse(**preview.dict(), output_dir=str(out_dir))
+
+
+@app.post("/tracking/preview", response_model=TrackingPreviewResponse)
+def tracking_preview(req: TrackingFrameRequest):
+    return _tracking_preview_response(
+        table_path=req.table_path,
+        frame=req.frame,
+        image_dir=req.image_dir,
+        image_col=req.image_col,
+        trail_window=req.trail_window,
+        show_complete_trail=bool(req.show_complete_trail),
+        preview_cache_dir=req.preview_cache_dir,
+        message="Tracking preview updated.",
+    )
+
+
+@app.post("/tracking/edit/delete", response_model=TrackingEditResponse)
+def tracking_edit_delete(req: TrackingDeleteRequest):
+    df = _tracking_df_load(req.table_path)
+    sel = _tracking_find_rows_by_selection(df, req.selections)
+    if sel.empty:
+        raise HTTPException(status_code=400, detail="Select at least one point/track to delete.")
+    track_ids = sorted(set(sel["track_id"].astype(int).tolist()))
+    prev_n = len(df)
+    df = df[~df["track_id"].isin(track_ids)].copy()
+    _tracking_df_save(req.table_path, df)
+    preview = _tracking_preview_response(
+        table_path=req.table_path,
+        frame=req.frame,
+        image_dir=req.image_dir,
+        image_col=req.image_col,
+        trail_window=req.trail_window,
+        show_complete_trail=bool(req.show_complete_trail),
+        preview_cache_dir=None,
+        message=f"Deleted {len(track_ids)} track(s).",
+    )
+    return TrackingEditResponse(**preview.dict(), edited_rows=int(prev_n - len(df)))
+
+
+@app.post("/tracking/edit/link", response_model=TrackingEditResponse)
+def tracking_edit_link(req: TrackingLinkRequest):
+    df = _tracking_df_load(req.table_path)
+    sel = _tracking_find_rows_by_selection(df, req.selections)
+    if len(sel) < 2:
+        raise HTTPException(status_code=400, detail="Select at least two points to link tracks.")
+    sel = sel.sort_values(by=["Frame", "X", "Y"]).reset_index(drop=True)
+
+    base = sel.iloc[0]
+    base_family = base["family"]
+    base_family_name = str(base["family_name"])
+    base_color = str(base["family_color"])
+    edited = 0
+
+    prev_x = float(base["X"])
+    prev_y = float(base["Y"])
+    for i in range(1, len(sel)):
+        row = sel.iloc[i]
+        old_track = int(row["track_id"])
+        old_family_name = str(row["family_name"])
+        start_frame = int(row["Frame"])
+        idx_target = df[(df["Frame"] == int(row["Frame"])) & (df["Cell"] == int(row["Cell"])) & (df["track_id"] == old_track)].index
+        if len(idx_target):
+            df.at[idx_target[0], "previous_x"] = prev_x
+            df.at[idx_target[0], "previous_y"] = prev_y
+            edited += 1
+        mask = (df["track_id"] == old_track) & (df["Frame"] >= start_frame)
+        if mask.any():
+            df.loc[mask, "family"] = base_family
+            df.loc[mask, "family_color"] = base_color
+            df.loc[mask, "family_name"] = df.loc[mask, "family_name"].astype(str).apply(
+                lambda x: x.replace(old_family_name, base_family_name, 1)
+            )
+            edited += int(mask.sum())
+        prev_x = float(row["X"])
+        prev_y = float(row["Y"])
+
+    _tracking_df_save(req.table_path, df)
+    preview = _tracking_preview_response(
+        table_path=req.table_path,
+        frame=req.frame,
+        image_dir=req.image_dir,
+        image_col=req.image_col,
+        trail_window=req.trail_window,
+        show_complete_trail=bool(req.show_complete_trail),
+        preview_cache_dir=None,
+        message="Tracks linked successfully.",
+    )
+    return TrackingEditResponse(**preview.dict(), edited_rows=edited)
 
 
 def _prepare_clustering_input(req: UMAPPreviewRequest):

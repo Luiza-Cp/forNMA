@@ -40,6 +40,7 @@ def find_previous_positions(df: pd.DataFrame) -> pd.DataFrame:
 
 def run_laptracker(
         path_to_table: str,
+        image_col: str | None = None,
         max_distance: int = 30,
         time_window: int = 5,
         max_split_distance: int = 10,  # essa aqui que separa os segmentos mto grudados (2024)
@@ -50,10 +51,18 @@ def run_laptracker(
     """ Gets a dataframe and user parameters and applies LapTracker for cell tracking."""
 
     table = pd.read_csv(path_to_table)
-    for i in table.columns:
-        if 'Image_name' in i:
-            img_name = i
-            break
+    cols_all = [str(c) for c in table.columns]
+    img_name = None
+    if image_col:
+        if image_col in cols_all:
+            img_name = image_col
+        else:
+            norm = str(image_col).strip().casefold()
+            img_name = next((c for c in cols_all if str(c).strip().casefold() == norm), None)
+    if img_name is None:
+        img_name = next((c for c in cols_all if "image_name" in str(c).strip().casefold()), None)
+    if img_name is None:
+        raise KeyError("Image column not found in tracking table")
 
     cols = ['Cell', 'X', "Y", 'Frame', img_name]
     df2 = table[cols]
@@ -170,7 +179,14 @@ def tracking(
         max_gap_closing_distance: int = 30,
 ) -> None:
 
-    df = run_laptracker(path_to_table, max_distance, time_window, max_split_distance, max_gap_closing_distance)
+    df = run_laptracker(
+        path_to_table,
+        image_col=None,
+        max_distance=max_distance,
+        time_window=time_window,
+        max_split_distance=max_split_distance,
+        max_gap_closing_distance=max_gap_closing_distance,
+    )
     min_frame = df['Frame'].min()
     df = find_family(df, min_frame, max_distance)
     df = create_tree_nomenclature(df, max_gap_closing_distance)

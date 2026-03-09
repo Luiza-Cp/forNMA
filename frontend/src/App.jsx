@@ -176,6 +176,30 @@ const initialGatingState = () => ({
   files: [],
   message: "",
 });
+const initialTrackingState = () => ({
+  path_to_table: "",
+  output_dir: "",
+  image_dir: "",
+  image_col: "",
+  columns: [],
+  preview_cache_dir: "",
+  preview_image_path: "",
+  max_distance: 30,
+  time_window: 5,
+  max_split_distance: 10,
+  max_gap_closing_distance: 30,
+  table_path: "",
+  frame: 0,
+  max_frame: 0,
+  trail_window: 7,
+  show_complete_trail: false,
+  figure: null,
+  selected: [],
+  message: "",
+  total_rows: 0,
+  total_tracks: 0,
+  manual_stage_enabled: false,
+});
 
 function readStorage(key, fallback) {
   if (typeof window === "undefined") return fallback;
@@ -2123,6 +2147,185 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
   );
 }
 
+function TrackingLeftPanel({
+  onPickCsv,
+  onPickDirectory,
+  onRunAutomatic,
+  onGoToCorrection,
+  onRefreshFrame,
+  onPrevFrame,
+  onNextFrame,
+  onDeleteTracks,
+  onLinkTracks,
+  status,
+  state,
+  setState,
+  running,
+  loadingFrame,
+  editing,
+}) {
+  const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
+  const busy = running || loadingFrame || editing;
+  const hasTracked = !!String(state.table_path || "").trim();
+  const imageNameColumns = (state.columns || []).filter((c) => String(c || "").toLowerCase().includes("image_name"));
+  const manualStageEnabled = !!state.manual_stage_enabled;
+  const hasSelection = (state.selected || []).length > 0;
+  const canRun = !!String(state.path_to_table || "").trim()
+    && !!String(state.output_dir || "").trim()
+    && !!String(state.image_dir || "").trim()
+    && !!String(state.image_col || "").trim()
+    && !busy;
+  const canGoToCorrection = hasTracked && !busy;
+  const canPreview = hasTracked && !busy;
+  const canDelete = hasTracked && hasSelection && !busy;
+  const canLink = hasTracked && (state.selected || []).length >= 2 && !busy;
+
+  return (
+    <aside className="panel seg-panel">
+      <div className="seg-header">
+        <h3>Tracking</h3>
+        <p className="hint">
+          Automatic tracking is simple and may produce errors. Step 2 is manual correction and becomes available only
+          after running automatic tracking.
+        </p>
+      </div>
+      <div className="seg-scroll">
+        <details open className="seg-section">
+          <summary>Step 1 - Automatic tracking</summary>
+          <div className="seg-body">
+            <div className="row path-row">
+              <input className="input" value={state.path_to_table || ""} onChange={(e) => setField("path_to_table", e.target.value)} placeholder="/path/Results.csv" />
+              <button
+                className="ghost"
+                onClick={async () => {
+                  try {
+                    const p = await onPickCsv();
+                    if (p) setField("path_to_table", p);
+                  } catch {
+                    // no-op
+                  }
+                }}
+              >
+                Browse CSV
+              </button>
+            </div>
+            <div className="row path-row">
+              <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save tracked table" />
+              <button
+                className="ghost"
+                onClick={async () => {
+                  try {
+                    const p = await onPickDirectory();
+                    if (p) setField("output_dir", p);
+                  } catch {
+                    // no-op
+                  }
+                }}
+              >
+                Browse
+              </button>
+            </div>
+            <div className="row path-row">
+              <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder (required)" />
+              <button
+                className="ghost"
+                onClick={async () => {
+                  try {
+                    const p = await onPickDirectory();
+                    if (p) setField("image_dir", p);
+                  } catch {
+                    // no-op
+                  }
+                }}
+              >
+                Browse
+              </button>
+            </div>
+            <div className="hint">This folder is used to render the tracking viewer images.</div>
+            <div className="field-head">
+              Image name column <Tip text="Required. Choose the CSV column that stores image file names. These names must exactly match files inside the selected image folder." />
+            </div>
+            <select
+              className="input"
+              value={state.image_col || ""}
+              onChange={(e) => setField("image_col", e.target.value)}
+            >
+              <option value="">Select image column</option>
+              {imageNameColumns.map((col) => (
+                <option key={`tracking-img-col-${col}`} value={col}>{col}</option>
+              ))}
+            </select>
+            <div className="hint">The values in this column must match the image filenames in the folder above.</div>
+            <div className="row">
+              <input className="input" type="number" min="1" value={state.max_distance ?? 30} onChange={(e) => setField("max_distance", Number(e.target.value || 30))} placeholder="max distance" />
+              <input className="input" type="number" min="1" value={state.time_window ?? 5} onChange={(e) => setField("time_window", Number(e.target.value || 5))} placeholder="time window" />
+            </div>
+            <div className="row">
+              <input className="input" type="number" min="1" value={state.max_split_distance ?? 10} onChange={(e) => setField("max_split_distance", Number(e.target.value || 10))} placeholder="max split distance" />
+              <input className="input" type="number" min="1" value={state.max_gap_closing_distance ?? 30} onChange={(e) => setField("max_gap_closing_distance", Number(e.target.value || 30))} placeholder="max gap closing distance" />
+            </div>
+            <div className="row">
+              <button className="primary" onClick={onRunAutomatic} disabled={!canRun}>
+                {running ? "Running..." : "Run tracking"}
+              </button>
+              <button className="secondary" onClick={onGoToCorrection} disabled={!canGoToCorrection}>
+                Next: correct tracks
+              </button>
+            </div>
+          </div>
+        </details>
+
+        {manualStageEnabled && (
+          <details open className="seg-section">
+            <summary>Step 2 - Manual correction</summary>
+            <div className="seg-body">
+              <div className="hint">Click points in the plot to select cells from tracks.</div>
+              <div className="row">
+                <input className="input" type="number" min="0" value={state.frame ?? 0} onChange={(e) => setField("frame", Number(e.target.value || 0))} placeholder="frame" />
+                <input className="input" type="number" min="1" value={state.trail_window ?? 7} onChange={(e) => setField("trail_window", Number(e.target.value || 7))} placeholder="trail window" />
+              </div>
+              <div className="row path-row">
+                <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder for viewer" />
+                <button
+                  className="ghost"
+                  onClick={async () => {
+                    try {
+                      const p = await onPickDirectory();
+                      if (p) setField("image_dir", p);
+                    } catch {
+                      // no-op
+                    }
+                  }}
+                >
+                  Browse
+                </button>
+              </div>
+              <div className="hint">{state.preview_cache_dir ? "Viewer cache ready." : "Viewer cache will be generated automatically."}</div>
+              <div className="row">
+                <button className="ghost" onClick={onPrevFrame} disabled={busy || Number(state.frame || 0) <= 0}>Previous frame</button>
+                <button className="ghost" onClick={onNextFrame} disabled={busy || Number(state.frame || 0) >= Number(state.max_frame || 0)}>Next frame</button>
+              </div>
+              <label className="checkbox">
+                <input type="checkbox" checked={!!state.show_complete_trail} onChange={(e) => setField("show_complete_trail", e.target.checked)} />
+                Show complete trail
+              </label>
+              <button className="secondary" onClick={onRefreshFrame} disabled={!canPreview}>
+                {loadingFrame ? "Updating..." : "Refresh preview"}
+              </button>
+              <div className="row">
+                <button className="ghost" onClick={onDeleteTracks} disabled={!canDelete}>Delete selected tracks</button>
+                <button className="ghost" onClick={onLinkTracks} disabled={!canLink}>Link selected tracks</button>
+              </div>
+              <div className="hint">Selected points: {(state.selected || []).length}</div>
+            </div>
+          </details>
+        )}
+      </div>
+      <Status level={status.level} text={status.text} />
+    </aside>
+  );
+}
+
 function StatsTableView({ table, onDownload }) {
   const cols = table?.columns || [];
   const rows = table?.rows || [];
@@ -2188,7 +2391,7 @@ function Status({ level = "info", text }) {
   return <div className={`status ${level}`}>{text}</div>;
 }
 
-function PlotPanel({ figure, config, onRelayout }) {
+function PlotPanel({ figure, config, onRelayout, onClick }) {
   const ref = React.useRef(null);
   const requestedWidth = Number(figure?.layout?.width);
   const panelWidth = Number.isFinite(requestedWidth) && requestedWidth > 0 ? Math.round(requestedWidth) : 640;
@@ -2208,13 +2411,19 @@ function PlotPanel({ figure, config, onRelayout }) {
   React.useEffect(() => {
     if (!ref.current || !figure) return;
     Plotly.react(ref.current, figure.data, figure.layout, config || defaultConfig);
-    if (onRelayout && ref.current?.on) {
+    if (ref.current?.on) {
       if (ref.current.removeAllListeners) {
         ref.current.removeAllListeners("plotly_relayout");
+        ref.current.removeAllListeners("plotly_click");
       }
-      ref.current.on("plotly_relayout", onRelayout);
+      if (onRelayout) {
+        ref.current.on("plotly_relayout", onRelayout);
+      }
+      if (onClick) {
+        ref.current.on("plotly_click", onClick);
+      }
     }
-  }, [figure, config, onRelayout]);
+  }, [figure, config, onRelayout, onClick]);
 
   return (
     <div className="plot-host">
@@ -2565,12 +2774,18 @@ export default function App() {
   const [gatingStatus, setGatingStatus] = useState({ level: "info", text: "" });
   const [gatingLoading, setGatingLoading] = useState(false);
   const [gatingApplying, setGatingApplying] = useState(false);
+  const [trackingState, setTrackingState] = useState(initialTrackingState);
+  const [trackingStatus, setTrackingStatus] = useState({ level: "info", text: "" });
+  const [trackingRunning, setTrackingRunning] = useState(false);
+  const [trackingLoadingFrame, setTrackingLoadingFrame] = useState(false);
+  const [trackingEditing, setTrackingEditing] = useState(false);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const plotDataColsCacheRef = React.useRef({});
   const clusteringColsCacheRef = React.useRef({});
   const statsColsCacheRef = React.useRef({});
   const gatingColsCacheRef = React.useRef({});
+  const trackingColsCacheRef = React.useRef({});
   const gatingRelayoutTimerRef = React.useRef(null);
   const plotDataPathsKey = useMemo(
     () => (plotData.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
@@ -2587,6 +2802,10 @@ export default function App() {
   const gatingPathsKey = useMemo(
     () => (gatingState.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
     [gatingState.datasets]
+  );
+  const trackingTablePath = useMemo(
+    () => String(trackingState.path_to_table || "").trim(),
+    [trackingState.path_to_table]
   );
   const hasPlotRun = Boolean(plotJob.job_id);
   const hasSegSession =
@@ -2998,6 +3217,46 @@ export default function App() {
       cancelled = true;
     };
   }, [gatingPathsKey]);
+
+  useEffect(() => {
+    const path = trackingTablePath;
+    if (!path) {
+      setTrackingState((prev) => {
+        if ((prev.columns || []).length === 0 && !prev.image_col) return prev;
+        return { ...prev, columns: [], image_col: "" };
+      });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      let cols = [];
+      if (trackingColsCacheRef.current[path]) {
+        cols = trackingColsCacheRef.current[path];
+      } else {
+        try {
+          const res = await callApi("/nma/datasets/columns", { path });
+          cols = res.columns || [];
+          trackingColsCacheRef.current[path] = cols;
+        } catch {
+          cols = [];
+        }
+      }
+      if (cancelled) return;
+      setTrackingState((prev) => {
+        const imgCols = (cols || []).filter((c) => String(c || "").toLowerCase().includes("image_name"));
+        const keepImageCol = prev.image_col && imgCols.includes(prev.image_col) ? prev.image_col : "";
+        if (sameArray(prev.columns || [], cols) && keepImageCol === prev.image_col) return prev;
+        return {
+          ...prev,
+          columns: cols,
+          image_col: keepImageCol,
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [trackingTablePath]);
 
   const handleDownloadTable = () => {
     if (!step2Percentages) return;
@@ -4264,6 +4523,183 @@ export default function App() {
     }, 220);
   };
 
+  const trackingFramePayload = (override = {}) => ({
+    table_path: String((override.table_path ?? trackingState.table_path) || "").trim(),
+    frame: Number(override.frame ?? trackingState.frame ?? 0),
+    image_dir: String((override.image_dir ?? trackingState.image_dir) || "").trim() || null,
+    image_col: (override.image_col ?? trackingState.image_col) || null,
+    preview_cache_dir: String((override.preview_cache_dir ?? trackingState.preview_cache_dir) || "").trim() || null,
+    trail_window: Number(override.trail_window ?? trackingState.trail_window ?? 7),
+    show_complete_trail: !!(override.show_complete_trail ?? trackingState.show_complete_trail),
+  });
+
+  const applyTrackingPreviewResponse = (res) => {
+    setTrackingState((prev) => ({
+      ...prev,
+      table_path: res.table_path || prev.table_path,
+      image_col: res.image_col || prev.image_col,
+      preview_cache_dir: res.preview_cache_dir || prev.preview_cache_dir || "",
+      preview_image_path: res.preview_image_path || "",
+      frame: Number(res.frame ?? prev.frame ?? 0),
+      max_frame: Number(res.max_frame ?? prev.max_frame ?? 0),
+      figure: res.figure || null,
+      total_rows: Number(res.total_rows ?? prev.total_rows ?? 0),
+      total_tracks: Number(res.total_tracks ?? prev.total_tracks ?? 0),
+      message: res.message || "",
+    }));
+  };
+
+  const handleTrackingRunAutomatic = async () => {
+    if (!String(trackingState.path_to_table || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Select the input Results.csv table." });
+      return;
+    }
+    if (!String(trackingState.output_dir || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Select an output folder." });
+      return;
+    }
+    if (!String(trackingState.image_dir || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Select the image folder. It is required for tracking preview and validation." });
+      return;
+    }
+    if (!String(trackingState.image_col || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Select the CSV column that contains image file names." });
+      return;
+    }
+    scrollToTopSmooth();
+    setTrackingRunning(true);
+    setTrackingStatus({ level: "info", text: "Running automatic tracking..." });
+    try {
+      const payload = {
+        path_to_table: String(trackingState.path_to_table || "").trim(),
+        output_dir: String(trackingState.output_dir || "").trim(),
+        image_dir: String(trackingState.image_dir || "").trim(),
+        image_col: trackingState.image_col || "",
+        max_distance: Number(trackingState.max_distance || 30),
+        time_window: Number(trackingState.time_window || 5),
+        max_split_distance: Number(trackingState.max_split_distance || 10),
+        max_gap_closing_distance: Number(trackingState.max_gap_closing_distance || 30),
+      };
+      const res = await callApi("/tracking/run", payload);
+      applyTrackingPreviewResponse(res);
+      setTrackingState((prev) => ({ ...prev, selected: [] }));
+      setTrackingStatus({ level: "success", text: res.message || "Automatic tracking complete." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Tracking run failed." });
+    } finally {
+      setTrackingRunning(false);
+    }
+  };
+
+  const handleTrackingGoToCorrection = () => {
+    if (!String(trackingState.table_path || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      return;
+    }
+    setTrackingState((prev) => ({ ...prev, manual_stage_enabled: true }));
+    setTrackingStatus({ level: "info", text: "Manual correction enabled." });
+  };
+
+  const handleTrackingRefreshFrame = async (override = {}) => {
+    if (!String(trackingState.table_path || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first or provide a tracked table." });
+      return;
+    }
+    setTrackingLoadingFrame(true);
+    setTrackingStatus({ level: "info", text: "Updating tracking preview..." });
+    try {
+      const res = await callApi("/tracking/preview", trackingFramePayload(override));
+      applyTrackingPreviewResponse(res);
+      setTrackingStatus({ level: "success", text: res.message || "Preview updated." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Tracking preview failed." });
+    } finally {
+      setTrackingLoadingFrame(false);
+    }
+  };
+
+  const handleTrackingStepFrame = async (delta) => {
+    const current = Number(trackingState.frame || 0);
+    const maxFrame = Number(trackingState.max_frame || 0);
+    const target = Math.max(0, Math.min(maxFrame, current + delta));
+    if (target === current) return;
+    const cacheDir = String(trackingState.preview_cache_dir || "").trim();
+    if (cacheDir) {
+      const frameName = String(target).padStart(5, "0");
+      const pngPath = `${cacheDir}/${frameName}.png`;
+      setTrackingState((prev) => ({
+        ...prev,
+        frame: target,
+        preview_image_path: pngPath,
+      }));
+      return;
+    }
+    setTrackingState((prev) => ({ ...prev, frame: target }));
+    await handleTrackingRefreshFrame({ frame: target });
+  };
+
+  const handleTrackingPlotClick = (evt) => {
+    const pt = evt?.points?.[0];
+    if (!pt || !Array.isArray(pt.customdata) || pt.customdata.length < 3) return;
+    const picked = {
+      frame: Number(pt.customdata[0]),
+      cell: Number(pt.customdata[1]),
+      track_id: Number(pt.customdata[2]),
+    };
+    if (![picked.frame, picked.cell, picked.track_id].every((v) => Number.isFinite(v))) return;
+    setTrackingState((prev) => {
+      const exists = (prev.selected || []).some((s) => s.frame === picked.frame && s.cell === picked.cell && s.track_id === picked.track_id);
+      const next = exists
+        ? (prev.selected || []).filter((s) => !(s.frame === picked.frame && s.cell === picked.cell && s.track_id === picked.track_id))
+        : [...(prev.selected || []), picked];
+      return { ...prev, selected: next };
+    });
+  };
+
+  const handleTrackingDelete = async () => {
+    if (!(trackingState.selected || []).length) {
+      setTrackingStatus({ level: "error", text: "Select at least one point/track first." });
+      return;
+    }
+    setTrackingEditing(true);
+    setTrackingStatus({ level: "info", text: "Deleting selected tracks..." });
+    try {
+      const res = await callApi("/tracking/edit/delete", {
+        ...trackingFramePayload(),
+        selections: trackingState.selected || [],
+      });
+      applyTrackingPreviewResponse(res);
+      setTrackingState((prev) => ({ ...prev, selected: [] }));
+      setTrackingStatus({ level: "success", text: res.message || "Tracks deleted." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Delete tracks failed." });
+    } finally {
+      setTrackingEditing(false);
+    }
+  };
+
+  const handleTrackingLink = async () => {
+    if ((trackingState.selected || []).length < 2) {
+      setTrackingStatus({ level: "error", text: "Select at least two points to link tracks." });
+      return;
+    }
+    setTrackingEditing(true);
+    setTrackingStatus({ level: "info", text: "Linking selected tracks..." });
+    try {
+      const res = await callApi("/tracking/edit/link", {
+        ...trackingFramePayload(),
+        selections: trackingState.selected || [],
+      });
+      applyTrackingPreviewResponse(res);
+      setTrackingState((prev) => ({ ...prev, selected: [] }));
+      setTrackingStatus({ level: "success", text: res.message || "Tracks linked." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Link tracks failed." });
+    } finally {
+      setTrackingEditing(false);
+    }
+  };
+
   const handleResetNma = () => {
     const ok = window.confirm("Reset NMA settings and return to initial state?");
     if (!ok) return;
@@ -4363,6 +4799,17 @@ export default function App() {
     setGatingLoading(false);
     setGatingApplying(false);
     gatingColsCacheRef.current = {};
+  };
+
+  const handleResetTrackingUi = () => {
+    if (trackingRunning || trackingLoadingFrame || trackingEditing) return;
+    const ok = window.confirm("Reset Tracking screen to a clean state?");
+    if (!ok) return;
+    setTrackingState(initialTrackingState());
+    setTrackingStatus({ level: "info", text: "" });
+    setTrackingRunning(false);
+    setTrackingLoadingFrame(false);
+    setTrackingEditing(false);
   };
 
   return (
@@ -4604,6 +5051,122 @@ export default function App() {
                 ) : null}
               </section>
             </main>
+          </>
+        ) : activeModule === "Tracking" ? (
+          <>
+            <TrackingLeftPanel
+              onPickCsv={async () => {
+                const res = await pickCsvPath();
+                return res.path || "";
+              }}
+              onPickDirectory={async () => {
+                const res = await pickDirectoryPath();
+                return res.path || "";
+              }}
+              onRunAutomatic={handleTrackingRunAutomatic}
+              onGoToCorrection={handleTrackingGoToCorrection}
+              onRefreshFrame={handleTrackingRefreshFrame}
+              onPrevFrame={() => handleTrackingStepFrame(-1)}
+              onNextFrame={() => handleTrackingStepFrame(1)}
+              onDeleteTracks={handleTrackingDelete}
+              onLinkTracks={handleTrackingLink}
+              status={trackingStatus}
+              state={trackingState}
+              setState={setTrackingState}
+              running={trackingRunning}
+              loadingFrame={trackingLoadingFrame}
+              editing={trackingEditing}
+            />
+            <main className="content">
+              <section>
+                <div className="row row-between">
+                  <h2>Tracking</h2>
+                  <button className="ghost btn-small" onClick={handleResetTrackingUi} disabled={trackingRunning || trackingLoadingFrame || trackingEditing}>
+                    Reset
+                  </button>
+                </div>
+	                {(trackingRunning || trackingLoadingFrame || trackingEditing) && (
+	                  <div className="preview-loading">
+                    <div className="spinner" />
+                    <div className="hint">
+                      {trackingRunning ? "Running automatic tracking..." : (trackingEditing ? "Applying correction..." : "Updating frame...")}
+                    </div>
+	                  </div>
+	                )}
+	                <div className="section">
+	                  <h3>Tracking viewer</h3>
+	                  <div className="viewer-toolbar">
+	                    <button
+	                      className="ghost btn-small"
+	                      onClick={() => handleTrackingStepFrame(-1)}
+	                      disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) <= 0}
+	                    >
+	                      ◀
+	                    </button>
+	                    <span className="viewer-counter">
+	                      {(Number(trackingState.frame || 0) + 1)} / {(Number(trackingState.max_frame || 0) + 1)}
+	                    </span>
+	                    <button
+	                      className="ghost btn-small"
+	                      onClick={() => handleTrackingStepFrame(1)}
+	                      disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) >= Number(trackingState.max_frame || 0)}
+	                    >
+	                      ▶
+	                    </button>
+	                  </div>
+	                  {trackingState.preview_image_path ? (
+	                    <a
+	                      href={`${API_BASE}/tracking/file?path=${encodeURIComponent(trackingState.preview_image_path)}`}
+	                      target="_blank"
+	                      rel="noreferrer"
+	                      className="thumb-card viewer-single"
+	                    >
+	                      <img
+	                        src={`${API_BASE}/tracking/file?path=${encodeURIComponent(trackingState.preview_image_path)}&v=${trackingState.frame || 0}`}
+	                        alt={`tracking-frame-${trackingState.frame || 0}`}
+	                      />
+	                      <span>{trackingState.preview_image_path.split("/").pop()}</span>
+	                    </a>
+	                  ) : (
+	                    <p className="hint">
+	                      Run tracking and refresh a frame to load generated tracking images.
+	                      {trackingState.preview_cache_dir ? ` Cache: ${trackingState.preview_cache_dir}` : ""}
+	                    </p>
+	                  )}
+	                </div>
+	                {!trackingState.preview_image_path && (
+	                  <p className="hint">Run automatic tracking first, then load a frame in the viewer.</p>
+	                )}
+	                {trackingState.manual_stage_enabled ? (
+	                  <div className="section">
+	                    <div className="row row-between">
+	                      <h3>Selection</h3>
+	                      <button
+	                        className="ghost btn-small"
+	                        onClick={() => setTrackingState((prev) => ({ ...prev, selected: [] }))}
+	                        disabled={!(trackingState.selected || []).length}
+	                      >
+	                        Clear selection
+	                      </button>
+	                    </div>
+	                    <p className="hint">
+	                      Rows: {trackingState.total_rows || 0} | Tracks: {trackingState.total_tracks || 0} | Frame: {trackingState.frame || 0}/{trackingState.max_frame || 0}
+	                    </p>
+	                    {(trackingState.selected || []).length ? (
+	                      <pre className="seg-log">
+	                        {(trackingState.selected || [])
+	                          .map((s, i) => `${i + 1}. frame=${s.frame}, cell=${s.cell}, track=${s.track_id}`)
+	                          .join("\n")}
+	                      </pre>
+	                    ) : (
+	                      <p className="hint">No points selected.</p>
+	                    )}
+	                  </div>
+	                ) : (
+	                  <p className="hint">Step 2 is hidden. Run tracking and click "Next: correct tracks" to continue.</p>
+	                )}
+	              </section>
+	            </main>
           </>
         ) : activeModule === "Foci Overlay" ? (
           <>
