@@ -18,6 +18,31 @@ const FORNMA_STAGES = [
   "Statistics",
   "Tracking",
 ];
+const HOME_SECTIONS = [
+  { id: "about", title: "About" },
+  { id: "article", title: "Article" },
+  { id: "tutorial-registration", title: "Image Registration" },
+  { id: "tutorial-segmentation", title: "Segmentation" },
+  { id: "tutorial-gating", title: "Gating" },
+  { id: "tutorial-foci", title: "Foci Overlay" },
+  { id: "tutorial-nma", title: "NMA" },
+  { id: "tutorial-plot", title: "Plot Data" },
+  { id: "tutorial-clustering", title: "Clustering" },
+  { id: "tutorial-statistics", title: "Statistics" },
+  { id: "tutorial-tracking", title: "Tracking" },
+  { id: "resources", title: "Resources" },
+];
+const MODULE_TUTORIAL_SECTION = {
+  "Image Registration": "tutorial-registration",
+  Segmentation: "tutorial-segmentation",
+  Gating: "tutorial-gating",
+  "Foci Overlay": "tutorial-foci",
+  NMA: "tutorial-nma",
+  "Plot Data": "tutorial-plot",
+  Clustering: "tutorial-clustering",
+  Statistics: "tutorial-statistics",
+  Tracking: "tutorial-tracking",
+};
 const PALETTE_OPTIONS = ["viridis", "plasma", "magma", "inferno", "cividis", "coolwarm", "Spectral", "RdBu"];
 const sameArray = (a = [], b = []) => a.length === b.length && a.every((v, i) => v === b[i]);
 const scrollToTopSmooth = () => {
@@ -225,6 +250,31 @@ function Tip({ text }) {
     <span className="tip-badge" title={text} aria-label={text}>
       i
     </span>
+  );
+}
+
+function HomeLeftPanel({ activeSection, onSelectSection }) {
+  return (
+    <Card as="aside" className="panel seg-panel home-panel" variant="panel">
+      <div className="seg-header">
+        <h3>Home Settings</h3>
+        <p className="hint">Use this sidebar as an index for the software overview, tutorials, and useful links.</p>
+      </div>
+      <div className="seg-scroll">
+        <div className="home-index">
+          {HOME_SECTIONS.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`home-index-item ${activeSection === section.id ? "active" : ""}`}
+              onClick={() => onSelectSection(section.id)}
+            >
+              {section.title}
+            </button>
+          ))}
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -2868,7 +2918,8 @@ function buildStep2Figure(
 }
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState(() => readStorage(STORAGE_KEYS.activeModule, "NMA"));
+  const [activeModule, setActiveModule] = useState(() => readStorage(STORAGE_KEYS.activeModule, "Home"));
+  const [homeSection, setHomeSection] = useState("about");
   const [rows, setRows] = useState(initialNmaRows());
   const [collapsedById, setCollapsedById] = useState({});
 
@@ -2978,6 +3029,29 @@ export default function App() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEYS.activeModule, JSON.stringify(activeModule));
   }, [activeModule]);
+
+  const handleSelectHomeSection = (sectionId) => {
+    setHomeSection(sectionId);
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(`home-${sectionId}`);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const handleOpenTutorial = (moduleName) => {
+    const sectionId = MODULE_TUTORIAL_SECTION[moduleName];
+    setActiveModule("Home");
+    if (!sectionId) return;
+    setHomeSection(sectionId);
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const target = document.getElementById(`home-${sectionId}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -5144,9 +5218,14 @@ export default function App() {
     <div className="app">
       <div className="top-shell">
         <header className="topbar">
-          <div>
-            <div className="logo">forNMA</div>
-            <div className="subtitle">{activeModule}</div>
+          <div className="topbar-brand">
+            <div className="topbar-logo-slot" aria-hidden="true">
+              <span className="topbar-logo-mark">fN</span>
+            </div>
+            <div>
+              <div className="logo">forNMA</div>
+              <div className="subtitle">{activeModule}</div>
+            </div>
           </div>
           {activeModule === "NMA" && step1Ready && (
             <div className="stepper">
@@ -5173,7 +5252,126 @@ export default function App() {
       </div>
 
       <div className="layout">
-        {activeModule === "Segmentation" ? (
+        {activeModule === "Home" ? (
+          <>
+            <HomeLeftPanel activeSection={homeSection} onSelectSection={handleSelectHomeSection} />
+            <main className="content">
+              <section className="home-stack">
+                <div id="home-about" className="section home-section-card">
+                  <div className="home-hero">
+                    <div className="home-logo-box">forNMA</div>
+                    <div>
+                      <h2>About forNMA</h2>
+                      <p className="hint hint-muted">
+                        forNMA is a microscopy analysis environment that brings registration, segmentation, gating,
+                        foci inspection, NMA workflows, plotting, clustering, statistics, and tracking into a single interface.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="home-meta-grid">
+                    <div className="home-info-card">
+                      <h4>What the software does</h4>
+                      <p className="hint hint-muted">
+                        The goal of this home page is to guide new users through the platform, explain the workflow,
+                        and centralize learning materials for each module.
+                      </p>
+                    </div>
+                    <div className="home-info-card">
+                      <h4>Developed by</h4>
+                      <p className="hint hint-muted">
+                        Add here the authors, lab, institution, and collaborators responsible for the software.
+                      </p>
+                    </div>
+                    <div className="home-info-card">
+                      <h4>Contact</h4>
+                      <p className="hint hint-muted">
+                        Add email addresses, GitHub links, and any preferred support or citation contact information.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="home-article" className="section home-section-card">
+                  <h3>Article</h3>
+                  <p className="hint hint-muted">
+                    Reserve this section for the publication that originated the software, including citation text,
+                    DOI, journal information, and a short summary of the scientific context.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-registration" className="section home-section-card">
+                  <h3>Image Registration Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Explain how to organize channels and conditions, choose a reference channel, and run registration safely.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-segmentation" className="section home-section-card">
+                  <h3>Segmentation Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Introduce the image table, nucleus detection channel, segmentation method, and per-channel settings.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-gating" className="section home-section-card">
+                  <h3>Gating Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Describe how to load datasets, pick X/Y columns, preview the gate, and save filtered outputs.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-foci" className="section home-section-card">
+                  <h3>Foci Overlay Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Describe how to select `.pkl` folders, choose channels, and generate overlays and profile outputs.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-nma" className="section home-section-card">
+                  <h3>NMA Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Explain the control dataset, threshold generation, manual adjustments, and settings export workflow.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-plot" className="section home-section-card">
+                  <h3>Plot Data Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Describe how to load CSV files, choose plot types, map columns, and interpret the generated views.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-clustering" className="section home-section-card">
+                  <h3>Clustering Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Introduce feature selection, embedding settings, color strategies, and elbow-plot-assisted clustering.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-statistics" className="section home-section-card">
+                  <h3>Statistics Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Outline when to use one-way, two-way, and chi-square analyses, and how to prepare the input tables.
+                  </p>
+                </div>
+
+                <div id="home-tutorial-tracking" className="section home-section-card">
+                  <h3>Tracking Tutorial</h3>
+                  <p className="hint hint-muted">
+                    Explain the automatic tracking step, correction workflow, linking, unlinking, cell division, and final export.
+                  </p>
+                </div>
+
+                <div id="home-resources" className="section home-section-card">
+                  <h3>Resources</h3>
+                  <p className="hint hint-muted">
+                    Add quick links and micro-tutorials for GitHub, repository navigation, issue reporting, releases, and documentation.
+                  </p>
+                </div>
+              </section>
+            </main>
+          </>
+        ) : activeModule === "Segmentation" ? (
           <>
             <SegmentationLeftPanel
               key={`seg-panel-${segPanelResetKey}`}
@@ -5192,8 +5390,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Segmentation</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Segmentation")}>
+                    Tutorial
+                  </button>
                   <button
                     className="ghost btn-small"
                     onClick={handleResetSegmentationUi}
@@ -5340,8 +5540,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Gating</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Gating")}>
+                    Tutorial
+                  </button>
                   <button className="ghost btn-small" onClick={handleResetGatingUi} disabled={gatingLoading || gatingApplying}>
                     Reset
                   </button>
@@ -5412,8 +5614,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Tracking</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Tracking")}>
+                    Tutorial
+                  </button>
                   <button className="ghost btn-small" onClick={handleResetTrackingUi} disabled={trackingRunning || trackingLoadingFrame || trackingEditing}>
                     Reset
                   </button>
@@ -5560,8 +5764,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Foci Overlay</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Foci Overlay")}>
+                    Tutorial
+                  </button>
                   <button
                     className="ghost btn-small"
                     onClick={handleResetFociUi}
@@ -5609,8 +5815,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Statistics</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Statistics")}>
+                    Tutorial
+                  </button>
                   <button className="ghost btn-small" onClick={handleResetStatisticsUi} disabled={statsLoading}>
                     Reset
                   </button>
@@ -5659,8 +5867,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Clustering</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Clustering")}>
+                    Tutorial
+                  </button>
                   <button className="ghost btn-small" onClick={handleResetClusteringUi} disabled={clusteringLoading || clusteringElbowLoading}>
                     Reset
                   </button>
@@ -5701,8 +5911,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Plot Data</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Plot Data")}>
+                    Tutorial
+                  </button>
                   <button className="ghost btn-small" onClick={handleResetPlotDataUi} disabled={plotDataLoading}>
                     Reset
                   </button>
@@ -5739,8 +5951,10 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-between">
-                  <h2>Image Registration</h2>
+                <div className="row row-right">
+                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Image Registration")}>
+                    Tutorial
+                  </button>
                   <button
                     className="ghost btn-small"
                     onClick={handleResetRegistrationUi}
@@ -5790,13 +6004,6 @@ export default function App() {
           <div className="row row-right">
             <Button className="ghost btn-small" onClick={() => setAllCollapsed(true)}>Minimize all</Button>
             <Button className="ghost btn-small" onClick={() => setAllCollapsed(false)}>Expand all</Button>
-            <Button
-              className="ghost btn-small"
-              onClick={handleResetNma}
-              disabled={plotJob.status === "running" || plotJob.status === "queued"}
-            >
-              Reset NMA
-            </Button>
           </div>
 
           {rows.map((row, idx) => (
@@ -6265,9 +6472,20 @@ export default function App() {
         </Card>
 
         <main className="content">
+          <div className="row row-right">
+            <button className="ghost btn-small" onClick={() => handleOpenTutorial("NMA")}>
+              Tutorial
+            </button>
+            <button
+              className="ghost btn-small"
+              onClick={handleResetNma}
+              disabled={plotJob.status === "running" || plotJob.status === "queued"}
+            >
+              Reset
+            </button>
+          </div>
           {!step1Ready ? (
             <section>
-              <h2>NMA</h2>
               <p className="hint">No settings loaded yet. Use `Load settings` or `Create Settings` to start.</p>
             </section>
           ) : (
