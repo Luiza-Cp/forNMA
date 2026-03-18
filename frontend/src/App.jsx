@@ -1151,11 +1151,11 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
       <aside className="panel seg-panel">
         <div className="seg-header">
           <h3>Registration Inputs</h3>
-          <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
-          <div className="field-head">Saving path</div>
+          <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
+          <div className="field-head">Saving path <Tip text="Directory where registered outputs will be saved." /></div>
           <div className="row path-row">
             <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save results..." />
-            <button className="ghost" onClick={async () => {
+            <button className="ghost" title="Choose where registration outputs should be written." onClick={async () => {
               const p = await onPickDirectory();
               if (p) setSavePath(p);
             }}>Browse</button>
@@ -1170,12 +1170,12 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
           <details open className="seg-section">
             <summary>Channel mapping</summary>
             <div className="seg-body">
-              <div className="field-head">Reference channel</div>
+              <div className="field-head">Reference channel <Tip text="Fixed channel used as the alignment target for all corrected channels." /></div>
               <select className="input" value={referenceChannel} onChange={(e) => setReferenceChannel(e.target.value)}>
                 <option value="">Select reference...</option>
                 {channels.map((ch) => <option key={`reg-ref-${ch.id}`} value={ch.id}>{ch.name}</option>)}
               </select>
-              <div className="field-head">Other channels to correct</div>
+              <div className="field-head">Other channels to correct <Tip text="Channels that will be transformed to match the reference channel." /></div>
               <div className="multi-picker">
                 {channels.filter((ch) => ch.id !== referenceChannel).map((ch) => (
                   <label className="checkbox" key={`reg-m-${ch.id}`}>
@@ -1202,7 +1202,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
             <div className="seg-body">
               <label className="checkbox">
                 <input type="checkbox" checked={cropOutput} onChange={(e) => setCropOutput(e.target.checked)} />
-                Crop output (keep common FOV)
+                Crop output (keep common FOV) <Tip text="Trim the output to the common overlapping field of view after registration." />
               </label>
             </div>
           </details>
@@ -1210,8 +1210,8 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
         </div>
 
         <div className="seg-footer">
-          <button className="primary" onClick={startRegistration} disabled={regRunning}>Run Registration</button>
-          <button className="ghost" onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
+          <button className="primary" title="Run image registration with the current mapping and options." onClick={startRegistration} disabled={regRunning}>Run Registration</button>
+          <button className="ghost" title="Request cancellation of the current registration job." onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
         </div>
       </aside>
 
@@ -1302,10 +1302,10 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
     <aside className="panel seg-panel">
       <div className="seg-header">
         <h3>Foci Overlay — Inputs</h3>
-        <div className="field-head">Pickle (.pkl) folder</div>
+        <div className="field-head">Pickle (.pkl) folder <Tip text="Folder containing the `.pkl` files used to generate the selected foci outputs." /></div>
         <div className="row path-row">
           <input className="input" value={pklPath} onChange={(e) => setPklPath(e.target.value)} placeholder="Folder with .pkl result files..." />
-          <button className="ghost" onClick={async () => {
+          <button className="ghost" title="Choose the folder containing the `.pkl` files." onClick={async () => {
             const p = await onPickDirectory();
             if (p) {
               setPklPath(p);
@@ -1313,10 +1313,10 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
             }
           }}>Browse</button>
         </div>
-        <div className="field-head">Saving path</div>
+        <div className="field-head">Saving path <Tip text="Directory where the overlay outputs and optional rendered images will be saved." /></div>
         <div className="row path-row">
           <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save overlay outputs..." />
-          <button className="ghost" onClick={async () => {
+          <button className="ghost" title="Choose where the foci overlay outputs should be written." onClick={async () => {
             const p = await onPickDirectory();
             if (p) setSavePath(p);
           }}>Browse</button>
@@ -1361,7 +1361,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
                   else setActions((prev) => prev.filter((a) => a !== "overlay"));
                 }}
               />
-              Overlay
+              Overlay <Tip text="Generate overlay views showing the detected foci over the original image context." />
             </label>
             <label className="checkbox">
               <input
@@ -1372,11 +1372,11 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
                   else setActions((prev) => prev.filter((a) => a !== "profiles"));
                 }}
               />
-              Plot profiles
+              Plot profiles <Tip text="Generate profile-style output plots from the loaded foci measurements." />
             </label>
             <label className="checkbox">
               <input type="checkbox" checked={saveImages} onChange={(e) => setSaveImages(e.target.checked)} />
-              Save overlay images
+              Save overlay images <Tip text="Export the rendered overlay images in addition to the other selected outputs." />
             </label>
           </div>
         </details>
@@ -1386,6 +1386,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
       <div className="seg-footer">
         <button
           className="primary"
+          title="Run the selected foci overlay/profile outputs with the chosen channels and save options."
           onClick={() => onStartFoci({
             pkl_path: pklPath.trim(),
             save_path: (savePath.trim() || pklPath.trim()),
@@ -1397,7 +1398,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
         >
           Run Overlay
         </button>
-        <button className="ghost" onClick={() => onStopFoci()} disabled={!running}>Stop</button>
+        <button className="ghost" title="Request cancellation of the current foci overlay job." onClick={() => onStopFoci()} disabled={!running}>Stop</button>
       </div>
     </aside>
   );
@@ -1446,20 +1447,27 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                     />
                     plot
                   </label>
-                  <input
-                    className="input"
-                    value={d.name || ""}
-                    onChange={(e) => updateDataset(d.id, { name: e.target.value })}
-                    placeholder={`Dataset ${idx + 1} name`}
-                  />
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">Dataset name <Tip text="Friendly label used in legends and plot summaries." /></div>
+                    <input
+                      className="input"
+                      value={d.name || ""}
+                      onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                      placeholder={`Dataset ${idx + 1} name`}
+                    />
+                  </div>
                   {(graphState.datasets || []).length > 1 && (
-                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                    <button className="ghost btn-small" title="Remove this dataset from the plotting configuration." onClick={() => removeDataset(d.id)}>Remove</button>
                   )}
                 </div>
                 <div className="row path-row">
-                  <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">CSV path <Tip text="Local CSV file containing the measurements to plot." /></div>
+                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  </div>
                   <button
                     className="ghost"
+                    title="Choose a CSV file for this plot dataset."
                     onClick={async () => {
                       try {
                         const picked = await onPickCsv();
@@ -1474,7 +1482,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 </div>
               </div>
             ))}
-            <button className="secondary" onClick={addDataset}>Add CSV</button>
+            <button className="secondary" title="Add another CSV dataset to the plot configuration." onClick={addDataset}>Add CSV</button>
             {graphState.columnsWarning && (
               <Status level="error" text={graphState.columnsWarning} />
             )}
@@ -1484,7 +1492,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
         <details open className="seg-section">
           <summary>Plot options</summary>
           <div className="seg-body">
-            <div className="field-head">Graph type</div>
+            <div className="field-head">Graph type <Tip text="Select the plot style to generate from the loaded datasets." /></div>
             <select
               className="input"
               value={graphState.graph_type}
@@ -1503,7 +1511,9 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
             </select>
             {!isCpd && supportsX && (
               <div className="row">
-                <select className="input" value={graphState.x} onChange={(e) => setField("x", e.target.value)}>
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">X axis <Tip text="Column used on the horizontal axis of the selected plot type." /></div>
+                  <select className="input" value={graphState.x} onChange={(e) => setField("x", e.target.value)}>
                   <option value="">
                     {(graphType === "violin" || graphType === "box" || graphType === "dot" || graphType === "bar")
                       ? "Category axis (optional)"
@@ -1512,15 +1522,20 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                         : (requiresXY ? "Select X axis (required)" : "Select X axis"))}
                   </option>
                   {xOptions.map((c) => <option key={`x-${c}`} value={c}>{c}</option>)}
-                </select>
-                <select className="input" value={graphState.y} onChange={(e) => setField("y", e.target.value)}>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Y axis <Tip text="Column used on the vertical axis of the selected plot type." /></div>
+                  <select className="input" value={graphState.y} onChange={(e) => setField("y", e.target.value)}>
                   <option value="">{requiresY ? "Select Y axis (required)" : "Select Y axis"}</option>
                   {cols.map((c) => <option key={`y-${c}`} value={c}>{c}</option>)}
-                </select>
+                  </select>
+                </div>
               </div>
             )}
             {!isCpd && !supportsX && (
-              <div className="row">
+              <div>
+                <div className="field-head">Y axis <Tip text="Column used on the vertical axis of the selected plot type." /></div>
                 <select className="input" value={graphState.y} onChange={(e) => setField("y", e.target.value)}>
                   <option value="">{requiresY ? "Select Y axis (required)" : "Select Y axis"}</option>
                   {cols.map((c) => <option key={`y-${c}`} value={c}>{c}</option>)}
@@ -1529,7 +1544,9 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
             )}
             {!isCpd && (
             <div className="row">
-              <select
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Hue <Tip text="Optional column used to color points or groups in the plot." /></div>
+                <select
                 className="input"
                 value={graphState.hue}
                 onChange={(e) => setField("hue", e.target.value)}
@@ -1537,11 +1554,15 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 <option value="">Hue (optional)</option>
                 {cols.map((c) => <option key={`h-${c}`} value={c}>{c}</option>)}
               </select>
+              </div>
               {supportsSize && (
-                <select className="input" value={graphState.size} onChange={(e) => setField("size", e.target.value)}>
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Size <Tip text="Optional numeric column used to scale marker size when supported." /></div>
+                  <select className="input" value={graphState.size} onChange={(e) => setField("size", e.target.value)}>
                   <option value="">Size (optional)</option>
                   {cols.map((c) => <option key={`s-${c}`} value={c}>{c}</option>)}
                 </select>
+                </div>
               )}
             </div>
             )}
@@ -1553,7 +1574,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                     checked={!!graphState.violin_box}
                     onChange={(e) => setField("violin_box", e.target.checked)}
                   />
-                  Show box inside violin
+                  Show box inside violin <Tip text="Overlay a boxplot summary inside each violin distribution." />
                 </label>
                 <label className="checkbox">
                   <input
@@ -1561,7 +1582,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                     checked={!!graphState.violin_points}
                     onChange={(e) => setField("violin_points", e.target.checked)}
                   />
-                  Show dots
+                  Show dots <Tip text="Overlay the individual observations on top of the violin plot." />
                 </label>
               </>
             )}
@@ -1572,7 +1593,8 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
               </div>
             )}
             {shouldShowFrames && (
-              <div className="row">
+              <div>
+                <div className="field-head">Frames <Tip text="Comma-separated list of frames/timepoints to include in the plot." /></div>
                 <input
                   className="input"
                   value={graphState.framesText || ""}
@@ -1582,7 +1604,8 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
               </div>
             )}
             {isCpd && (
-              <div className="row">
+              <div>
+                <div className="field-head">Control condition <Tip text="Optional control group used as a reference in CPD interpretation." /></div>
                 <select
                   className="input"
                   value={graphState.control || ""}
@@ -1602,11 +1625,12 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                   checked={!!graphState.line_rolling}
                   onChange={(e) => setField("line_rolling", e.target.checked)}
                 />
-                Rolling average
+                Rolling average <Tip text="Smooth the line using a moving average window." />
               </label>
             )}
             {lineRolling && (
-              <div className="row">
+              <div>
+                <div className="field-head">Rolling window <Tip text="Number of points used in the moving average for line plots." /></div>
                 <input
                   className="input"
                   type="number"
@@ -1621,7 +1645,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
               <>
                 <label className="checkbox">
                   <input type="checkbox" checked={!!graphState.dot} onChange={(e) => setField("dot", e.target.checked)} />
-                  Dot (box)
+                  Dot (box) <Tip text="Overlay individual observations on the box plot." />
                 </label>
                 <label className="checkbox">
                   <input
@@ -1629,7 +1653,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                     checked={!!graphState.box_outliers}
                     onChange={(e) => setField("box_outliers", e.target.checked)}
                   />
-                  Show outliers
+                  Show outliers <Tip text="Display points considered outliers by the box plot rule." />
                 </label>
               </>
             )}
@@ -1640,7 +1664,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                   checked={!!graphState.compute_auc}
                   onChange={(e) => setField("compute_auc", e.target.checked)}
                 />
-                Compute AUC
+                Compute AUC <Tip text="Calculate the area under the line curve when supported by the data." />
               </label>
             )}
           </div>
@@ -1649,6 +1673,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
       <div className="seg-footer">
         <button
           className="primary"
+          title="Generate the selected plot using the current datasets and plot options."
           onClick={onPreview}
           disabled={!canPreview || loading}
         >
@@ -1691,20 +1716,27 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                     />
                     use
                   </label>
-                  <input
-                    className="input"
-                    value={d.name || ""}
-                    onChange={(e) => updateDataset(d.id, { name: e.target.value })}
-                    placeholder={`Dataset ${idx + 1} name`}
-                  />
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">Dataset name <Tip text="Friendly label used to identify this dataset in the embedding preview." /></div>
+                    <input
+                      className="input"
+                      value={d.name || ""}
+                      onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                      placeholder={`Dataset ${idx + 1} name`}
+                    />
+                  </div>
                   {(state.datasets || []).length > 1 && (
-                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                    <button className="ghost btn-small" title="Remove this dataset from the clustering configuration." onClick={() => removeDataset(d.id)}>Remove</button>
                   )}
                 </div>
                 <div className="row path-row">
-                  <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">CSV path <Tip text="Local CSV file used to compute the embedding." /></div>
+                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  </div>
                   <button
                     className="ghost"
+                    title="Choose a CSV file for this clustering dataset."
                     onClick={async () => {
                       try {
                         const picked = await onPickCsv();
@@ -1719,14 +1751,14 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                 </div>
               </div>
             ))}
-            <button className="secondary" onClick={addDataset}>Add CSV</button>
+            <button className="secondary" title="Add another CSV dataset to the clustering configuration." onClick={addDataset}>Add CSV</button>
           </div>
         </details>
 
         <details open className="seg-section">
           <summary>Features</summary>
           <div className="seg-body">
-            <div className="hint">Select numeric columns used by UMAP.</div>
+            <div className="field-head">Numeric features <Tip text="Numeric columns used as input features for UMAP or PCA." /></div>
             <select
               className="input"
               multiple
@@ -1740,8 +1772,8 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
               {numeric.map((c) => <option key={`umap-col-${c}`} value={c}>{c}</option>)}
             </select>
             <div className="row row-right">
-              <button className="ghost btn-small" onClick={() => setField("columns", numeric.slice())}>Select all</button>
-              <button className="ghost btn-small" onClick={() => setField("columns", [])}>Clear</button>
+              <button className="ghost btn-small" title="Select all numeric columns as embedding features." onClick={() => setField("columns", numeric.slice())}>Select all</button>
+              <button className="ghost btn-small" title="Clear the selected embedding features." onClick={() => setField("columns", [])}>Clear</button>
             </div>
           </div>
         </details>
@@ -1749,6 +1781,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
         <details open className="seg-section">
           <summary>Embedding options</summary>
           <div className="seg-body">
+            <div className="field-head">Embedding method <Tip text="Choose whether to compute a UMAP embedding or a PCA projection." /></div>
             <select className="input" value={state.method || "umap"} onChange={(e) => setField("method", e.target.value)}>
               <option value="umap">UMAP</option>
               <option value="pca">PCA</option>
@@ -1756,27 +1789,42 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
             {state.method !== "pca" && (
               <>
             <div className="row">
-              <input className="input" type="number" min="2" value={state.n_neighbors ?? 15} onChange={(e) => setField("n_neighbors", Number(e.target.value || 15))} placeholder="n_neighbors" />
-              <input className="input" type="number" min="0" max="0.99" step="0.01" value={state.min_dist ?? 0.1} onChange={(e) => setField("min_dist", Number(e.target.value || 0.1))} placeholder="min_dist" />
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Neighbors <Tip text="Number of nearest neighbors used by UMAP to preserve local structure." /></div>
+                <input className="input" type="number" min="2" value={state.n_neighbors ?? 15} onChange={(e) => setField("n_neighbors", Number(e.target.value || 15))} placeholder="n_neighbors" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Minimum distance <Tip text="How tightly UMAP is allowed to pack points in the embedding." /></div>
+                <input className="input" type="number" min="0" max="0.99" step="0.01" value={state.min_dist ?? 0.1} onChange={(e) => setField("min_dist", Number(e.target.value || 0.1))} placeholder="min_dist" />
+              </div>
             </div>
             <div className="row">
-              <select className="input" value={state.metric || "euclidean"} onChange={(e) => setField("metric", e.target.value)}>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Metric <Tip text="Distance metric used to compare rows before embedding." /></div>
+                <select className="input" value={state.metric || "euclidean"} onChange={(e) => setField("metric", e.target.value)}>
                 {["euclidean", "manhattan", "cosine", "chebyshev", "canberra", "correlation"].map((m) => (
                   <option key={`metric-${m}`} value={m}>{m}</option>
                 ))}
-              </select>
-              <input className="input" type="number" min="500" step="500" value={state.max_points ?? 12000} onChange={(e) => setField("max_points", Number(e.target.value || 12000))} placeholder="max points" />
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Max points <Tip text="Maximum number of rows sampled into the preview to keep interaction responsive." /></div>
+                <input className="input" type="number" min="500" step="500" value={state.max_points ?? 12000} onChange={(e) => setField("max_points", Number(e.target.value || 12000))} placeholder="max points" />
+              </div>
             </div>
               </>
             )}
             {state.method === "pca" && (
               <div className="row">
-                <input className="input" type="number" min="500" step="500" value={state.max_points ?? 12000} onChange={(e) => setField("max_points", Number(e.target.value || 12000))} placeholder="max points" />
+                <div style={{ flex: 1 }}>
+                  <div className="field-head">Max points <Tip text="Maximum number of rows sampled into the PCA preview." /></div>
+                  <input className="input" type="number" min="500" step="500" value={state.max_points ?? 12000} onChange={(e) => setField("max_points", Number(e.target.value || 12000))} placeholder="max points" />
+                </div>
               </div>
             )}
             <label className="checkbox">
               <input type="checkbox" checked={!!state.scale} onChange={(e) => setField("scale", e.target.checked)} />
-              Standardize features (z-score)
+              Standardize features (z-score) <Tip text="Normalize features before embedding so large-scale variables do not dominate." />
             </label>
           </div>
         </details>
@@ -1786,7 +1834,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
           <div className="seg-body">
             <label className="checkbox">
               <input type="checkbox" checked={!!state.use_clusters} onChange={(e) => setField("use_clusters", e.target.checked)} />
-              Use KMeans clusters
+              Use KMeans clusters <Tip text="Color the embedding by KMeans cluster assignment instead of a metadata column." />
             </label>
             {state.use_clusters ? (
               <>
@@ -1797,22 +1845,25 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                   <input className="input" type="number" min="2" value={state.k_min ?? 2} onChange={(e) => setField("k_min", Number(e.target.value || 2))} placeholder="Minimum k" />
                   <input className="input" type="number" min="3" value={state.k_max ?? 12} onChange={(e) => setField("k_max", Number(e.target.value || 12))} placeholder="Maximum k" />
                 </div>
-                <button className="ghost" onClick={onElbow} disabled={loading || elbowLoading}>
+                <button className="ghost" title="Generate an elbow plot across the selected k range to help choose the number of clusters." onClick={onElbow} disabled={loading || elbowLoading}>
                   {elbowLoading ? "Generating elbow..." : "Generate elbow plot"}
                 </button>
               </>
             ) : (
+              <>
+              <div className="field-head">Color by <Tip text="Column used to color the embedding when KMeans coloring is disabled." /></div>
               <select className="input" value={state.color_by || ""} onChange={(e) => setField("color_by", e.target.value)}>
                 <option value="">Color by default (Condition)</option>
                 {(state.columnsAll || []).map((c) => <option key={`color-${c}`} value={c}>{c}</option>)}
               </select>
+              </>
             )}
           </div>
         </details>
       </div>
 
       <div className="seg-footer">
-        <button className="primary" onClick={onPreview} disabled={!canRun}>
+        <button className="primary" title="Compute the embedding preview with the selected datasets, features, and coloring options." onClick={onPreview} disabled={!canRun}>
           {loading ? "Running..." : "Run"}
         </button>
       </div>
@@ -2059,15 +2110,22 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
                     <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
                     use
                   </label>
-                  <input className="input" value={d.name || ""} onChange={(e) => updateDataset(d.id, { name: e.target.value })} placeholder={`Dataset ${idx + 1} name`} />
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">Dataset name <Tip text="Friendly label shown in the gating preview and saved outputs." /></div>
+                    <input className="input" value={d.name || ""} onChange={(e) => updateDataset(d.id, { name: e.target.value })} placeholder={`Dataset ${idx + 1} name`} />
+                  </div>
                   {(state.datasets || []).length > 1 && (
-                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                    <button className="ghost btn-small" title="Remove this dataset from the gating analysis." onClick={() => removeDataset(d.id)}>Remove</button>
                   )}
                 </div>
                 <div className="row path-row">
-                  <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  <div style={{ flex: 1 }}>
+                    <div className="field-head">CSV path <Tip text="Local CSV file that will be filtered by the gate." /></div>
+                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                  </div>
                   <button
                     className="ghost"
+                    title="Choose a CSV file for this gating dataset."
                     onClick={async () => {
                       try {
                         const picked = await onPickCsv();
@@ -2082,7 +2140,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
                 </div>
               </div>
             ))}
-            <button className="secondary" onClick={addDataset}>Add CSV</button>
+            <button className="secondary" title="Add another CSV dataset to the gating analysis." onClick={addDataset}>Add CSV</button>
           </div>
         </details>
 
@@ -2090,30 +2148,54 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
           <summary>Gate setup</summary>
           <div className="seg-body">
             <div className="row">
-              <select className="input" value={state.x_col || ""} onChange={(e) => setField("x_col", e.target.value)}>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">X column <Tip text="Numeric column plotted on the horizontal axis of the gate." /></div>
+                <select className="input" value={state.x_col || ""} onChange={(e) => setField("x_col", e.target.value)}>
                 <option value="">X column</option>
                 {numeric.map((c) => <option key={`gx-${c}`} value={c}>{c}</option>)}
-              </select>
-              <select className="input" value={state.y_col || ""} onChange={(e) => setField("y_col", e.target.value)}>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Y column <Tip text="Numeric column plotted on the vertical axis of the gate." /></div>
+                <select className="input" value={state.y_col || ""} onChange={(e) => setField("y_col", e.target.value)}>
                 <option value="">Y column</option>
                 {numeric.map((c) => <option key={`gy-${c}`} value={c}>{c}</option>)}
-              </select>
+                </select>
+              </div>
             </div>
             <div className="row">
-              <input className="input" type="number" value={state.x_min} onChange={(e) => setField("x_min", e.target.value)} placeholder="X minimum (optional)" />
-              <input className="input" type="number" value={state.x_max} onChange={(e) => setField("x_max", e.target.value)} placeholder="X maximum (optional)" />
+              <div style={{ flex: 1 }}>
+                <div className="field-head">X minimum <Tip text="Optional lower horizontal bound for the gate." /></div>
+                <input className="input" type="number" value={state.x_min} onChange={(e) => setField("x_min", e.target.value)} placeholder="X minimum (optional)" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">X maximum <Tip text="Optional upper horizontal bound for the gate." /></div>
+                <input className="input" type="number" value={state.x_max} onChange={(e) => setField("x_max", e.target.value)} placeholder="X maximum (optional)" />
+              </div>
             </div>
             <div className="row">
-              <input className="input" type="number" value={state.y_min} onChange={(e) => setField("y_min", e.target.value)} placeholder="Y minimum (optional)" />
-              <input className="input" type="number" value={state.y_max} onChange={(e) => setField("y_max", e.target.value)} placeholder="Y maximum (optional)" />
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Y minimum <Tip text="Optional lower vertical bound for the gate." /></div>
+                <input className="input" type="number" value={state.y_min} onChange={(e) => setField("y_min", e.target.value)} placeholder="Y minimum (optional)" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Y maximum <Tip text="Optional upper vertical bound for the gate." /></div>
+                <input className="input" type="number" value={state.y_max} onChange={(e) => setField("y_max", e.target.value)} placeholder="Y maximum (optional)" />
+              </div>
             </div>
             <div className="row">
-              <input className="input" type="number" min="0" max="0.49" step="0.01" value={state.q_low ?? 0.05} onChange={(e) => setField("q_low", Number(e.target.value || 0.05))} placeholder="Low quantile" />
-              <input className="input" type="number" min="0.51" max="1" step="0.01" value={state.q_high ?? 0.95} onChange={(e) => setField("q_high", Number(e.target.value || 0.95))} placeholder="High quantile" />
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Low quantile <Tip text="Lower quantile used to estimate automatic bounds when explicit limits are empty." /></div>
+                <input className="input" type="number" min="0" max="0.49" step="0.01" value={state.q_low ?? 0.05} onChange={(e) => setField("q_low", Number(e.target.value || 0.05))} placeholder="Low quantile" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">High quantile <Tip text="Upper quantile used to estimate automatic bounds when explicit limits are empty." /></div>
+                <input className="input" type="number" min="0.51" max="1" step="0.01" value={state.q_high ?? 0.95} onChange={(e) => setField("q_high", Number(e.target.value || 0.95))} placeholder="High quantile" />
+              </div>
             </div>
             <label className="checkbox">
               <input type="checkbox" checked={!!state.color_by_dataset} onChange={(e) => setField("color_by_dataset", e.target.checked)} />
-              Color by dataset
+              Color by dataset <Tip text="Color each dataset differently in the gating preview." />
             </label>
             <div className="hint">If bounds are empty, they are estimated from quantiles (legacy filters behavior).</div>
           </div>
@@ -2122,10 +2204,12 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
         <details open className="seg-section">
           <summary>Output</summary>
           <div className="seg-body">
+            <div className="field-head">Saving path <Tip text="Directory where the gated CSV files will be written." /></div>
             <div className="row path-row">
               <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save gated CSV files" />
               <button
                 className="ghost"
+                title="Choose where gated CSV files should be saved."
                 onClick={async () => {
                   try {
                     const picked = await onPickDirectory();
@@ -2142,10 +2226,10 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
         </details>
       </div>
       <div className="seg-footer">
-        <button className="secondary" onClick={onPreview} disabled={!canPreview}>
+        <button className="secondary" title="Preview the gate on the selected X/Y columns without saving files yet." onClick={onPreview} disabled={!canPreview}>
           {loading ? "Previewing..." : "Preview gate"}
         </button>
-        <button className="primary" onClick={onApply} disabled={!canApply}>
+        <button className="primary" title="Apply the gate and save the filtered CSV files to the selected output folder." onClick={onApply} disabled={!canApply}>
           {applying ? "Applying..." : "Apply and save"}
         </button>
       </div>
@@ -5720,12 +5804,15 @@ export default function App() {
               {!collapsedById[row.id] && (
                 <>
                   <div className="row">
-                    <input
-                      className="input"
-                      placeholder="Name"
-                      value={row.name}
-                      onChange={(e) => updateRow(idx, { name: e.target.value })}
-                    />
+                    <div style={{ flex: 1 }}>
+                      <div className="field-head">Dataset name <Tip text="Friendly name used to identify this dataset throughout the NMA workflow." /></div>
+                      <input
+                        className="input"
+                        placeholder="Name"
+                        value={row.name}
+                        onChange={(e) => updateRow(idx, { name: e.target.value })}
+                      />
+                    </div>
                     <label className="checkbox">
                       <input
                         type="checkbox"
@@ -5736,14 +5823,18 @@ export default function App() {
                     </label>
                   </div>
                   <div className="row path-row">
-                    <input
-                      className="input"
-                      placeholder="/path/Results.csv"
-                      value={row.path}
-                      onChange={(e) => updateRow(idx, { path: e.target.value })}
-                    />
+                    <div style={{ flex: 1 }}>
+                      <div className="field-head">CSV path <Tip text="Results table used as input for this NMA dataset." /></div>
+                      <input
+                        className="input"
+                        placeholder="/path/Results.csv"
+                        value={row.path}
+                        onChange={(e) => updateRow(idx, { path: e.target.value })}
+                      />
+                    </div>
                     <button
                       className="ghost"
+                      title="Choose a CSV file for this NMA dataset."
                       onClick={async () => {
                         setStatus("Opening file picker...");
                         setStatusLevel("info");
@@ -5762,24 +5853,30 @@ export default function App() {
                     </button>
                   </div>
                   <div className="row">
-                    <select
-                      className="input"
-                      value={row.area_col}
-                      onChange={(e) => updateRow(idx, { area_col: e.target.value })}
-                    >
-                      {(row.columns || ["Area"]).map((c) => (
-                        <option key={`area-${idx}-${c}`} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="input"
-                      value={row.nii_col}
-                      onChange={(e) => updateRow(idx, { nii_col: e.target.value })}
-                    >
-                      {(row.columns || ["NII"]).map((c) => (
-                        <option key={`nii-${idx}-${c}`} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <div style={{ flex: 1 }}>
+                      <div className="field-head">Area column <Tip text="Column used as the Area axis/input for NMA calculations." /></div>
+                      <select
+                        className="input"
+                        value={row.area_col}
+                        onChange={(e) => updateRow(idx, { area_col: e.target.value })}
+                      >
+                        {(row.columns || ["Area"]).map((c) => (
+                          <option key={`area-${idx}-${c}`} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div className="field-head">NII column <Tip text="Column used as the NII axis/input for NMA calculations." /></div>
+                      <select
+                        className="input"
+                        value={row.nii_col}
+                        onChange={(e) => updateRow(idx, { nii_col: e.target.value })}
+                      >
+                        {(row.columns || ["NII"]).map((c) => (
+                          <option key={`nii-${idx}-${c}`} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div className="row row-right">
                     <button
@@ -5926,62 +6023,74 @@ export default function App() {
                       </select>
                     </div>
                     <div className="row">
-                      <input
-                        className="input"
-                        type="number"
-                        placeholder="Hue min (optional)"
-                        value={plotConfig.dot.hue_min}
-                        onChange={(e) => updateDotConfig({ hue_min: e.target.value })}
-                      />
-                      <input
-                        className="input"
-                        type="number"
-                        placeholder="Hue max (optional)"
-                        value={plotConfig.dot.hue_max}
-                        onChange={(e) => updateDotConfig({ hue_max: e.target.value })}
-                      />
-                    </div>
-                    <div className="hint">
-                      Hue min/max are optional. <Tip text="Optional lower/upper bounds for the color scale. Leave empty for automatic scaling." />
-                    </div>
-                    <div className="row">
-                      <input
-                        className="input"
-                        type="number"
-                        placeholder="Size min (optional)"
-                        value={plotConfig.dot.size_min}
-                        onChange={(e) => updateDotConfig({ size_min: e.target.value })}
-                      />
-                      <input
-                        className="input"
-                        type="number"
-                        placeholder="Size max (optional)"
-                        value={plotConfig.dot.size_max}
-                        onChange={(e) => updateDotConfig({ size_max: e.target.value })}
-                      />
-                    </div>
-                    <div className="hint">
-                      Size min/max are optional. <Tip text="Optional lower/upper bounds for marker size scaling. Leave empty for automatic scaling." />
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Hue minimum <Tip text="Optional lower bound for the color scale. Leave empty for automatic scaling." /></div>
+                        <input
+                          className="input"
+                          type="number"
+                          placeholder="Hue min (optional)"
+                          value={plotConfig.dot.hue_min}
+                          onChange={(e) => updateDotConfig({ hue_min: e.target.value })}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Hue maximum <Tip text="Optional upper bound for the color scale. Leave empty for automatic scaling." /></div>
+                        <input
+                          className="input"
+                          type="number"
+                          placeholder="Hue max (optional)"
+                          value={plotConfig.dot.hue_max}
+                          onChange={(e) => updateDotConfig({ hue_max: e.target.value })}
+                        />
+                      </div>
                     </div>
                     <div className="row">
-                      <input
-                        className="input"
-                        type="number"
-                        min="1"
-                        placeholder="Sample size (optional)"
-                        value={plotConfig.dot.sample_size}
-                        onChange={(e) => updateDotConfig({ sample_size: e.target.value })}
-                      />
-                      <select
-                        className="input"
-                        value={plotConfig.dot.palette}
-                        onChange={(e) => updateDotConfig({ palette: e.target.value })}
-                      >
-                        <option value="">Palette (optional)</option>
-                        {PALETTE_OPTIONS.map((p) => (
-                          <option key={`pal-${p}`} value={p}>{p}</option>
-                        ))}
-                      </select>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Size minimum <Tip text="Optional lower bound for marker size scaling." /></div>
+                        <input
+                          className="input"
+                          type="number"
+                          placeholder="Size min (optional)"
+                          value={plotConfig.dot.size_min}
+                          onChange={(e) => updateDotConfig({ size_min: e.target.value })}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Size maximum <Tip text="Optional upper bound for marker size scaling." /></div>
+                        <input
+                          className="input"
+                          type="number"
+                          placeholder="Size max (optional)"
+                          value={plotConfig.dot.size_max}
+                          onChange={(e) => updateDotConfig({ size_max: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="row">
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Sample size <Tip text="Optional limit on how many nuclei are sampled into the dot plot." /></div>
+                        <input
+                          className="input"
+                          type="number"
+                          min="1"
+                          placeholder="Sample size (optional)"
+                          value={plotConfig.dot.sample_size}
+                          onChange={(e) => updateDotConfig({ sample_size: e.target.value })}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Palette <Tip text="Optional color palette used for the dot plot." /></div>
+                        <select
+                          className="input"
+                          value={plotConfig.dot.palette}
+                          onChange={(e) => updateDotConfig({ palette: e.target.value })}
+                        >
+                          <option value="">Palette (optional)</option>
+                          {PALETTE_OPTIONS.map((p) => (
+                            <option key={`pal-${p}`} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div className="check-grid">
                       <label className="checkbox">
@@ -6060,6 +6169,7 @@ export default function App() {
                   />
                   <button
                     className="ghost"
+                    title="Choose where the generated NMA plots should be saved."
                     onClick={async () => {
                       try {
                         const res = await pickDirectoryPath();
@@ -6075,6 +6185,7 @@ export default function App() {
                 </div>
                 <button
                   className="primary"
+                  title="Generate all NMA plots with the current plotting settings and save them to the selected folder."
                   onClick={handlePlotAll}
                   disabled={!plotSavePath.trim() || datasets.length === 0 || (plotJob.status === "running" || plotJob.status === "queued")}
                 >

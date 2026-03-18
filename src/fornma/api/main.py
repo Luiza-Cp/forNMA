@@ -2126,7 +2126,7 @@ def tracking_save_results(req: TrackingSaveRequest):
 
     saved_images = 0
     images_dir = None
-    if req.include_images and req.preview_cache_dir:
+    if req.preview_cache_dir:
         cache_dir = Path(req.preview_cache_dir).expanduser().resolve()
         if cache_dir.exists() and cache_dir.is_dir():
             files = sorted([p for p in cache_dir.iterdir() if p.is_file() and p.suffix.lower() in {".png", ".tif", ".tiff"}])
@@ -2141,8 +2141,6 @@ def tracking_save_results(req: TrackingSaveRequest):
     msg = f"Saved tracked table to '{dst_table}'."
     if saved_images:
         msg += f" Saved {saved_images} image(s) to '{images_dir}'."
-    elif not req.include_images:
-        msg += " Images were not exported."
     else:
         msg += " No cached tracking images were found to copy."
 
@@ -2341,7 +2339,6 @@ def tracking_edit_link(req: TrackingLinkRequest):
 @app.post("/tracking/edit/division", response_model=TrackingEditResponse)
 def tracking_edit_division(req: TrackingDivisionRequest):
     df = _tracking_df_load(req.table_path)
-    source_df = df.copy()
     sel = _tracking_find_rows_by_selection(df, req.selections)
     if len(sel) != 3:
         raise HTTPException(status_code=400, detail="Cell division requires exactly 3 selected cells: mother and two daughters.")
@@ -2352,43 +2349,27 @@ def tracking_edit_division(req: TrackingDivisionRequest):
     daughter_frames = daughters["Frame"].astype(int).tolist()
     if len(set(daughter_frames)) != 1:
         raise HTTPException(status_code=400, detail="The two daughter cells must be selected in the same frame.")
-    if int(daughters.iloc[0]["Frame"]) != int(mother["Frame"]) + 1:
-        raise HTTPException(status_code=400, detail="Cell division must connect one mother cell in frame t to two daughter cells in frame t+1.")
+    if int(mother["Frame"]) >= int(daughters.iloc[0]["Frame"]):
+        raise HTTPException(status_code=400, detail="The mother cell must be in an earlier frame than the two daughters.")
 
     mother_family = mother["family"]
     mother_family_name = _tracking_family_name_prefix(mother["family_name"])
     mother_color = str(mother["family_color"])
     edited = 0
-    processed_indices: set[int] = set()
 
-    for i, daughter in enumerate(daughters.itertuples(index=False), start=1):
-        daughter_frame = int(daughter.Frame)
-        daughter_cell = int(daughter.Cell)
-        daughter_track_id = int(daughter.track_id)
-        daughter_row = source_df[
-            (source_df["Frame"] == daughter_frame)
-            & (source_df["Cell"] == daughter_cell)
-            & (source_df["track_id"] == daughter_track_id)
-        ]
-        if daughter_row.empty:
-            continue
-        daughter_source = daughter_row.iloc[0]
-        daughter_start_idx = int(daughter_source.name)
-        daughter_indices = _tracking_collect_descendant_indices(source_df, daughter_start_idx) - processed_indices
-        if not daughter_indices:
-            continue
+    for i, (_, daughter) in enumerate(daughters.iterrows(), start=1):
         daughter_prefix = f"{mother_family_name}{i}."
-        old_prefix = _tracking_family_name_prefix(daughter_source["family_name"])
+        old_prefix = _tracking_family_name_prefix(daughter["family_name"])
         target_idx = df[
-            (df["Frame"] == daughter_frame)
-            & (df["Cell"] == daughter_cell)
-            & (df["track_id"] == daughter_track_id)
+            (df["Frame"] == int(daughter["Frame"]))
+            & (df["Cell"] == int(daughter["Cell"]))
+            & (df["track_id"] == int(daughter["track_id"]))
         ].index
         if len(target_idx):
             df.at[target_idx[0], "previous_x"] = float(mother["X"])
             df.at[target_idx[0], "previous_y"] = float(mother["Y"])
             edited += 1
-        mask = df.index.isin(sorted(daughter_indices))
+        mask = (df["track_id"] == int(daughter["track_id"])) & (df["Frame"] >= int(daughter["Frame"]))
         if mask.any():
             df.loc[mask, "family"] = mother_family
             df.loc[mask, "family_color"] = mother_color
@@ -2396,7 +2377,6 @@ def tracking_edit_division(req: TrackingDivisionRequest):
                 lambda x, old_prefix=old_prefix, daughter_prefix=daughter_prefix: _tracking_replace_family_prefix(x, old_prefix, daughter_prefix)
             )
             edited += int(mask.sum())
-            processed_indices.update(daughter_indices)
 
     _tracking_df_save(req.table_path, df)
     preview = _tracking_preview_response(
@@ -2416,29 +2396,31 @@ def tracking_edit_division(req: TrackingDivisionRequest):
 @app.post("/tracking/edit/unlink", response_model=TrackingEditResponse)
 def tracking_edit_unlink(req: TrackingUnlinkRequest):
     df = _tracking_df_load(req.table_path)
-    source_df = df.copy()
     sel = _tracking_find_rows_by_selection(df, req.selections)
     if sel.empty:
         raise HTTPException(status_code=400, detail="Select at least one point to unlink.")
 
     sel = sel.sort_values(by=["Frame", "__selection_order"], kind="stable").reset_index(drop=True)
     edited = 0
-    processed_indices: set[int] = set()
+    frame_counts = sel["Frame"].astype(int).value_counts().to_dict()
 
     for _, picked in sel.iterrows():
         picked_frame = int(picked["Frame"])
         picked_cell = int(picked["Cell"])
-        row_now = source_df[(source_df["Frame"] == picked_frame) & (source_df["Cell"] == picked_cell)].copy()
+        row_now = df[(df["Frame"] == picked_frame) & (df["Cell"] == picked_cell)].copy()
         if row_now.empty:
             continue
         current = row_now.iloc[0]
+        track_id = int(current["track_id"])
         split_frame = int(current["Frame"])
         old_family_name = str(current["family_name"])
-        start_idx = int(current.name)
-        lineage_indices = _tracking_collect_descendant_indices(source_df, start_idx) - processed_indices
-        if not lineage_indices:
+        same_frame_multi = int(frame_counts.get(split_frame, 0)) > 1
+        if same_frame_multi:
+            mask = (df["Frame"] == split_frame) & (df["Cell"] == picked_cell)
+        else:
+            mask = (df["track_id"] == track_id) & (df["Frame"] >= split_frame)
+        if not mask.any():
             continue
-        mask = df.index.isin(sorted(lineage_indices))
 
         new_track_id = int(df["track_id"].max()) + 1
         new_family_color = str(_tracking_color_for_family(new_track_id))
@@ -2453,7 +2435,6 @@ def tracking_edit_unlink(req: TrackingUnlinkRequest):
             df.at[first_idx[0], "previous_x"] = np.nan
             df.at[first_idx[0], "previous_y"] = np.nan
         edited += int(mask.sum())
-        processed_indices.update(lineage_indices)
 
     _tracking_df_save(req.table_path, df)
     preview = _tracking_preview_response(
@@ -2464,7 +2445,7 @@ def tracking_edit_unlink(req: TrackingUnlinkRequest):
         trail_window=req.trail_window,
         show_complete_trail=bool(req.show_complete_trail),
         preview_cache_dir=None,
-        message="Selected cells were unlinked from the chosen frame onward.",
+        message="Selected cells were unlinked into separate tracks.",
         force_redraw=True,
     )
     return TrackingEditResponse(**preview.dict(), edited_rows=edited)
