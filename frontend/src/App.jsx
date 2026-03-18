@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Plotly from "plotly.js-dist-min";
+import { Button, Card, FieldTitle } from "./design-system/index.js";
 
 const API_BASE = "http://127.0.0.1:8000";
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
@@ -527,9 +528,10 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
 
   return (
     <>
-    <aside className="panel seg-panel">
+    <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Segmentation — Settings</h3>
+        <h3>Segmentation Settings</h3>
+        <p className="hint">Configure image inputs, nucleus detection, and per-channel measurement options.</p>
         <div className="row">
           <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
           <button className="ghost" onClick={resetSegForm} disabled={segRunning}>Reset settings</button>
@@ -919,7 +921,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         <button className="primary" onClick={() => startSeg(false)} disabled={segRunning}>Run</button>
         <button className="ghost" onClick={() => onStopSegmentation()} disabled={!segRunning}>Stop</button>
       </div>
-    </aside>
+    </Card>
     {modalOpen && (
       <div className="seg-modal-backdrop" onClick={() => setModalOpen(false)}>
         <div className="seg-modal" onClick={(e) => e.stopPropagation()}>
@@ -1148,9 +1150,10 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 
   return (
     <>
-      <aside className="panel seg-panel">
+      <Card as="aside" className="panel seg-panel" variant="panel">
         <div className="seg-header">
-          <h3>Registration Inputs</h3>
+          <h3>Image Registration Settings</h3>
+          <p className="hint">Set the reference channel, moving channels, and output options for registration.</p>
           <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
           <div className="field-head">Saving path <Tip text="Directory where registered outputs will be saved." /></div>
           <div className="row path-row">
@@ -1213,7 +1216,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
           <button className="primary" title="Run image registration with the current mapping and options." onClick={startRegistration} disabled={regRunning}>Run Registration</button>
           <button className="ghost" title="Request cancellation of the current registration job." onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
         </div>
-      </aside>
+      </Card>
 
       {modalOpen && (
         <div className="seg-modal-backdrop" onClick={() => setModalOpen(false)}>
@@ -1299,9 +1302,10 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
   };
 
   return (
-    <aside className="panel seg-panel">
+    <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Foci Overlay — Inputs</h3>
+        <h3>Foci Overlay Settings</h3>
+        <p className="hint">Generate overlay views and profile outputs from previously processed `.pkl` files.</p>
         <div className="field-head">Pickle (.pkl) folder <Tip text="Folder containing the `.pkl` files used to generate the selected foci outputs." /></div>
         <div className="row path-row">
           <input className="input" value={pklPath} onChange={(e) => setPklPath(e.target.value)} placeholder="Folder with .pkl result files..." />
@@ -1400,7 +1404,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
         </button>
         <button className="ghost" title="Request cancellation of the current foci overlay job." onClick={() => onStopFoci()} disabled={!running}>Stop</button>
       </div>
-    </aside>
+    </Card>
   );
 }
 
@@ -1427,9 +1431,9 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
   const shouldShowFrames = isCpd || (graphType === "line" && (!graphState.x || graphState.x === "Frame"));
 
   return (
-    <aside className="panel seg-panel">
+    <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Plot Data — Settings</h3>
+        <h3>Plot Data Settings</h3>
         <p className="hint">Use CSV outputs to build interactive plots.</p>
       </div>
       <div className="seg-scroll">
@@ -1681,7 +1685,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
         </button>
       </div>
       <Status level={status.level} text={status.text} />
-    </aside>
+    </Card>
   );
 }
 
@@ -1696,9 +1700,9 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
   const canRun = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim()) && (state.columns || []).length > 0 && !loading;
 
   return (
-    <aside className="panel seg-panel">
+    <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Clustering</h3>
+        <h3>Clustering Settings</h3>
         <p className="hint">Interactive embedding preview with optional KMeans coloring.</p>
       </div>
       <div className="seg-scroll">
@@ -1868,7 +1872,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
         </button>
       </div>
       <Status level={status.level} text={status.text} />
-    </aside>
+    </Card>
   );
 }
 
@@ -1888,9 +1892,9 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   };
 
   return (
-    <aside className="panel seg-panel">
+    <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Statistics</h3>
+        <h3>Statistics Settings</h3>
         <p className="hint">Run statistical tests and inspect result tables.</p>
       </div>
       <div className="seg-scroll">
@@ -2078,7 +2082,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
         </button>
       </div>
       <Status level={status.level} text={status.text} />
-    </aside>
+    </Card>
   );
 }
 
@@ -2094,9 +2098,9 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
   const canApply = canPreview && !!String(state.output_dir || "").trim();
 
   return (
-    <aside className="panel seg-panel">
+    <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Gating</h3>
+        <h3>Gating Settings</h3>
         <p className="hint">Filter populations by rectangular gates on two numeric columns, including cleanup of segmentation errors/debris.</p>
       </div>
       <div className="seg-scroll">
@@ -2234,7 +2238,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
         </button>
       </div>
       <Status level={status.level} text={status.text} />
-    </aside>
+    </Card>
   );
 }
 
@@ -2274,9 +2278,9 @@ function TrackingLeftPanel({
   const canLink = hasTracked && (state.selected || []).length >= 2 && !busy;
 
   return (
-    <aside className="panel seg-panel">
+    <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Tracking</h3>
+        <h3>Tracking Settings</h3>
         <p className="hint">
           Automatic tracking is simple and may produce errors. Step 2 is manual correction and becomes available only
           after running automatic tracking.
@@ -2476,7 +2480,7 @@ function TrackingLeftPanel({
           </details>
         )}
       </div>
-    </aside>
+    </Card>
   );
 }
 
@@ -5138,32 +5142,35 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div>
-          <div className="logo">forNMA</div>
-          <div className="subtitle">{activeModule === "NMA" ? "NMA Settings" : `${activeModule} Settings`}</div>
-        </div>
-        {activeModule === "NMA" && step1Ready && (
-          <div className="stepper">
-            <div className={`chip ${step === 1 ? "active" : ""}`}>Step 1</div>
-            <div className={`chip ${step === 2 ? "active" : ""}`}>Step 2</div>
+      <div className="top-shell">
+        <header className="topbar">
+          <div>
+            <div className="logo">forNMA</div>
+            <div className="subtitle">{activeModule}</div>
           </div>
-        )}
-      </header>
-      <nav className="module-menu" aria-label="forNMA stages">
-        {FORNMA_STAGES.map((stage) => (
-          <button
-            key={stage}
-            type="button"
-            className={`module-chip ${stage === activeModule ? "active" : ""}`}
-            onClick={() => {
-              setActiveModule(stage);
-            }}
-          >
-            {stage}
-          </button>
-        ))}
-      </nav>
+          {activeModule === "NMA" && step1Ready && (
+            <div className="stepper">
+              <div className={`chip ${step === 1 ? "active" : ""}`}>Step 1</div>
+              <div className={`chip ${step === 2 ? "active" : ""}`}>Step 2</div>
+            </div>
+          )}
+        </header>
+        <nav className="module-menu" aria-label="forNMA stages">
+          {FORNMA_STAGES.map((stage) => (
+            <Button
+              key={stage}
+              type="button"
+              className={`module-chip ${stage === activeModule ? "active" : ""}`}
+              data-state={stage === activeModule ? "active" : "inactive"}
+              onClick={() => {
+                setActiveModule(stage);
+              }}
+            >
+              <span className="module-chip-label">{stage}</span>
+            </Button>
+          ))}
+        </nav>
+      </div>
 
       <div className="layout">
         {activeModule === "Segmentation" ? (
@@ -5411,125 +5418,126 @@ export default function App() {
                     Reset
                   </button>
                 </div>
-	                <div className="section">
-	                  <h3>Tracking viewer</h3>
-	                  {String(trackingState.workflow_stage || "step1") === "correction" && (
-	                    <div className="row" style={{ marginBottom: 8 }}>
-	                      <button
-	                        className="ghost"
-	                        title="Remove the current highlighted selections without changing the tracking table."
-	                        onClick={() => setTrackingState((prev) => ({ ...prev, selected: [], selected_markers: [] }))}
-	                        disabled={!(trackingState.selected || []).length}
-	                      >
-	                        Clear selection
-	                      </button>
+                {(trackingState.preview_image_path || trackingRunning || trackingLoadingFrame || trackingEditing) ? (
+                  <div className="section">
+                    <h3>Tracking viewer</h3>
+                    {String(trackingState.workflow_stage || "step1") === "correction" && (
+                      <div className="row" style={{ marginBottom: 8 }}>
+                        <button
+                          className="ghost"
+                          title="Remove the current highlighted selections without changing the tracking table."
+                          onClick={() => setTrackingState((prev) => ({ ...prev, selected: [], selected_markers: [] }))}
+                          disabled={!(trackingState.selected || []).length}
+                        >
+                          Clear selection
+                        </button>
                         <button className="ghost" title="Restore the table and viewer to the state before the last edit action." onClick={handleTrackingUndo} disabled={!String(trackingState.undo_checkpoint_path || "").trim() || trackingEditing || trackingLoadingFrame || trackingRunning}>
                           Undo
                         </button>
                         <button className="ghost" title="Save the current corrected table to a temporary checkpoint so you can keep working without losing progress." onClick={handleTrackingSaveProgress} disabled={trackingEditing || trackingLoadingFrame || trackingRunning || !String(trackingState.table_path || "").trim()}>
                           Save progress
                         </button>
-	                      <button className="ghost" title="Link the selected cells into the same track. Across frames, the earliest selected cell becomes the base track." onClick={handleTrackingLink} disabled={(trackingState.selected || []).length < 2}>
-	                        Link selected
-	                      </button>
-	                      <button className="ghost" title="Mark a cell division using exactly 3 selections: the mother cell in the earlier frame and the two daughter cells in the later frame." onClick={handleTrackingDivision} disabled={(trackingState.selected || []).length !== 3}>
-	                        Cell division
-	                      </button>
-	                      <button className="ghost" title="Cut the selected track from that point onward. The chosen cell keeps the old family before that frame, and gets a new number/color from the selected frame to the end." onClick={handleTrackingUnlink} disabled={(trackingState.selected || []).length < 1}>
-	                        Unlink
-	                      </button>
-	                    </div>
-	                  )}
-	                  <div className="viewer-toolbar">
-	                    <button
-	                      className="ghost btn-small"
-	                      title="Show the previous frame in the tracking viewer."
-	                      onClick={() => handleTrackingStepFrame(-1)}
-	                      disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) <= 0}
-	                    >
-	                      ◀
-	                    </button>
-	                    <span className="viewer-counter">
-	                      {(Number(trackingState.frame || 0) + 1)} / {(Number(trackingState.max_frame || 0) + 1)}
-	                    </span>
-	                    <button
-	                      className="ghost btn-small"
-	                      title="Show the next frame in the tracking viewer."
-	                      onClick={() => handleTrackingStepFrame(1)}
-	                      disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) >= Number(trackingState.max_frame || 0)}
-	                    >
-	                      ▶
-	                    </button>
-	                  </div>
-	                  {trackingState.preview_image_path ? (
-	                    <div className="thumb-card viewer-single" style={{ cursor: "crosshair" }}>
-	                      <div style={{ position: "relative", width: "100%" }}>
+                        <button className="ghost" title="Link the selected cells into the same track. Across frames, the earliest selected cell becomes the base track." onClick={handleTrackingLink} disabled={(trackingState.selected || []).length < 2}>
+                          Link selected
+                        </button>
+                        <button className="ghost" title="Mark a cell division using exactly 3 selections: the mother cell in the earlier frame and the two daughter cells in the later frame." onClick={handleTrackingDivision} disabled={(trackingState.selected || []).length !== 3}>
+                          Cell division
+                        </button>
+                        <button className="ghost" title="Cut the selected track from that point onward. The chosen cell keeps the old family before that frame, and gets a new number/color from the selected frame to the end." onClick={handleTrackingUnlink} disabled={(trackingState.selected || []).length < 1}>
+                          Unlink
+                        </button>
+                      </div>
+                    )}
+                    <div className="viewer-toolbar">
+                      <button
+                        className="ghost btn-small"
+                        title="Show the previous frame in the tracking viewer."
+                        onClick={() => handleTrackingStepFrame(-1)}
+                        disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) <= 0}
+                      >
+                        ◀
+                      </button>
+                      <span className="viewer-counter">
+                        {(Number(trackingState.frame || 0) + 1)} / {(Number(trackingState.max_frame || 0) + 1)}
+                      </span>
+                      <button
+                        className="ghost btn-small"
+                        title="Show the next frame in the tracking viewer."
+                        onClick={() => handleTrackingStepFrame(1)}
+                        disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) >= Number(trackingState.max_frame || 0)}
+                      >
+                        ▶
+                      </button>
+                    </div>
+                    {trackingState.preview_image_path ? (
+                      <div className="thumb-card viewer-single" style={{ cursor: "crosshair" }}>
+                        <div style={{ position: "relative", width: "100%" }}>
                           {(trackingRunning || trackingLoadingFrame || trackingEditing) && (
                             <div className="viewer-overlay">
                               <div className="spinner" />
-                              <div className="hint">
+                              <div className="hint hint-muted">
                                 {trackingRunning ? "Running automatic tracking..." : (trackingEditing ? "Applying correction..." : "Updating frame...")}
                               </div>
                             </div>
                           )}
-	                        <img
-	                          src={`${API_BASE}/tracking/file?path=${encodeURIComponent(trackingState.preview_image_path)}&v=${trackingState.preview_nonce || 0}`}
-	                          alt={`tracking-frame-${trackingState.frame || 0}`}
-	                          onLoad={(e) => {
-	                            const w = Number(e.currentTarget.naturalWidth || 0);
-	                            const h = Number(e.currentTarget.naturalHeight || 0);
-	                            setTrackingState((prev) => ({ ...prev, viewer_w: w, viewer_h: h }));
-	                          }}
-	                          onClick={handleTrackingViewerClick}
-	                        />
-	                        {(trackingState.selected_markers || [])
-	                          .filter((m) => Number(m.frame) === Number(trackingState.frame || 0))
-	                          .map((m, i) => {
-	                          const w = Number(trackingState.viewer_w || 0);
-	                          const h = Number(trackingState.viewer_h || 0);
-	                          if (!w || !h) return null;
-	                          return (
-	                            <span
-	                              key={`trk-marker-${i}`}
-	                              style={{
-	                                position: "absolute",
-	                                left: `calc(${(Number(m.x) / w) * 100}% - 6px)`,
-	                                top: `calc(${(Number(m.y) / h) * 100}% - 6px)`,
-	                                width: 12,
-	                                height: 12,
-	                                borderRadius: "50%",
-	                                background: "#ffd400",
-	                                border: "2px solid #6a4f00",
-	                                pointerEvents: "none",
-	                              }}
-	                            />
-	                          );
-	                          })}
-	                      </div>
-	                      <span>{trackingState.preview_image_path.split("/").pop()}</span>
-	                    </div>
-	                  ) : (
-	                    <p className="hint">
-	                      Run tracking and refresh a frame to load generated tracking images.
-	                      {trackingState.preview_cache_dir ? ` Cache: ${trackingState.preview_cache_dir}` : ""}
-	                    </p>
-	                  )}
-	                  {(trackingState.selected_markers || []).filter((m) => Number(m.frame) === Number(trackingState.frame || 0)).length > 0 && (
-	                    <div className="hint">
-	                      {(trackingState.selected_markers || [])
-	                        .filter((m) => Number(m.frame) === Number(trackingState.frame || 0))
-	                        .map((m, i) => `#${i + 1} x=${Number(m.x).toFixed(1)}, y=${Number(m.y).toFixed(1)}`)
-	                        .join(" | ")}
-	                    </div>
-	                  )}
-	                </div>
-	                {!trackingState.preview_image_path && (
-	                  <p className="hint">Run automatic tracking first, then load a frame in the viewer.</p>
-	                )}
+                          <img
+                            src={`${API_BASE}/tracking/file?path=${encodeURIComponent(trackingState.preview_image_path)}&v=${trackingState.preview_nonce || 0}`}
+                            alt={`tracking-frame-${trackingState.frame || 0}`}
+                            onLoad={(e) => {
+                              const w = Number(e.currentTarget.naturalWidth || 0);
+                              const h = Number(e.currentTarget.naturalHeight || 0);
+                              setTrackingState((prev) => ({ ...prev, viewer_w: w, viewer_h: h }));
+                            }}
+                            onClick={handleTrackingViewerClick}
+                          />
+                          {(trackingState.selected_markers || [])
+                            .filter((m) => Number(m.frame) === Number(trackingState.frame || 0))
+                            .map((m, i) => {
+                              const w = Number(trackingState.viewer_w || 0);
+                              const h = Number(trackingState.viewer_h || 0);
+                              if (!w || !h) return null;
+                              return (
+                                <span
+                                  key={`trk-marker-${i}`}
+                                  style={{
+                                    position: "absolute",
+                                    left: `calc(${(Number(m.x) / w) * 100}% - 6px)`,
+                                    top: `calc(${(Number(m.y) / h) * 100}% - 6px)`,
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: "50%",
+                                    background: "#ffd400",
+                                    border: "2px solid #6a4f00",
+                                    pointerEvents: "none",
+                                  }}
+                                />
+                              );
+                            })}
+                        </div>
+                        <span>{trackingState.preview_image_path.split("/").pop()}</span>
+                      </div>
+                    ) : (
+                      <p className="hint hint-muted">
+                        Running tracking. The viewer will appear as soon as the first frame is ready.
+                        {trackingState.preview_cache_dir ? ` Cache: ${trackingState.preview_cache_dir}` : ""}
+                      </p>
+                    )}
+                    {(trackingState.selected_markers || []).filter((m) => Number(m.frame) === Number(trackingState.frame || 0)).length > 0 && (
+                      <div className="hint hint-muted">
+                        {(trackingState.selected_markers || [])
+                          .filter((m) => Number(m.frame) === Number(trackingState.frame || 0))
+                          .map((m, i) => `#${i + 1} x=${Number(m.x).toFixed(1)}, y=${Number(m.y).toFixed(1)}`)
+                          .join(" | ")}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="hint hint-muted">Run automatic tracking first. The tracking viewer will appear when frames are available.</p>
+                )}
 	                {trackingState.saved_progress_path && (
-	                  <p className="hint">Saved progress file: {trackingState.saved_progress_path}</p>
+	                  <p className="hint hint-muted">Saved progress file: {trackingState.saved_progress_path}</p>
 	                )}
-	                <p className="hint">Rows: {trackingState.total_rows || 0} | Tracks: {trackingState.total_tracks || 0} | Frame: {trackingState.frame || 0}/{trackingState.max_frame || 0}</p>
+	                <p className="hint hint-muted">Rows: {trackingState.total_rows || 0} | Tracks: {trackingState.total_tracks || 0} | Frame: {trackingState.frame || 0}/{trackingState.max_frame || 0}</p>
 	              </section>
 	            </main>
           </>
@@ -5776,36 +5784,36 @@ export default function App() {
           </>
         ) : (
           <>
-        <aside className="panel">
-          <h3>Datasets</h3>
+        <Card as="aside" className="panel" variant="panel">
+          <h3>NMA Settings</h3>
           <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
           <div className="row row-right">
-            <button className="ghost btn-small" onClick={() => setAllCollapsed(true)}>Minimize all</button>
-            <button className="ghost btn-small" onClick={() => setAllCollapsed(false)}>Expand all</button>
-            <button
+            <Button className="ghost btn-small" onClick={() => setAllCollapsed(true)}>Minimize all</Button>
+            <Button className="ghost btn-small" onClick={() => setAllCollapsed(false)}>Expand all</Button>
+            <Button
               className="ghost btn-small"
               onClick={handleResetNma}
               disabled={plotJob.status === "running" || plotJob.status === "queued"}
             >
               Reset NMA
-            </button>
+            </Button>
           </div>
 
           {rows.map((row, idx) => (
-            <div className="dataset" key={row.id}>
+            <Card className="dataset" variant="dataset" key={row.id}>
               <div className="row dataset-header-row">
                 <div className="dataset-title">
                   {row.name?.trim() || `Dataset ${idx + 1}`}{row.is_control ? " (Control)" : ""}
                 </div>
-                <button className="ghost btn-small" onClick={() => toggleDatasetCollapse(row.id)}>
+                <Button className="ghost btn-small" onClick={() => toggleDatasetCollapse(row.id)}>
                   {collapsedById[row.id] ? "Expand" : "Minimize"}
-                </button>
+                </Button>
               </div>
               {!collapsedById[row.id] && (
                 <>
                   <div className="row">
                     <div style={{ flex: 1 }}>
-                      <div className="field-head">Dataset name <Tip text="Friendly name used to identify this dataset throughout the NMA workflow." /></div>
+                      <FieldTitle title="Dataset name" tip="Friendly name used to identify this dataset throughout the NMA workflow." className="field-head" />
                       <input
                         className="input"
                         placeholder="Name"
@@ -5824,7 +5832,7 @@ export default function App() {
                   </div>
                   <div className="row path-row">
                     <div style={{ flex: 1 }}>
-                      <div className="field-head">CSV path <Tip text="Results table used as input for this NMA dataset." /></div>
+                      <FieldTitle title="CSV path" tip="Results table used as input for this NMA dataset." className="field-head" />
                       <input
                         className="input"
                         placeholder="/path/Results.csv"
@@ -5832,7 +5840,7 @@ export default function App() {
                         onChange={(e) => updateRow(idx, { path: e.target.value })}
                       />
                     </div>
-                    <button
+                    <Button
                       className="ghost"
                       title="Choose a CSV file for this NMA dataset."
                       onClick={async () => {
@@ -5850,11 +5858,11 @@ export default function App() {
                       }}
                     >
                       Browse CSV
-                    </button>
+                    </Button>
                   </div>
                   <div className="row">
                     <div style={{ flex: 1 }}>
-                      <div className="field-head">Area column <Tip text="Column used as the Area axis/input for NMA calculations." /></div>
+                      <FieldTitle title="Area column" tip="Column used as the Area axis/input for NMA calculations." className="field-head" />
                       <select
                         className="input"
                         value={row.area_col}
@@ -5866,7 +5874,7 @@ export default function App() {
                       </select>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div className="field-head">NII column <Tip text="Column used as the NII axis/input for NMA calculations." /></div>
+                      <FieldTitle title="NII column" tip="Column used as the NII axis/input for NMA calculations." className="field-head" />
                       <select
                         className="input"
                         value={row.nii_col}
@@ -5879,8 +5887,9 @@ export default function App() {
                     </div>
                   </div>
                   <div className="row row-right">
-                    <button
+                    <Button
                       className="ghost"
+                      title="Read the CSV header and populate the Area/NII selectors for this dataset."
                       onClick={async () => {
                         setStatus("Loading columns...");
                         setStatusLevel("info");
@@ -5900,17 +5909,17 @@ export default function App() {
                       disabled={!row.path.trim()}
                     >
                       Load columns
-                    </button>
+                    </Button>
                     {rows.length > 1 && (
-                      <button className="ghost" onClick={() => removeRow(idx)}>Remove</button>
+                      <Button className="ghost" onClick={() => removeRow(idx)}>Remove</Button>
                     )}
                   </div>
                 </>
               )}
-            </div>
+            </Card>
           ))}
 
-          <button className="secondary" onClick={addRow}>Add dataset</button>
+          <Button className="secondary" onClick={addRow}>Add dataset</Button>
 
           <div className="section">
             {!showPlotConfig ? (
@@ -5948,15 +5957,15 @@ export default function App() {
                     />
                   </div>
                 </div>
-                <button className="secondary" onClick={handleAutoDbscan}>Auto (DBSCAN)</button>
+                <Button className="secondary" onClick={handleAutoDbscan}>Auto (DBSCAN)</Button>
               </>
             ) : (
               <>
                 <div className="row row-between">
                   <h4 style={{ margin: 0 }}>NMA analysis</h4>
-                  <button className="ghost btn-small" onClick={() => setShowPlotConfig(false)}>
+                  <Button className="ghost btn-small" onClick={() => setShowPlotConfig(false)}>
                     Back to NMA settings
-                  </button>
+                  </Button>
                 </div>
                 <p className="hint">Choose how you want to plot NMA (dot plot or heatmap).</p>
                 <div className="row">
@@ -5990,7 +5999,7 @@ export default function App() {
                     <div className="hint">
                       Dot plot options <Tip text="These selectors use columns detected from your loaded dataset tables." />
                     </div>
-                    <div className="field-head">Color by (column1) <Tip text="Choose which dataset column controls marker color." /></div>
+                    <FieldTitle title="Color by (column1)" tip="Choose which dataset column controls marker color." className="field-head" />
                     <div className="row">
                       <select
                         className="input"
@@ -6006,7 +6015,7 @@ export default function App() {
                         ))}
                       </select>
                     </div>
-                    <div className="field-head">Size by (column2) <Tip text="Choose which dataset column controls marker size." /></div>
+                    <FieldTitle title="Size by (column2)" tip="Choose which dataset column controls marker size." className="field-head" />
                     <div className="row">
                       <select
                         className="input"
@@ -6024,7 +6033,7 @@ export default function App() {
                     </div>
                     <div className="row">
                       <div style={{ flex: 1 }}>
-                        <div className="field-head">Hue minimum <Tip text="Optional lower bound for the color scale. Leave empty for automatic scaling." /></div>
+                        <FieldTitle title="Hue minimum" tip="Optional lower bound for the color scale. Leave empty for automatic scaling." className="field-head" />
                         <input
                           className="input"
                           type="number"
@@ -6034,7 +6043,7 @@ export default function App() {
                         />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div className="field-head">Hue maximum <Tip text="Optional upper bound for the color scale. Leave empty for automatic scaling." /></div>
+                        <FieldTitle title="Hue maximum" tip="Optional upper bound for the color scale. Leave empty for automatic scaling." className="field-head" />
                         <input
                           className="input"
                           type="number"
@@ -6046,7 +6055,7 @@ export default function App() {
                     </div>
                     <div className="row">
                       <div style={{ flex: 1 }}>
-                        <div className="field-head">Size minimum <Tip text="Optional lower bound for marker size scaling." /></div>
+                        <FieldTitle title="Size minimum" tip="Optional lower bound for marker size scaling." className="field-head" />
                         <input
                           className="input"
                           type="number"
@@ -6056,7 +6065,7 @@ export default function App() {
                         />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div className="field-head">Size maximum <Tip text="Optional upper bound for marker size scaling." /></div>
+                        <FieldTitle title="Size maximum" tip="Optional upper bound for marker size scaling." className="field-head" />
                         <input
                           className="input"
                           type="number"
@@ -6068,7 +6077,7 @@ export default function App() {
                     </div>
                     <div className="row">
                       <div style={{ flex: 1 }}>
-                        <div className="field-head">Sample size <Tip text="Optional limit on how many nuclei are sampled into the dot plot." /></div>
+                        <FieldTitle title="Sample size" tip="Optional limit on how many nuclei are sampled into the dot plot." className="field-head" />
                         <input
                           className="input"
                           type="number"
@@ -6079,7 +6088,7 @@ export default function App() {
                         />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div className="field-head">Palette <Tip text="Optional color palette used for the dot plot." /></div>
+                        <FieldTitle title="Palette" tip="Optional color palette used for the dot plot." className="field-head" />
                         <select
                           className="input"
                           value={plotConfig.dot.palette}
@@ -6115,7 +6124,7 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <div className="field-head">Heatmap palette <Tip text="Color palette used for heatmap rendering." /></div>
+                    <FieldTitle title="Heatmap palette" tip="Color palette used for heatmap rendering." className="field-head" />
                     <div className="row">
                       <select
                         className="input"
@@ -6159,7 +6168,7 @@ export default function App() {
                     </div>
                   </>
                 )}
-                <div className="field-head">Saving path <Tip text="Directory where NMA plots and outputs will be saved." /></div>
+                <FieldTitle title="Saving path" tip="Directory where NMA plots and outputs will be saved." className="field-head" />
                 <div className="row path-row">
                   <input
                     className="input"
@@ -6167,7 +6176,7 @@ export default function App() {
                     value={plotSavePath}
                     onChange={(e) => setPlotSavePath(e.target.value)}
                   />
-                  <button
+                  <Button
                     className="ghost"
                     title="Choose where the generated NMA plots should be saved."
                     onClick={async () => {
@@ -6181,16 +6190,16 @@ export default function App() {
                     }}
                   >
                     Browse
-                  </button>
+                  </Button>
                 </div>
-                <button
+                <Button
                   className="primary"
                   title="Generate all NMA plots with the current plotting settings and save them to the selected folder."
                   onClick={handlePlotAll}
                   disabled={!plotSavePath.trim() || datasets.length === 0 || (plotJob.status === "running" || plotJob.status === "queued")}
                 >
                   Plot all
-                </button>
+                </Button>
                 <div className="hint">
                   Generate plots with current settings and save them to the chosen folder.
                 </div>
@@ -6222,21 +6231,21 @@ export default function App() {
                   if (f) handleLoadSettings(f);
                 }}
               />
-              <button
+              <Button
                 className="secondary"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={step1Ready}
               >
                 Load settings
-              </button>
+              </Button>
               {!step1Ready && (
-                <button className="primary" onClick={handleStep1} disabled={!hasControl}>Create Settings</button>
+                <Button className="primary" onClick={handleStep1} disabled={!hasControl}>Create Settings</Button>
               )}
               {step1Ready && (
                 <div className="wizard-actions">
-                  <button className="secondary" onClick={() => setStep(1)} disabled={step === 1}>Previous</button>
+                  <Button className="secondary" onClick={() => setStep(1)} disabled={step === 1}>Previous</Button>
                   {step === 1 ? (
-                    <button
+                    <Button
                       className="primary"
                       onClick={async () => {
                         const ok = await handleStep2();
@@ -6244,16 +6253,16 @@ export default function App() {
                       }}
                     >
                       Next
-                    </button>
+                    </Button>
                   ) : (
-                    <button className="primary" onClick={handleComplete}>Complete</button>
+                    <Button className="primary" onClick={handleComplete}>Complete</Button>
                   )}
                 </div>
               )}
             </div>
           )}
           <Status level={statusLevel} text={status} />
-        </aside>
+        </Card>
 
         <main className="content">
           {!step1Ready ? (
@@ -6318,24 +6327,24 @@ export default function App() {
               {(showPlotConfig && hasPlotRun && !showNmaPreviewWhilePlotting) ? (
                 <div className="hint">
                   NMA preview and quadrant table are minimized while plotting.
-                  <button
+                  <Button
                     className="ghost btn-small"
                     style={{ marginLeft: 8 }}
                     onClick={() => setShowNmaPreviewWhilePlotting(true)}
                   >
                     Show preview
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <>
                   {showPlotConfig && hasPlotRun && (
                     <div className="row row-right" style={{ marginBottom: 8 }}>
-                      <button
+                      <Button
                         className="ghost btn-small"
                         onClick={() => setShowNmaPreviewWhilePlotting(false)}
                       >
                         Minimize preview
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {step2Figure ? (
@@ -6409,21 +6418,21 @@ export default function App() {
               )}
               {(!showPlotConfig || !hasPlotRun || showNmaPreviewWhilePlotting) && finalMode && downloadReady && (
                 <div className="section">
-                  <button
+                  <Button
                     className="primary"
                     onClick={() => {
                       window.location.href = `${API_BASE}/nma/settings/download`;
                     }}
                   >
                     Download settings
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className="secondary"
                     onClick={handleDownloadTable}
                     disabled={!step2Percentages}
                   >
                     Download table
-                  </button>
+                  </Button>
                 </div>
               )}
               {showPlotConfig && (
@@ -6439,23 +6448,23 @@ export default function App() {
                   {plotJob.files?.length > 0 && (
                     <div className="plot-viewer">
                       <div className="viewer-toolbar">
-                        <button
+                        <Button
                           className="ghost btn-small"
                           onClick={() => setCurrentPlotIndex((i) => Math.max(0, i - 1))}
                           disabled={currentPlotIndex <= 0}
                         >
                           ◀
-                        </button>
+                        </Button>
                         <span className="viewer-counter">
                           {currentPlotIndex + 1} / {plotJob.files.length}
                         </span>
-                        <button
+                        <Button
                           className="ghost btn-small"
                           onClick={() => setCurrentPlotIndex((i) => Math.min(plotJob.files.length - 1, i + 1))}
                           disabled={currentPlotIndex >= plotJob.files.length - 1}
                         >
                           ▶
-                        </button>
+                        </Button>
                       </div>
                       <a
                         href={`${API_BASE}/nma/plots/file?path=${encodeURIComponent(plotJob.files[currentPlotIndex])}`}
