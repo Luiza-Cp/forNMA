@@ -511,6 +511,18 @@ select.input {
   margin: 0 auto;
 }
 
+.viewer-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  background: rgba(245, 248, 251, 0.72);
+  border-radius: 6px;
+}
+
 .thumb-card {
   display: grid;
   gap: 6px;

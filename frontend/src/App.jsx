@@ -178,12 +178,14 @@ const initialGatingState = () => ({
 });
 const initialTrackingState = () => ({
   path_to_table: "",
-  output_dir: "",
   image_dir: "",
   image_col: "",
   columns: [],
   preview_cache_dir: "",
   preview_image_path: "",
+  preview_nonce: 0,
+  viewer_w: 0,
+  viewer_h: 0,
   max_distance: 30,
   time_window: 5,
   max_split_distance: 10,
@@ -195,10 +197,15 @@ const initialTrackingState = () => ({
   show_complete_trail: false,
   figure: null,
   selected: [],
+  selected_markers: [],
+  undo_checkpoint_path: "",
+  saved_progress_path: "",
+  finish_open: false,
   message: "",
   total_rows: 0,
   total_tracks: 0,
-  manual_stage_enabled: false,
+  workflow_stage: "step1",
+  save_results_dir: "",
 });
 
 function readStorage(key, fallback) {
@@ -2152,6 +2159,8 @@ function TrackingLeftPanel({
   onPickDirectory,
   onRunAutomatic,
   onGoToCorrection,
+  onOpenCorrection,
+  onSaveResults,
   onRefreshFrame,
   onPrevFrame,
   onNextFrame,
@@ -2168,14 +2177,14 @@ function TrackingLeftPanel({
   const busy = running || loadingFrame || editing;
   const hasTracked = !!String(state.table_path || "").trim();
   const imageNameColumns = (state.columns || []).filter((c) => String(c || "").toLowerCase().includes("image_name"));
-  const manualStageEnabled = !!state.manual_stage_enabled;
+  const workflowStage = String(state.workflow_stage || "step1");
   const hasSelection = (state.selected || []).length > 0;
   const canRun = !!String(state.path_to_table || "").trim()
-    && !!String(state.output_dir || "").trim()
     && !!String(state.image_dir || "").trim()
     && !!String(state.image_col || "").trim()
     && !busy;
   const canGoToCorrection = hasTracked && !busy;
+  const canSaveResults = hasTracked && !!String(state.save_results_dir || "").trim() && !busy;
   const canPreview = hasTracked && !busy;
   const canDelete = hasTracked && hasSelection && !busy;
   const canLink = hasTracked && (state.selected || []).length >= 2 && !busy;
@@ -2190,13 +2199,16 @@ function TrackingLeftPanel({
         </p>
       </div>
       <div className="seg-scroll">
-        <details open className="seg-section">
+        {workflowStage === "step1" && (
+          <details open className="seg-section">
           <summary>Step 1 - Automatic tracking</summary>
           <div className="seg-body">
+            <div className="field-head">Tracking table</div>
             <div className="row path-row">
               <input className="input" value={state.path_to_table || ""} onChange={(e) => setField("path_to_table", e.target.value)} placeholder="/path/Results.csv" />
               <button
                 className="ghost"
+                title="Open a file picker to choose the tracking Results.csv input table."
                 onClick={async () => {
                   try {
                     const p = await onPickCsv();
@@ -2209,26 +2221,12 @@ function TrackingLeftPanel({
                 Browse CSV
               </button>
             </div>
-            <div className="row path-row">
-              <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save tracked table" />
-              <button
-                className="ghost"
-                onClick={async () => {
-                  try {
-                    const p = await onPickDirectory();
-                    if (p) setField("output_dir", p);
-                  } catch {
-                    // no-op
-                  }
-                }}
-              >
-                Browse
-              </button>
-            </div>
+            <div className="field-head">Image folder</div>
             <div className="row path-row">
               <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder (required)" />
               <button
                 className="ghost"
+                title="Choose the folder containing the source images used by the tracking viewer."
                 onClick={async () => {
                   try {
                     const p = await onPickDirectory();
@@ -2256,38 +2254,86 @@ function TrackingLeftPanel({
               ))}
             </select>
             <div className="hint">The values in this column must match the image filenames in the folder above.</div>
+            <div className="field-head">Tracking parameters</div>
             <div className="row">
-              <input className="input" type="number" min="1" value={state.max_distance ?? 30} onChange={(e) => setField("max_distance", Number(e.target.value || 30))} placeholder="max distance" />
-              <input className="input" type="number" min="1" value={state.time_window ?? 5} onChange={(e) => setField("time_window", Number(e.target.value || 5))} placeholder="time window" />
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Max distance <Tip text="Maximum distance allowed to link a cell to a candidate in the next frame." /></div>
+                <input className="input" type="number" min="1" value={state.max_distance ?? 30} onChange={(e) => setField("max_distance", Number(e.target.value || 30))} placeholder="max distance" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Time window <Tip text="How many frames the tracker can remember when reconnecting interrupted trajectories." /></div>
+                <input className="input" type="number" min="1" value={state.time_window ?? 5} onChange={(e) => setField("time_window", Number(e.target.value || 5))} placeholder="time window" />
+              </div>
             </div>
             <div className="row">
-              <input className="input" type="number" min="1" value={state.max_split_distance ?? 10} onChange={(e) => setField("max_split_distance", Number(e.target.value || 10))} placeholder="max split distance" />
-              <input className="input" type="number" min="1" value={state.max_gap_closing_distance ?? 30} onChange={(e) => setField("max_gap_closing_distance", Number(e.target.value || 30))} placeholder="max gap closing distance" />
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Max split distance <Tip text="Maximum distance used to detect possible split events between nearby trajectory segments." /></div>
+                <input className="input" type="number" min="1" value={state.max_split_distance ?? 10} onChange={(e) => setField("max_split_distance", Number(e.target.value || 10))} placeholder="max split distance" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="field-head">Gap closing distance <Tip text="Maximum distance allowed when reconnecting a trajectory after a temporary gap." /></div>
+                <input className="input" type="number" min="1" value={state.max_gap_closing_distance ?? 30} onChange={(e) => setField("max_gap_closing_distance", Number(e.target.value || 30))} placeholder="max gap closing distance" />
+              </div>
             </div>
             <div className="row">
-              <button className="primary" onClick={onRunAutomatic} disabled={!canRun}>
+              <button className="primary" title="Run automatic tracking with the parameters above and generate the first tracked table." onClick={onRunAutomatic} disabled={!canRun}>
                 {running ? "Running..." : "Run tracking"}
               </button>
-              <button className="secondary" onClick={onGoToCorrection} disabled={!canGoToCorrection}>
-                Next: correct tracks
+              <button className="secondary" title="Move to step 2 after a tracked table has been generated." onClick={onGoToCorrection} disabled={!canGoToCorrection}>
+                Next
               </button>
             </div>
+            <Status level={status.level} text={status.text} />
           </div>
-        </details>
+          </details>
+        )}
 
-        {manualStageEnabled && (
+        {workflowStage === "menu" && (
+          <details open className="seg-section">
+            <summary>Step 2 - Choose action</summary>
+            <div className="seg-body">
+              <div className="field-head">1. Save results</div>
+              <div className="row path-row">
+                <input className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save table and tracking images" />
+                <button
+                  className="ghost"
+                  title="Choose where the final table and rendered tracking images should be exported."
+                  onClick={async () => {
+                    try {
+                      const p = await onPickDirectory();
+                      if (p) setField("save_results_dir", p);
+                    } catch {
+                      // no-op
+                    }
+                  }}
+                >
+                  Browse
+                </button>
+              </div>
+              <button className="secondary" title="Export the current tracked table and the cached tracking images to the selected folder." onClick={onSaveResults} disabled={!canSaveResults}>
+                Save results
+              </button>
+              <div className="field-head" style={{ marginTop: 10 }}>2. Correct tracks</div>
+              <button className="primary" title="Open the manual correction viewer to inspect and edit tracks." onClick={onOpenCorrection} disabled={!hasTracked || busy}>
+                Correct tracks
+              </button>
+              <Status level={status.level} text={status.text} />
+            </div>
+          </details>
+        )}
+
+        {workflowStage === "correction" && (
           <details open className="seg-section">
             <summary>Step 2 - Manual correction</summary>
             <div className="seg-body">
-              <div className="hint">Click points in the plot to select cells from tracks.</div>
-              <div className="row">
-                <input className="input" type="number" min="0" value={state.frame ?? 0} onChange={(e) => setField("frame", Number(e.target.value || 0))} placeholder="frame" />
-                <input className="input" type="number" min="1" value={state.trail_window ?? 7} onChange={(e) => setField("trail_window", Number(e.target.value || 7))} placeholder="trail window" />
+              <div className="row row-right">
+                <button className="ghost btn-small" title="Return to the step 2 menu without losing the current tracked table." onClick={onGoToCorrection} disabled={busy}>Back to options</button>
               </div>
               <div className="row path-row">
                 <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder for viewer" />
                 <button
                   className="ghost"
+                  title="Choose the image folder used by the correction viewer."
                   onClick={async () => {
                     try {
                       const p = await onPickDirectory();
@@ -2301,27 +2347,51 @@ function TrackingLeftPanel({
                 </button>
               </div>
               <div className="hint">{state.preview_cache_dir ? "Viewer cache ready." : "Viewer cache will be generated automatically."}</div>
-              <div className="row">
-                <button className="ghost" onClick={onPrevFrame} disabled={busy || Number(state.frame || 0) <= 0}>Previous frame</button>
-                <button className="ghost" onClick={onNextFrame} disabled={busy || Number(state.frame || 0) >= Number(state.max_frame || 0)}>Next frame</button>
-              </div>
               <label className="checkbox">
                 <input type="checkbox" checked={!!state.show_complete_trail} onChange={(e) => setField("show_complete_trail", e.target.checked)} />
                 Show complete trail
               </label>
-              <button className="secondary" onClick={onRefreshFrame} disabled={!canPreview}>
+              <button className="secondary" title="Redraw the current frame using the latest table state and viewer settings." onClick={onRefreshFrame} disabled={!canPreview}>
                 {loadingFrame ? "Updating..." : "Refresh preview"}
               </button>
-              <div className="row">
-                <button className="ghost" onClick={onDeleteTracks} disabled={!canDelete}>Delete selected tracks</button>
-                <button className="ghost" onClick={onLinkTracks} disabled={!canLink}>Link selected tracks</button>
-              </div>
-              <div className="hint">Selected points: {(state.selected || []).length}</div>
+              <button className="primary" title="Finish correction and open the final export options for the tracked table and images." onClick={() => setField("finish_open", !state.finish_open)} disabled={!hasTracked || busy}>
+                {state.finish_open ? "Hide finish options" : "Finish"}
+              </button>
+              {state.finish_open && (
+                <>
+                  <div className="field-head">Finish output folder</div>
+                  <div className="row path-row">
+                    <input className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save final tracking outputs" />
+                    <button
+                      className="ghost"
+                      title="Choose the folder where the final tracking outputs will be exported."
+                      onClick={async () => {
+                        try {
+                          const p = await onPickDirectory();
+                          if (p) setField("save_results_dir", p);
+                        } catch {
+                          // no-op
+                        }
+                      }}
+                    >
+                      Browse
+                    </button>
+                  </div>
+                  <div className="row">
+                    <button className="secondary" title="Export only the final tracked table to the selected folder." onClick={() => onSaveResults(false)} disabled={!canSaveResults}>
+                      Save table only
+                    </button>
+                    <button className="primary" title="Export the final tracked table together with the rendered tracking images." onClick={() => onSaveResults(true)} disabled={!canSaveResults}>
+                      Save table + images
+                    </button>
+                  </div>
+                </>
+              )}
+              <Status level={status.level} text={status.text} />
             </div>
           </details>
         )}
       </div>
-      <Status level={status.level} text={status.text} />
     </aside>
   );
 }
@@ -4540,6 +4610,7 @@ export default function App() {
       image_col: res.image_col || prev.image_col,
       preview_cache_dir: res.preview_cache_dir || prev.preview_cache_dir || "",
       preview_image_path: res.preview_image_path || "",
+      preview_nonce: Number(prev.preview_nonce || 0) + 1,
       frame: Number(res.frame ?? prev.frame ?? 0),
       max_frame: Number(res.max_frame ?? prev.max_frame ?? 0),
       figure: res.figure || null,
@@ -4549,13 +4620,18 @@ export default function App() {
     }));
   };
 
+  const createTrackingUndoCheckpoint = async () => {
+    const tablePath = String(trackingState.table_path || "").trim();
+    if (!tablePath) {
+      throw new Error("Run automatic tracking first.");
+    }
+    const res = await callApi("/tracking/checkpoint/create", { table_path: tablePath });
+    return String(res.checkpoint_path || "").trim();
+  };
+
   const handleTrackingRunAutomatic = async () => {
     if (!String(trackingState.path_to_table || "").trim()) {
       setTrackingStatus({ level: "error", text: "Select the input Results.csv table." });
-      return;
-    }
-    if (!String(trackingState.output_dir || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Select an output folder." });
       return;
     }
     if (!String(trackingState.image_dir || "").trim()) {
@@ -4572,7 +4648,6 @@ export default function App() {
     try {
       const payload = {
         path_to_table: String(trackingState.path_to_table || "").trim(),
-        output_dir: String(trackingState.output_dir || "").trim(),
         image_dir: String(trackingState.image_dir || "").trim(),
         image_col: trackingState.image_col || "",
         max_distance: Number(trackingState.max_distance || 30),
@@ -4596,8 +4671,94 @@ export default function App() {
       setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
       return;
     }
-    setTrackingState((prev) => ({ ...prev, manual_stage_enabled: true }));
+    setTrackingState((prev) => ({ ...prev, workflow_stage: "menu" }));
+    setTrackingStatus({ level: "info", text: "Choose the next action: save results or correct tracks." });
+  };
+
+  const handleTrackingOpenCorrection = () => {
+    if (!String(trackingState.table_path || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      return;
+    }
+    setTrackingState((prev) => ({ ...prev, workflow_stage: "correction" }));
     setTrackingStatus({ level: "info", text: "Manual correction enabled." });
+  };
+
+  const handleTrackingSaveResults = async (includeImages = true) => {
+    if (!String(trackingState.table_path || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      return;
+    }
+    if (!String(trackingState.save_results_dir || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Select a destination folder to save results." });
+      return;
+    }
+    setTrackingLoadingFrame(true);
+    setTrackingStatus({ level: "info", text: "Saving tracking results..." });
+    try {
+      const res = await callApi("/tracking/save-results", {
+        table_path: String(trackingState.table_path || "").trim(),
+        output_dir: String(trackingState.save_results_dir || "").trim(),
+        preview_cache_dir: String(trackingState.preview_cache_dir || "").trim() || null,
+        include_images: !!includeImages,
+      });
+      setTrackingStatus({ level: "success", text: res.message || "Results saved." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Failed to save tracking results." });
+    } finally {
+      setTrackingLoadingFrame(false);
+    }
+  };
+
+  const handleTrackingUndo = async () => {
+    const checkpointPath = String(trackingState.undo_checkpoint_path || "").trim();
+    if (!checkpointPath) {
+      setTrackingStatus({ level: "error", text: "No undo checkpoint is available yet." });
+      return;
+    }
+    setTrackingEditing(true);
+    setTrackingStatus({ level: "info", text: "Undoing last tracking action..." });
+    try {
+      const res = await callApi("/tracking/checkpoint/restore", {
+        ...trackingFramePayload(),
+        checkpoint_path: checkpointPath,
+      });
+      applyTrackingPreviewResponse(res);
+      setTrackingState((prev) => ({
+        ...prev,
+        selected: [],
+        selected_markers: [],
+        undo_checkpoint_path: "",
+      }));
+      setTrackingStatus({ level: "success", text: res.message || "Last action undone." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Undo failed." });
+    } finally {
+      setTrackingEditing(false);
+    }
+  };
+
+  const handleTrackingSaveProgress = async () => {
+    if (!String(trackingState.table_path || "").trim()) {
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      return;
+    }
+    setTrackingEditing(true);
+    setTrackingStatus({ level: "info", text: "Saving tracking progress..." });
+    try {
+      const res = await callApi("/tracking/progress/save", trackingFramePayload());
+      applyTrackingPreviewResponse(res);
+      setTrackingState((prev) => ({
+        ...prev,
+        table_path: res.saved_table_path || prev.table_path,
+        saved_progress_path: res.saved_table_path || prev.saved_progress_path,
+      }));
+      setTrackingStatus({ level: "success", text: res.message || "Progress saved." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Save progress failed." });
+    } finally {
+      setTrackingEditing(false);
+    }
   };
 
   const handleTrackingRefreshFrame = async (override = {}) => {
@@ -4638,22 +4799,40 @@ export default function App() {
     await handleTrackingRefreshFrame({ frame: target });
   };
 
-  const handleTrackingPlotClick = (evt) => {
-    const pt = evt?.points?.[0];
-    if (!pt || !Array.isArray(pt.customdata) || pt.customdata.length < 3) return;
-    const picked = {
-      frame: Number(pt.customdata[0]),
-      cell: Number(pt.customdata[1]),
-      track_id: Number(pt.customdata[2]),
-    };
-    if (![picked.frame, picked.cell, picked.track_id].every((v) => Number.isFinite(v))) return;
-    setTrackingState((prev) => {
-      const exists = (prev.selected || []).some((s) => s.frame === picked.frame && s.cell === picked.cell && s.track_id === picked.track_id);
-      const next = exists
-        ? (prev.selected || []).filter((s) => !(s.frame === picked.frame && s.cell === picked.cell && s.track_id === picked.track_id))
-        : [...(prev.selected || []), picked];
-      return { ...prev, selected: next };
-    });
+  const handleTrackingViewerClick = async (evt) => {
+    if (String(trackingState.workflow_stage || "step1") !== "correction") return;
+    if (!String(trackingState.table_path || "").trim()) return;
+    const imgEl = evt?.currentTarget;
+    if (!imgEl) return;
+    const rect = imgEl.getBoundingClientRect();
+    const rx = (evt.clientX - rect.left) / Math.max(1, rect.width);
+    const ry = (evt.clientY - rect.top) / Math.max(1, rect.height);
+    const naturalW = Number(imgEl.naturalWidth || trackingState.viewer_w || 0);
+    const naturalH = Number(imgEl.naturalHeight || trackingState.viewer_h || 0);
+    const x = rx * naturalW;
+    const y = ry * naturalH;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    try {
+      const res = await callApi("/tracking/select-point", {
+        ...trackingFramePayload(),
+        x,
+        y,
+        max_distance: 35,
+      });
+      const picked = res.selection;
+      setTrackingState((prev) => {
+        const already = (prev.selected || []).some(
+          (s) => s.frame === picked.frame && s.cell === picked.cell && s.track_id === picked.track_id
+        );
+        if (already) return prev;
+        const nextSelected = [...(prev.selected || []), picked];
+        const nextMarkers = [...(prev.selected_markers || []), { frame: Number(picked.frame), x: Number(res.x), y: Number(res.y) }];
+        return { ...prev, selected: nextSelected, selected_markers: nextMarkers };
+      });
+      setTrackingStatus({ level: "success", text: res.message || "Track selected." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "No track found at clicked position." });
+    }
   };
 
   const handleTrackingDelete = async () => {
@@ -4664,12 +4843,13 @@ export default function App() {
     setTrackingEditing(true);
     setTrackingStatus({ level: "info", text: "Deleting selected tracks..." });
     try {
+      const undoCheckpointPath = await createTrackingUndoCheckpoint();
       const res = await callApi("/tracking/edit/delete", {
         ...trackingFramePayload(),
         selections: trackingState.selected || [],
       });
       applyTrackingPreviewResponse(res);
-      setTrackingState((prev) => ({ ...prev, selected: [] }));
+      setTrackingState((prev) => ({ ...prev, selected: [], selected_markers: [], undo_checkpoint_path: undoCheckpointPath }));
       setTrackingStatus({ level: "success", text: res.message || "Tracks deleted." });
     } catch (err) {
       setTrackingStatus({ level: "error", text: err.message || "Delete tracks failed." });
@@ -4686,15 +4866,75 @@ export default function App() {
     setTrackingEditing(true);
     setTrackingStatus({ level: "info", text: "Linking selected tracks..." });
     try {
+      const undoCheckpointPath = await createTrackingUndoCheckpoint();
+      const targetFrame = Math.max(...(trackingState.selected || []).map((s) => Number(s.frame || 0)));
       const res = await callApi("/tracking/edit/link", {
-        ...trackingFramePayload(),
+        ...trackingFramePayload({ frame: targetFrame }),
         selections: trackingState.selected || [],
       });
       applyTrackingPreviewResponse(res);
-      setTrackingState((prev) => ({ ...prev, selected: [] }));
+      setTrackingState((prev) => ({
+        ...prev,
+        selected: [],
+        selected_markers: [],
+        undo_checkpoint_path: undoCheckpointPath,
+      }));
       setTrackingStatus({ level: "success", text: res.message || "Tracks linked." });
     } catch (err) {
       setTrackingStatus({ level: "error", text: err.message || "Link tracks failed." });
+    } finally {
+      setTrackingEditing(false);
+    }
+  };
+
+  const handleTrackingDivision = async () => {
+    if ((trackingState.selected || []).length !== 3) {
+      setTrackingStatus({ level: "error", text: "Select exactly 3 cells: one mother and two daughters." });
+      return;
+    }
+    setTrackingEditing(true);
+    setTrackingStatus({ level: "info", text: "Applying cell division..." });
+    try {
+      const undoCheckpointPath = await createTrackingUndoCheckpoint();
+      const targetFrame = Math.max(...(trackingState.selected || []).map((s) => Number(s.frame || 0)));
+      const res = await callApi("/tracking/edit/division", {
+        ...trackingFramePayload({ frame: targetFrame }),
+        selections: trackingState.selected || [],
+      });
+      applyTrackingPreviewResponse(res);
+      setTrackingState((prev) => ({
+        ...prev,
+        selected: [],
+        selected_markers: [],
+        undo_checkpoint_path: undoCheckpointPath,
+      }));
+      setTrackingStatus({ level: "success", text: res.message || "Cell division linked." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Cell division failed." });
+    } finally {
+      setTrackingEditing(false);
+    }
+  };
+
+  const handleTrackingUnlink = async () => {
+    if (!(trackingState.selected || []).length) {
+      setTrackingStatus({ level: "error", text: "Select one or more cells first." });
+      return;
+    }
+    setTrackingEditing(true);
+    setTrackingStatus({ level: "info", text: "Unlinking selected cells..." });
+    try {
+      const undoCheckpointPath = await createTrackingUndoCheckpoint();
+      const targetFrame = Math.max(...(trackingState.selected || []).map((s) => Number(s.frame || 0)));
+      const res = await callApi("/tracking/edit/unlink", {
+        ...trackingFramePayload({ frame: targetFrame }),
+        selections: trackingState.selected || [],
+      });
+      applyTrackingPreviewResponse(res);
+      setTrackingState((prev) => ({ ...prev, selected: [], selected_markers: [], undo_checkpoint_path: undoCheckpointPath }));
+      setTrackingStatus({ level: "success", text: res.message || "Selected cells unlinked." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: err.message || "Unlink failed." });
     } finally {
       setTrackingEditing(false);
     }
@@ -5065,6 +5305,8 @@ export default function App() {
               }}
               onRunAutomatic={handleTrackingRunAutomatic}
               onGoToCorrection={handleTrackingGoToCorrection}
+              onOpenCorrection={handleTrackingOpenCorrection}
+              onSaveResults={handleTrackingSaveResults}
               onRefreshFrame={handleTrackingRefreshFrame}
               onPrevFrame={() => handleTrackingStepFrame(-1)}
               onNextFrame={() => handleTrackingStepFrame(1)}
@@ -5085,19 +5327,39 @@ export default function App() {
                     Reset
                   </button>
                 </div>
-	                {(trackingRunning || trackingLoadingFrame || trackingEditing) && (
-	                  <div className="preview-loading">
-                    <div className="spinner" />
-                    <div className="hint">
-                      {trackingRunning ? "Running automatic tracking..." : (trackingEditing ? "Applying correction..." : "Updating frame...")}
-                    </div>
-	                  </div>
-	                )}
 	                <div className="section">
 	                  <h3>Tracking viewer</h3>
+	                  {String(trackingState.workflow_stage || "step1") === "correction" && (
+	                    <div className="row" style={{ marginBottom: 8 }}>
+	                      <button
+	                        className="ghost"
+	                        title="Remove the current highlighted selections without changing the tracking table."
+	                        onClick={() => setTrackingState((prev) => ({ ...prev, selected: [], selected_markers: [] }))}
+	                        disabled={!(trackingState.selected || []).length}
+	                      >
+	                        Clear selection
+	                      </button>
+                        <button className="ghost" title="Restore the table and viewer to the state before the last edit action." onClick={handleTrackingUndo} disabled={!String(trackingState.undo_checkpoint_path || "").trim() || trackingEditing || trackingLoadingFrame || trackingRunning}>
+                          Undo
+                        </button>
+                        <button className="ghost" title="Save the current corrected table to a temporary checkpoint so you can keep working without losing progress." onClick={handleTrackingSaveProgress} disabled={trackingEditing || trackingLoadingFrame || trackingRunning || !String(trackingState.table_path || "").trim()}>
+                          Save progress
+                        </button>
+	                      <button className="ghost" title="Link the selected cells into the same track. Across frames, the earliest selected cell becomes the base track." onClick={handleTrackingLink} disabled={(trackingState.selected || []).length < 2}>
+	                        Link selected
+	                      </button>
+	                      <button className="ghost" title="Mark a cell division using exactly 3 selections: the mother cell in the earlier frame and the two daughter cells in the later frame." onClick={handleTrackingDivision} disabled={(trackingState.selected || []).length !== 3}>
+	                        Cell division
+	                      </button>
+	                      <button className="ghost" title="Cut the selected track from that point onward. The chosen cell keeps the old family before that frame, and gets a new number/color from the selected frame to the end." onClick={handleTrackingUnlink} disabled={(trackingState.selected || []).length < 1}>
+	                        Unlink
+	                      </button>
+	                    </div>
+	                  )}
 	                  <div className="viewer-toolbar">
 	                    <button
 	                      className="ghost btn-small"
+	                      title="Show the previous frame in the tracking viewer."
 	                      onClick={() => handleTrackingStepFrame(-1)}
 	                      disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) <= 0}
 	                    >
@@ -5108,6 +5370,7 @@ export default function App() {
 	                    </span>
 	                    <button
 	                      className="ghost btn-small"
+	                      title="Show the next frame in the tracking viewer."
 	                      onClick={() => handleTrackingStepFrame(1)}
 	                      disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) >= Number(trackingState.max_frame || 0)}
 	                    >
@@ -5115,56 +5378,74 @@ export default function App() {
 	                    </button>
 	                  </div>
 	                  {trackingState.preview_image_path ? (
-	                    <a
-	                      href={`${API_BASE}/tracking/file?path=${encodeURIComponent(trackingState.preview_image_path)}`}
-	                      target="_blank"
-	                      rel="noreferrer"
-	                      className="thumb-card viewer-single"
-	                    >
-	                      <img
-	                        src={`${API_BASE}/tracking/file?path=${encodeURIComponent(trackingState.preview_image_path)}&v=${trackingState.frame || 0}`}
-	                        alt={`tracking-frame-${trackingState.frame || 0}`}
-	                      />
+	                    <div className="thumb-card viewer-single" style={{ cursor: "crosshair" }}>
+	                      <div style={{ position: "relative", width: "100%" }}>
+                          {(trackingRunning || trackingLoadingFrame || trackingEditing) && (
+                            <div className="viewer-overlay">
+                              <div className="spinner" />
+                              <div className="hint">
+                                {trackingRunning ? "Running automatic tracking..." : (trackingEditing ? "Applying correction..." : "Updating frame...")}
+                              </div>
+                            </div>
+                          )}
+	                        <img
+	                          src={`${API_BASE}/tracking/file?path=${encodeURIComponent(trackingState.preview_image_path)}&v=${trackingState.preview_nonce || 0}`}
+	                          alt={`tracking-frame-${trackingState.frame || 0}`}
+	                          onLoad={(e) => {
+	                            const w = Number(e.currentTarget.naturalWidth || 0);
+	                            const h = Number(e.currentTarget.naturalHeight || 0);
+	                            setTrackingState((prev) => ({ ...prev, viewer_w: w, viewer_h: h }));
+	                          }}
+	                          onClick={handleTrackingViewerClick}
+	                        />
+	                        {(trackingState.selected_markers || [])
+	                          .filter((m) => Number(m.frame) === Number(trackingState.frame || 0))
+	                          .map((m, i) => {
+	                          const w = Number(trackingState.viewer_w || 0);
+	                          const h = Number(trackingState.viewer_h || 0);
+	                          if (!w || !h) return null;
+	                          return (
+	                            <span
+	                              key={`trk-marker-${i}`}
+	                              style={{
+	                                position: "absolute",
+	                                left: `calc(${(Number(m.x) / w) * 100}% - 6px)`,
+	                                top: `calc(${(Number(m.y) / h) * 100}% - 6px)`,
+	                                width: 12,
+	                                height: 12,
+	                                borderRadius: "50%",
+	                                background: "#ffd400",
+	                                border: "2px solid #6a4f00",
+	                                pointerEvents: "none",
+	                              }}
+	                            />
+	                          );
+	                          })}
+	                      </div>
 	                      <span>{trackingState.preview_image_path.split("/").pop()}</span>
-	                    </a>
+	                    </div>
 	                  ) : (
 	                    <p className="hint">
 	                      Run tracking and refresh a frame to load generated tracking images.
 	                      {trackingState.preview_cache_dir ? ` Cache: ${trackingState.preview_cache_dir}` : ""}
 	                    </p>
 	                  )}
+	                  {(trackingState.selected_markers || []).filter((m) => Number(m.frame) === Number(trackingState.frame || 0)).length > 0 && (
+	                    <div className="hint">
+	                      {(trackingState.selected_markers || [])
+	                        .filter((m) => Number(m.frame) === Number(trackingState.frame || 0))
+	                        .map((m, i) => `#${i + 1} x=${Number(m.x).toFixed(1)}, y=${Number(m.y).toFixed(1)}`)
+	                        .join(" | ")}
+	                    </div>
+	                  )}
 	                </div>
 	                {!trackingState.preview_image_path && (
 	                  <p className="hint">Run automatic tracking first, then load a frame in the viewer.</p>
 	                )}
-	                {trackingState.manual_stage_enabled ? (
-	                  <div className="section">
-	                    <div className="row row-between">
-	                      <h3>Selection</h3>
-	                      <button
-	                        className="ghost btn-small"
-	                        onClick={() => setTrackingState((prev) => ({ ...prev, selected: [] }))}
-	                        disabled={!(trackingState.selected || []).length}
-	                      >
-	                        Clear selection
-	                      </button>
-	                    </div>
-	                    <p className="hint">
-	                      Rows: {trackingState.total_rows || 0} | Tracks: {trackingState.total_tracks || 0} | Frame: {trackingState.frame || 0}/{trackingState.max_frame || 0}
-	                    </p>
-	                    {(trackingState.selected || []).length ? (
-	                      <pre className="seg-log">
-	                        {(trackingState.selected || [])
-	                          .map((s, i) => `${i + 1}. frame=${s.frame}, cell=${s.cell}, track=${s.track_id}`)
-	                          .join("\n")}
-	                      </pre>
-	                    ) : (
-	                      <p className="hint">No points selected.</p>
-	                    )}
-	                  </div>
-	                ) : (
-	                  <p className="hint">Step 2 is hidden. Run tracking and click "Next: correct tracks" to continue.</p>
+	                {trackingState.saved_progress_path && (
+	                  <p className="hint">Saved progress file: {trackingState.saved_progress_path}</p>
 	                )}
+	                <p className="hint">Rows: {trackingState.total_rows || 0} | Tracks: {trackingState.total_tracks || 0} | Frame: {trackingState.frame || 0}/{trackingState.max_frame || 0}</p>
 	              </section>
 	            </main>
           </>

@@ -392,13 +392,20 @@ class GatingApplyResponse(BaseModel):
 
 class TrackingRunRequest(BaseModel):
     path_to_table: str
-    output_dir: str
+    output_dir: Optional[str] = None
     image_dir: str
     image_col: str
     max_distance: int = 30
     time_window: int = 5
     max_split_distance: int = 10
     max_gap_closing_distance: int = 30
+
+
+class TrackingSaveRequest(BaseModel):
+    table_path: str
+    output_dir: str
+    preview_cache_dir: Optional[str] = None
+    include_images: bool = True
 
 
 class TrackingFrameRequest(BaseModel):
@@ -417,12 +424,68 @@ class TrackingSelection(BaseModel):
     track_id: int
 
 
+class TrackingPointSelectRequest(TrackingFrameRequest):
+    x: float
+    y: float
+    max_distance: float = 30.0
+
+
+class TrackingPointSelectResponse(BaseModel):
+    selection: TrackingSelection
+    x: float
+    y: float
+    distance: float
+    message: str = ""
+
+
+class TrackingMarker(BaseModel):
+    frame: int
+    cell: int
+    track_id: int
+    x: float
+    y: float
+
+
+class TrackingMarkersRequest(TrackingFrameRequest):
+    selections: List[TrackingSelection] = Field(default_factory=list)
+
+
+class TrackingMarkersResponse(BaseModel):
+    markers: List[TrackingMarker] = Field(default_factory=list)
+    message: str = ""
+
+
 class TrackingDeleteRequest(TrackingFrameRequest):
     selections: List[TrackingSelection] = Field(default_factory=list)
 
 
 class TrackingLinkRequest(TrackingFrameRequest):
     selections: List[TrackingSelection] = Field(default_factory=list)
+
+
+class TrackingDivisionRequest(TrackingFrameRequest):
+    selections: List[TrackingSelection] = Field(default_factory=list)
+
+
+class TrackingUnlinkRequest(TrackingFrameRequest):
+    selections: List[TrackingSelection] = Field(default_factory=list)
+
+
+class TrackingCheckpointRequest(BaseModel):
+    table_path: str
+
+
+class TrackingCheckpointResponse(BaseModel):
+    checkpoint_path: str
+    message: str = ""
+
+
+class TrackingRestoreRequest(TrackingFrameRequest):
+    checkpoint_path: str
+
+
+class TrackingProgressSaveRequest(TrackingFrameRequest):
+    pass
 
 
 class TrackingPreviewResponse(BaseModel):
@@ -444,3 +507,15 @@ class TrackingRunResponse(TrackingPreviewResponse):
 
 class TrackingEditResponse(TrackingPreviewResponse):
     edited_rows: int = 0
+
+
+class TrackingProgressSaveResponse(TrackingPreviewResponse):
+    saved_table_path: str
+
+
+class TrackingSaveResponse(BaseModel):
+    output_dir: str
+    table_path: str
+    images_dir: Optional[str] = None
+    saved_images: int = 0
+    message: str = ""

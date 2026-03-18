@@ -11,6 +11,7 @@ import tempfile
 import hashlib
 import base64
 import mimetypes
+import shutil
 from datetime import datetime
 import subprocess
 import sys
@@ -90,12 +91,27 @@ from .schemas import (
     GatingApplyResponse,
     GatingBounds,
     TrackingRunRequest,
+    TrackingSaveRequest,
     TrackingFrameRequest,
+    TrackingSelection,
+    TrackingPointSelectRequest,
+    TrackingPointSelectResponse,
+    TrackingMarkersRequest,
+    TrackingMarkersResponse,
+    TrackingMarker,
     TrackingDeleteRequest,
     TrackingLinkRequest,
+    TrackingDivisionRequest,
+    TrackingUnlinkRequest,
+    TrackingCheckpointRequest,
+    TrackingCheckpointResponse,
+    TrackingRestoreRequest,
+    TrackingProgressSaveRequest,
+    TrackingProgressSaveResponse,
     TrackingRunResponse,
     TrackingPreviewResponse,
     TrackingEditResponse,
+    TrackingSaveResponse,
 )
 from fornma.gui.utils.params_builder import build_interface_params
 
@@ -1739,6 +1755,18 @@ def _tracking_df_save(path: str, df: pd.DataFrame) -> None:
     save_df.to_csv(p, index=False)
 
 
+def _tracking_checkpoint_copy(table_path: str, label: str = "checkpoint") -> str:
+    src = Path(table_path).expanduser().resolve()
+    if not src.exists() or not src.is_file():
+        raise HTTPException(status_code=400, detail=f"Tracked table not found: {table_path}")
+    ckpt_dir = (Path(tempfile.gettempdir()) / "fornma_tracking_checkpoints").resolve()
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    dst = ckpt_dir / f"{src.stem}_{label}_{stamp}.csv"
+    shutil.copy2(src, dst)
+    return str(dst)
+
+
 def _tracking_resolve_image_path(row: pd.Series, image_col: str, image_dir: str | None) -> Path | None:
     raw = str(row.get(image_col, "") or "").strip()
     if not raw:
@@ -1765,6 +1793,7 @@ def _tracking_draw_preview_image(
     trail_window: int,
     show_complete_trail: bool,
     preview_cache_dir: str | None = None,
+    force_redraw: bool = False,
 ):
     try:
         import cv2 as cv
@@ -1789,13 +1818,24 @@ def _tracking_draw_preview_image(
                 str(int(df["Frame"].max())),
                 str(int(len(df))),
                 str(int(df["track_id"].nunique())),
-                str(int(pd.util.hash_pandas_object(df[["Frame", "Cell", "X", "Y", "track_id"]], index=False).sum())),
+                str(
+                    int(
+                        pd.util.hash_pandas_object(
+                            df[
+                                [c for c in ["Frame", "Cell", "X", "Y", "track_id", "previous_x", "previous_y", "family", "family_name"] if c in df.columns]
+                            ],
+                            index=False,
+                        ).sum()
+                    )
+                ),
             ]
         )
         cache_key = hashlib.sha1(key_raw.encode("utf-8")).hexdigest()[:16]
         cache_dir = cache_root / cache_key
 
     # Pre-render all tracked frames once into temp cache to keep frame navigation fast.
+    if force_redraw and cache_dir.exists():
+        shutil.rmtree(cache_dir, ignore_errors=True)
     if not cache_dir.exists() or not any(cache_dir.glob("*.tiff")):
         cache_dir.mkdir(parents=True, exist_ok=True)
         draw_tracking_frames(
@@ -1839,6 +1879,7 @@ def _tracking_preview_figure(
     preview_cache_dir: str | None,
     trail_window: int,
     show_complete_trail: bool,
+    force_redraw: bool = False,
 ) -> tuple[dict, str | None]:
     frame = int(frame)
     fr_min = int(df["Frame"].min())
@@ -1855,6 +1896,7 @@ def _tracking_preview_figure(
         preview_cache_dir=preview_cache_dir,
         trail_window=trail_window,
         show_complete_trail=show_complete_trail,
+        force_redraw=force_redraw,
     )
     if rendered is not None:
         fig.add_trace(go.Image(z=rendered))
@@ -1896,6 +1938,7 @@ def _tracking_preview_response(
     show_complete_trail: bool,
     message: str = "",
     preview_cache_dir: str | None = None,
+    force_redraw: bool = False,
 ):
     df = _tracking_df_load(table_path)
     img_col = _tracking_image_col(df, image_col)
@@ -1910,6 +1953,7 @@ def _tracking_preview_response(
         preview_cache_dir,
         trail_window,
         show_complete_trail,
+        force_redraw,
     )
     preview_image_path = None
     if cache_dir:
@@ -1936,16 +1980,76 @@ def _tracking_preview_response(
 
 def _tracking_find_rows_by_selection(df: pd.DataFrame, selections: list) -> pd.DataFrame:
     picked = []
-    for s in selections:
+    for idx, s in enumerate(selections):
         frame = int(s.frame)
         cell = int(s.cell)
         track_id = int(s.track_id)
         hit = df[(df["Frame"] == frame) & (df["Cell"] == cell) & (df["track_id"] == track_id)]
         if not hit.empty:
-            picked.append(hit.iloc[0])
+            row = hit.iloc[0].copy()
+            row["__selection_order"] = idx
+            picked.append(row)
     if not picked:
         return pd.DataFrame(columns=df.columns)
-    return pd.DataFrame(picked).sort_values(by=["Frame", "X", "Y"])
+    return pd.DataFrame(picked)
+
+
+def _tracking_family_name_prefix(value) -> str:
+    text = str(value or "").strip()
+    return text if text else ""
+
+
+def _tracking_replace_family_prefix(value, old_prefix: str, new_prefix: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return new_prefix
+    if old_prefix and text.startswith(old_prefix):
+        return f"{new_prefix}{text[len(old_prefix):]}"
+    return new_prefix
+
+
+def _tracking_link_sort_key(row: pd.Series) -> tuple[int, int]:
+    return int(row["Frame"]), int(row.get("__selection_order", 0))
+
+
+def _tracking_collect_descendant_indices(df: pd.DataFrame, start_index: int) -> set[int]:
+    """Follow the previous_x/previous_y chain from one selected row to all reachable descendants."""
+    if start_index not in df.index:
+        return set()
+
+    collected: set[int] = set()
+    queue = [start_index]
+
+    while queue:
+        idx = queue.pop(0)
+        if idx in collected:
+            continue
+        collected.add(idx)
+        row = df.loc[idx]
+        frame = int(row["Frame"])
+        x = float(row["X"])
+        y = float(row["Y"])
+        children = df[
+            (df["Frame"] > frame)
+            & np.isclose(pd.to_numeric(df["previous_x"], errors="coerce"), x, equal_nan=False)
+            & np.isclose(pd.to_numeric(df["previous_y"], errors="coerce"), y, equal_nan=False)
+        ]
+        for child_idx in children.index.tolist():
+            if child_idx not in collected:
+                queue.append(child_idx)
+
+    return collected
+
+
+def _tracking_pick_by_point(df: pd.DataFrame, frame: int, x: float, y: float, max_distance: float) -> pd.Series | None:
+    frame_df = df[df["Frame"] == int(frame)].copy()
+    if frame_df.empty:
+        return None
+    frame_df["__dist__"] = np.sqrt((frame_df["X"].astype(float) - float(x)) ** 2 + (frame_df["Y"].astype(float) - float(y)) ** 2)
+    best = frame_df.sort_values("__dist__").iloc[0]
+    if float(best["__dist__"]) > float(max_distance):
+        return None
+    return best
 
 
 @app.post("/tracking/run", response_model=TrackingRunResponse)
@@ -1953,7 +2057,10 @@ def tracking_run(req: TrackingRunRequest):
     source_path = Path(req.path_to_table).expanduser().resolve()
     if not source_path.exists() or not source_path.is_file():
         raise HTTPException(status_code=400, detail=f"CSV not found: {req.path_to_table}")
-    out_dir = Path(req.output_dir).expanduser().resolve()
+    if req.output_dir and str(req.output_dir).strip():
+        out_dir = Path(req.output_dir).expanduser().resolve()
+    else:
+        out_dir = (Path(tempfile.gettempdir()) / "fornma_tracking_runs" / uuid.uuid4().hex[:12]).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     original_df = pd.read_csv(source_path)
     img_col = _tracking_image_col(original_df, req.image_col)
@@ -2005,6 +2112,96 @@ def tracking_run(req: TrackingRunRequest):
     return TrackingRunResponse(**preview.dict(), output_dir=str(out_dir))
 
 
+@app.post("/tracking/save-results", response_model=TrackingSaveResponse)
+def tracking_save_results(req: TrackingSaveRequest):
+    src_table = Path(req.table_path).expanduser().resolve()
+    if not src_table.exists() or not src_table.is_file():
+        raise HTTPException(status_code=400, detail=f"Tracked table not found: {req.table_path}")
+
+    out_dir = Path(req.output_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    dst_table = out_dir / "Tracked Results.csv"
+    shutil.copy2(src_table, dst_table)
+
+    saved_images = 0
+    images_dir = None
+    if req.include_images and req.preview_cache_dir:
+        cache_dir = Path(req.preview_cache_dir).expanduser().resolve()
+        if cache_dir.exists() and cache_dir.is_dir():
+            files = sorted([p for p in cache_dir.iterdir() if p.is_file() and p.suffix.lower() in {".png", ".tif", ".tiff"}])
+            if files:
+                out_imgs = out_dir / "tracked_images"
+                out_imgs.mkdir(parents=True, exist_ok=True)
+                for p in files:
+                    shutil.copy2(p, out_imgs / p.name)
+                saved_images = len(files)
+                images_dir = str(out_imgs)
+
+    msg = f"Saved tracked table to '{dst_table}'."
+    if saved_images:
+        msg += f" Saved {saved_images} image(s) to '{images_dir}'."
+    elif not req.include_images:
+        msg += " Images were not exported."
+    else:
+        msg += " No cached tracking images were found to copy."
+
+    return TrackingSaveResponse(
+        output_dir=str(out_dir),
+        table_path=str(dst_table),
+        images_dir=images_dir,
+        saved_images=saved_images,
+        message=msg,
+    )
+
+
+@app.post("/tracking/checkpoint/create", response_model=TrackingCheckpointResponse)
+def tracking_checkpoint_create(req: TrackingCheckpointRequest):
+    checkpoint_path = _tracking_checkpoint_copy(req.table_path)
+    return TrackingCheckpointResponse(
+        checkpoint_path=checkpoint_path,
+        message="Undo checkpoint created.",
+    )
+
+
+@app.post("/tracking/checkpoint/restore", response_model=TrackingPreviewResponse)
+def tracking_checkpoint_restore(req: TrackingRestoreRequest):
+    checkpoint = Path(req.checkpoint_path).expanduser().resolve()
+    if not checkpoint.exists() or not checkpoint.is_file():
+        raise HTTPException(status_code=400, detail=f"Checkpoint not found: {req.checkpoint_path}")
+    target = Path(req.table_path).expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(checkpoint, target)
+    return _tracking_preview_response(
+        table_path=str(target),
+        frame=req.frame,
+        image_dir=req.image_dir,
+        image_col=req.image_col,
+        trail_window=req.trail_window,
+        show_complete_trail=bool(req.show_complete_trail),
+        preview_cache_dir=None,
+        message="Last action undone.",
+        force_redraw=True,
+    )
+
+
+@app.post("/tracking/progress/save", response_model=TrackingProgressSaveResponse)
+def tracking_progress_save(req: TrackingProgressSaveRequest):
+    saved_table_path = _tracking_checkpoint_copy(req.table_path, label="progress")
+    preview = _tracking_preview_response(
+        table_path=saved_table_path,
+        frame=req.frame,
+        image_dir=req.image_dir,
+        image_col=req.image_col,
+        trail_window=req.trail_window,
+        show_complete_trail=bool(req.show_complete_trail),
+        preview_cache_dir=None,
+        message="Progress saved. Continuing from saved checkpoint.",
+        force_redraw=True,
+    )
+    return TrackingProgressSaveResponse(**preview.dict(), saved_table_path=saved_table_path)
+
+
 @app.post("/tracking/preview", response_model=TrackingPreviewResponse)
 def tracking_preview(req: TrackingFrameRequest):
     return _tracking_preview_response(
@@ -2017,6 +2214,48 @@ def tracking_preview(req: TrackingFrameRequest):
         preview_cache_dir=req.preview_cache_dir,
         message="Tracking preview updated.",
     )
+
+
+@app.post("/tracking/select-point", response_model=TrackingPointSelectResponse)
+def tracking_select_point(req: TrackingPointSelectRequest):
+    df = _tracking_df_load(req.table_path)
+    hit = _tracking_pick_by_point(df, req.frame, req.x, req.y, req.max_distance)
+    if hit is None:
+        raise HTTPException(status_code=400, detail="No track found near clicked point in this frame.")
+    return TrackingPointSelectResponse(
+        selection=TrackingSelection(
+            frame=int(hit["Frame"]),
+            cell=int(hit["Cell"]),
+            track_id=int(hit["track_id"]),
+        ),
+        x=float(hit["X"]),
+        y=float(hit["Y"]),
+        distance=float(np.sqrt((float(hit["X"]) - float(req.x)) ** 2 + (float(hit["Y"]) - float(req.y)) ** 2)),
+        message="Track selected.",
+    )
+
+
+@app.post("/tracking/markers", response_model=TrackingMarkersResponse)
+def tracking_markers(req: TrackingMarkersRequest):
+    df = _tracking_df_load(req.table_path)
+    frame = int(req.frame)
+    out = []
+    for s in req.selections or []:
+        tid = int(s.track_id)
+        row = df[(df["Frame"] == frame) & (df["track_id"] == tid)].sort_values(["Cell", "X", "Y"])
+        if row.empty:
+            continue
+        r = row.iloc[0]
+        out.append(
+            TrackingMarker(
+                frame=int(r["Frame"]),
+                cell=int(r["Cell"]),
+                track_id=int(r["track_id"]),
+                x=float(r["X"]),
+                y=float(r["Y"]),
+            )
+        )
+    return TrackingMarkersResponse(markers=out, message="Markers loaded.")
 
 
 @app.post("/tracking/edit/delete", response_model=TrackingEditResponse)
@@ -2038,6 +2277,7 @@ def tracking_edit_delete(req: TrackingDeleteRequest):
         show_complete_trail=bool(req.show_complete_trail),
         preview_cache_dir=None,
         message=f"Deleted {len(track_ids)} track(s).",
+        force_redraw=True,
     )
     return TrackingEditResponse(**preview.dict(), edited_rows=int(prev_n - len(df)))
 
@@ -2048,7 +2288,10 @@ def tracking_edit_link(req: TrackingLinkRequest):
     sel = _tracking_find_rows_by_selection(df, req.selections)
     if len(sel) < 2:
         raise HTTPException(status_code=400, detail="Select at least two points to link tracks.")
-    sel = sel.sort_values(by=["Frame", "X", "Y"]).reset_index(drop=True)
+    sel = sel.sort_values(
+        by=["Frame", "__selection_order"],
+        kind="stable",
+    ).reset_index(drop=True)
 
     base = sel.iloc[0]
     base_family = base["family"]
@@ -2061,7 +2304,6 @@ def tracking_edit_link(req: TrackingLinkRequest):
     for i in range(1, len(sel)):
         row = sel.iloc[i]
         old_track = int(row["track_id"])
-        old_family_name = str(row["family_name"])
         start_frame = int(row["Frame"])
         idx_target = df[(df["Frame"] == int(row["Frame"])) & (df["Cell"] == int(row["Cell"])) & (df["track_id"] == old_track)].index
         if len(idx_target):
@@ -2070,14 +2312,16 @@ def tracking_edit_link(req: TrackingLinkRequest):
             edited += 1
         mask = (df["track_id"] == old_track) & (df["Frame"] >= start_frame)
         if mask.any():
+            old_family_name = str(df.loc[mask, "family_name"].iloc[0])
             df.loc[mask, "family"] = base_family
             df.loc[mask, "family_color"] = base_color
             df.loc[mask, "family_name"] = df.loc[mask, "family_name"].astype(str).apply(
-                lambda x: x.replace(old_family_name, base_family_name, 1)
+                lambda x: _tracking_replace_family_prefix(x, old_family_name, base_family_name)
             )
             edited += int(mask.sum())
         prev_x = float(row["X"])
         prev_y = float(row["Y"])
+    message = "Tracks linked successfully."
 
     _tracking_df_save(req.table_path, df)
     preview = _tracking_preview_response(
@@ -2088,7 +2332,140 @@ def tracking_edit_link(req: TrackingLinkRequest):
         trail_window=req.trail_window,
         show_complete_trail=bool(req.show_complete_trail),
         preview_cache_dir=None,
-        message="Tracks linked successfully.",
+        message=message,
+        force_redraw=True,
+    )
+    return TrackingEditResponse(**preview.dict(), edited_rows=edited)
+
+
+@app.post("/tracking/edit/division", response_model=TrackingEditResponse)
+def tracking_edit_division(req: TrackingDivisionRequest):
+    df = _tracking_df_load(req.table_path)
+    source_df = df.copy()
+    sel = _tracking_find_rows_by_selection(df, req.selections)
+    if len(sel) != 3:
+        raise HTTPException(status_code=400, detail="Cell division requires exactly 3 selected cells: mother and two daughters.")
+    sel = sel.sort_values(by=["Frame", "__selection_order"], kind="stable").reset_index(drop=True)
+
+    mother = sel.iloc[0]
+    daughters = sel.iloc[1:].copy().sort_values(by=["__selection_order"], kind="stable").reset_index(drop=True)
+    daughter_frames = daughters["Frame"].astype(int).tolist()
+    if len(set(daughter_frames)) != 1:
+        raise HTTPException(status_code=400, detail="The two daughter cells must be selected in the same frame.")
+    if int(daughters.iloc[0]["Frame"]) != int(mother["Frame"]) + 1:
+        raise HTTPException(status_code=400, detail="Cell division must connect one mother cell in frame t to two daughter cells in frame t+1.")
+
+    mother_family = mother["family"]
+    mother_family_name = _tracking_family_name_prefix(mother["family_name"])
+    mother_color = str(mother["family_color"])
+    edited = 0
+    processed_indices: set[int] = set()
+
+    for i, daughter in enumerate(daughters.itertuples(index=False), start=1):
+        daughter_frame = int(daughter.Frame)
+        daughter_cell = int(daughter.Cell)
+        daughter_track_id = int(daughter.track_id)
+        daughter_row = source_df[
+            (source_df["Frame"] == daughter_frame)
+            & (source_df["Cell"] == daughter_cell)
+            & (source_df["track_id"] == daughter_track_id)
+        ]
+        if daughter_row.empty:
+            continue
+        daughter_source = daughter_row.iloc[0]
+        daughter_start_idx = int(daughter_source.name)
+        daughter_indices = _tracking_collect_descendant_indices(source_df, daughter_start_idx) - processed_indices
+        if not daughter_indices:
+            continue
+        daughter_prefix = f"{mother_family_name}{i}."
+        old_prefix = _tracking_family_name_prefix(daughter_source["family_name"])
+        target_idx = df[
+            (df["Frame"] == daughter_frame)
+            & (df["Cell"] == daughter_cell)
+            & (df["track_id"] == daughter_track_id)
+        ].index
+        if len(target_idx):
+            df.at[target_idx[0], "previous_x"] = float(mother["X"])
+            df.at[target_idx[0], "previous_y"] = float(mother["Y"])
+            edited += 1
+        mask = df.index.isin(sorted(daughter_indices))
+        if mask.any():
+            df.loc[mask, "family"] = mother_family
+            df.loc[mask, "family_color"] = mother_color
+            df.loc[mask, "family_name"] = df.loc[mask, "family_name"].astype(str).apply(
+                lambda x, old_prefix=old_prefix, daughter_prefix=daughter_prefix: _tracking_replace_family_prefix(x, old_prefix, daughter_prefix)
+            )
+            edited += int(mask.sum())
+            processed_indices.update(daughter_indices)
+
+    _tracking_df_save(req.table_path, df)
+    preview = _tracking_preview_response(
+        table_path=req.table_path,
+        frame=req.frame,
+        image_dir=req.image_dir,
+        image_col=req.image_col,
+        trail_window=req.trail_window,
+        show_complete_trail=bool(req.show_complete_trail),
+        preview_cache_dir=None,
+        message="Cell division linked successfully.",
+        force_redraw=True,
+    )
+    return TrackingEditResponse(**preview.dict(), edited_rows=edited)
+
+
+@app.post("/tracking/edit/unlink", response_model=TrackingEditResponse)
+def tracking_edit_unlink(req: TrackingUnlinkRequest):
+    df = _tracking_df_load(req.table_path)
+    source_df = df.copy()
+    sel = _tracking_find_rows_by_selection(df, req.selections)
+    if sel.empty:
+        raise HTTPException(status_code=400, detail="Select at least one point to unlink.")
+
+    sel = sel.sort_values(by=["Frame", "__selection_order"], kind="stable").reset_index(drop=True)
+    edited = 0
+    processed_indices: set[int] = set()
+
+    for _, picked in sel.iterrows():
+        picked_frame = int(picked["Frame"])
+        picked_cell = int(picked["Cell"])
+        row_now = source_df[(source_df["Frame"] == picked_frame) & (source_df["Cell"] == picked_cell)].copy()
+        if row_now.empty:
+            continue
+        current = row_now.iloc[0]
+        split_frame = int(current["Frame"])
+        old_family_name = str(current["family_name"])
+        start_idx = int(current.name)
+        lineage_indices = _tracking_collect_descendant_indices(source_df, start_idx) - processed_indices
+        if not lineage_indices:
+            continue
+        mask = df.index.isin(sorted(lineage_indices))
+
+        new_track_id = int(df["track_id"].max()) + 1
+        new_family_color = str(_tracking_color_for_family(new_track_id))
+        df.loc[mask, "track_id"] = new_track_id
+        df.loc[mask, "family"] = new_track_id
+        df.loc[mask, "family_color"] = new_family_color
+        df.loc[mask, "family_name"] = df.loc[mask, "family_name"].astype(str).apply(
+            lambda x: _tracking_replace_family_prefix(x, old_family_name, f"{new_track_id}.")
+        )
+        first_idx = df[(df["track_id"] == new_track_id) & (df["Frame"] == split_frame) & (df["Cell"] == picked_cell)].index
+        if len(first_idx):
+            df.at[first_idx[0], "previous_x"] = np.nan
+            df.at[first_idx[0], "previous_y"] = np.nan
+        edited += int(mask.sum())
+        processed_indices.update(lineage_indices)
+
+    _tracking_df_save(req.table_path, df)
+    preview = _tracking_preview_response(
+        table_path=req.table_path,
+        frame=req.frame,
+        image_dir=req.image_dir,
+        image_col=req.image_col,
+        trail_window=req.trail_window,
+        show_complete_trail=bool(req.show_complete_trail),
+        preview_cache_dir=None,
+        message="Selected cells were unlinked from the chosen frame onward.",
+        force_redraw=True,
     )
     return TrackingEditResponse(**preview.dict(), edited_rows=edited)
 
