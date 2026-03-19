@@ -5404,7 +5404,7 @@ export default function App() {
                 </div>
                 <p className="hint">Run segmentation and monitor progress in real time.</p>
                 {hasSegSession ? (
-                  <div className="section">
+                  <div className="section tracking-viewer-section">
                     <h3>Execution progress</h3>
                     <div className="progress-wrap">
                       <div
@@ -5622,6 +5622,14 @@ export default function App() {
                     Reset
                   </button>
                 </div>
+                {String(trackingState.workflow_stage || "step1") === "step1" && trackingRunning && (
+                  <div className="tracking-run-feedback">
+                    <div className="spinner" />
+                    <div className="hint hint-muted">
+                      Automatic tracking is running. This may take a little while depending on the table size.
+                    </div>
+                  </div>
+                )}
                 {(trackingState.preview_image_path || trackingRunning || trackingLoadingFrame || trackingEditing) ? (
                   <div className="section">
                     <h3>Tracking viewer</h3>
@@ -5649,6 +5657,9 @@ export default function App() {
                         </button>
                         <button className="ghost" title="Cut the selected track from that point onward. The chosen cell keeps the old family before that frame, and gets a new number/color from the selected frame to the end." onClick={handleTrackingUnlink} disabled={(trackingState.selected || []).length < 1}>
                           Unlink
+                        </button>
+                        <button className="ghost" title="Delete the selected track completely from the table and from the rendered tracking view." onClick={handleTrackingDelete} disabled={!(trackingState.selected || []).length}>
+                          Delete track
                         </button>
                       </div>
                     )}

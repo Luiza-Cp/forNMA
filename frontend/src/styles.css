@@ -791,6 +791,11 @@ select.input {
   border-top: 1px dashed var(--border);
 }
 
+.tracking-viewer-section {
+  border-top: none;
+  padding-top: 0;
+}
+
 .section h4 {
   margin: 0 0 8px;
   font-size: 14px;
@@ -951,6 +956,17 @@ button:not(:disabled):hover {
   justify-items: center;
   gap: 8px;
   margin: 8px 0 14px;
+}
+
+.tracking-run-feedback {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .spinner {

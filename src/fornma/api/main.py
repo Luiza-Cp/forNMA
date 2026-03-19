@@ -2262,9 +2262,22 @@ def tracking_edit_delete(req: TrackingDeleteRequest):
     sel = _tracking_find_rows_by_selection(df, req.selections)
     if sel.empty:
         raise HTTPException(status_code=400, detail="Select at least one point/track to delete.")
-    track_ids = sorted(set(sel["track_id"].astype(int).tolist()))
+
+    family_prefixes = sorted(
+        {
+            _tracking_family_name_prefix(value)
+            for value in sel["family_name"].astype(str).tolist()
+            if str(value).strip()
+        }
+    )
+    if not family_prefixes:
+        raise HTTPException(status_code=400, detail="Could not determine the selected family to delete.")
+
     prev_n = len(df)
-    df = df[~df["track_id"].isin(track_ids)].copy()
+    mask = df["family_name"].astype(str).apply(
+        lambda value: any(str(value).startswith(prefix) for prefix in family_prefixes)
+    )
+    df = df[~mask].copy()
     _tracking_df_save(req.table_path, df)
     preview = _tracking_preview_response(
         table_path=req.table_path,
@@ -2274,7 +2287,7 @@ def tracking_edit_delete(req: TrackingDeleteRequest):
         trail_window=req.trail_window,
         show_complete_trail=bool(req.show_complete_trail),
         preview_cache_dir=None,
-        message=f"Deleted {len(track_ids)} track(s).",
+        message=f"Deleted {len(family_prefixes)} track lineage(s).",
         force_redraw=True,
     )
     return TrackingEditResponse(**preview.dict(), edited_rows=int(prev_n - len(df)))
@@ -2411,14 +2424,16 @@ def tracking_edit_unlink(req: TrackingUnlinkRequest):
         if row_now.empty:
             continue
         current = row_now.iloc[0]
-        track_id = int(current["track_id"])
-        split_frame = int(current["Frame"])
+        current_idx = row_now.index[0]
         old_family_name = str(current["family_name"])
-        same_frame_multi = int(frame_counts.get(split_frame, 0)) > 1
+        same_frame_multi = int(frame_counts.get(picked_frame, 0)) > 1
         if same_frame_multi:
-            mask = (df["Frame"] == split_frame) & (df["Cell"] == picked_cell)
+            mask = (df["Frame"] == picked_frame) & (df["Cell"] == picked_cell)
         else:
-            mask = (df["track_id"] == track_id) & (df["Frame"] >= split_frame)
+            descendant_indices = _tracking_collect_descendant_indices(df, current_idx)
+            if not descendant_indices:
+                descendant_indices = {current_idx}
+            mask = df.index.isin(descendant_indices)
         if not mask.any():
             continue
 
@@ -2430,7 +2445,7 @@ def tracking_edit_unlink(req: TrackingUnlinkRequest):
         df.loc[mask, "family_name"] = df.loc[mask, "family_name"].astype(str).apply(
             lambda x: _tracking_replace_family_prefix(x, old_family_name, f"{new_track_id}.")
         )
-        first_idx = df[(df["track_id"] == new_track_id) & (df["Frame"] == split_frame) & (df["Cell"] == picked_cell)].index
+        first_idx = df[(df["Frame"] == picked_frame) & (df["Cell"] == picked_cell) & (df["track_id"] == new_track_id)].index
         if len(first_idx):
             df.at[first_idx[0], "previous_x"] = np.nan
             df.at[first_idx[0], "previous_y"] = np.nan
