@@ -124,6 +124,17 @@ class DatasetColumnsResponse(BaseModel):
     numeric_columns: List[str] = Field(default_factory=list)
 
 
+class DatasetColumnValuesRequest(BaseModel):
+    paths: List[str] = Field(default_factory=list)
+    column: str
+    limit: int = 200
+
+
+class DatasetColumnValuesResponse(BaseModel):
+    column: str
+    values: List[str] = Field(default_factory=list)
+
+
 class NMASettingsUploadResponse(BaseModel):
     name: str
     sd_area: float
@@ -327,6 +338,11 @@ class StatsTable(BaseModel):
     rows: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class StatsFilter(BaseModel):
+    column: str
+    values: List[str] = Field(default_factory=list)
+
+
 class StatsRunRequest(BaseModel):
     paths: List[str] = Field(default_factory=list)
     method: str = "oneway"  # oneway | twoway | chi2 | chi2-subgroups
@@ -340,6 +356,7 @@ class StatsRunRequest(BaseModel):
     expected_min: float = 5.0
     correction_method: str = "auto"
     pairs_of_interest: List[str] = Field(default_factory=list)
+    filters: List[StatsFilter] = Field(default_factory=list)
 
 
 class StatsRunResponse(BaseModel):

@@ -45,6 +45,27 @@ const MODULE_TUTORIAL_SECTION = {
 };
 const PALETTE_OPTIONS = ["viridis", "plasma", "magma", "inferno", "cividis", "coolwarm", "Spectral", "RdBu"];
 const sameArray = (a = [], b = []) => a.length === b.length && a.every((v, i) => v === b[i]);
+const makeStatsFilterRow = () => ({ id: makeRowId(), column: "", values: [] });
+const normalizeFilterOption = (value) => String(value ?? "").trim();
+const copyText = async (text) => {
+  const normalized = String(text ?? "");
+  if (!normalized) return false;
+  try {
+    await navigator.clipboard.writeText(normalized);
+    return true;
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = normalized;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return !!ok;
+  }
+};
 const scrollToTopSmooth = () => {
   if (typeof window === "undefined") return;
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -168,6 +189,7 @@ const initialStatsState = () => ({
   datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", enabled: true }],
   method: "oneway",
   columns: [],
+  categoricalColumns: [],
   numeric_col: "",
   group_col: "",
   group_col1: "",
@@ -178,6 +200,8 @@ const initialStatsState = () => ({
   expected_min: 5.0,
   correction_method: "auto",
   pairs_text: "",
+  filters: [makeStatsFilterRow()],
+  filterValueOptions: {},
   tables: [],
   log: "",
   message: "",
@@ -1931,7 +1955,11 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
   const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const addFilter = () => setField("filters", [...(state.filters || []), makeStatsFilterRow()]);
+  const removeFilter = (id) => setField("filters", (state.filters || []).filter((f) => f.id !== id));
+  const updateFilter = (id, patch) => setField("filters", (state.filters || []).map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const cols = state.columns || [];
+  const categoricalCols = state.categoricalColumns || [];
   const method = state.method || "oneway";
   const canRun = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim()) && !loading;
   const methodHelp = {
@@ -2122,6 +2150,61 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                 <div className="field-head">Pairs of interest (optional) <Tip text="Specific pairs for post-hoc testing. Example: A|B; A|C." /></div>
                 <input className="input" value={state.pairs_text || ""} onChange={(e) => setField("pairs_text", e.target.value)} placeholder="Pairs (optional): A|B; A|C" />
               </div>
+            )}
+          </div>
+        </details>
+
+        <details open className="seg-section">
+          <summary>Subset data</summary>
+          <div className="seg-body">
+            <div className="hint">Optional exact-match filters applied before the test. Example: `Condition = control` and `Frame = 1`.</div>
+            {(state.filters || []).map((filter, idx) => {
+              const valueOptions = state.filterValueOptions?.[filter.column] || [];
+              return (
+                <div className="dataset" key={filter.id}>
+                  <div className="row">
+                    <div style={{ flex: 1 }}>
+                      <div className="field-head">Filter column <Tip text="Column used to subset rows before running the analysis." /></div>
+                      <select
+                        className="input"
+                        value={filter.column || ""}
+                        onChange={(e) => updateFilter(filter.id, { column: e.target.value, values: [] })}
+                      >
+                        <option value="">No filter</option>
+                        {cols.map((c) => <option key={`sf-col-${filter.id}-${c}`} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    {(state.filters || []).length > 1 && (
+                      <button className="ghost btn-small" onClick={() => removeFilter(filter.id)}>Remove</button>
+                    )}
+                  </div>
+                  {filter.column ? (
+                    <div>
+                      <div className="field-head">Accepted values <Tip text="Only rows matching one of the selected values will be kept." /></div>
+                      <select
+                        className="input"
+                        multiple
+                        size={Math.min(6, Math.max(3, valueOptions.length || 3))}
+                        value={filter.values || []}
+                        onChange={(e) => updateFilter(filter.id, {
+                          values: Array.from(e.target.selectedOptions || []).map((opt) => opt.value),
+                        })}
+                      >
+                        {valueOptions.map((value) => <option key={`sf-val-${filter.id}-${value}`} value={value}>{value}</option>)}
+                      </select>
+                      <div className="hint">
+                        {valueOptions.length
+                          ? "Use Ctrl/Cmd-click to select more than one value."
+                          : "No values loaded yet for this column."}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+            <button className="secondary" onClick={addFilter}>Add filter</button>
+            {categoricalCols.length > 0 && (
+              <div className="hint">Suggested categorical columns: {categoricalCols.join(", ")}</div>
             )}
           </div>
         </details>
@@ -2537,26 +2620,84 @@ function TrackingLeftPanel({
 function StatsTableView({ table, onDownload }) {
   const cols = table?.columns || [];
   const rows = table?.rows || [];
+  const group1Key = cols.find((c) => ["group1", "grupo1"].includes(String(c).toLowerCase()));
+  const group2Key = cols.find((c) => ["group2", "grupo2"].includes(String(c).toLowerCase()));
+  const valueKey = cols.find((c) => ["p_tukey", "p_adjusted", "p_ajustado", "p_raw"].includes(String(c).toLowerCase()));
+  const rejectKey = cols.find((c) => ["reject_h0", "significativo"].includes(String(c).toLowerCase()));
+  const isPairwiseLongTable = !!group1Key && !!group2Key && !!valueKey && rows.length > 0;
+
+  let displayCols = cols;
+  let displayRows = rows;
+
+  if (isPairwiseLongTable) {
+    const labels = Array.from(
+      new Set(
+        rows.flatMap((row) => [String(row?.[group1Key] ?? ""), String(row?.[group2Key] ?? "")]).filter(Boolean)
+      )
+    );
+    const pairMap = new Map();
+    rows.forEach((row) => {
+      const a = String(row?.[group1Key] ?? "");
+      const b = String(row?.[group2Key] ?? "");
+      const p = row?.[valueKey];
+      const reject = rejectKey ? row?.[rejectKey] : null;
+      const base = p == null || p === "" ? "" : String(p);
+      const text = reject == null || reject === "" ? base : `${base}${String(reject) === "true" ? " *" : ""}`;
+      if (!a || !b) return;
+      pairMap.set(`${a}||${b}`, text);
+      pairMap.set(`${b}||${a}`, text);
+    });
+    displayCols = ["group", ...labels];
+    displayRows = labels.map((label) => {
+      const out = { group: label };
+      labels.forEach((other) => {
+        out[other] = label === other ? "-" : (pairMap.get(`${label}||${other}`) || "");
+      });
+      return out;
+    });
+  }
+  const rowHeaderKey = isPairwiseLongTable
+    ? "group"
+    : ((displayCols[0] === "" || String(displayCols[0] || "").toLowerCase() === "group") ? displayCols[0] : null);
+
+  const handleCopy = async () => {
+    if (!displayRows.length || !displayCols.length) return;
+    const lines = [displayCols.map((c) => String(c ?? "")).join("\t")];
+    displayRows.forEach((row) => {
+      const vals = displayCols.map((c) => String(row?.[c] ?? ""));
+      lines.push(vals.join("\t"));
+    });
+    await copyText(`${lines.join("\n")}\n`);
+  };
   return (
     <div className="section">
       <div className="row row-between">
         <h3>{table?.name || "Table"}</h3>
-        <button className="ghost btn-small" onClick={() => onDownload?.(table)} disabled={!rows.length}>
-          Download CSV
-        </button>
+        <div className="row">
+          <button className="ghost btn-small" onClick={handleCopy} disabled={!displayRows.length}>
+            Copy table
+          </button>
+          <button className="ghost btn-small" onClick={() => onDownload?.(table)} disabled={!rows.length}>
+            Download CSV
+          </button>
+        </div>
       </div>
-      {!rows.length ? (
+      {!displayRows.length ? (
         <p className="hint">No rows.</p>
       ) : (
         <div className="table-wrap">
           <table className="results-table">
             <thead>
-              <tr>{cols.map((c) => <th key={`th-${table.name}-${c}`}>{c}</th>)}</tr>
+              <tr>{displayCols.map((c) => <th key={`th-${table.name}-${c}`}>{c}</th>)}</tr>
             </thead>
             <tbody>
-              {rows.slice(0, 2000).map((r, i) => (
+              {displayRows.slice(0, 2000).map((r, i) => (
                 <tr key={`tr-${table.name}-${i}`}>
-                  {cols.map((c) => <td key={`td-${table.name}-${i}-${c}`}>{r[c] == null ? "" : String(r[c])}</td>)}
+                  {displayCols.map((c) => (
+                    c === rowHeaderKey
+                      ? <th key={`td-${table.name}-${i}-${c}`} scope="row" className="results-table-rowhead">{r[c] == null ? "" : String(r[c])}</th>
+                      : <td key={`td-${table.name}-${i}-${c}`}>{r[c] == null ? "" : String(r[c])}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -2993,6 +3134,7 @@ export default function App() {
   const plotDataColsCacheRef = React.useRef({});
   const clusteringColsCacheRef = React.useRef({});
   const statsColsCacheRef = React.useRef({});
+  const statsFilterValuesCacheRef = React.useRef({});
   const gatingColsCacheRef = React.useRef({});
   const trackingColsCacheRef = React.useRef({});
   const gatingRelayoutTimerRef = React.useRef(null);
@@ -3334,12 +3476,15 @@ export default function App() {
         return {
           ...prev,
           columns: [],
+          categoricalColumns: [],
           numeric_col: "",
           group_col: "",
           group_col1: "",
           group_col2: "",
           category_col: "",
           condition_col: "",
+          filters: (prev.filters || [makeStatsFilterRow()]).map((filter) => ({ ...filter, column: "", values: [] })),
+          filterValueOptions: {},
         };
       });
       return;
@@ -3350,39 +3495,58 @@ export default function App() {
         targets.map(async ({ d, idx }) => {
           const path = String(d.path || "").trim();
           if (statsColsCacheRef.current[path]) {
-            return { idx, columns: statsColsCacheRef.current[path] };
+            return { idx, ...statsColsCacheRef.current[path] };
           }
           try {
             const res = await callApi("/nma/datasets/columns", { path });
-            const cols = res.columns || [];
-            statsColsCacheRef.current[path] = cols;
-            return { idx, columns: cols };
+            const entry = {
+              columns: res.columns || [],
+              categoricalColumns: res.categorical_columns || [],
+            };
+            statsColsCacheRef.current[path] = entry;
+            return { idx, ...entry };
           } catch {
-            return { idx, columns: [] };
+            return { idx, columns: [], categoricalColumns: [] };
           }
         })
       );
       if (cancelled) return;
       const valid = loaded.filter((x) => x.columns.length > 0);
       const firstCols = valid[0]?.columns || [];
+      const firstCategorical = valid[0]?.categoricalColumns || [];
       setStatsState((prev) => {
         const keep = (k) => (prev[k] && firstCols.includes(prev[k]) ? prev[k] : "");
+        const nextFilters = (prev.filters || [makeStatsFilterRow()]).map((filter) => {
+          if (!filter.column || firstCols.includes(filter.column)) {
+            return filter;
+          }
+          return { ...filter, column: "", values: [] };
+        });
+        const nextFilterValueOptions = Object.fromEntries(
+          Object.entries(prev.filterValueOptions || {}).filter(([column]) => firstCols.includes(column))
+        );
         if (sameArray(prev.columns || [], firstCols || [])
+          && sameArray(prev.categoricalColumns || [], firstCategorical || [])
           && keep("numeric_col") === prev.numeric_col
           && keep("group_col") === prev.group_col
           && keep("group_col1") === prev.group_col1
           && keep("group_col2") === prev.group_col2
           && keep("category_col") === prev.category_col
-          && keep("condition_col") === prev.condition_col) return prev;
+          && keep("condition_col") === prev.condition_col
+          && JSON.stringify(nextFilters) === JSON.stringify(prev.filters || [])
+          && JSON.stringify(nextFilterValueOptions) === JSON.stringify(prev.filterValueOptions || {})) return prev;
         return {
           ...prev,
           columns: firstCols,
+          categoricalColumns: firstCategorical,
           numeric_col: keep("numeric_col"),
           group_col: keep("group_col"),
           group_col1: keep("group_col1"),
           group_col2: keep("group_col2"),
           category_col: keep("category_col"),
           condition_col: keep("condition_col"),
+          filters: nextFilters,
+          filterValueOptions: nextFilterValueOptions,
         };
       });
     })();
@@ -3390,6 +3554,80 @@ export default function App() {
       cancelled = true;
     };
   }, [statsPathsKey]);
+
+  useEffect(() => {
+    const paths = (statsState.datasets || [])
+      .filter((d) => d.enabled !== false)
+      .map((d) => String(d.path || "").trim())
+      .filter(Boolean);
+    const filterColumns = Array.from(new Set(
+      (statsState.filters || [])
+        .map((filter) => String(filter.column || "").trim())
+        .filter(Boolean)
+    ));
+
+    if (!paths.length || !filterColumns.length) {
+      setStatsState((prev) => {
+        if (!Object.keys(prev.filterValueOptions || {}).length) return prev;
+        const keepColumns = new Set(
+          (prev.filters || [])
+            .map((filter) => String(filter.column || "").trim())
+            .filter(Boolean)
+        );
+        const nextOptions = Object.fromEntries(
+          Object.entries(prev.filterValueOptions || {}).filter(([column]) => keepColumns.has(column))
+        );
+        if (JSON.stringify(nextOptions) === JSON.stringify(prev.filterValueOptions || {})) return prev;
+        const nextFilters = (prev.filters || []).map((filter) => {
+          const opts = nextOptions[filter.column] || [];
+          return opts.length ? { ...filter, values: (filter.values || []).filter((value) => opts.includes(value)) } : filter;
+        });
+        return { ...prev, filters: nextFilters, filterValueOptions: nextOptions };
+      });
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const loaded = await Promise.all(
+        filterColumns.map(async (column) => {
+          const cacheKey = `${paths.join("||")}::${column}`;
+          if (statsFilterValuesCacheRef.current[cacheKey]) {
+            return { column, values: statsFilterValuesCacheRef.current[cacheKey] };
+          }
+          try {
+            const res = await callApi("/datasets/column-values", { paths, column, limit: 200 });
+            const values = (res.values || []).map(normalizeFilterOption).filter(Boolean);
+            statsFilterValuesCacheRef.current[cacheKey] = values;
+            return { column, values };
+          } catch {
+            return { column, values: [] };
+          }
+        })
+      );
+      if (cancelled) return;
+      setStatsState((prev) => {
+        const nextOptions = { ...(prev.filterValueOptions || {}) };
+        for (const item of loaded) {
+          nextOptions[item.column] = item.values || [];
+        }
+        const nextFilters = (prev.filters || []).map((filter) => {
+          const opts = nextOptions[filter.column] || [];
+          return {
+            ...filter,
+            values: (filter.values || []).filter((value) => opts.includes(value)),
+          };
+        });
+        if (JSON.stringify(nextOptions) === JSON.stringify(prev.filterValueOptions || {})
+          && JSON.stringify(nextFilters) === JSON.stringify(prev.filters || [])) return prev;
+        return { ...prev, filters: nextFilters, filterValueOptions: nextOptions };
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [statsState.datasets, statsState.filters]);
 
   useEffect(() => {
     const datasets = gatingState.datasets || [];
@@ -3553,6 +3791,12 @@ export default function App() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const copyStatsLogTxt = async () => {
+    const text = String(statsState.log || "");
+    if (!text.trim()) return;
+    await copyText(text);
   };
 
   const pickCsvPath = async () => {
@@ -4550,6 +4794,16 @@ export default function App() {
       .split(";")
       .map((s) => s.trim())
       .filter(Boolean);
+    const filters = (statsState.filters || [])
+      .map((filter) => ({
+        column: String(filter.column || "").trim(),
+        values: (filter.values || []).map(normalizeFilterOption).filter(Boolean),
+      }))
+      .filter((filter) => filter.column);
+    if (filters.some((filter) => filter.values.length === 0)) {
+      setStatsStatus({ level: "error", text: "Each active subset filter needs at least one selected value." });
+      return;
+    }
 
     scrollToTopSmooth();
     setStatsLoading(true);
@@ -4568,6 +4822,7 @@ export default function App() {
         expected_min: Number(statsState.expected_min || 5.0),
         correction_method: statsState.correction_method || "auto",
         pairs_of_interest: pairs,
+        filters,
       };
       const res = await callApi("/stats/run", payload);
       setStatsState((prev) => ({
@@ -5190,6 +5445,7 @@ export default function App() {
     setStatsStatus({ level: "info", text: "" });
     setStatsLoading(false);
     statsColsCacheRef.current = {};
+    statsFilterValuesCacheRef.current = {};
   };
 
   const handleResetGatingUi = () => {
@@ -5848,9 +6104,14 @@ export default function App() {
                     <div className="section">
                       <div className="row row-between">
                         <h3>Log</h3>
-                        <button className="ghost btn-small" onClick={downloadStatsLogTxt} disabled={!String(statsState.log || "").trim()}>
-                          Download TXT
-                        </button>
+                        <div className="row">
+                          <button className="ghost btn-small" onClick={copyStatsLogTxt} disabled={!String(statsState.log || "").trim()}>
+                            Copy TXT
+                          </button>
+                          <button className="ghost btn-small" onClick={downloadStatsLogTxt} disabled={!String(statsState.log || "").trim()}>
+                            Download TXT
+                          </button>
+                        </div>
                       </div>
                       <pre className="seg-log">{statsState.log || "No logs yet."}</pre>
                     </div>

@@ -60,6 +60,8 @@ from .schemas import (
     NMAFigureResponse,
     DatasetColumnsRequest,
     DatasetColumnsResponse,
+    DatasetColumnValuesRequest,
+    DatasetColumnValuesResponse,
     NMASettingsUploadResponse,
     NMAPlotRunRequest,
     NMAPlotStartResponse,
@@ -84,6 +86,7 @@ from .schemas import (
     ClusteringElbowResponse,
     StatsRunRequest,
     StatsRunResponse,
+    StatsFilter,
     StatsTable,
     GatingPreviewRequest,
     GatingPreviewResponse,
@@ -157,6 +160,19 @@ def _is_display_column(name: str) -> bool:
     return "unnamed" not in str(name).strip().lower()
 
 
+def _normalize_filter_value(value) -> str:
+    if pd.isna(value):
+        return ""
+    if isinstance(value, (np.integer, int)):
+        return str(int(value))
+    if isinstance(value, (np.floating, float)):
+        value = float(value)
+        if value.is_integer():
+            return str(int(value))
+        return format(value, "g")
+    return str(value).strip()
+
+
 @app.post("/nma/datasets/columns", response_model=DatasetColumnsResponse)
 def nma_datasets_columns(req: DatasetColumnsRequest):
     try:
@@ -175,6 +191,43 @@ def nma_datasets_columns(req: DatasetColumnsRequest):
             categorical_cols.append(c)
     numeric_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
     return DatasetColumnsResponse(columns=cols, categorical_columns=categorical_cols, numeric_columns=numeric_cols)
+
+
+@app.post("/datasets/column-values", response_model=DatasetColumnValuesResponse)
+def dataset_column_values(req: DatasetColumnValuesRequest):
+    paths = [str(p).strip() for p in (req.paths or []) if str(p).strip()]
+    if not paths:
+        raise HTTPException(status_code=400, detail="Provide at least one CSV path.")
+    column = str(req.column or "").strip()
+    if not column:
+        raise HTTPException(status_code=400, detail="Provide a column name.")
+
+    values = set()
+    limit = max(1, min(int(req.limit or 200), 1000))
+    for raw_path in paths:
+        try:
+            df = pd.read_csv(raw_path, usecols=[column])
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Column '{column}' was not found in {Path(raw_path).name}.")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read values from {Path(raw_path).name}: {e}")
+
+        for value in df[column].dropna().tolist():
+            norm = _normalize_filter_value(value)
+            if norm:
+                values.add(norm)
+            if len(values) >= limit:
+                break
+        if len(values) >= limit:
+            break
+
+    def _sort_key(item: str):
+        try:
+            return (0, float(item))
+        except Exception:
+            return (1, item.casefold())
+
+    return DatasetColumnValuesResponse(column=column, values=sorted(values, key=_sort_key)[:limit])
 
 
 @app.post("/system/pick-csv")
@@ -2606,9 +2659,48 @@ def _df_to_stats_table(name: str, df: pd.DataFrame | None) -> StatsTable | None:
     if not isinstance(df, pd.DataFrame):
         return None
     tmp = df.copy()
+    if not isinstance(tmp.index, pd.RangeIndex) or tmp.index.start != 0 or tmp.index.step != 1:
+        index_label = str(tmp.index.name) if tmp.index.name is not None else ""
+        if index_label in tmp.columns:
+            index_label = f"{index_label}_row"
+        tmp.insert(0, index_label, tmp.index.astype(str))
     tmp.columns = [str(c) for c in tmp.columns]
     rows = json.loads(tmp.to_json(orient="records", date_format="iso"))
     return StatsTable(name=name, columns=[str(c) for c in tmp.columns], rows=rows)
+
+
+def _apply_stats_filters(df: pd.DataFrame, filters: list[StatsFilter], helper) -> pd.DataFrame:
+    active_filters = []
+    for item in filters or []:
+        column = str(item.column or "").strip()
+        if not column:
+            continue
+        values = []
+        for raw in item.values or []:
+            norm = _normalize_filter_value(raw)
+            if norm:
+                values.append(norm)
+        if not values:
+            raise HTTPException(status_code=400, detail=f"Filter '{column}' has no selected values.")
+        if column not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Filter column '{column}' was not found in the dataset.")
+        active_filters.append((column, set(values)))
+
+    if not active_filters:
+        return df
+
+    filtered = df.copy()
+    helper.log("\nSubset filters:")
+    for column, allowed in active_filters:
+        before = len(filtered)
+        filtered = filtered[filtered[column].map(_normalize_filter_value).isin(allowed)].copy()
+        helper.log(f"- {column}: {', '.join(sorted(allowed))} ({before} -> {len(filtered)} rows)")
+
+    if filtered.empty:
+        raise HTTPException(status_code=400, detail="The selected filters removed all rows. Adjust the subset and try again.")
+
+    helper.log(f"Rows kept after filtering: {len(filtered)} / {len(df)}")
+    return filtered
 
 
 @app.post("/clustering/umap/preview", response_model=UMAPPreviewResponse)
@@ -2744,6 +2836,7 @@ def stats_run(req: StatsRunRequest):
     tmp_log.close()
     helper = AnalysisHelper(alpha=float(req.alpha), log_file=tmp_log_path)
     df = helper.load_and_concat(paths)
+    df = _apply_stats_filters(df, req.filters, helper)
     method = (req.method or "oneway").strip().lower()
     tables: list[StatsTable] = []
 
