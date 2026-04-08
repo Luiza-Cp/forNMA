@@ -26,12 +26,14 @@ What the launcher does
 - Starts the API at http://127.0.0.1:8000
 - Starts a local static frontend server at http://127.0.0.1:4173
 - Opens the browser automatically
+- Prints both URLs in the launcher window for troubleshooting
 
 Important notes
 - Python 3.10 to 3.12 is recommended
 - First-time setup installs dependencies from the internet
 - Keep the launcher terminal open while using the app
 - File and folder pickers use the local operating system dialogs
+- If something looks unresponsive, first confirm in the launcher window that both URLs above started successfully
 
 If the browser does not open automatically
 - Open: http://127.0.0.1:4173

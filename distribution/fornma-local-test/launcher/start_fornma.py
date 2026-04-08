@@ -11,6 +11,7 @@ from pathlib import Path
 
 BACKEND_URL = "http://127.0.0.1:8000/health"
 FRONTEND_URL = "http://127.0.0.1:4173/"
+API_ROOT_URL = "http://127.0.0.1:8000"
 
 
 def _wait_for_url(url: str, timeout: float = 30.0) -> bool:
@@ -81,8 +82,10 @@ def main() -> int:
     ]
 
     print("Starting forNMA backend...")
+    print(f"  API: {API_ROOT_URL}")
     backend = subprocess.Popen(backend_cmd, cwd=root, env=env)
     print("Starting local frontend server...")
+    print(f"  Frontend: {FRONTEND_URL}")
     frontend = subprocess.Popen(frontend_cmd, cwd=root, env=env)
 
     processes = [frontend, backend]
@@ -96,7 +99,10 @@ def main() -> int:
 
         print(f"Opening {FRONTEND_URL}")
         webbrowser.open(FRONTEND_URL)
-        print("forNMA is running. Press Ctrl+C in this window to stop it.")
+        print("forNMA is running.")
+        print(f"  Frontend URL: {FRONTEND_URL}")
+        print(f"  Backend URL: {API_ROOT_URL}")
+        print("Press Ctrl+C in this window to stop it.")
 
         while True:
             for proc, name in ((backend, "backend"), (frontend, "frontend")):
