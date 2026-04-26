@@ -7,6 +7,7 @@ import ast
 import random
 import pandas as pd
 import math
+from fornma.core.image_io import imread, imwrite
 
 st.set_page_config(layout='wide')
 
@@ -329,7 +330,7 @@ def show_controllers():
         if save_images:
             for f in range(len(st.session_state['images_dict'].keys())):
                 img = draw_track(st.session_state['df'], st.session_state['images_dict'][f].copy(), f, True)
-                cv.imwrite(
+                imwrite(
                     '/media/luiza/DATA/Doutorado/forNMA/experimentos/exp_kaka/populacional 1/exp kaka populacional 1/results/dados para tracking/results/GREEN_D8_3 Registered/tracked_images'
                     + str(f) + '.jpeg', img)
             message = {'success': 'Images saved!'}
@@ -389,7 +390,7 @@ else:
     if 'images_dict' not in st.session_state:
         image_names = sorted(os.listdir(path))
         image_paths = [os.path.join(path, i) for i in image_names]
-        images = [cv.cvtColor(cv.imread(f), cv.COLOR_BGR2RGB) for f in image_paths]
+        images = [cv.cvtColor(imread(f), cv.COLOR_BGR2RGB) for f in image_paths]
 
         temp_images_dict = {}
         images_dict = {}
@@ -452,4 +453,3 @@ else:
     with col2:
         show_slidebar()
         show_message(message)
-

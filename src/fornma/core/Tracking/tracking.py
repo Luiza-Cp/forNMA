@@ -6,6 +6,7 @@ import cv2 as cv
 import random
 import ast
 import random
+from fornma.core.image_io import imread, imwrite
 
 pd.options.mode.chained_assignment = None
 
@@ -226,7 +227,7 @@ def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point
         # Resolve caminho da imagem
         image_to_open = df_frame[img_col].iloc[0]
         img_path = image_to_open if os.path.isabs(image_to_open) else os.path.join(folder, image_to_open)
-        img = cv.imread(img_path)
+        img = imread(img_path)
         if img is None:
             # pula frames com problema de leitura de imagem
             continue
@@ -257,7 +258,7 @@ def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point
 
         # salva com zero-padding no frame (opcional)
         out_path = os.path.join(save, f"{int(frame):05d}.tiff")
-        cv.imwrite(out_path, img)
+        imwrite(out_path, img)
 
 
 #path_to_table = '/media/luiza/DATA/Doutorado/forNMA/experimentos/exp_kaka/populacional 1/exp kaka populacional 1/results/dados para tracking/results/GREEN_D9_2 Registered/Results_NMA_para_tracking.csv'

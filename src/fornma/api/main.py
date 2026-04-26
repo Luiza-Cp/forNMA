@@ -40,6 +40,7 @@ from fornma.core.Tracking.tracking import (
     draw_track as draw_tracking_frames,
 )
 from fornma.core.Segmentation.analyze import saving_images
+from fornma.core.image_io import imread, imwrite
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
@@ -741,7 +742,7 @@ def tracking_file(path: str = Query(...)):
     if p.suffix.lower() in {".tif", ".tiff"}:
         try:
             import cv2 as cv
-            img = cv.imread(str(p), cv.IMREAD_UNCHANGED)
+            img = imread(p, cv.IMREAD_UNCHANGED)
             if img is None:
                 raise HTTPException(status_code=500, detail="Failed to read image file.")
             ok, buf = cv.imencode(".png", img)
@@ -1987,11 +1988,11 @@ def _tracking_draw_preview_image(
         for tif in cache_dir.glob("*.tif*"):
             try:
                 import cv2 as cv
-                im = cv.imread(str(tif), cv.IMREAD_UNCHANGED)
+                im = imread(tif, cv.IMREAD_UNCHANGED)
                 if im is None:
                     continue
                 out_png = tif.with_suffix(".png")
-                cv.imwrite(str(out_png), im)
+                imwrite(out_png, im)
             except Exception:
                 continue
 
@@ -2000,7 +2001,7 @@ def _tracking_draw_preview_image(
         frame_path = cache_dir / f"{int(frame):05d}.tiff"
     if not frame_path.exists():
         return None, str(cache_dir)
-    img = cv.imread(str(frame_path))
+    img = imread(frame_path)
     if img is None:
         return None, str(cache_dir)
     return cv.cvtColor(img, cv.COLOR_BGR2RGB), str(cache_dir)
