@@ -373,8 +373,14 @@ class GatingBounds(BaseModel):
     y_max: float
 
 
+class GatingDatasetSpec(BaseModel):
+    name: Optional[str] = None
+    path: str
+    pkl_dir: Optional[str] = None
+
+
 class GatingPreviewRequest(BaseModel):
-    datasets: List[Dict[str, str]] = Field(default_factory=list)
+    datasets: List[GatingDatasetSpec] = Field(default_factory=list)
     paths: List[str] = Field(default_factory=list)
     x_col: str = "Area"
     y_col: str = "NII"
@@ -397,6 +403,7 @@ class GatingPreviewResponse(BaseModel):
 
 class GatingApplyRequest(GatingPreviewRequest):
     output_dir: str
+    draw_images: bool = False
 
 
 class GatingApplyResponse(BaseModel):

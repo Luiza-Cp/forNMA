@@ -32,6 +32,437 @@ const HOME_SECTIONS = [
   { id: "tutorial-tracking", title: "Tracking" },
   { id: "resources", title: "Resources" },
 ];
+const HOME_INTERFACE_TIPS = [
+  "forNMA is modular, so each tab can be used as part of a full workflow or on its own, depending on your experiment.",
+  "In most modules, you begin by organizing files by condition and by channel, so consistent names and folder structure are important.",
+  "Saving path fields tell the software where to write outputs such as previews, tables, figures, and logs.",
+  "Tooltips are available throughout the interface and give a quick explanation of what each parameter does.",
+  "While a process is running, use the progress indicators and logs to monitor what is happening. If something goes wrong, save the log text or take a screenshot before reporting it.",
+];
+const HOME_LOAD_IMAGES_GUIDE = [
+  "Click Load images to open the table where you describe how your image folders are organized.",
+  "Each row represents one experimental condition, such as Control, Treatment, or a specific timepoint group.",
+  "Each channel column represents one imaging channel, such as DAPI, GFP, or another marker.",
+  "Inside the table, type the condition names in the first column and rename the channel columns so they match your real acquisition channels.",
+  "For each cell in the table, use Browse to choose the folder that contains the images for that specific condition and that specific channel.",
+  "If you have more than one condition, use Add condition to create new rows. If you have more than one channel, use Add channel to create new columns.",
+  "Click Save only after every row and every channel column is filled in. The software checks whether names are missing, duplicated, or pointing to invalid paths.",
+  "If the table feels confusing, read it like this: one row = one condition, one channel column = one marker, one folder path = the image sequence for that combination.",
+];
+const HOME_MODULE_GUIDES = [
+  {
+    id: "tutorial-registration",
+    title: "Image Registration Tutorial",
+    intro:
+      "Use Image Registration to correct motion and align channels using one channel as the reference. It is most useful when frame-to-frame consistency matters, especially before tracking.",
+    whenToUse: [
+      "Use it when the image sequence drifted during acquisition or when channels are slightly misaligned over time.",
+      "It is especially important before tracking, since misaligned frames can break trajectories.",
+      "For each condition, place all timepoint images from one channel in one folder and the corresponding images from the other channel in a separate folder.",
+      "The files inside those channel folders must be in the same temporal order, because registration assumes that matching frames appear in the same sequence across folders.",
+    ],
+    params: [
+      ["Load images", "Opens the condition × channel table where you assign one folder for each condition and each channel."],
+      ["Condition", "The experimental condition represented by that row."],
+      ["Channel name", "The name of each image channel. Rename the columns so they match your acquisition setup before saving the table."],
+      ["Path to channel", "The folder that contains the full time sequence for that condition and channel."],
+      ["Browse", "Lets you select the folder for a specific condition and channel directly from the table."],
+      ["Save", "Checks the table and closes the window only after names and paths are valid."],
+      ["Saving path", "Sets the output folder for registered images and logs."],
+      ["Reference channel", "The anchor channel used to align the others."],
+      ["Other channels to correct", "The channels that will be moved to match the reference channel."],
+      ["Crop output (keep common FOV)", "Keeps only the field of view shared by all aligned images."],
+      ["Run Registration", "Starts the registration process."],
+      ["Stop", "Requests cancellation of the current registration job."],
+    ],
+    outputs: [
+      "A set of output folders containing the registered image sequences.",
+      "Registered images aligned to the reference channel.",
+      "Execution logs that help document or troubleshoot the run.",
+    ],
+    notes: [
+      "Registration can be slow and may use a large amount of memory.",
+      "In the Load images table, every condition must have one valid folder for every channel column.",
+      "Before running, double-check that each condition points to the correct folders and that matching frames stay synchronized across channels.",
+      "Load images can feel confusing at first because it works with folders, not with individual files. If something looks wrong, check the table structure first.",
+    ],
+  },
+  {
+    id: "tutorial-segmentation",
+    title: "Segmentation Tutorial",
+    intro:
+      "Use Segmentation to detect nuclei and, if needed, measure cytoplasmic rings and foci on selected channels. This is one of the main starting points of the workflow.",
+    whenToUse: [
+      "Use it to generate nuclei masks, per-cell measurements, and outputs for later steps such as gating, NMA, plotting, and tracking.",
+      "For time-lapse experiments, enable the temporal workflow and keep a single image field per folder.",
+    ],
+    paramGroups: [
+      {
+        title: "General setup",
+        items: [
+          ["Load images", "Opens the condition × channel table used to define the full dataset structure."],
+          ["Saving path", "Sets the folder where tables, previews, images, and logs will be saved."],
+          ["Nuclear Detection", "Chooses which channel will be used to find the nuclei. The nuclear contours generated here are then used for measurements in the other channels."],
+          ["Overtime", "Marks the dataset as a time sequence. Use this when the folders contain frames from the same field over time."],
+          ["Foci", "Turns on foci detection so the software can count spot-like structures in the selected channels."],
+          ["Channels for Foci", "Defines which channels should be analyzed for foci detection."],
+          ["Cytoplasmatic Ring", "Turns on translocation-style measurements around the nucleus by creating a ring outside the nuclear contour."],
+          ["Channels for Cytoplasmatic Ring", "Defines which channels should be used for cytoplasmic ring measurements."],
+          ["Magnification", "The microscope magnification used during image acquisition. In the original documentation, this is treated as the only mandatory segmentation value."],
+          ["Pixel Size", "The real size of one pixel in micrometers."],
+          ["Segmentation Method", "Chooses which nucleus segmentation workflow will be used: the native forNMA pipeline or Cellpose."],
+        ],
+      },
+      {
+        title: "Shared preprocessing and filters",
+        items: [
+          ["Rescale Intensity", "Redistributes image intensity so dim pixels move toward the lower end of the scale and bright pixels move toward the upper end. This improves contrast and is especially useful for images with strong background."],
+          ["Remove Background", "Applies rolling-ball background subtraction before segmentation."],
+          ["Rolling Ball Radius", "Defines the size of the rolling-ball background correction. It should be at least as large as the biggest structure that is not part of the background."],
+          ["Shape", "Filters nuclei by irregularity."],
+          ["Eccentricity", "Filters nuclei by how far their shape is from a circle. A circle has eccentricity 0; more elongated objects have higher eccentricity."],
+          ["Min Size", "Minimum nucleus area, in pixels, accepted by the segmentation."],
+          ["Max Size", "Maximum nucleus area, in pixels, accepted by the segmentation."],
+          ["Min Radius", "Minimum nucleus radius, in pixels, accepted by the segmentation."],
+          ["Max Radius", "Maximum nucleus radius, in pixels, accepted by the segmentation."],
+        ],
+      },
+      {
+        title: "forNMA nuclear segmentation",
+        items: [
+          ["Threshold", "Defines how the software separates nucleus from background in the native forNMA workflow. Global and local threshold options are available."],
+          ["Offset", "Used with local thresholds. It is a constant subtracted from the neighborhood-based threshold calculation."],
+          ["Smooth", "Blurs the nuclear mask to make the final contours smoother."],
+          ["Adjust size", "Moves the contour edge inward or outward. Positive values enlarge the contour; negative values shrink it."],
+          ["Cut edges", "Helps split touching nuclei when watershed segmentation was not able to separate them correctly. Higher values make the cut more restrictive."],
+          ["Weakly labeled images", "Activates extra routines for images where nuclear staining is weak and the nuclear boundary is hard to identify."],
+          ["Find low-intensity nuclei", "Runs an extra search step to detect nuclei that may have been missed in low-intensity regions."],
+        ],
+      },
+      {
+        title: "Cellpose nuclear segmentation",
+        items: [
+          ["Cellpose Diameter", "Expected nucleus diameter, in pixels, used by Cellpose."],
+          ["Cellpose Flow Threshold", "Controls the allowed flow error in Cellpose. Objects with errors below the threshold are kept."],
+          ["Cellpose Mask Threshold", "Controls which pixels are kept in Cellpose masks. Lower values tend to find more and larger masks."],
+          ["Cellprob Threshold", "Controls the minimum cell probability accepted by Cellpose."],
+          ["Use GPU", "Allows Cellpose to run on GPU when one is available."],
+          ["Invert Intensities", "Inverts the image intensity before Cellpose segmentation when needed."],
+        ],
+      },
+      {
+        title: "Per-channel detection and measurements",
+        items: [
+          ["Per-channel Rescale intensity", "Applies intensity redistribution independently to one measurement channel."],
+          ["Per-channel Remove background", "Applies rolling-ball background correction independently to one measurement channel."],
+          ["Per-channel Rolling-ball radius", "Defines the rolling-ball radius for that specific measurement channel."],
+          ["Match histograms", "Matches image histograms using the first image as reference, helping correct illumination differences across images."],
+          ["Ring size", "Width of the cytoplasmic ring, in pixels, used in translocation measurements."],
+          ["Use ellipse", "Uses an ellipse instead of a simple expanded contour to build the cytoplasmic ring. This can help in elongated cell lines."],
+          ["Min foci size", "Minimum number of pixels required for a region to be counted as a focus."],
+          ["Max foci size", "Maximum number of pixels allowed for a region to still be counted as a focus."],
+          ["Min foci intensity", "Minimum mean intensity required for a region to be counted as a focus."],
+          ["Max foci intensity", "Maximum mean intensity allowed for a region to be counted as a focus."],
+          ["Foci prominence", "How much brighter a focus must be relative to the surrounding nucleus."],
+        ],
+      },
+      {
+        title: "Run controls",
+        items: [
+          ["Preview / Run / Stop", "Preview checks the current setup, Run starts the full process, and Stop requests cancellation."],
+        ],
+      },
+    ],
+    outputs: [
+      {
+        title: "Annotated images",
+        description: "forNMA returns image outputs in the results folder so you can visually inspect what was detected.",
+        items: [
+          "Annotated 8-bit RGB images showing the segmentation and any user-selected measurements.",
+          "Preview-style outputs that help you check whether the nuclear contours look correct.",
+        ],
+      },
+      {
+        title: "Pickle files (.pkl)",
+        description: "These files store structured results that can be reused by downstream tools.",
+        items: [
+          "A folder containing `.pkl` objects for later use in modules such as Foci Overlay.",
+          "If you do not plan to use those downstream analyses, these files are not usually the main results you need to inspect manually.",
+        ],
+      },
+      {
+        title: "Nuclei Results CSV",
+        description: "This is the main per-nucleus results table. Column names are based on the channel names defined by the user.",
+        items: [
+          "Whenever you see `ChannelName` in a column description, it means the actual channel name you entered in Load images. These columns are created once for each channel. For example, if you define the channels as `Red` and `Green`, columns such as `Mean_ChannelName` will appear in the table as `Mean_Red` and `Mean_Green`.",
+          "Frame, Cell, X, Y: identify the image frame, nucleus number, and centroid position.",
+          "Area, Perimeter: basic size and boundary measurements of each nucleus.",
+          "Aspect, Extent, Roundness, Radius_ratio: shape descriptors used to describe how elongated, compact, or irregular the nucleus is.",
+          "NII: the Nuclear Irregularity Index, a combined metric based on aspect, extent, radius ratio, and roundness.",
+          "FitEllipse_X, FitEllipse_Y, FitEllipse_a, FitEllipse_b, FitEllipse_angle: parameters of the ellipse fitted to the nucleus.",
+          "Image_name_ChannelName, Min_image_ChannelName, Max_image_ChannelName: image identity and image-level intensity range for that channel.",
+          "Mean_ChannelName, Median_ChannelName: mean and median intensity measured inside the nucleus for each channel.",
+          "Mean_ring_ChannelName, Median_ring_ChannelName: mean and median intensity measured in the cytoplasmic ring region.",
+          "Mean_ellipse_ChannelName, Median_ellipse_ChannelName: mean and median intensity measured in the elliptical ring region.",
+          "Mean_Ring/Nucleus, Median_Ring/Nucleus, Mean_Nucleus/Ring, Median_Nucleus/Ring: ratios between ring and nuclear intensities.",
+          "Mean_Ellipse/Nucleus, Median_Ellipse/Nucleus, Mean_Nucleus/Ellipse, Median_Nucleus/Ellipse: ratios between elliptical ring and nuclear intensities.",
+          "Total_foci_ChannelName, Total_foci_area_ChannelName, Total_foci_mean_ChannelName, Foci_area_fraction_ChannelName: summary foci measurements per nucleus when foci detection is enabled.",
+          "Condition and Overtime: identify the user-defined condition and whether the dataset belongs to a time series.",
+        ],
+      },
+      {
+        title: "Foci Results CSV",
+        description: "When foci detection is enabled, forNMA can also return a second CSV with one row per individual focus.",
+        items: [
+          "Channel, Image_name, Frame: identify where the focus was found.",
+          "Origin_nucleus, Focus_number: identify which nucleus the focus belongs to and its index inside that nucleus.",
+          "Focus_mean_intensity, Focus_Area, Focus_perimeter: intensity and shape measurements for each focus.",
+          "Focus_centroid_x, Focus_centroid_y: focus position in the image.",
+          "Condition and Is_overtime: identify the experimental condition and whether the data are part of a time series.",
+        ],
+      },
+      {
+        title: "Logs and run information",
+        description: "The results folder also includes files that help document the run and troubleshoot problems.",
+        items: [
+          "Execution logs and intermediate outputs saved in the selected results folder.",
+        ],
+      },
+    ],
+    notes: [
+      "Load images is the step that defines the whole dataset structure, so mistakes there usually affect everything that comes after.",
+    ],
+  },
+  {
+    id: "tutorial-gating",
+    title: "Gating Tutorial",
+    intro:
+      "Use Gating to filter a dataset by applying numeric limits to two selected variables. This is useful for removing debris, extreme outliers, or other unwanted populations before downstream analysis.",
+    whenToUse: [
+      "Use it when you want to clean a dataset before plotting, statistics, or clustering.",
+      "A common approach is to gate area- and shape-related columns to remove obvious segmentation artifacts.",
+    ],
+    params: [
+      ["Datasets", "Load one or more CSV files to filter."],
+      ["PKL folder", "Optional folder with segmentation `.pkl` files for each dataset. This is required only if you want the gate to be applied to images as well as to tables."],
+      ["X column / Y column", "Select the numeric columns used in the 2D gating view."],
+      ["X min / X max / Y min / Y max", "Set the numeric limits for the selected variables."],
+      ["q_low / q_high", "Use quantiles to suggest an initial range for the gate."],
+      ["max_points", "Limits the number of points shown in the preview for better performance."],
+      ["color_by_dataset", "Colors the scatter plot by dataset when more than one file is loaded."],
+      ["Apply gate to images too", "Uses the associated `.pkl` folders to redraw filtered images after gating, in addition to saving gated tables."],
+      ["output_dir", "Sets the folder where the gated table and preview outputs will be saved."],
+    ],
+    outputs: [
+      {
+        title: "Filtered tables",
+        description: "The main output of Gating is a set of CSV files containing only the rows kept by the selected gate.",
+        items: [
+          "A combined gated CSV table with the rows kept across all selected datasets.",
+          "One gated CSV per dataset, so you can continue analysis separately if needed.",
+          "A summary table showing how many rows were kept and removed in each dataset.",
+        ],
+      },
+      {
+        title: "Preview and logs",
+        description: "The module also saves supporting information about the gating step.",
+        items: [
+          "A preview figure showing the applied rectangular gate.",
+          "A log file describing the final gate bounds used in the analysis.",
+        ],
+      },
+      {
+        title: "Filtered images from PKL data",
+        description: "If you enable image redraw and provide PKL folders, the gate can also be applied to the segmentation image outputs.",
+        items: [
+          "A new folder of redrawn images showing only the nuclei kept by the gate.",
+          "A filtered `pkl-data-filtered` folder for the kept nuclei, which can be useful for later inspection.",
+        ],
+      },
+    ],
+    notes: [
+      "The goal of gating is to clean the data, not to define phenotypes arbitrarily. Keep thresholds biologically justified.",
+      "If you gate multiple datasets together, make sure they use the same column structure.",
+    ],
+  },
+  {
+    id: "tutorial-foci",
+    title: "Foci Overlay Tutorial",
+    intro:
+      "Foci Overlay uses `.pkl` results from previous analyses to generate visual overlays and, if needed, profile plots for selected channels.",
+    whenToUse: [
+      "Use it after segmentation or foci analysis when you want an image-based quality check or a visual output for reporting.",
+    ],
+    params: [
+      ["Pickle (.pkl) folder", "Select the folder that contains the result pickle files generated by the software."],
+      ["Saving path", "Sets the output folder for overlay images and tables."],
+      ["Channels", "Lists the channels found automatically in the pickle metadata."],
+      ["Actions", "Choose whether to create overlays, profile plots, or both."],
+      ["Save overlay images", "Controls whether the rendered overlay figures are saved to disk."],
+      ["Run Overlay / Stop", "Starts or interrupts the overlay process."],
+    ],
+    outputs: [
+      "Overlay images for the selected channels.",
+      "Optional profile plots, depending on the selected action.",
+      "Saved tables and visual outputs in the chosen results folder.",
+    ],
+    notes: [
+      "This module depends on previous results, so it is usually used after segmentation-based workflows.",
+    ],
+  },
+  {
+    id: "tutorial-nma",
+    title: "NMA Tutorial",
+    intro:
+      "NMA compares cell populations using nuclear area and nuclear irregularity index (NII). The workflow combines dataset setup, control-based threshold definition, and final plotting.",
+    whenToUse: [
+      "Use it when you want to compare nuclear morphometric phenotypes across conditions.",
+      "When creating new NMA settings, at least one dataset must be marked as Control.",
+    ],
+    params: [
+      ["Add dataset", "Adds a new CSV input row."],
+      ["Dataset name", "The label used in the interface and in plots."],
+      ["Control", "Marks the reference population used to create NMA settings."],
+      ["CSV path", "Path to the dataset file."],
+      ["Area column / NII column", "Select the columns used to define the morphometric space."],
+      ["Create NMA settings / Load settings", "Create new thresholds from control data or load an existing configuration."],
+      ["Standard Deviations from Area / NII", "Set the ellipse spread around the control population in Step 1."],
+      ["Auto (DBSCAN)", "Attempts to detect the core control cluster automatically."],
+      ["Step 2 threshold lines", "Manual adjustment stage for the final NII thresholds."],
+      ["Dot plot / Heatmap", "Choose the final visualization style."],
+      ["Color by / Size by / Hue norm / Size norm", "Define how additional variables are encoded in the final NMA plots."],
+      ["Sample size / Palette", "Adjust display performance and appearance for larger datasets."],
+      ["Single plot / Overtime / Jointplot", "Change how results are grouped and displayed."],
+      ["Saving path / Run NMA / Stop / Save settings", "Control output location, execution, cancellation, and settings export."],
+    ],
+    outputs: [
+      "Saved NMA settings that can be reused later.",
+      "Dot plots or heatmaps, depending on the selected visualization mode.",
+      "Result images and supporting files written to the chosen output folder.",
+      "Execution logs for the NMA run.",
+    ],
+    notes: [
+      "The control population is central to the NMA workflow because it defines the thresholds used later.",
+    ],
+  },
+  {
+    id: "tutorial-plot",
+    title: "Plot Data Tutorial",
+    intro:
+      "Plot Data creates exploratory visualizations directly from CSV measurements, including scatter, violin, box, dot, bar, line, rolling average, and CPD-style outputs.",
+    whenToUse: [
+      "Use it for quick visual inspection of trends, comparisons between conditions, or time-course summaries.",
+    ],
+    params: [
+      ["Datasets", "Load one or more CSV files with the same column structure."],
+      ["Graph type", "Choose the type of plot to generate."],
+      ["X / Y / Hue / Size", "Map table columns to axes and visual encodings."],
+      ["control", "Select a reference condition for workflows that require a control baseline."],
+      ["conditionsText / framesText", "Restrict the plot to selected conditions or frames."],
+      ["dot / violin_box / violin_points / box_outliers / line_rolling / compute_auc / n", "Additional options that become relevant depending on the selected plot type."],
+    ],
+    outputs: [
+      "The requested plot saved to the output folder.",
+      "Additional derived figures when supported by the selected plot type.",
+    ],
+    notes: [
+      "Available columns are inferred from the loaded datasets, so files should follow the same table structure whenever possible.",
+    ],
+  },
+  {
+    id: "tutorial-clustering",
+    title: "Clustering Tutorial",
+    intro:
+      "Clustering supports dimensionality reduction and grouping workflows, with a focus on UMAP-style exploration and optional K-means-based coloring.",
+    whenToUse: [
+      "Use it to inspect multidimensional structure, identify phenotypic neighborhoods, and explore how conditions distribute in feature space.",
+    ],
+    params: [
+      ["Datasets", "Load the CSV files used for embedding and clustering."],
+      ["columns", "Select the numeric features used to compute the embedding."],
+      ["n_neighbors / min_dist / metric", "Core UMAP parameters that control neighborhood size, compactness, and distance metric."],
+      ["method", "Select the embedding approach used in the interface."],
+      ["scale", "Standardizes values before dimensionality reduction."],
+      ["max_points", "Limits the number of rendered points to keep the preview responsive."],
+      ["use_clusters / n_clusters", "Color the embedding by K-means clusters and choose the number of groups."],
+      ["k_min / k_max", "Set the range used when generating an elbow plot."],
+      ["color_by", "Color the embedding by an existing metadata column instead of clusters."],
+    ],
+    outputs: [
+      "An embedding plot, such as UMAP, based on the selected features.",
+      "Optional elbow-plot output to help choose the number of clusters.",
+      "Saved result files for later inspection or downstream analysis.",
+    ],
+    notes: [
+      "Clustering is exploratory, so any visible groups should always be interpreted together with biology and metadata.",
+    ],
+  },
+  {
+    id: "tutorial-statistics",
+    title: "Statistics Tutorial",
+    intro:
+      "Statistics brings together one-way, two-way, and chi-square analyses for one or more CSV datasets that share the same column structure.",
+    whenToUse: [
+      "Use one-way analysis for a single grouping factor, two-way analysis for factorial comparisons, and chi-square tests for contingency-style categorical questions.",
+    ],
+    params: [
+      ["Datasets", "Load the CSV inputs that will be combined for statistical testing."],
+      ["method", "Choose between one-way, two-way, chi-square, or chi-square subgroup comparison."],
+      ["numeric_col", "Select the dependent numeric variable for one-way or two-way analysis."],
+      ["group_col / group_col1 / group_col2", "Choose the grouping columns required by the selected test."],
+      ["category_col / condition_col", "Select the categorical columns used in chi-square workflows."],
+      ["alpha", "Set the significance threshold."],
+      ["expected_min", "Define the expected count threshold used in contingency-table decisions."],
+      ["correction_method", "Choose the multiple-testing correction strategy."],
+      ["pairs_text", "List any pairwise comparisons you want to prioritize."],
+      ["filters", "Apply extra column-based filters before running the analysis."],
+    ],
+    outputs: [
+      "Statistical result tables saved to the output folder.",
+      "Logs summarizing the selected test and the analysis flow.",
+      "Post-hoc or contingency-table outputs when supported by the selected method.",
+    ],
+    notes: [
+      "This module works best with clean input tables and clearly defined grouping columns.",
+      "Statistical outputs support exploration, but they should still be interpreted in the context of the study design.",
+    ],
+  },
+  {
+    id: "tutorial-tracking",
+    title: "Tracking Tutorial",
+    intro:
+      "Tracking reconstructs cell trajectories over time and supports manual correction after automatic linking.",
+    whenToUse: [
+      "Use it when you need trajectory-level information across frames, including migration paths and lineage events.",
+    ],
+    params: [
+      ["path_to_table", "Select the measurement table used as tracking input."],
+      ["image_dir", "Select the folder containing the corresponding images."],
+      ["image_col", "Choose the column that identifies the image name or frame source."],
+      ["max_distance", "Set the maximum allowed displacement between linked objects."],
+      ["time_window", "Set the temporal window used for association."],
+      ["max_split_distance", "Set the maximum distance allowed when assigning division events."],
+      ["max_gap_closing_distance", "Set the tolerance for reconnecting interrupted tracks."],
+      ["frame / max_frame / trail_window", "Viewer controls for navigating the time series and adjusting the trail display."],
+      ["show_complete_trail", "Shows the full trajectory instead of only the recent trail."],
+      ["save_results_dir", "Sets the output folder for corrected tracking results."],
+    ],
+    outputs: [
+      "Tracking result tables with linked trajectories.",
+      "Corrected outputs after manual editing, when applicable.",
+      "Saved tracking files in the selected results folder.",
+    ],
+    notes: [
+      "Manual correction is part of the workflow, so linking, unlinking, and marking cell divisions are expected editing steps.",
+    ],
+  },
+];
+const HOME_RESOURCES = [
+  "Use the accompanying article or thesis for the full scientific rationale behind each analysis module.",
+  "Use the Home page as a quick guide before moving into the working tabs.",
+  "If a run fails, save the logs shown in the interface before reporting the issue.",
+  "Whenever possible, keep raw data and processed outputs in separate folders to make reruns safer.",
+];
 const MODULE_TUTORIAL_SECTION = {
   "Image Registration": "tutorial-registration",
   Segmentation: "tutorial-segmentation",
@@ -207,7 +638,7 @@ const initialStatsState = () => ({
   message: "",
 });
 const initialGatingState = () => ({
-  datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", enabled: true }],
+  datasets: [{ id: makeRowId(), name: "Dataset 1", path: "", pkl_dir: "", enabled: true }],
   columns: [],
   numericColumns: [],
   x_col: "",
@@ -220,6 +651,7 @@ const initialGatingState = () => ({
   q_high: 0.95,
   max_points: 12000,
   color_by_dataset: false,
+  draw_images: false,
   output_dir: "",
   figure: null,
   tables: [],
@@ -299,6 +731,125 @@ function HomeLeftPanel({ activeSection, onSelectSection }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+function HomeTutorialSection({ title, intro, whenToUse = [], params = [], paramGroups = [], outputs = [], notes = [] }) {
+  return (
+    <>
+      <h3>{title}</h3>
+      <p className="hint hint-muted">{intro}</p>
+      {whenToUse.length > 0 && (
+        <details className="home-detail-block home-copy-block" open>
+          <summary>
+            <span>When to use</span>
+            <span className="home-detail-hint">Click to expand or collapse</span>
+          </summary>
+          <ul className="home-bullet-list">
+            {whenToUse.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {(params.length > 0 || paramGroups.length > 0) && (
+        <details className="home-detail-block home-copy-block">
+          <summary>
+            <span>Key interface parameters</span>
+            <span className="home-detail-hint">Click to expand or collapse</span>
+          </summary>
+          {paramGroups.length > 0 ? (
+            <div className="home-param-groups">
+              {paramGroups.map((group) => (
+                <div key={group.title} className="home-param-group">
+                  <h4>{group.title}</h4>
+                  <ul className="home-param-list">
+                    {group.items.map(([label, text]) => (
+                      <li key={`${group.title}-${label}`} className="home-param-item">
+                        <strong>{label}:</strong> {text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul className="home-param-list">
+              {params.map(([label, text]) => (
+                <li key={label} className="home-param-item">
+                  <strong>{label}:</strong> {text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
+      )}
+      {(title === "Image Registration Tutorial" || title === "Segmentation Tutorial") && (
+        <details className="home-detail-block home-copy-block" open>
+          <summary>
+            <span>How to use Load images</span>
+            <span className="home-detail-hint">Click to expand or collapse</span>
+          </summary>
+          <p className="hint hint-muted">
+            The <strong>Load images</strong> window is often the least intuitive part of the interface for new users,
+            so it helps to think of it as a map of your experiment. The table does not ask for single image files. It
+            asks for folders that contain the image sequence for each condition and each channel.
+          </p>
+          <ol className="home-number-list">
+            {HOME_LOAD_IMAGES_GUIDE.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ol>
+          <p className="hint hint-muted">
+            Before saving, check whether the table matches the way you would describe the experiment out loud. For
+            example: “Control, DAPI folder” should point to the DAPI images for the control condition, and “Treatment,
+            GFP folder” should point to the GFP images for the treatment condition.
+          </p>
+        </details>
+      )}
+      {outputs.length > 0 && (
+        <details className="home-detail-block home-copy-block" open>
+          <summary>
+            <span>Outputs</span>
+            <span className="home-detail-hint">Click to expand or collapse</span>
+          </summary>
+          {outputs.every((item) => typeof item === "object" && item !== null && Array.isArray(item.items)) ? (
+            <div className="home-output-groups">
+              {outputs.map((group) => (
+                <div key={group.title} className="home-output-group">
+                  <h4>{group.title}</h4>
+                  {group.description ? <p className="hint hint-muted">{group.description}</p> : null}
+                  <ul className="home-bullet-list">
+                    {group.items.map((item) => (
+                      <li key={`${group.title}-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul className="home-bullet-list">
+              {outputs.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </details>
+      )}
+      {notes.length > 0 && (
+        <details className="home-detail-block home-copy-block">
+          <summary>
+            <span>Notes</span>
+            <span className="home-detail-hint">Click to expand or collapse</span>
+          </summary>
+          <ul className="home-bullet-list">
+            {notes.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
   );
 }
 
@@ -2221,14 +2772,15 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
 
 function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, status, loading, applying, state, setState }) {
   const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
-  const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
+  const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", pkl_dir: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
   const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
   const numeric = state.numericColumns || [];
   const busy = !!loading || !!applying;
   const hasDatasets = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim());
   const canPreview = hasDatasets && !!state.x_col && !!state.y_col && !busy;
-  const canApply = canPreview && !!String(state.output_dir || "").trim();
+  const hasMissingPkl = !!state.draw_images && (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim() && !String(d.pkl_dir || "").trim());
+  const canApply = canPreview && !!String(state.output_dir || "").trim() && !hasMissingPkl;
 
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
@@ -2275,6 +2827,28 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
                     Browse CSV
                   </button>
                 </div>
+                {state.draw_images && (
+                  <div className="row path-row">
+                    <div style={{ flex: 1 }}>
+                      <div className="field-head">PKL folder <Tip text="Folder containing the segmentation `.pkl` files for this dataset. Needed only if you want to redraw filtered images after gating." /></div>
+                      <input className="input" value={d.pkl_dir || ""} onChange={(e) => updateDataset(d.id, { pkl_dir: e.target.value })} placeholder="/path/pkl-data" />
+                    </div>
+                    <button
+                      className="ghost"
+                      title="Choose the PKL folder associated with this dataset."
+                      onClick={async () => {
+                        try {
+                          const picked = await onPickDirectory();
+                          if (picked) updateDataset(d.id, { pkl_dir: picked });
+                        } catch {
+                          // no-op
+                        }
+                      }}
+                    >
+                      Browse PKL
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <button className="secondary" title="Add another CSV dataset to the gating analysis." onClick={addDataset}>Add CSV</button>
@@ -2341,9 +2915,16 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
         <details open className="seg-section">
           <summary>Output</summary>
           <div className="seg-body">
-            <div className="field-head">Saving path <Tip text="Directory where the gated CSV files will be written." /></div>
+            <label className="checkbox">
+              <input type="checkbox" checked={!!state.draw_images} onChange={(e) => setField("draw_images", e.target.checked)} />
+              Apply gate to images too <Tip text="When enabled, the gate is also applied to segmentation PKL files so the software redraws filtered images, in addition to saving gated CSV files." />
+            </label>
+            {state.draw_images && (
+              <div className="hint">Provide one PKL folder for each dataset above. The software will redraw images using only the nuclei kept by the gate.</div>
+            )}
+            <div className="field-head">Saving path <Tip text="Directory where gated CSV files, logs, and optional redrawn image outputs will be written." /></div>
             <div className="row path-row">
-              <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save gated CSV files" />
+              <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save gating outputs" />
               <button
                 className="ghost"
                 title="Choose where gated CSV files should be saved."
@@ -2359,6 +2940,11 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
                 Browse
               </button>
             </div>
+            {hasMissingPkl && (
+              <div className="hint" style={{ color: "var(--danger)" }}>
+                Add a PKL folder for every active dataset before applying the gate to images.
+              </div>
+            )}
           </div>
         </details>
       </div>
@@ -4851,6 +5437,7 @@ export default function App() {
       .map((d) => ({
         name: String(d.name || "").trim(),
         path: String(d.path || "").trim(),
+        pkl_dir: String(d.pkl_dir || "").trim(),
       }))
       .filter((d) => d.path);
     if (!datasets.length) {
@@ -4905,6 +5492,7 @@ export default function App() {
       .map((d) => ({
         name: String(d.name || "").trim(),
         path: String(d.path || "").trim(),
+        pkl_dir: String(d.pkl_dir || "").trim(),
       }))
       .filter((d) => d.path);
     if (!datasets.length) {
@@ -4917,6 +5505,10 @@ export default function App() {
     }
     if (!String(gatingState.output_dir || "").trim()) {
       setGatingStatus({ level: "error", text: "Choose an output directory to save gated CSVs." });
+      return;
+    }
+    if (gatingState.draw_images && datasets.some((d) => !d.pkl_dir)) {
+      setGatingStatus({ level: "error", text: "Choose a PKL folder for every active dataset before applying the gate to images." });
       return;
     }
     scrollToTopSmooth();
@@ -4936,6 +5528,7 @@ export default function App() {
         max_points: Number(gatingState.max_points || 12000),
         color_by_dataset: !!gatingState.color_by_dataset,
         output_dir: String(gatingState.output_dir || "").trim(),
+        draw_images: !!gatingState.draw_images,
       };
       const res = await callApi("/filters/apply", payload);
       setGatingState((prev) => ({
@@ -5519,29 +6112,35 @@ export default function App() {
                     <div>
                       <h2>About forNMA</h2>
                       <p className="hint hint-muted">
-                        forNMA is a microscopy analysis environment that brings registration, segmentation, gating,
-                        foci inspection, NMA workflows, plotting, clustering, statistics, and tracking into a single interface.
+                        forNMA is a modular microscopy analysis environment that brings registration, segmentation,
+                        gating, foci inspection, NMA workflows, plotting, clustering, statistics, and tracking into a
+                        single interface. Each tab can be used as part of a full workflow or on its own, depending on
+                        the question you want to answer.
                       </p>
                     </div>
                   </div>
                   <div className="home-meta-grid">
                     <div className="home-info-card">
-                      <h4>What the software does</h4>
-                      <p className="hint hint-muted">
-                        The goal of this home page is to guide new users through the platform, explain the workflow,
-                        and centralize learning materials for each module.
-                      </p>
+                      <h4>How to read the interface</h4>
+                      <ul className="home-bullet-list compact">
+                        {HOME_INTERFACE_TIPS.slice(0, 3).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
                     </div>
                     <div className="home-info-card">
-                      <h4>Developed by</h4>
-                      <p className="hint hint-muted">
-                        Add here the authors, lab, institution, and collaborators responsible for the software.
-                      </p>
+                      <h4>Running analyses</h4>
+                      <ul className="home-bullet-list compact">
+                        {HOME_INTERFACE_TIPS.slice(3).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
                     </div>
                     <div className="home-info-card">
-                      <h4>Contact</h4>
+                      <h4>Practical recommendation</h4>
                       <p className="hint hint-muted">
-                        Add email addresses, GitHub links, and any preferred support or citation contact information.
+                        Start with the module that matches your immediate goal. Segmentation and NMA are common entry
+                        points, while registration and tracking depend more directly on how the images were acquired.
                       </p>
                     </div>
                   </div>
@@ -5550,79 +6149,25 @@ export default function App() {
                 <div id="home-article" className="section home-section-card">
                   <h3>Article</h3>
                   <p className="hint hint-muted">
-                    Reserve this section for the publication that originated the software, including citation text,
-                    DOI, journal information, and a short summary of the scientific context.
+                    The full scientific rationale for each module should be described in the article or thesis that
+                    accompanies the software. Use that material for methodological details, validation strategy, and
+                    citation guidance.
                   </p>
                 </div>
 
-                <div id="home-tutorial-registration" className="section home-section-card">
-                  <h3>Image Registration Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Explain how to organize channels and conditions, choose a reference channel, and run registration safely.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-segmentation" className="section home-section-card">
-                  <h3>Segmentation Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Introduce the image table, nucleus detection channel, segmentation method, and per-channel settings.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-gating" className="section home-section-card">
-                  <h3>Gating Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Describe how to load datasets, pick X/Y columns, preview the gate, and save filtered outputs.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-foci" className="section home-section-card">
-                  <h3>Foci Overlay Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Describe how to select `.pkl` folders, choose channels, and generate overlays and profile outputs.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-nma" className="section home-section-card">
-                  <h3>NMA Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Explain the control dataset, threshold generation, manual adjustments, and settings export workflow.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-plot" className="section home-section-card">
-                  <h3>Plot Data Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Describe how to load CSV files, choose plot types, map columns, and interpret the generated views.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-clustering" className="section home-section-card">
-                  <h3>Clustering Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Introduce feature selection, embedding settings, color strategies, and elbow-plot-assisted clustering.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-statistics" className="section home-section-card">
-                  <h3>Statistics Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Outline when to use one-way, two-way, and chi-square analyses, and how to prepare the input tables.
-                  </p>
-                </div>
-
-                <div id="home-tutorial-tracking" className="section home-section-card">
-                  <h3>Tracking Tutorial</h3>
-                  <p className="hint hint-muted">
-                    Explain the automatic tracking step, correction workflow, linking, unlinking, cell division, and final export.
-                  </p>
-                </div>
+                {HOME_MODULE_GUIDES.map((section) => (
+                  <div key={section.id} id={`home-${section.id}`} className="section home-section-card">
+                    <HomeTutorialSection {...section} />
+                  </div>
+                ))}
 
                 <div id="home-resources" className="section home-section-card">
                   <h3>Resources</h3>
-                  <p className="hint hint-muted">
-                    Add quick links and micro-tutorials for GitHub, repository navigation, issue reporting, releases, and documentation.
-                  </p>
+                  <ul className="home-bullet-list">
+                    {HOME_RESOURCES.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
                 </div>
               </section>
             </main>

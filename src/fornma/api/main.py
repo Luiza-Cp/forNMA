@@ -39,6 +39,7 @@ from fornma.core.Tracking.tracking import (
     create_tree_nomenclature as create_tracking_nomenclature,
     draw_track as draw_tracking_frames,
 )
+from fornma.core.Segmentation.analyze import saving_images
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
@@ -1488,11 +1489,14 @@ def _normalize_gate_datasets(datasets: list[dict] | None, paths: list[str] | Non
     raw = datasets or [{"path": p, "name": Path(p).stem} for p in (paths or [])]
     cleaned = []
     for ds in raw:
+        if hasattr(ds, "model_dump"):
+            ds = ds.model_dump()
         p = str(ds.get("path", "")).strip()
         if not p:
             continue
         name = str(ds.get("name", "")).strip() or Path(p).stem
-        cleaned.append({"path": p, "name": name})
+        pkl_dir = str(ds.get("pkl_dir", "")).strip() or None
+        cleaned.append({"path": p, "name": name, "pkl_dir": pkl_dir})
     return cleaned
 
 
@@ -1554,6 +1558,74 @@ def _resolve_gate_bounds(req: GatingPreviewRequest, df: pd.DataFrame) -> tuple[f
 def _apply_gate(df: pd.DataFrame, x_col: str, y_col: str, x_min: float, x_max: float, y_min: float, y_max: float) -> pd.Series:
     # Mirrors the legacy filter behavior (strict interval on both axes).
     return (df[x_col] > x_min) & (df[x_col] < x_max) & (df[y_col] > y_min) & (df[y_col] < y_max)
+
+
+def _redraw_gated_images(kept: pd.DataFrame, datasets: list[dict], out_dir: Path) -> list[str]:
+    files: list[str] = []
+    dataset_by_source = {
+        str(Path(ds["path"]).expanduser().resolve()): ds
+        for ds in datasets
+    }
+
+    missing = []
+    for ds in datasets:
+        pkl_dir = str(ds.get("pkl_dir") or "").strip()
+        if not pkl_dir:
+            missing.append(ds["name"])
+            continue
+        pkl_path = Path(pkl_dir).expanduser().resolve()
+        if not pkl_path.exists() or not pkl_path.is_dir():
+            raise HTTPException(status_code=400, detail=f"PKL folder not found for dataset '{ds['name']}': {pkl_dir}")
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail="PKL folder is required for every dataset when 'Apply gate to images' is enabled: "
+                   + ", ".join(sorted(missing)),
+        )
+
+    for source_path, part in kept.groupby("__source_path__", sort=True):
+        ds = dataset_by_source.get(str(source_path))
+        if not ds:
+            continue
+
+        pkl_dir = Path(str(ds["pkl_dir"])).expanduser().resolve()
+        pkl_files = sorted([p for p in pkl_dir.iterdir() if p.suffix.lower() == ".pkl"])
+        if not pkl_files:
+            raise HTTPException(status_code=400, detail=f"No .pkl files found in {pkl_dir}")
+
+        safe_name = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(ds["name"])).strip("_") or "dataset"
+        redraw_root = (out_dir / f"{safe_name}_gated_images").resolve()
+        filtered_pkl_dir = redraw_root / "pkl-data-filtered"
+        filtered_pkl_dir.mkdir(parents=True, exist_ok=True)
+
+        channel_names = [str(c).replace("Image_name_", "") for c in part.columns if str(c).startswith("Image_name_")]
+        channel_names = list(dict.fromkeys(channel_names))
+        files.append(str(redraw_root))
+        files.append(str(filtered_pkl_dir))
+
+        for pkl_file in pkl_files:
+            try:
+                df_draw = pd.read_pickle(pkl_file)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to read pickle '{pkl_file.name}': {e}")
+
+            if df_draw is None or len(df_draw) == 0 or "Frame" not in df_draw.columns or "Cell" not in df_draw.columns:
+                continue
+
+            frame_rows = part.loc[part["Frame"] == df_draw["Frame"].iloc[0]]
+            if frame_rows.empty:
+                continue
+
+            cells_to_keep = set(frame_rows["Cell"].tolist())
+            df_filtered = df_draw[df_draw["Cell"].isin(cells_to_keep)].copy()
+            if df_filtered.empty:
+                continue
+
+            df_filtered.to_pickle(filtered_pkl_dir / pkl_file.name)
+            use_cellpose = bool(df_draw["use_cellpose"].iloc[0]) if "use_cellpose" in df_draw.columns else False
+            saving_images(df_filtered, str(redraw_root), channel_names, use_cellpose)
+
+    return list(dict.fromkeys(files))
 
 
 def _gate_summary_table(df: pd.DataFrame) -> StatsTable:
@@ -1643,6 +1715,7 @@ def filters_preview(req: GatingPreviewRequest):
 def filters_apply(req: GatingApplyRequest):
     out_dir = Path(req.output_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    datasets = _normalize_gate_datasets(req.datasets, req.paths)
 
     df = _load_gate_dataframe(req)
     x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
@@ -1662,6 +1735,9 @@ def filters_apply(req: GatingApplyRequest):
         part.drop(columns=["__gate_keep__", "__source_path__"], errors="ignore").to_csv(p, index=False)
         files.append(str(p))
 
+    if req.draw_images:
+        files.extend(_redraw_gated_images(kept, datasets, out_dir))
+
     dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     log = (
         f"\n\n{dt} - Gating filter applied:\n"
@@ -1669,6 +1745,7 @@ def filters_apply(req: GatingApplyRequest):
         f"{req.x_col} maximum: {x_max}\n"
         f"{req.y_col} minimum: {y_min}\n"
         f"{req.y_col} maximum: {y_max}\n"
+        f"Apply gate to images: {'yes' if req.draw_images else 'no'}\n"
     )
     with open(out_dir / "logs-fornma.txt", "a", encoding="utf-8") as logs:
         logs.write(log)
@@ -1680,7 +1757,10 @@ def filters_apply(req: GatingApplyRequest):
         tables=[summary],
         output_dir=str(out_dir),
         files=files,
-        message=f"Gating applied. Saved {len(files)} file(s). Kept {kept_n}/{total} rows ({(kept_n * 100.0 / total):.1f}%).",
+        message=(
+            f"Gating applied. Saved {len(files)} output item(s). "
+            f"Kept {kept_n}/{total} rows ({(kept_n * 100.0 / total):.1f}%)."
+        ),
     )
 
 
