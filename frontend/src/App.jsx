@@ -3708,7 +3708,7 @@ function buildStep2Figure(
 }
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState(() => readStorage(STORAGE_KEYS.activeModule, "Home"));
+  const [activeModule, setActiveModule] = useState("Home");
   const [homeSection, setHomeSection] = useState("about");
   const [rows, setRows] = useState(initialNmaRows());
   const [collapsedById, setCollapsedById] = useState({});
