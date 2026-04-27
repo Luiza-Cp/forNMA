@@ -16,6 +16,7 @@ from .thresholding import threshold_dict
 from .Divide_contours import Segmenting, select_right_contour
 from .weak_label import fluorescence_of_rings, adjust_binary_image
 from .filters import filter_debree, filter_contours
+from fornma.core.image_io import imread
 
 not_processed = []  # images that were not analyzed
 
@@ -33,7 +34,7 @@ def load_image(
     to not_processed list.
     """
     # print ('file: ',filename)
-    img = cv.imread(filename, cv.IMREAD_ANYDEPTH)
+    img = imread(filename, cv.IMREAD_ANYDEPTH)
     if img is None or img.size == 0:
         not_processed.append(filename)
         return None

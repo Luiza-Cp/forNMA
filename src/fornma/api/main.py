@@ -1221,6 +1221,27 @@ def _compute_stats(pool: pd.DataFrame, xcol: str, ycol: str) -> Dict[str, float]
     return {"mu_x": mu_x, "mu_y": mu_y, "sd_x": sd_x, "sd_y": sd_y}
 
 
+def _json_safe(value):
+    if isinstance(value, np.ndarray):
+        return [_json_safe(item) for item in value.tolist()]
+    if isinstance(value, (pd.Series, pd.Index)):
+        return [_json_safe(item) for item in value.tolist()]
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        value = float(value)
+        return value if np.isfinite(value) else None
+    if isinstance(value, float):
+        return value if np.isfinite(value) else None
+    if isinstance(value, (np.bool_,)):
+        return bool(value)
+    return value
+
+
 @app.post("/graphs/preview", response_model=GraphPreviewResponse)
 def graphs_preview(req: GraphPreviewRequest):
     datasets = req.datasets or [{"path": p, "name": Path(p).stem} for p in (req.paths or [])]
@@ -3256,7 +3277,7 @@ def nma_settings_compute(req: NMAComputeRequest):
         axis=axis,
         sample=sample,
         sd_factors={"sd_nii": 1.0, "sd_area": 1.0},
-        figure=fig.to_dict(),
+        figure=_json_safe(fig.to_dict()),
     )
 
 
@@ -3343,7 +3364,7 @@ def nma_settings_figure(req: NMAFigureRequest):
     fig = _build_plotly_figure(df_plot, xcol, ycol, stats, graph_limits, thresholds)
 
     return NMAFigureResponse(
-        figure=fig.to_dict(),
+        figure=_json_safe(fig.to_dict()),
         stats=stats,
         graph_limits=[float(x) for x in graph_limits],
     )

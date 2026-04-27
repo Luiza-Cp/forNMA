@@ -109,12 +109,10 @@ def register(app, pick_dir):
             errs.append("Please define an output path (Saving path).")
         if not ref_id:
             errs.append("Select a reference channel.")
-        if not mov_ids:
-            errs.append("Select at least one moving channel.")
         if not rows:
             errs.append("No conditions loaded (use 'Load images').")
 
-        sel_ids = [ref_id] + list(mov_ids or [])
+        sel_ids = [ch_id for ch_id in [ref_id] + list(mov_ids or []) if ch_id]
         for i, r in enumerate(rows, start=1):
             for ch_id in sel_ids:
                 if not (r.get(ch_id) or "").strip():
@@ -419,7 +417,6 @@ def register(app, pick_dir):
         ready = (
             bool(save_path and os.path.isdir(save_path)) and
             ref_ch is not None and
-            bool(moving_chs) and
             len((table_state or {}).get("rows", [])) > 0
         )
         add(f"- Pronto para executar (pré-validação): {ready}")

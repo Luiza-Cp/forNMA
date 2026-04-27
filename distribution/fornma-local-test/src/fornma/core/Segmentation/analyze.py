@@ -18,6 +18,7 @@ from .measure.Cell import Cell
 from .segmentation.find_contours import fornma_contour_finding, load_image
 from .segmentation.cellpose_integration import run_cellpose
 from .df_managing.organize import get_foci_df, split_dfs
+from fornma.core.image_io import imwrite
 
 pd.options.mode.chained_assignment = None  # default='warn'
 from fornma.gui.utils.progress import update_progress
@@ -182,9 +183,9 @@ def draw_and_save(df: pd.DataFrame,
                 img = cv.drawContours(img, cnt, -1, (122, 144, 248), 1)
 
         prog = os.environ.get("FORNMA_PROGRESS_FILE")
-        cv.imwrite(os.path.join(saving_dir, name), img)
+        imwrite(os.path.join(saving_dir, name), img)
         preview_path = os.path.join(saving_dir, "_preview.png")
-        cv.imwrite(preview_path, img)  # faz uma cópia em PNG só para a UI
+        imwrite(preview_path, img)  # faz uma cópia em PNG só para a UI
         update_progress(prog, preview_path=preview_path, append_preview_path=preview_path)
 
     return None

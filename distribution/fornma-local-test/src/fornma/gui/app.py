@@ -625,9 +625,11 @@ def create_app():
 
         errors = []
         # canais
-        ch_names = [(ch.get("name") or "").strip() for ch in channels]
-        if any(n == "" for n in ch_names):
-            errors.append("There are channels without a name.")
+        normalized_channels = [
+            {**ch, "name": (ch.get("name") or "").strip() or f"Channel {i + 1}"}
+            for i, ch in enumerate(channels)
+        ]
+        ch_names = [ch["name"] for ch in normalized_channels]
         if len(set(ch_names)) != len(ch_names):
             errors.append("Channel names must be unique.")
 
@@ -640,7 +642,7 @@ def create_app():
 
         # paths
         for i, r in enumerate(rows):
-            for ch in channels:
+            for ch in normalized_channels:
                 ch_id = ch["id"]
                 ch_name = ch["name"]
                 p = (r.get(ch_id, "") or "").strip()
@@ -656,7 +658,7 @@ def create_app():
         lines = ["Image selection OK:\n", f"Conditions: {len(rows)} | Channels: {len(channels)}\n"]
         for r in rows:
             lines.append(f"- {r['condition']}:")
-            for ch in channels:
+            for ch in normalized_channels:
                 lines.append(f"    {ch['name']}: {r[ch['id']]}")
         summary = "\n".join(lines)
 
@@ -807,7 +809,11 @@ def create_app():
         threading.Thread(target=_worker, daemon=True).start()
 
         # 4) Liga polling + header + mostra Stop
-        chans = [k.replace("Channel ", "") for k in params.keys() if k.startswith("Channel ")]
+        chans = [
+            v.get("channel_name") or k.removeprefix("Channel ")
+            for k, v in params.items()
+            if k.startswith("Channel ")
+        ]
         action = "PREVIEW" if preview else "RUN"
         header = "\n".join([
             f"{action} started…",

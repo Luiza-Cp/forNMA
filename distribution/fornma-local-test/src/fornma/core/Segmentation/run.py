@@ -22,6 +22,16 @@ from fornma.gui.utils.progress import update_progress, cancel_requested
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
+def _interface_channel_items(parameters_dict: dict) -> list[tuple[str, str, dict]]:
+    """Return interface channel key, display name, and params."""
+    items = []
+    for key, value in parameters_dict.items():
+        if not str(key).startswith("Channel "):
+            continue
+        name = value.get("channel_name") or str(key).removeprefix("Channel ")
+        items.append((key, name, value))
+    return items
+
 def rename_channel_parameters(channel_parameters: dict) -> dict:
     """ Renames parameter dictionary keys"""
 
@@ -116,12 +126,13 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
        """
     save_images = True  # TODO change for interface output
     path_to_save = parameters_dict['global']['output_folder']
-    ch_name_list = [f.replace('Channel ', '') for f in parameters_dict.keys() if 'Channel' in f]
+    channel_items = _interface_channel_items(parameters_dict)
+    ch_name_list = [name for _, name, _ in channel_items]
     ch_with_nuc = parameters_dict['global']['channel_with_nuclei']
     # overtime = parameters_dict['global']['overtime']
     overtime = False
-    parameter_list = [parameters_dict['Channel ' + f] for f in ch_name_list]
-    conditions = list(parameters_dict['Channel ' + ch_name_list[0]]['paths'].keys())
+    parameter_list = [params for _, _, params in channel_items]
+    conditions = list(parameter_list[0]['paths'].keys())
     segment_dict = {'magnification': parameters_dict['global']['magnification'],
                     'pixel_size': parameters_dict['global']['pixel_size'],
                     'rescale_intensity': parameters_dict['global']['rescale_intensity'],
@@ -249,9 +260,9 @@ def run(parameters_dict: dict,
             adjust_parameters_interface(parameters_dict)
         subfolders = list(parameter_list[0]['paths'].keys())  # names of treatments/conditions
         folder_dict = {}
-        for channel in ch_name_list:
-            folder_dict[channel] = [list(parameters_dict['Channel ' + channel]['paths'].values()),
-                                    parameters_dict['Channel ' + channel],
+        for key, channel, channel_params in _interface_channel_items(parameters_dict):
+            folder_dict[channel] = [list(channel_params['paths'].values()),
+                                    channel_params,
                                     parameters_dict['global']['channel_with_nuclei'] == channel]
     else:
         wants_to_save, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \

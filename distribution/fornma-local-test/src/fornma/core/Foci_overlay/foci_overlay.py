@@ -18,6 +18,7 @@ import math
 from matplotlib import pyplot as plt
 import seaborn as sns
 from rich.progress import track
+from fornma.core.image_io import imwrite
 
 import os, time, json, inspect
 
@@ -152,7 +153,7 @@ def save_images_ch(group: pd.DataFrame,
     os.makedirs(direc, exist_ok=True)
     image_names = [os.path.join(direc, name + ' - Cell ' + str(f) + '.png') for f in list(group['Cell'])]
     if len(images_to_save) > 1:
-        _ = [cv.imwrite(f, j) for f, j in zip(image_names, images_to_save) if j.size != 0]
+        _ = [imwrite(f, j) for f, j in zip(image_names, images_to_save) if j.size != 0]
     return
 
 

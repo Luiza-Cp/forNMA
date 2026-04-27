@@ -16,13 +16,14 @@ import numpy as np
 import cv2 as cv
 import shapely 
 from shapely.geometry import Polygon, LineString, box
+from fornma.core.image_io import imread, imwrite
 
 
 def open_images(path: str)-> Tuple[np.ndarray, List[str]]:
     """ Loads images and creates a stack """
     image_names = sorted(os.listdir(path)) 
     image_paths = [os.path.join(path, i) for i in image_names]
-    images = [cv.imread(i,cv.IMREAD_ANYDEPTH) for i in image_paths]
+    images = [imread(i, cv.IMREAD_ANYDEPTH) for i in image_paths]
     stack = np.stack(images) 
     
     return stack, image_names
@@ -189,7 +190,7 @@ def save(stack: np.ndarray,
     if crop != None:
         stack = stack[0:stack.shape[0], crop[0]:crop[1], crop[2]:crop[3]]
     for i in range(len(filenames)):
-        cv.imwrite(os.path.join(path, filenames[i]), stack[i])
+        imwrite(os.path.join(path, filenames[i]), stack[i])
     
     return True
          

@@ -39,6 +39,8 @@ from fornma.core.Tracking.tracking import (
     create_tree_nomenclature as create_tracking_nomenclature,
     draw_track as draw_tracking_frames,
 )
+from fornma.core.Segmentation.analyze import saving_images
+from fornma.core.image_io import imread, imwrite
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
@@ -60,6 +62,8 @@ from .schemas import (
     NMAFigureResponse,
     DatasetColumnsRequest,
     DatasetColumnsResponse,
+    DatasetColumnValuesRequest,
+    DatasetColumnValuesResponse,
     NMASettingsUploadResponse,
     NMAPlotRunRequest,
     NMAPlotStartResponse,
@@ -84,6 +88,7 @@ from .schemas import (
     ClusteringElbowResponse,
     StatsRunRequest,
     StatsRunResponse,
+    StatsFilter,
     StatsTable,
     GatingPreviewRequest,
     GatingPreviewResponse,
@@ -159,6 +164,19 @@ def _is_display_column(name: str) -> bool:
     return "unnamed" not in str(name).strip().lower()
 
 
+def _normalize_filter_value(value) -> str:
+    if pd.isna(value):
+        return ""
+    if isinstance(value, (np.integer, int)):
+        return str(int(value))
+    if isinstance(value, (np.floating, float)):
+        value = float(value)
+        if value.is_integer():
+            return str(int(value))
+        return format(value, "g")
+    return str(value).strip()
+
+
 @app.post("/nma/datasets/columns", response_model=DatasetColumnsResponse)
 def nma_datasets_columns(req: DatasetColumnsRequest):
     try:
@@ -177,6 +195,43 @@ def nma_datasets_columns(req: DatasetColumnsRequest):
             categorical_cols.append(c)
     numeric_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
     return DatasetColumnsResponse(columns=cols, categorical_columns=categorical_cols, numeric_columns=numeric_cols)
+
+
+@app.post("/datasets/column-values", response_model=DatasetColumnValuesResponse)
+def dataset_column_values(req: DatasetColumnValuesRequest):
+    paths = [str(p).strip() for p in (req.paths or []) if str(p).strip()]
+    if not paths:
+        raise HTTPException(status_code=400, detail="Provide at least one CSV path.")
+    column = str(req.column or "").strip()
+    if not column:
+        raise HTTPException(status_code=400, detail="Provide a column name.")
+
+    values = set()
+    limit = max(1, min(int(req.limit or 200), 1000))
+    for raw_path in paths:
+        try:
+            df = pd.read_csv(raw_path, usecols=[column])
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Column '{column}' was not found in {Path(raw_path).name}.")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read values from {Path(raw_path).name}: {e}")
+
+        for value in df[column].dropna().tolist():
+            norm = _normalize_filter_value(value)
+            if norm:
+                values.add(norm)
+            if len(values) >= limit:
+                break
+        if len(values) >= limit:
+            break
+
+    def _sort_key(item: str):
+        try:
+            return (0, float(item))
+        except Exception:
+            return (1, item.casefold())
+
+    return DatasetColumnValuesResponse(column=column, values=sorted(values, key=_sort_key)[:limit])
 
 
 @app.post("/system/pick-csv")
@@ -410,12 +465,12 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
             job_id,
             status="completed",
             progress=100,
-            message=f"Completed. {len(files)} image(s) generated.",
+            message=f"Plot generation finished successfully. {len(files)} image file(s) were saved to {output_dir}.",
             files=files,
             error=None,
         )
     except Exception as e:
-        _set_plot_job(job_id, status="failed", progress=100, error=str(e), message=f"Plot failed: {e}")
+        _set_plot_job(job_id, status="failed", progress=100, error=str(e), message=f"Plot generation failed. Details: {e}")
     finally:
         NMAClass.save_figs = original_save_figs
 
@@ -486,7 +541,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             job_id,
             status="failed",
             progress=100,
-            message="Invalid parameters.",
+            message="Segmentation could not start because the setup is incomplete.",
             error="\n".join(sorted(set(errs))),
         )
         return
@@ -529,7 +584,11 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             job_id,
             status="completed" if st == "done" else ("canceled" if st == "canceled" else st),
             progress=percent,
-            message="Finished." if st == "done" else (d.get("message") or st),
+            message=(
+                f"Segmentation finished successfully. Outputs were saved to {params['global']['output_folder']}."
+                if st == "done"
+                else (d.get("message") or st)
+            ),
             log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path"),
             preview_paths=d.get("preview_paths", []),
@@ -545,7 +604,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
                     json.dump(d, f)
         except Exception:
             pass
-        _set_seg_job(job_id, status="failed", progress=100, message=f"Segmentation failed: {e}", error=str(e))
+        _set_seg_job(job_id, status="failed", progress=100, message=f"Segmentation failed. Details: {e}", error=str(e))
     finally:
         with SEG_JOBS_LOCK:
             SEG_THREADS.pop(job_id, None)
@@ -554,7 +613,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
 @app.post("/segmentation/start", response_model=SegmentationStartResponse)
 def segmentation_start(req: SegmentationStartRequest):
     if _has_active_seg_job():
-        raise HTTPException(status_code=409, detail="A segmentation job is already running. Please wait or stop it first.")
+        raise HTTPException(status_code=409, detail="A segmentation job is already running. Wait for it to finish, or click Stop before starting another one.")
 
     job_id = str(uuid.uuid4())
     with SEG_JOBS_LOCK:
@@ -619,9 +678,9 @@ def segmentation_status(job_id: str):
         cancel_flag = bool(d.get("cancel")) if d else False
         forced_status = "canceled" if cancel_flag else "failed"
         forced_message = (
-            "Canceled."
+            "Segmentation was canceled."
             if cancel_flag
-            else (job.get("message") or "Segmentation process ended unexpectedly.")
+            else (job.get("message") or "Segmentation stopped unexpectedly before reporting completion. Check the log for the last processed image.")
         )
         _set_seg_job(
             job_id,
@@ -655,10 +714,10 @@ def segmentation_stop(job_id: str):
         raise HTTPException(status_code=404, detail="Segmentation job not found.")
     pf = job.get("progress_file")
     if not _seg_thread_alive(job_id):
-        _set_seg_job(job_id, status="canceled", message="Canceled.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_seg_job(job_id, status="canceled", message="Canceled.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
         return {"status": "canceled"}
     d = _safe_read_json(pf)
     d.update({"cancel": True, "status": d.get("status", "running")})
@@ -687,7 +746,7 @@ def tracking_file(path: str = Query(...)):
     if p.suffix.lower() in {".tif", ".tiff"}:
         try:
             import cv2 as cv
-            img = cv.imread(str(p), cv.IMREAD_UNCHANGED)
+            img = imread(p, cv.IMREAD_UNCHANGED)
             if img is None:
                 raise HTTPException(status_code=500, detail="Failed to read image file.")
             ok, buf = cv.imencode(".png", img)
@@ -720,26 +779,24 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
 
     errs = []
     if not save_path:
-        errs.append("Please define an output path (Saving path).")
+        errs.append("Choose a Saving path before running registration.")
     if not reference:
-        errs.append("Select a reference channel.")
-    if not moving:
-        errs.append("Select at least one moving channel.")
+        errs.append("Select the reference channel to register. Extra moving channels are optional.")
     if not rows:
-        errs.append("No conditions loaded (use 'Load images').")
-    selected_ids = [reference] + list(moving or [])
+        errs.append("No image conditions are loaded. Click Load images and save the condition/channel table first.")
+    selected_ids = [ch_id for ch_id in [reference] + list(moving or []) if ch_id]
     for idx, r in enumerate(rows, start=1):
         for ch_id in selected_ids:
             p = str(r.get(ch_id) or "").strip()
             if not p:
-                errs.append(f"Row {idx}: empty path for '{id2name.get(ch_id, ch_id)}'.")
+                errs.append(f"Row {idx}, {id2name.get(ch_id, ch_id)}: choose the image folder before running registration.")
 
     if errs:
         _set_reg_job(
             job_id,
             status="failed",
             progress=100,
-            message="Invalid parameters.",
+            message="Registration could not start because the setup is incomplete.",
             log="\n".join(sorted(set(errs))),
             error="\n".join(sorted(set(errs))),
         )
@@ -798,7 +855,7 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
 
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        final_line = "Registration finished."
+        final_line = f"Registration finished successfully. Registered images were saved to {save_path}."
         d.update({"status": "done", "done": total, "percent": 100, "log": final_line, "log_history": f"{hist}\n{final_line}".strip() if hist else final_line})
         with open(progress_file, "w") as f:
             json.dump(d, f)
@@ -806,7 +863,7 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
     except Exception as e:
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        err_line = f"Error: {e}"
+        err_line = f"Registration failed. Details: {e}"
         d.update({"status": "error", "log": err_line, "log_history": f"{hist}\n{err_line}".strip() if hist else err_line, "message": str(e)})
         try:
             with open(progress_file, "w") as f:
@@ -822,7 +879,7 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
 @app.post("/registration/start", response_model=RegistrationStartResponse)
 def registration_start(req: RegistrationStartRequest):
     if _has_active_reg_job():
-        raise HTTPException(status_code=409, detail="A registration job is already running. Please wait or stop it first.")
+        raise HTTPException(status_code=409, detail="A registration job is already running. Wait for it to finish, or click Stop before starting another one.")
     job_id = str(uuid.uuid4())
     with REG_JOBS_LOCK:
         REG_JOBS[job_id] = {
@@ -867,7 +924,7 @@ def registration_status(job_id: str):
             job = REG_JOBS.get(job_id)
 
     if not _reg_thread_alive(job_id) and job.get("status") in {"starting", "queued", "running", "canceling"}:
-        _set_reg_job(job_id, status="failed", message=job.get("message") or "Registration process ended unexpectedly.")
+        _set_reg_job(job_id, status="failed", message=job.get("message") or "Registration stopped unexpectedly before reporting completion. Check the log for the last processed condition.")
         with REG_JOBS_LOCK:
             job = REG_JOBS.get(job_id)
 
@@ -882,10 +939,10 @@ def registration_stop(job_id: str):
         raise HTTPException(status_code=404, detail="Registration job not found.")
     pf = job.get("progress_file")
     if not _reg_thread_alive(job_id):
-        _set_reg_job(job_id, status="canceled", message="Canceled.")
+        _set_reg_job(job_id, status="canceled", message="Registration was canceled.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_reg_job(job_id, status="canceled", message="Canceled.")
+        _set_reg_job(job_id, status="canceled", message="Registration was canceled.")
         return {"status": "canceled"}
     d = _safe_read_json(pf)
     d.update({"cancel": True, "status": d.get("status", "running")})
@@ -957,11 +1014,11 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
 
     errs = []
     if not pkl_path or not os.path.isdir(pkl_path):
-        errs.append("Please select a valid Pickles folder.")
+        errs.append("Select a valid Pickles folder generated by the segmentation step.")
     if not actions:
-        errs.append("Select at least one action (overlay and/or profiles).")
+        errs.append("Select at least one action: overlay images, intensity profiles, or both.")
     if errs:
-        _set_foci_job(job_id, status="failed", progress=100, message="Invalid parameters.", error="\n".join(errs), log="\n".join(errs))
+        _set_foci_job(job_id, status="failed", progress=100, message="Foci overlay could not start because the setup is incomplete.", error="\n".join(errs), log="\n".join(errs))
         return
 
     os.makedirs(save_path, exist_ok=True)
@@ -1039,7 +1096,7 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
 
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        final_line = "Finished all actions."
+        final_line = f"Foci overlay finished successfully. Output files were saved to {save_path}."
         d.update({"status": "done", "percent": 100, "log": final_line, "log_history": f"{hist}\n{final_line}".strip() if hist else final_line})
         with open(progress_file, "w") as f:
             json.dump(d, f)
@@ -1047,7 +1104,7 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
     except Exception as e:
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        err_line = f"ERROR: {e}"
+        err_line = f"Foci overlay failed. Details: {e}"
         d.update({"status": "error", "log": err_line, "message": str(e), "log_history": f"{hist}\n{err_line}".strip() if hist else err_line})
         try:
             with open(progress_file, "w") as f:
@@ -1063,7 +1120,7 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
 @app.post("/foci/start", response_model=FociStartResponse)
 def foci_start(req: FociStartRequest):
     if _has_active_foci_job():
-        raise HTTPException(status_code=409, detail="A foci overlay job is already running. Please wait or stop it first.")
+        raise HTTPException(status_code=409, detail="A foci overlay job is already running. Wait for it to finish, or click Stop before starting another one.")
     job_id = str(uuid.uuid4())
     with FOCI_JOBS_LOCK:
         FOCI_JOBS[job_id] = {
@@ -1104,7 +1161,7 @@ def foci_status(job_id: str):
             job = FOCI_JOBS.get(job_id)
 
     if not _foci_thread_alive(job_id) and job.get("status") in {"starting", "queued", "running", "canceling"}:
-        _set_foci_job(job_id, status="failed", message=job.get("message") or "Foci process ended unexpectedly.")
+        _set_foci_job(job_id, status="failed", message=job.get("message") or "Foci overlay stopped unexpectedly before reporting completion. Check the log for the last completed action.")
         with FOCI_JOBS_LOCK:
             job = FOCI_JOBS.get(job_id)
 
@@ -1119,10 +1176,10 @@ def foci_stop(job_id: str):
         raise HTTPException(status_code=404, detail="Foci job not found.")
     pf = job.get("progress_file")
     if not _foci_thread_alive(job_id):
-        _set_foci_job(job_id, status="canceled", message="Canceled.")
+        _set_foci_job(job_id, status="canceled", message="Foci overlay was canceled.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_foci_job(job_id, status="canceled", message="Canceled.")
+        _set_foci_job(job_id, status="canceled", message="Foci overlay was canceled.")
         return {"status": "canceled"}
     d = _safe_read_json(pf)
     d.update({"cancel": True, "status": d.get("status", "running")})
@@ -1162,6 +1219,27 @@ def _compute_stats(pool: pd.DataFrame, xcol: str, ycol: str) -> Dict[str, float]
     sd_x = float(pool[xcol].std(ddof=1) or 1.0)
     sd_y = float(pool[ycol].std(ddof=1) or 1.0)
     return {"mu_x": mu_x, "mu_y": mu_y, "sd_x": sd_x, "sd_y": sd_y}
+
+
+def _json_safe(value):
+    if isinstance(value, np.ndarray):
+        return [_json_safe(item) for item in value.tolist()]
+    if isinstance(value, (pd.Series, pd.Index)):
+        return [_json_safe(item) for item in value.tolist()]
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        value = float(value)
+        return value if np.isfinite(value) else None
+    if isinstance(value, float):
+        return value if np.isfinite(value) else None
+    if isinstance(value, (np.bool_,)):
+        return bool(value)
+    return value
 
 
 @app.post("/graphs/preview", response_model=GraphPreviewResponse)
@@ -1435,11 +1513,14 @@ def _normalize_gate_datasets(datasets: list[dict] | None, paths: list[str] | Non
     raw = datasets or [{"path": p, "name": Path(p).stem} for p in (paths or [])]
     cleaned = []
     for ds in raw:
+        if hasattr(ds, "model_dump"):
+            ds = ds.model_dump()
         p = str(ds.get("path", "")).strip()
         if not p:
             continue
         name = str(ds.get("name", "")).strip() or Path(p).stem
-        cleaned.append({"path": p, "name": name})
+        pkl_dir = str(ds.get("pkl_dir", "")).strip() or None
+        cleaned.append({"path": p, "name": name, "pkl_dir": pkl_dir})
     return cleaned
 
 
@@ -1501,6 +1582,74 @@ def _resolve_gate_bounds(req: GatingPreviewRequest, df: pd.DataFrame) -> tuple[f
 def _apply_gate(df: pd.DataFrame, x_col: str, y_col: str, x_min: float, x_max: float, y_min: float, y_max: float) -> pd.Series:
     # Mirrors the legacy filter behavior (strict interval on both axes).
     return (df[x_col] > x_min) & (df[x_col] < x_max) & (df[y_col] > y_min) & (df[y_col] < y_max)
+
+
+def _redraw_gated_images(kept: pd.DataFrame, datasets: list[dict], out_dir: Path) -> list[str]:
+    files: list[str] = []
+    dataset_by_source = {
+        str(Path(ds["path"]).expanduser().resolve()): ds
+        for ds in datasets
+    }
+
+    missing = []
+    for ds in datasets:
+        pkl_dir = str(ds.get("pkl_dir") or "").strip()
+        if not pkl_dir:
+            missing.append(ds["name"])
+            continue
+        pkl_path = Path(pkl_dir).expanduser().resolve()
+        if not pkl_path.exists() or not pkl_path.is_dir():
+            raise HTTPException(status_code=400, detail=f"PKL folder not found for dataset '{ds['name']}': {pkl_dir}")
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail="PKL folder is required for every dataset when 'Apply gate to images' is enabled: "
+                   + ", ".join(sorted(missing)),
+        )
+
+    for source_path, part in kept.groupby("__source_path__", sort=True):
+        ds = dataset_by_source.get(str(source_path))
+        if not ds:
+            continue
+
+        pkl_dir = Path(str(ds["pkl_dir"])).expanduser().resolve()
+        pkl_files = sorted([p for p in pkl_dir.iterdir() if p.suffix.lower() == ".pkl"])
+        if not pkl_files:
+            raise HTTPException(status_code=400, detail=f"No .pkl files found in {pkl_dir}")
+
+        safe_name = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(ds["name"])).strip("_") or "dataset"
+        redraw_root = (out_dir / f"{safe_name}_gated_images").resolve()
+        filtered_pkl_dir = redraw_root / "pkl-data-filtered"
+        filtered_pkl_dir.mkdir(parents=True, exist_ok=True)
+
+        channel_names = [str(c).replace("Image_name_", "") for c in part.columns if str(c).startswith("Image_name_")]
+        channel_names = list(dict.fromkeys(channel_names))
+        files.append(str(redraw_root))
+        files.append(str(filtered_pkl_dir))
+
+        for pkl_file in pkl_files:
+            try:
+                df_draw = pd.read_pickle(pkl_file)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to read pickle '{pkl_file.name}': {e}")
+
+            if df_draw is None or len(df_draw) == 0 or "Frame" not in df_draw.columns or "Cell" not in df_draw.columns:
+                continue
+
+            frame_rows = part.loc[part["Frame"] == df_draw["Frame"].iloc[0]]
+            if frame_rows.empty:
+                continue
+
+            cells_to_keep = set(frame_rows["Cell"].tolist())
+            df_filtered = df_draw[df_draw["Cell"].isin(cells_to_keep)].copy()
+            if df_filtered.empty:
+                continue
+
+            df_filtered.to_pickle(filtered_pkl_dir / pkl_file.name)
+            use_cellpose = bool(df_draw["use_cellpose"].iloc[0]) if "use_cellpose" in df_draw.columns else False
+            saving_images(df_filtered, str(redraw_root), channel_names, use_cellpose)
+
+    return list(dict.fromkeys(files))
 
 
 def _gate_summary_table(df: pd.DataFrame) -> StatsTable:
@@ -1590,6 +1739,7 @@ def filters_preview(req: GatingPreviewRequest):
 def filters_apply(req: GatingApplyRequest):
     out_dir = Path(req.output_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    datasets = _normalize_gate_datasets(req.datasets, req.paths)
 
     df = _load_gate_dataframe(req)
     x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
@@ -1609,6 +1759,9 @@ def filters_apply(req: GatingApplyRequest):
         part.drop(columns=["__gate_keep__", "__source_path__"], errors="ignore").to_csv(p, index=False)
         files.append(str(p))
 
+    if req.draw_images:
+        files.extend(_redraw_gated_images(kept, datasets, out_dir))
+
     dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     log = (
         f"\n\n{dt} - Gating filter applied:\n"
@@ -1616,6 +1769,7 @@ def filters_apply(req: GatingApplyRequest):
         f"{req.x_col} maximum: {x_max}\n"
         f"{req.y_col} minimum: {y_min}\n"
         f"{req.y_col} maximum: {y_max}\n"
+        f"Apply gate to images: {'yes' if req.draw_images else 'no'}\n"
     )
     with open(out_dir / "logs-fornma.txt", "a", encoding="utf-8") as logs:
         logs.write(log)
@@ -1627,7 +1781,10 @@ def filters_apply(req: GatingApplyRequest):
         tables=[summary],
         output_dir=str(out_dir),
         files=files,
-        message=f"Gating applied. Saved {len(files)} file(s). Kept {kept_n}/{total} rows ({(kept_n * 100.0 / total):.1f}%).",
+        message=(
+            f"Gating applied. Saved {len(files)} output item(s). "
+            f"Kept {kept_n}/{total} rows ({(kept_n * 100.0 / total):.1f}%)."
+        ),
     )
 
 
@@ -1854,11 +2011,11 @@ def _tracking_draw_preview_image(
         for tif in cache_dir.glob("*.tif*"):
             try:
                 import cv2 as cv
-                im = cv.imread(str(tif), cv.IMREAD_UNCHANGED)
+                im = imread(tif, cv.IMREAD_UNCHANGED)
                 if im is None:
                     continue
                 out_png = tif.with_suffix(".png")
-                cv.imwrite(str(out_png), im)
+                imwrite(out_png, im)
             except Exception:
                 continue
 
@@ -1867,7 +2024,7 @@ def _tracking_draw_preview_image(
         frame_path = cache_dir / f"{int(frame):05d}.tiff"
     if not frame_path.exists():
         return None, str(cache_dir)
-    img = cv.imread(str(frame_path))
+    img = imread(frame_path)
     if img is None:
         return None, str(cache_dir)
     return cv.cvtColor(img, cv.COLOR_BGR2RGB), str(cache_dir)
@@ -2608,9 +2765,48 @@ def _df_to_stats_table(name: str, df: pd.DataFrame | None) -> StatsTable | None:
     if not isinstance(df, pd.DataFrame):
         return None
     tmp = df.copy()
+    if not isinstance(tmp.index, pd.RangeIndex) or tmp.index.start != 0 or tmp.index.step != 1:
+        index_label = str(tmp.index.name) if tmp.index.name is not None else ""
+        if index_label in tmp.columns:
+            index_label = f"{index_label}_row"
+        tmp.insert(0, index_label, tmp.index.astype(str))
     tmp.columns = [str(c) for c in tmp.columns]
     rows = json.loads(tmp.to_json(orient="records", date_format="iso"))
     return StatsTable(name=name, columns=[str(c) for c in tmp.columns], rows=rows)
+
+
+def _apply_stats_filters(df: pd.DataFrame, filters: list[StatsFilter], helper) -> pd.DataFrame:
+    active_filters = []
+    for item in filters or []:
+        column = str(item.column or "").strip()
+        if not column:
+            continue
+        values = []
+        for raw in item.values or []:
+            norm = _normalize_filter_value(raw)
+            if norm:
+                values.append(norm)
+        if not values:
+            raise HTTPException(status_code=400, detail=f"Filter '{column}' has no selected values.")
+        if column not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Filter column '{column}' was not found in the dataset.")
+        active_filters.append((column, set(values)))
+
+    if not active_filters:
+        return df
+
+    filtered = df.copy()
+    helper.log("\nSubset filters:")
+    for column, allowed in active_filters:
+        before = len(filtered)
+        filtered = filtered[filtered[column].map(_normalize_filter_value).isin(allowed)].copy()
+        helper.log(f"- {column}: {', '.join(sorted(allowed))} ({before} -> {len(filtered)} rows)")
+
+    if filtered.empty:
+        raise HTTPException(status_code=400, detail="The selected filters removed all rows. Adjust the subset and try again.")
+
+    helper.log(f"Rows kept after filtering: {len(filtered)} / {len(df)}")
+    return filtered
 
 
 @app.post("/clustering/umap/preview", response_model=UMAPPreviewResponse)
@@ -2746,6 +2942,7 @@ def stats_run(req: StatsRunRequest):
     tmp_log.close()
     helper = AnalysisHelper(alpha=float(req.alpha), log_file=tmp_log_path)
     df = helper.load_and_concat(paths)
+    df = _apply_stats_filters(df, req.filters, helper)
     method = (req.method or "oneway").strip().lower()
     tables: list[StatsTable] = []
 
@@ -3080,7 +3277,7 @@ def nma_settings_compute(req: NMAComputeRequest):
         axis=axis,
         sample=sample,
         sd_factors={"sd_nii": 1.0, "sd_area": 1.0},
-        figure=fig.to_dict(),
+        figure=_json_safe(fig.to_dict()),
     )
 
 
@@ -3167,7 +3364,7 @@ def nma_settings_figure(req: NMAFigureRequest):
     fig = _build_plotly_figure(df_plot, xcol, ycol, stats, graph_limits, thresholds)
 
     return NMAFigureResponse(
-        figure=fig.to_dict(),
+        figure=_json_safe(fig.to_dict()),
         stats=stats,
         graph_limits=[float(x) for x in graph_limits],
     )

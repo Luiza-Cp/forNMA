@@ -23,6 +23,9 @@ _CHANNEL_DEFAULTS = {
 def _norm(s):
     return (s or "").strip()
 
+def _default_channel_name(index: int) -> str:
+    return f"Channel {index + 1}"
+
 def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, list[str]]:
     """
     Constrói o dicionário no formato aceito por adjust_parameters_interface()
@@ -40,14 +43,14 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     rows     = images.get("rows", [])           # [{"condition":"...", "ch1":"/abs/..", ...}, ...]
 
     if not channels:
-        errors.append("No channels defined.")
+        errors.append("No image channels were loaded. Click 'Load images' and add at least one channel.")
         return {}, errors
     if not rows:
-        errors.append("No conditions defined.")
+        errors.append("No experimental conditions were loaded. Click 'Load images' and add at least one condition row.")
         return {}, errors
 
     ch_ids   = [c["id"] for c in channels]
-    ch_names = [_norm(c.get("name") or c["id"]) for c in channels]
+    ch_names = [_norm(c.get("name")) or _default_channel_name(i) for i, c in enumerate(channels)]
 
     general      = seg.get("general", {})
     segmentation = seg.get("segmentation", {})
@@ -59,7 +62,7 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     # Saving path é obrigatório
     output_folder = (general.get("path_to_save") or "").strip()
     if not output_folder:
-        errors.append("Saving path is required. Fill the 'Saving path' field before running.")
+        errors.append("Choose a Saving path before running. This is where forNMA will write tables, images, and logs.")
         return {}, errors
 
     # (opcional, recomendado) tentar criar a pasta se não existir
@@ -67,7 +70,7 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     try:
         os.makedirs(output_folder, exist_ok=True)
     except Exception as e:
-        errors.append(f"Cannot create/access saving path: {e}")
+        errors.append(f"Cannot create or access the Saving path '{output_folder}'. Check folder permissions or choose another location. Details: {e}")
         return {}, errors
 
     ch_nuc_id = general.get("channel_with_nuclei")
@@ -75,7 +78,7 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     if ch_nuc_id in ch_ids:
         channel_with_nuclei = ch_names[ch_ids.index(ch_nuc_id)]
     elif ch_nuc_id:
-        errors.append("Selected nuclei channel not found among current channels.")
+        errors.append("The selected Nuclear Detection channel is no longer available. Choose one of the current channels.")
 
     params = {
         # <<< chave 'global' primeiro: o run() usa isso para escolher o caminho "interface"
@@ -124,9 +127,10 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
             cond = _norm(r.get("condition", ""))
             p    = _norm(r.get(ch_id, ""))
             if not cond:
-                errors.append("Empty condition name found.")
+                errors.append("One condition row has no name. Open 'Load images' and fill the Condition column.")
             if not p:
-                errors.append(f"Missing path for channel '{ch_name}' in condition '{cond}'")
+                condition_label = cond or "unnamed condition"
+                errors.append(f"Missing image folder for channel '{ch_name}' in condition '{condition_label}'. Open 'Load images' and choose a folder for that cell.")
             cond_to_path[cond] = p
 
         ch_dict = dict(_CHANNEL_DEFAULTS)
@@ -154,8 +158,9 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
             ch_dict["foci_proeminence"] = ov.get("foci_prominence", ov.get("foci_proeminence"))
 
         # por fim, os paths
+        ch_dict["channel_name"] = ch_name
         ch_dict["paths"] = cond_to_path
-        params[f"Channel {ch_name}"] = ch_dict
+        params[f"Channel {ch_id}"] = ch_dict
 
 
     return params, errors
