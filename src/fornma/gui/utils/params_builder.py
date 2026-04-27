@@ -23,6 +23,9 @@ _CHANNEL_DEFAULTS = {
 def _norm(s):
     return (s or "").strip()
 
+def _default_channel_name(index: int) -> str:
+    return f"Channel {index + 1}"
+
 def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, list[str]]:
     """
     Constrói o dicionário no formato aceito por adjust_parameters_interface()
@@ -47,7 +50,7 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
         return {}, errors
 
     ch_ids   = [c["id"] for c in channels]
-    ch_names = [_norm(c.get("name") or c["id"]) for c in channels]
+    ch_names = [_norm(c.get("name")) or _default_channel_name(i) for i, c in enumerate(channels)]
 
     general      = seg.get("general", {})
     segmentation = seg.get("segmentation", {})
@@ -154,8 +157,9 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
             ch_dict["foci_proeminence"] = ov.get("foci_prominence", ov.get("foci_proeminence"))
 
         # por fim, os paths
+        ch_dict["channel_name"] = ch_name
         ch_dict["paths"] = cond_to_path
-        params[f"Channel {ch_name}"] = ch_dict
+        params[f"Channel {ch_id}"] = ch_dict
 
 
     return params, errors

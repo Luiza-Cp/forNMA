@@ -860,6 +860,14 @@ function previewMeta(path) {
   return { channel, condition };
 }
 
+function defaultChannelName(index) {
+  return `Channel ${index + 1}`;
+}
+
+function channelNameOrDefault(channel, index) {
+  return String(channel?.name || "").trim() || defaultChannelName(index);
+}
+
 function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSegmentation, onResetSegmentation, segJob }) {
   const resetSegForm = () => {
     const ok = window.confirm("Reset all segmentation settings to defaults?");
@@ -1035,8 +1043,8 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     const chs = imagesData.channels || [];
     const rows = imagesData.rows || [];
 
-    const chNames = chs.map((c) => (c.name || "").trim());
-    if (chNames.some((n) => !n)) errors.push("There are channels without a name.");
+    const normalizedChannels = chs.map((ch, idx) => ({ ...ch, name: channelNameOrDefault(ch, idx) }));
+    const chNames = normalizedChannels.map((c) => c.name);
     if (new Set(chNames).size !== chNames.length) errors.push("Channel names must be unique.");
 
     const conds = rows.map((r) => (r.condition || "").trim());
@@ -1044,7 +1052,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     if (new Set(conds).size !== conds.length) errors.push("Condition names must be unique.");
 
     rows.forEach((r, idx) => {
-      chs.forEach((ch) => {
+      normalizedChannels.forEach((ch) => {
         const p = (r[ch.id] || "").trim();
         if (!p) errors.push(`Row ${idx + 1} — ${ch.name}: empty path.`);
       });
@@ -1058,8 +1066,9 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     const lines = [`Image selection OK:`, `Conditions: ${rows.length} | Channels: ${chs.length}`, ""];
     rows.forEach((r) => {
       lines.push(`- ${r.condition}:`);
-      chs.forEach((ch) => lines.push(`    ${ch.name}: ${r[ch.id] || ""}`));
+      normalizedChannels.forEach((ch) => lines.push(`    ${ch.name}: ${r[ch.id] || ""}`));
     });
+    setImagesData((prev) => ({ ...prev, channels: normalizedChannels }));
     setSummaryText(lines.join("\n"));
     setModalError("");
     setModalOpen(false);
@@ -1069,9 +1078,10 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
 
   const buildSegDataPayload = () => {
     const channelsMap = {};
-    channels.forEach((ch) => {
+    channels.forEach((ch, idx) => {
       const cfg = channelCfg[ch.id] || {};
       channelsMap[ch.id] = {
+        name: channelNameOrDefault(ch, idx),
         rescale_intensity: !!cfg.rescale_intensity,
         remove_background: !!cfg.remove_background,
         rolling_ball_radius: Number(cfg.rolling_ball_radius ?? 40),
@@ -1729,8 +1739,8 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
     const chs = imagesData.channels || [];
     const rows = imagesData.rows || [];
 
-    const chNames = chs.map((c) => (c.name || "").trim());
-    if (chNames.some((n) => !n)) errors.push("There are channels without a name.");
+    const normalizedChannels = chs.map((ch, idx) => ({ ...ch, name: channelNameOrDefault(ch, idx) }));
+    const chNames = normalizedChannels.map((c) => c.name);
     if (new Set(chNames).size !== chNames.length) errors.push("Channel names must be unique.");
 
     const conds = rows.map((r) => (r.condition || "").trim());
@@ -1738,7 +1748,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
     if (new Set(conds).size !== conds.length) errors.push("Condition names must be unique.");
 
     rows.forEach((r, idx) => {
-      chs.forEach((ch) => {
+      normalizedChannels.forEach((ch) => {
         const p = (r[ch.id] || "").trim();
         if (!p) errors.push(`Row ${idx + 1} — ${ch.name}: empty path.`);
       });
@@ -1752,8 +1762,9 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
     const lines = [`Image selection OK:`, `Conditions: ${rows.length} | Channels: ${chs.length}`, ""];
     rows.forEach((r) => {
       lines.push(`- ${r.condition}:`);
-      chs.forEach((ch) => lines.push(`    ${ch.name}: ${r[ch.id] || ""}`));
+      normalizedChannels.forEach((ch) => lines.push(`    ${ch.name}: ${r[ch.id] || ""}`));
     });
+    setImagesData((prev) => ({ ...prev, channels: normalizedChannels }));
     setSummaryText(lines.join("\n"));
     setModalError("");
     setModalOpen(false);
