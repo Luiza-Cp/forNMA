@@ -54,7 +54,7 @@ const HOME_MODULE_GUIDES = [
     id: "tutorial-registration",
     title: "Image Registration Tutorial",
     intro:
-      "Use Image Registration to correct motion and align channels using one channel as the reference. It is most useful when frame-to-frame consistency matters, especially before tracking.",
+      "Use Image Registration to correct motion within one channel, or to align multiple channels using one channel as the reference. It is most useful when frame-to-frame consistency matters, especially before tracking.",
     whenToUse: [
       "Use it when the image sequence drifted during acquisition or when channels are slightly misaligned over time.",
       "It is especially important before tracking, since misaligned frames can break trajectories.",
@@ -70,7 +70,7 @@ const HOME_MODULE_GUIDES = [
       ["Save", "Checks the table and closes the window only after names and paths are valid."],
       ["Saving path", "Sets the output folder for registered images and logs."],
       ["Reference channel", "The anchor channel used to align the others."],
-      ["Other channels to correct", "The channels that will be moved to match the reference channel."],
+      ["Other channels to correct", "Optional channels that will be moved to match the reference channel. Leave this empty when registering only one channel over time."],
       ["Crop output (keep common FOV)", "Keeps only the field of view shared by all aligned images."],
       ["Run Registration", "Starts the registration process."],
       ["Stop", "Requests cancellation of the current registration job."],
@@ -1789,7 +1789,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
       <Card as="aside" className="panel seg-panel" variant="panel">
         <div className="seg-header">
           <h3>Image Registration Settings</h3>
-          <p className="hint">Set the reference channel, moving channels, and output options for registration.</p>
+          <p className="hint">Set the reference channel, optional moving channels, and output options for registration.</p>
           <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
           <div className="field-head">Saving path <Tip text="Directory where registered outputs will be saved." /></div>
           <div className="row path-row">
@@ -1814,7 +1814,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
                 <option value="">Select reference...</option>
                 {channels.map((ch) => <option key={`reg-ref-${ch.id}`} value={ch.id}>{ch.name}</option>)}
               </select>
-              <div className="field-head">Other channels to correct <Tip text="Channels that will be transformed to match the reference channel." /></div>
+              <div className="field-head">Other channels to correct <Tip text="Optional. Select any extra channels that should be transformed to match the reference channel. Leave empty to register only the reference channel over time." /></div>
               <div className="multi-picker">
                 {channels.filter((ch) => ch.id !== referenceChannel).map((ch) => (
                   <label className="checkbox" key={`reg-m-${ch.id}`}>
@@ -1832,6 +1832,9 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
                     {ch.name}
                   </label>
                 ))}
+                {channels.filter((ch) => ch.id !== referenceChannel).length === 0 && (
+                  <p className="hint">Only one channel is loaded. Registration will run on the reference channel only.</p>
+                )}
               </div>
             </div>
           </details>
@@ -4530,7 +4533,6 @@ export default function App() {
     const errs = [];
     if (!savePath) errs.push("Choose a Saving path before running registration.");
     if (!reference) errs.push("Select the reference channel that the other channels should align to.");
-    if (!moving.length) errs.push("Select at least one moving channel to correct.");
     if (!rows.length) errs.push("No image conditions are loaded. Click Load images and save the condition/channel table first.");
     rows.forEach((r, idx) => {
       [reference, ...moving].filter(Boolean).forEach((chId) => {

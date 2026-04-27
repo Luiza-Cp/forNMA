@@ -779,19 +779,17 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
 
     errs = []
     if not save_path:
-        errs.append("Please define an output path (Saving path).")
+        errs.append("Choose a Saving path before running registration.")
     if not reference:
-        errs.append("Select a reference channel.")
-    if not moving:
-        errs.append("Select at least one moving channel.")
+        errs.append("Select the reference channel to register. Extra moving channels are optional.")
     if not rows:
-        errs.append("No conditions loaded (use 'Load images').")
-    selected_ids = [reference] + list(moving or [])
+        errs.append("No image conditions are loaded. Click Load images and save the condition/channel table first.")
+    selected_ids = [ch_id for ch_id in [reference] + list(moving or []) if ch_id]
     for idx, r in enumerate(rows, start=1):
         for ch_id in selected_ids:
             p = str(r.get(ch_id) or "").strip()
             if not p:
-                errs.append(f"Row {idx}: empty path for '{id2name.get(ch_id, ch_id)}'.")
+                errs.append(f"Row {idx}, {id2name.get(ch_id, ch_id)}: choose the image folder before running registration.")
 
     if errs:
         _set_reg_job(
