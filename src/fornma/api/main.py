@@ -465,12 +465,12 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
             job_id,
             status="completed",
             progress=100,
-            message=f"Completed. {len(files)} image(s) generated.",
+            message=f"Plot generation finished successfully. {len(files)} image file(s) were saved to {output_dir}.",
             files=files,
             error=None,
         )
     except Exception as e:
-        _set_plot_job(job_id, status="failed", progress=100, error=str(e), message=f"Plot failed: {e}")
+        _set_plot_job(job_id, status="failed", progress=100, error=str(e), message=f"Plot generation failed. Details: {e}")
     finally:
         NMAClass.save_figs = original_save_figs
 
@@ -541,7 +541,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             job_id,
             status="failed",
             progress=100,
-            message="Invalid parameters.",
+            message="Segmentation could not start because the setup is incomplete.",
             error="\n".join(sorted(set(errs))),
         )
         return
@@ -584,7 +584,11 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             job_id,
             status="completed" if st == "done" else ("canceled" if st == "canceled" else st),
             progress=percent,
-            message="Finished." if st == "done" else (d.get("message") or st),
+            message=(
+                f"Segmentation finished successfully. Outputs were saved to {params['global']['output_folder']}."
+                if st == "done"
+                else (d.get("message") or st)
+            ),
             log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path"),
             preview_paths=d.get("preview_paths", []),
@@ -600,7 +604,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
                     json.dump(d, f)
         except Exception:
             pass
-        _set_seg_job(job_id, status="failed", progress=100, message=f"Segmentation failed: {e}", error=str(e))
+        _set_seg_job(job_id, status="failed", progress=100, message=f"Segmentation failed. Details: {e}", error=str(e))
     finally:
         with SEG_JOBS_LOCK:
             SEG_THREADS.pop(job_id, None)
@@ -609,7 +613,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
 @app.post("/segmentation/start", response_model=SegmentationStartResponse)
 def segmentation_start(req: SegmentationStartRequest):
     if _has_active_seg_job():
-        raise HTTPException(status_code=409, detail="A segmentation job is already running. Please wait or stop it first.")
+        raise HTTPException(status_code=409, detail="A segmentation job is already running. Wait for it to finish, or click Stop before starting another one.")
 
     job_id = str(uuid.uuid4())
     with SEG_JOBS_LOCK:
@@ -674,9 +678,9 @@ def segmentation_status(job_id: str):
         cancel_flag = bool(d.get("cancel")) if d else False
         forced_status = "canceled" if cancel_flag else "failed"
         forced_message = (
-            "Canceled."
+            "Segmentation was canceled."
             if cancel_flag
-            else (job.get("message") or "Segmentation process ended unexpectedly.")
+            else (job.get("message") or "Segmentation stopped unexpectedly before reporting completion. Check the log for the last processed image.")
         )
         _set_seg_job(
             job_id,
@@ -710,10 +714,10 @@ def segmentation_stop(job_id: str):
         raise HTTPException(status_code=404, detail="Segmentation job not found.")
     pf = job.get("progress_file")
     if not _seg_thread_alive(job_id):
-        _set_seg_job(job_id, status="canceled", message="Canceled.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_seg_job(job_id, status="canceled", message="Canceled.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
         return {"status": "canceled"}
     d = _safe_read_json(pf)
     d.update({"cancel": True, "status": d.get("status", "running")})
@@ -794,7 +798,7 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
             job_id,
             status="failed",
             progress=100,
-            message="Invalid parameters.",
+            message="Registration could not start because the setup is incomplete.",
             log="\n".join(sorted(set(errs))),
             error="\n".join(sorted(set(errs))),
         )
@@ -853,7 +857,7 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
 
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        final_line = "Registration finished."
+        final_line = f"Registration finished successfully. Registered images were saved to {save_path}."
         d.update({"status": "done", "done": total, "percent": 100, "log": final_line, "log_history": f"{hist}\n{final_line}".strip() if hist else final_line})
         with open(progress_file, "w") as f:
             json.dump(d, f)
@@ -861,7 +865,7 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
     except Exception as e:
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        err_line = f"Error: {e}"
+        err_line = f"Registration failed. Details: {e}"
         d.update({"status": "error", "log": err_line, "log_history": f"{hist}\n{err_line}".strip() if hist else err_line, "message": str(e)})
         try:
             with open(progress_file, "w") as f:
@@ -877,7 +881,7 @@ def _run_registration_job(job_id: str, images_data: dict, reg_data: dict):
 @app.post("/registration/start", response_model=RegistrationStartResponse)
 def registration_start(req: RegistrationStartRequest):
     if _has_active_reg_job():
-        raise HTTPException(status_code=409, detail="A registration job is already running. Please wait or stop it first.")
+        raise HTTPException(status_code=409, detail="A registration job is already running. Wait for it to finish, or click Stop before starting another one.")
     job_id = str(uuid.uuid4())
     with REG_JOBS_LOCK:
         REG_JOBS[job_id] = {
@@ -922,7 +926,7 @@ def registration_status(job_id: str):
             job = REG_JOBS.get(job_id)
 
     if not _reg_thread_alive(job_id) and job.get("status") in {"starting", "queued", "running", "canceling"}:
-        _set_reg_job(job_id, status="failed", message=job.get("message") or "Registration process ended unexpectedly.")
+        _set_reg_job(job_id, status="failed", message=job.get("message") or "Registration stopped unexpectedly before reporting completion. Check the log for the last processed condition.")
         with REG_JOBS_LOCK:
             job = REG_JOBS.get(job_id)
 
@@ -937,10 +941,10 @@ def registration_stop(job_id: str):
         raise HTTPException(status_code=404, detail="Registration job not found.")
     pf = job.get("progress_file")
     if not _reg_thread_alive(job_id):
-        _set_reg_job(job_id, status="canceled", message="Canceled.")
+        _set_reg_job(job_id, status="canceled", message="Registration was canceled.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_reg_job(job_id, status="canceled", message="Canceled.")
+        _set_reg_job(job_id, status="canceled", message="Registration was canceled.")
         return {"status": "canceled"}
     d = _safe_read_json(pf)
     d.update({"cancel": True, "status": d.get("status", "running")})
@@ -1012,11 +1016,11 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
 
     errs = []
     if not pkl_path or not os.path.isdir(pkl_path):
-        errs.append("Please select a valid Pickles folder.")
+        errs.append("Select a valid Pickles folder generated by the segmentation step.")
     if not actions:
-        errs.append("Select at least one action (overlay and/or profiles).")
+        errs.append("Select at least one action: overlay images, intensity profiles, or both.")
     if errs:
-        _set_foci_job(job_id, status="failed", progress=100, message="Invalid parameters.", error="\n".join(errs), log="\n".join(errs))
+        _set_foci_job(job_id, status="failed", progress=100, message="Foci overlay could not start because the setup is incomplete.", error="\n".join(errs), log="\n".join(errs))
         return
 
     os.makedirs(save_path, exist_ok=True)
@@ -1094,7 +1098,7 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
 
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        final_line = "Finished all actions."
+        final_line = f"Foci overlay finished successfully. Output files were saved to {save_path}."
         d.update({"status": "done", "percent": 100, "log": final_line, "log_history": f"{hist}\n{final_line}".strip() if hist else final_line})
         with open(progress_file, "w") as f:
             json.dump(d, f)
@@ -1102,7 +1106,7 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
     except Exception as e:
         d = _safe_read_json(progress_file)
         hist = str(d.get("log_history", "") or "")
-        err_line = f"ERROR: {e}"
+        err_line = f"Foci overlay failed. Details: {e}"
         d.update({"status": "error", "log": err_line, "message": str(e), "log_history": f"{hist}\n{err_line}".strip() if hist else err_line})
         try:
             with open(progress_file, "w") as f:
@@ -1118,7 +1122,7 @@ def _run_foci_job(job_id: str, req: FociStartRequest):
 @app.post("/foci/start", response_model=FociStartResponse)
 def foci_start(req: FociStartRequest):
     if _has_active_foci_job():
-        raise HTTPException(status_code=409, detail="A foci overlay job is already running. Please wait or stop it first.")
+        raise HTTPException(status_code=409, detail="A foci overlay job is already running. Wait for it to finish, or click Stop before starting another one.")
     job_id = str(uuid.uuid4())
     with FOCI_JOBS_LOCK:
         FOCI_JOBS[job_id] = {
@@ -1159,7 +1163,7 @@ def foci_status(job_id: str):
             job = FOCI_JOBS.get(job_id)
 
     if not _foci_thread_alive(job_id) and job.get("status") in {"starting", "queued", "running", "canceling"}:
-        _set_foci_job(job_id, status="failed", message=job.get("message") or "Foci process ended unexpectedly.")
+        _set_foci_job(job_id, status="failed", message=job.get("message") or "Foci overlay stopped unexpectedly before reporting completion. Check the log for the last completed action.")
         with FOCI_JOBS_LOCK:
             job = FOCI_JOBS.get(job_id)
 
@@ -1174,10 +1178,10 @@ def foci_stop(job_id: str):
         raise HTTPException(status_code=404, detail="Foci job not found.")
     pf = job.get("progress_file")
     if not _foci_thread_alive(job_id):
-        _set_foci_job(job_id, status="canceled", message="Canceled.")
+        _set_foci_job(job_id, status="canceled", message="Foci overlay was canceled.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_foci_job(job_id, status="canceled", message="Canceled.")
+        _set_foci_job(job_id, status="canceled", message="Foci overlay was canceled.")
         return {"status": "canceled"}
     d = _safe_read_json(pf)
     d.update({"cancel": True, "status": d.get("status", "running")})

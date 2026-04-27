@@ -1045,16 +1045,16 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
 
     const normalizedChannels = chs.map((ch, idx) => ({ ...ch, name: channelNameOrDefault(ch, idx) }));
     const chNames = normalizedChannels.map((c) => c.name);
-    if (new Set(chNames).size !== chNames.length) errors.push("Channel names must be unique.");
+    if (new Set(chNames).size !== chNames.length) errors.push("Each channel needs a unique name. Rename duplicate channel columns before saving.");
 
     const conds = rows.map((r) => (r.condition || "").trim());
-    if (conds.some((c) => !c)) errors.push("There are conditions without a name.");
-    if (new Set(conds).size !== conds.length) errors.push("Condition names must be unique.");
+    if (conds.some((c) => !c)) errors.push("Each row needs a condition name, for example Control or Treatment.");
+    if (new Set(conds).size !== conds.length) errors.push("Each condition name must be unique. Rename duplicate rows before saving.");
 
     rows.forEach((r, idx) => {
       normalizedChannels.forEach((ch) => {
         const p = (r[ch.id] || "").trim();
-        if (!p) errors.push(`Row ${idx + 1} — ${ch.name}: empty path.`);
+        if (!p) errors.push(`Row ${idx + 1}, ${ch.name}: choose the image folder for this condition/channel cell.`);
       });
     });
 
@@ -1741,16 +1741,16 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 
     const normalizedChannels = chs.map((ch, idx) => ({ ...ch, name: channelNameOrDefault(ch, idx) }));
     const chNames = normalizedChannels.map((c) => c.name);
-    if (new Set(chNames).size !== chNames.length) errors.push("Channel names must be unique.");
+    if (new Set(chNames).size !== chNames.length) errors.push("Each channel needs a unique name. Rename duplicate channel columns before saving.");
 
     const conds = rows.map((r) => (r.condition || "").trim());
-    if (conds.some((c) => !c)) errors.push("There are conditions without a name.");
-    if (new Set(conds).size !== conds.length) errors.push("Condition names must be unique.");
+    if (conds.some((c) => !c)) errors.push("Each row needs a condition name, for example Control or Treatment.");
+    if (new Set(conds).size !== conds.length) errors.push("Each condition name must be unique. Rename duplicate rows before saving.");
 
     rows.forEach((r, idx) => {
       normalizedChannels.forEach((ch) => {
         const p = (r[ch.id] || "").trim();
-        if (!p) errors.push(`Row ${idx + 1} — ${ch.name}: empty path.`);
+        if (!p) errors.push(`Row ${idx + 1}, ${ch.name}: choose the image folder for this condition/channel cell.`);
       });
     });
 
@@ -3332,9 +3332,58 @@ function buildDatasets(rows) {
     }));
 }
 
+function friendlyApiError(text, fallback = "Request failed.") {
+  const raw = String(text || "").trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.detail === "string") return parsed.detail;
+    if (Array.isArray(parsed?.detail)) {
+      return parsed.detail
+        .map((item) => {
+          const loc = Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(" > ") : "";
+          const msg = item.msg || item.message || JSON.stringify(item);
+          return loc ? `${loc}: ${msg}` : msg;
+        })
+        .join("\n");
+    }
+    if (typeof parsed?.message === "string") return parsed.message;
+    if (typeof parsed?.error === "string") return parsed.error;
+  } catch {
+    // Plain-text responses are already user-readable.
+  }
+  return raw;
+}
+
+async function errorFromResponse(res, fallback = "Request failed.") {
+  const text = await res.text();
+  return friendlyApiError(text || res.statusText, fallback);
+}
+
 function Status({ level = "info", text }) {
   if (!text) return null;
-  return <div className={`status ${level}`}>{text}</div>;
+  const labels = {
+    success: "Success",
+    error: "Needs attention",
+    warning: "Warning",
+    info: "Status",
+  };
+  const icons = {
+    success: "OK",
+    error: "!",
+    warning: "!",
+    info: "i",
+  };
+  const statusLevel = labels[level] ? level : "info";
+  return (
+    <div className={`status ${statusLevel}`} role={statusLevel === "error" ? "alert" : "status"} aria-live="polite">
+      <span className="status-icon" aria-hidden="true">{icons[statusLevel]}</span>
+      <div className="status-body">
+        <strong>{labels[statusLevel]}</strong>
+        <span>{text}</span>
+      </div>
+    </div>
+  );
 }
 
 function PlotPanel({ figure, config, onRelayout, onClick }) {
@@ -3849,8 +3898,7 @@ export default function App() {
       throw err;
     }
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || res.statusText);
+      throw new Error(await errorFromResponse(res, "API request failed."));
     }
     return res.json();
   };
@@ -4401,8 +4449,7 @@ export default function App() {
       method: "POST",
     });
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || res.statusText);
+      throw new Error(await errorFromResponse(res, "Could not open the CSV file picker."));
     }
     return res.json();
   };
@@ -4412,8 +4459,7 @@ export default function App() {
       method: "POST",
     });
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || res.statusText);
+      throw new Error(await errorFromResponse(res, "Could not open the folder picker."));
     }
     return res.json();
   };
@@ -4460,8 +4506,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/segmentation/stop/${segJob.job_id}`, { method: "POST" });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || res.statusText);
+        throw new Error(await errorFromResponse(res, "Could not stop segmentation."));
       }
       setSegJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
       setStatus("Stop requested...");
@@ -4483,14 +4528,14 @@ export default function App() {
     const reference = payload?.reg_data?.reference;
     const moving = payload?.reg_data?.moving || [];
     const errs = [];
-    if (!savePath) errs.push("Please define an output path (Saving path).");
-    if (!reference) errs.push("Select a reference channel.");
-    if (!moving.length) errs.push("Select at least one moving channel.");
-    if (!rows.length) errs.push("No conditions loaded (use Load images).");
+    if (!savePath) errs.push("Choose a Saving path before running registration.");
+    if (!reference) errs.push("Select the reference channel that the other channels should align to.");
+    if (!moving.length) errs.push("Select at least one moving channel to correct.");
+    if (!rows.length) errs.push("No image conditions are loaded. Click Load images and save the condition/channel table first.");
     rows.forEach((r, idx) => {
       [reference, ...moving].filter(Boolean).forEach((chId) => {
         if (!String(r[chId] || "").trim()) {
-          errs.push(`Row ${idx + 1}: empty path for '${idToName[chId] || chId}'.`);
+          errs.push(`Row ${idx + 1}, ${idToName[chId] || chId}: choose the image folder before running registration.`);
         }
       });
     });
@@ -4527,8 +4572,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/registration/stop/${regJob.job_id}`, { method: "POST" });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || res.statusText);
+        throw new Error(await errorFromResponse(res, "Could not stop registration."));
       }
       setRegJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
       setStatus("Registration stop requested...");
@@ -4572,8 +4616,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/foci/stop/${fociJob.job_id}`, { method: "POST" });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || res.statusText);
+        throw new Error(await errorFromResponse(res, "Could not stop foci overlay."));
       }
       setFociJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
       setStatus("Foci stop requested...");
@@ -4741,8 +4784,7 @@ export default function App() {
         body: form,
       });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || res.statusText);
+        throw new Error(await errorFromResponse(res, "Could not load the settings file."));
       }
       const data = await res.json();
 
@@ -4915,7 +4957,7 @@ export default function App() {
         const data = await res.json();
         setPlotJob((prev) => ({ ...prev, ...data }));
         if (data.status === "completed") {
-          setStatus(data.message || "Plots completed.");
+          setStatus(data.message || "Plot generation finished. Check the preview panel and output folder for the generated image files.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
           setStatus(data.error || data.message || "Plot failed.");
@@ -4966,7 +5008,7 @@ export default function App() {
           return next;
         });
         if (data.status === "completed") {
-          setStatus(data.message || "Segmentation completed.");
+          setStatus(data.message || "Segmentation finished successfully. Review the preview, log, and output folder before continuing.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
           setStatus(data.error || data.message || "Segmentation failed.");
@@ -4998,7 +5040,7 @@ export default function App() {
         const data = await res.json();
         setRegJob((prev) => ({ ...prev, ...data }));
         if (data.status === "completed") {
-          setStatus(data.message || "Registration completed.");
+          setStatus(data.message || "Registration finished successfully. Registered images were written to the selected saving path.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
           setStatus(data.error || data.message || "Registration failed.");
@@ -5029,7 +5071,7 @@ export default function App() {
         const data = await res.json();
         setFociJob((prev) => ({ ...prev, ...data }));
         if (data.status === "completed") {
-          setStatus(data.message || "Foci overlay completed.");
+          setStatus(data.message || "Foci overlay finished successfully. Output files were written to the selected saving path.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
           setStatus(data.error || data.message || "Foci overlay failed.");
@@ -6224,9 +6266,10 @@ export default function App() {
                         style={{ width: `${Math.max(0, Math.min(100, segJob.progress || 0))}%` }}
                       />
                     </div>
-                    <div className="hint">
-                      {segJob.message || "Waiting to start."}
-                    </div>
+                    <Status
+                      level={segJob.status === "completed" ? "success" : segJob.status === "failed" ? "error" : "info"}
+                      text={segJob.message || "Waiting to start."}
+                    />
                     {segJob.error && <Status level="error" text={segJob.error} />}
                     <div className="section">
                       <h4>
@@ -6608,7 +6651,10 @@ export default function App() {
                         style={{ width: `${Math.max(0, Math.min(100, fociJob.progress || 0))}%` }}
                       />
                     </div>
-                    <div className="hint">{fociJob.message || "Waiting to start."}</div>
+                    <Status
+                      level={fociJob.status === "completed" ? "success" : fociJob.status === "failed" ? "error" : "info"}
+                      text={fociJob.message || "Waiting to start."}
+                    />
                     {fociJob.error && <Status level="error" text={fociJob.error} />}
                     <div className="section">
                       <h4>Log</h4>
@@ -6793,10 +6839,10 @@ export default function App() {
                 </div>
                 {regJob.job_id ? (
                   <div className="section">
-                    <div className="status info">
-                      Registration can be slow and memory-intensive. Keep this window open and avoid running other heavy tasks.
-                      If needed, reduce the number of images/channels per run.
-                    </div>
+                    <Status
+                      level="warning"
+                      text="Registration can be slow and memory-intensive. Keep this window open and avoid running other heavy tasks. If needed, reduce the number of images/channels per run."
+                    />
                     <h3>Execution progress</h3>
                     <div className="progress-wrap">
                       <div
@@ -6804,9 +6850,10 @@ export default function App() {
                         style={{ width: `${Math.max(0, Math.min(100, regJob.progress || 0))}%` }}
                       />
                     </div>
-                    <div className="hint">
-                      {regJob.message || "Waiting to start."}
-                    </div>
+                    <Status
+                      level={regJob.status === "completed" ? "success" : regJob.status === "failed" ? "error" : "info"}
+                      text={regJob.message || "Waiting to start."}
+                    />
                     {(regJob.total || 0) > 0 && (
                       <div className="hint">{regJob.done || 0} / {regJob.total || 0} conditions</div>
                     )}
