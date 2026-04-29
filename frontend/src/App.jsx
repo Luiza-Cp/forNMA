@@ -3442,7 +3442,7 @@ function ellipseTrace(xc, yc, rx, ry, n = 256) {
     x,
     y,
     mode: "lines",
-    line: { width: 2, color: "black" },
+    line: { width: 2, color: "#3A6EA5" },
     name: "threshold",
     hoverinfo: "skip",
   };
@@ -3456,7 +3456,7 @@ function buildStep1Figure(sample, stats, graphLimits, sdNii, sdArea) {
       y: sample.y,
       mode: "markers",
       type: "scattergl",
-      marker: { size: 6, opacity: 0.65, color: "#2563eb" },
+      marker: { size: 6, opacity: 0.68, color: "#3A6EA5" },
       name: "Controls (sample)",
     });
   }
@@ -3528,9 +3528,9 @@ function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea, percen
     x: a.x,
     y: a.y,
     showarrow: false,
-    font: { size: 12, color: "#1b2a3a" },
-    bgcolor: "rgba(245, 248, 251, 0.9)",
-    bordercolor: "rgba(27, 42, 58, 0.15)",
+    font: { size: 12, color: "#1F2D3D" },
+    bgcolor: "rgba(247, 249, 252, 0.94)",
+    bordercolor: "rgba(217, 226, 236, 0.95)",
     borderwidth: 1,
     borderpad: 4,
   }));
@@ -3611,8 +3611,8 @@ function buildStep2Figure(
   sdNii,
   sdArea,
   withLabels = false,
-  verticalColor = "#12c7e5",
-  horizontalColor = "black"
+  verticalColor = "#8E7CC3",
+  horizontalColor = "#3A6EA5"
 ) {
   const data = [...(traces || [])];
   const rx = (sdNii || 1) * (stats.sd_x || 1);
@@ -6118,13 +6118,47 @@ export default function App() {
     setTrackingEditing(false);
   };
 
+  const handleResetActiveModule = () => {
+    if (activeModule === "Home") {
+      setHomeSection("about");
+    } else if (activeModule === "Image Registration") {
+      handleResetRegistrationUi();
+    } else if (activeModule === "Segmentation") {
+      handleResetSegmentationUi();
+    } else if (activeModule === "Gating") {
+      handleResetGatingUi();
+    } else if (activeModule === "Foci Overlay") {
+      handleResetFociUi();
+    } else if (activeModule === "NMA") {
+      handleResetNma();
+    } else if (activeModule === "Plot Data") {
+      handleResetPlotDataUi();
+    } else if (activeModule === "Clustering") {
+      handleResetClusteringUi();
+    } else if (activeModule === "Statistics") {
+      handleResetStatisticsUi();
+    } else if (activeModule === "Tracking") {
+      handleResetTrackingUi();
+    }
+  };
+
+  const resetActiveDisabled =
+    (activeModule === "Image Registration" && ["starting", "queued", "running", "canceling"].includes(regJob.status || "idle")) ||
+    (activeModule === "Segmentation" && ["starting", "queued", "running", "canceling"].includes(segJob.status || "idle")) ||
+    (activeModule === "Foci Overlay" && ["starting", "queued", "running", "canceling"].includes(fociJob.status || "idle")) ||
+    (activeModule === "Gating" && (gatingLoading || gatingApplying)) ||
+    (activeModule === "Plot Data" && plotDataLoading) ||
+    (activeModule === "Clustering" && (clusteringLoading || clusteringElbowLoading)) ||
+    (activeModule === "Statistics" && statsLoading) ||
+    (activeModule === "Tracking" && (trackingRunning || trackingLoadingFrame || trackingEditing));
+
   return (
     <div className="app">
       <div className="top-shell">
         <header className="topbar">
           <div className="topbar-brand">
             <div className="topbar-logo-slot" aria-hidden="true">
-              <span className="topbar-logo-mark">fN</span>
+              <span className="topbar-logo-mark">FN</span>
             </div>
             <div>
               <div className="logo">forNMA</div>
@@ -6139,19 +6173,43 @@ export default function App() {
           )}
         </header>
         <nav className="module-menu" aria-label="forNMA stages">
-          {FORNMA_STAGES.map((stage) => (
-            <Button
-              key={stage}
-              type="button"
-              className={`module-chip ${stage === activeModule ? "active" : ""}`}
-              data-state={stage === activeModule ? "active" : "inactive"}
-              onClick={() => {
-                setActiveModule(stage);
-              }}
-            >
-              <span className="module-chip-label">{stage}</span>
+          <div className="module-menu-list">
+            {FORNMA_STAGES.map((stage) => (
+              <Button
+                key={stage}
+                type="button"
+                className={`module-chip ${stage === activeModule ? "active" : ""}`}
+                data-state={stage === activeModule ? "active" : "inactive"}
+                onClick={() => {
+                  setActiveModule(stage);
+                }}
+              >
+                <span className="module-chip-label">{stage}</span>
+              </Button>
+            ))}
+          </div>
+          <div className="top-actions" aria-label="Current module actions">
+            {activeModule !== "Home" && (
+              <Button type="button" className="top-action" onClick={() => handleOpenTutorial(activeModule)}>
+                <span className="top-action-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M4 5.5c0-.83.67-1.5 1.5-1.5H10c1.1 0 2 .9 2 2v14c0-1.1-.9-2-2-2H5.5C4.67 18 4 17.33 4 16.5v-11Z" />
+                    <path d="M20 5.5c0-.83-.67-1.5-1.5-1.5H14c-1.1 0-2 .9-2 2v14c0-1.1.9-2 2-2h4.5c.83 0 1.5-.67 1.5-1.5v-11Z" />
+                  </svg>
+                </span>
+                <span>Tutorial</span>
+              </Button>
+            )}
+            <Button type="button" className="top-action" onClick={handleResetActiveModule} disabled={resetActiveDisabled}>
+              <span className="top-action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                  <path d="M20 4v5h-5" />
+                </svg>
+              </span>
+              <span>Reset</span>
             </Button>
-          ))}
+          </div>
         </nav>
       </div>
 
@@ -6578,8 +6636,8 @@ export default function App() {
                                     width: 12,
                                     height: 12,
                                     borderRadius: "50%",
-                                    background: "#ffd400",
-                                    border: "2px solid #6a4f00",
+                                    background: "#C8B6E2",
+                                    border: "2px solid #3A6EA5",
                                     pointerEvents: "none",
                                   }}
                                 />
