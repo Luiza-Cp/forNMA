@@ -142,6 +142,7 @@ const HOME_MODULE_GUIDES = [
       {
         title: "Cellpose nuclear segmentation",
         items: [
+          ["Cellpose Model", "Pretrained Cellpose model used for segmentation. For nuclear detection, try `nuclei`, `cyto3`, `cyto2`, or `cyto` depending on the image style."],
           ["Cellpose Diameter", "Expected nucleus diameter, in pixels, used by Cellpose."],
           ["Cellpose Flow Threshold", "Controls the allowed flow error in Cellpose. Objects with errors below the threshold are kept."],
           ["Cellpose Mask Threshold", "Controls which pixels are kept in Cellpose masks. Lower values tend to find more and larger masks."],
@@ -902,6 +903,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
   const [fornmaCutEdges, setFornmaCutEdges] = useState(0.7);
   const [fornmaFindLow, setFornmaFindLow] = useState(false);
   const [fornmaWeakly, setFornmaWeakly] = useState(false);
+  const [cellposeModel, setCellposeModel] = useState("nuclei");
   const [cellposeDiameter, setCellposeDiameter] = useState(25);
   const [cellposeFlow, setCellposeFlow] = useState(0.4);
   const [cellposeMask, setCellposeMask] = useState(0);
@@ -1121,6 +1123,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         weakly_labeled: !!fornmaWeakly,
       },
       cellpose: {
+        model_type: cellposeModel || "nuclei",
         diameter: showNumber(cellposeDiameter, 25),
         flow_threshold: showNumber(cellposeFlow, 0.4),
         mask_threshold: showNumber(cellposeMask, 0),
@@ -1326,6 +1329,15 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
             ) : (
               <>
                 <h4 className="seg-subtitle">Cellpose Parameters</h4>
+                <div className="field-head">Model <Tip text="Pretrained Cellpose model. If nuclei misses objects, try cyto3, cyto2, or cyto." /></div>
+                <div className="seg-threshold-wrap">
+                  <select className="input seg-threshold-input" value={cellposeModel} onChange={(e) => setCellposeModel(e.target.value)}>
+                    <option value="nuclei">nuclei</option>
+                    <option value="cyto3">cyto3</option>
+                    <option value="cyto2">cyto2</option>
+                    <option value="cyto">cyto</option>
+                  </select>
+                </div>
                 <div className="field-head">Diameter (px) <Tip text="Typical cell diameter in pixels for Cellpose scale normalization." /></div>
                 <input className="input" type="number" value={cellposeDiameter} onChange={(e) => setCellposeDiameter(e.target.value)} />
                 <div className="field-head">Flow Threshold <Tip text="Maximum flow error allowed; lower values are stricter." /></div>

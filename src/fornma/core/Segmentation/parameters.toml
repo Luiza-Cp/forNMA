@@ -60,10 +60,13 @@ weakly_labeled = false
 #parameters for running with cellpose 
 [segmentation.cellpose]   
 use_cellpose =  false
+model_type = 'nuclei'
 diameter = 25
 flow_threshold = 0.4
 mask_threshold = 0.0
 use_gpu = false
+invert = true
+cellprob_threshold = -3
 
 
 # Now let's set each channel parameter. You can add channels if needded.
@@ -162,4 +165,3 @@ foci_max_size = false
 foci_min_int = false
 foci_max_int = false
 foci_prominence =  1.2
-

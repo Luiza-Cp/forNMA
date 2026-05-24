@@ -577,6 +577,27 @@ ADVANCED_SETTINGS = dbc.AccordionItem(
                         dbc.Collapse([
                             html.H5("Cellpose Parameters", className="mt-3 mb-3"),
 
+                            dbc.Row([
+                                dbc.Col(dbc.Label("Model", id="label-cellpose-model"), width=12),
+                                dbc.Col(
+                                    dcc.Dropdown(
+                                        id={"type": "seg-field", "group": "cellpose", "name": "model_type"},
+                                        options=[
+                                            {"label": "nuclei", "value": "nuclei"},
+                                            {"label": "cyto3", "value": "cyto3"},
+                                            {"label": "cyto2", "value": "cyto2"},
+                                            {"label": "cyto", "value": "cyto"},
+                                        ],
+                                        value="nuclei",
+                                        clearable=False,
+                                    ), width=12
+                                ),
+                                dbc.Tooltip(
+                                    "Pretrained Cellpose model used for nuclear detection.",
+                                    target="label-cellpose-model", placement="right",
+                                ),
+                            ], className="mb-3"),
+
                             # Diameter
                             dbc.Row([
                                 dbc.Col(dbc.Label("Diameter (px)", id="label-diameter"), width=12),

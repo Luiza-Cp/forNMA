@@ -846,6 +846,7 @@ def create_app():
         Input({"type": "seg-flag", "group": "fornma", "name": "find_low_intensity_nucleus"}, "value"),
         Input({"type": "seg-flag", "group": "fornma", "name": "weakly_labeled"}, "value"),
         # CELLPOSE
+        Input({"type": "seg-field", "group": "cellpose", "name": "model_type"}, "value"),
         Input({"type": "seg-field", "group": "cellpose", "name": "diameter"}, "value"),
         Input({"type": "seg-field", "group": "cellpose", "name": "flow_threshold"}, "value"),
         Input({"type": "seg-field", "group": "cellpose", "name": "mask_threshold"}, "value"),
@@ -873,7 +874,7 @@ def create_app():
             magnification, pixel_size, ch_with_nuclei, overtime,
             rescale_intensity, remove_bg, rolling_radius, seg_method,
             f_th, f_off, f_blur, f_adj, f_cut, f_findlow, f_weak,
-            c_diam, c_flow, c_mask, c_cellprob, c_gpu, c_invert,
+            c_model, c_diam, c_flow, c_mask, c_cellprob, c_gpu, c_invert,
             fl_shape, fl_ecc, fl_min_sz, fl_max_sz, fl_min_r, fl_max_r,
             save_path, perch_field_vals, perch_field_ids, perch_flag_vals, perch_flag_ids
     ):
@@ -904,6 +905,7 @@ def create_app():
                 "weakly_labeled": bool(f_weak),
             },
             "cellpose": {
+                "model_type": c_model or "nuclei",
                 "diameter": c_diam,
                 "flow_threshold": c_flow,
                 "mask_threshold": c_mask,

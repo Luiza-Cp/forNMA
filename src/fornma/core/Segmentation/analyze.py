@@ -16,7 +16,7 @@ from rich.progress import track
 from .measure.Morphology import Morphology
 from .measure.Cell import Cell
 from .segmentation.find_contours import fornma_contour_finding, load_image
-from .segmentation.cellpose_integration import run_cellpose
+from .segmentation.cellpose_integration import get_cellpose_model, run_cellpose
 from .df_managing.organize import get_foci_df, split_dfs
 from fornma.core.image_io import imwrite
 
@@ -156,7 +156,7 @@ def draw_and_save(df: pd.DataFrame,
     """
 
     cols_to_draw = [f for f in list(df.columns) if ch in f
-                    and 'Y_draw' not in f and 'Image_' not in f]
+                    and 'Y_draw' not in f and 'Image_' not in f and 'Nuc_cnt_' not in f]
 
     df = df.filter(regex=ch + "|Cell|X")
     cnt_grouped = df.groupby('Image_name_' + ch)
@@ -165,7 +165,7 @@ def draw_and_save(df: pd.DataFrame,
         img = group['Image_' + ch].iloc[0]
         img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
         cnt_nuc = list(group['Nuc_cnt_' + ch])
-        img = cv.drawContours(img, cnt_nuc, -1, (98, 59, 132), 1)
+        img = _draw_contours_if_any(img, cnt_nuc, (98, 59, 132), 1)
         for i in range(len(group['Cell'])):
             img = cv.putText(img, str(int(group['Cell'].iloc[i])),
                              ((group['X'] + 5).iloc[i], group['Y_draw_' + ch].iloc[i]),
@@ -174,13 +174,11 @@ def draw_and_save(df: pd.DataFrame,
         for col in cols_to_draw:
             if 'Foci' in col:
                 foci_cnt = list(group['Foci_cnt_' + ch])
-                foci_cnt = [i for f in foci_cnt for i in f if len(f) > 0]
-                img = cv.drawContours(img, foci_cnt, -1, (122, 144, 248), 1)
+                img = _draw_contours_if_any(img, foci_cnt, (122, 144, 248), 1)
 
             else:
                 cnt = list(group[col])
-                cnt = [f[0] for f in cnt if len(f) > 0] if use_cellpose or 'Cyto' in col else cnt
-                img = cv.drawContours(img, cnt, -1, (122, 144, 248), 1)
+                img = _draw_contours_if_any(img, cnt, (122, 144, 248), 1)
 
         prog = os.environ.get("FORNMA_PROGRESS_FILE")
         imwrite(os.path.join(saving_dir, name), img)
@@ -218,6 +216,36 @@ def saving_images(df_draw: pd.DataFrame,
 from typing import Optional, Callable, List
 from pandas import DataFrame
 import os
+
+
+def _drawable_contours(values) -> List[np.ndarray]:
+    """Return OpenCV-drawable contours from dataframe contour values."""
+    contours = []
+
+    def collect(value):
+        if value is None:
+            return
+        if isinstance(value, np.ndarray):
+            cnt = np.asarray(value)
+            if cnt.ndim == 2 and cnt.shape[1] == 2 and len(cnt) > 0:
+                contours.append(np.ascontiguousarray(cnt, dtype=np.int32))
+            elif cnt.ndim == 3 and cnt.shape[1:] == (1, 2) and len(cnt) > 0:
+                contours.append(np.ascontiguousarray(cnt, dtype=np.int32))
+            return
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                collect(item)
+
+    collect(values)
+    return contours
+
+
+def _draw_contours_if_any(img: np.ndarray, contours, color, thickness: int) -> np.ndarray:
+    contours = _drawable_contours(contours)
+    if not contours:
+        return img
+    return cv.drawContours(img, contours, -1, color, thickness)
+
 
 def analyze_dict(
         subfolder_dict: dict,  # dict of every channel
@@ -258,11 +286,18 @@ def analyze_dict(
         n_imgs_used = 5 if (preview and total_images > 10) else total_images
         img_indices = list(range(n_imgs_used))
 
+    cellpose = segment_dict['use_cellpose']
+    cellpose_model = None
+    if cellpose:
+        cellpose_model = get_cellpose_model(
+            model_type=segment_dict.get('model_type', 'nuclei'),
+            use_gpu=segment_dict['use_gpu'],
+        )
+
     # se você usa rich.progress.track, mantém:
     for img_n in track(img_indices, description=f'Analyzing {subfolder_images_in} images...'):
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
 
-        cellpose = segment_dict['use_cellpose']
         if cellpose:  # calls cellpose
             contours = run_cellpose(
                 image_path=img_to_segment,
@@ -276,11 +311,16 @@ def analyze_dict(
                 max_size=segment_dict['max_size'],
                 min_radius=segment_dict['min_radius'],
                 max_radius=segment_dict['max_radius'],
+                model_type=segment_dict.get('model_type', 'nuclei'),
                 invert=segment_dict['invert'],
                 normalize=segment_dict['normalize'],
                 resample=segment_dict['resample'],
+                rescale_intensity=segment_dict['rescale_intensity'],
+                remove_bg=segment_dict['remove_bg'],
+                radius_bg=segment_dict['radius_bg'],
                 flow_threshold=segment_dict['flow_threshold'],
-                cellprob_threshold=segment_dict['cellprob_threshold']
+                cellprob_threshold=segment_dict['cellprob_threshold'],
+                model=cellpose_model,
             )
         else:  # calls forNMA pipeline
             contours = fornma_contour_finding(

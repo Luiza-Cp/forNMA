@@ -137,7 +137,8 @@ def filter_contours(
 
     if len(contours) == 0:
         return []
-    contours = hull_filter(contours, shape)
+    if shape is not None:
+        contours = hull_filter(contours, shape)
     
     if len(contours) == 0:
         return []

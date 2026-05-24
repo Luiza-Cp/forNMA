@@ -59,6 +59,7 @@ weakly_labeled = false
 #parameters for running with cellpose 
 [segmentation.cellpose]   
 use_cellpose =  false
+model_type = 'nuclei'
 diameter = 25
 flow_threshold = 0.4
 mask_threshold = 0.0
@@ -164,4 +165,3 @@ foci_max_size = false
 foci_min_int = false
 foci_max_int = false
 foci_prominence =  1.2
-

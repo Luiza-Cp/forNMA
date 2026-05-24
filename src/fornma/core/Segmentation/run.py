@@ -105,6 +105,7 @@ def adjust_parameters(parameters_dict) -> tuple[
                     'fast_detection': parameters_dict['segmentation']['forNMA']['find_low_intensity_nucleus'],
                     'weakly_labeled': parameters_dict['segmentation']['forNMA']['weakly_labeled'],
                     'use_cellpose': parameters_dict['segmentation']['cellpose']['use_cellpose'],
+                    'model_type': parameters_dict['segmentation']['cellpose'].get('model_type', 'nuclei'),
                     'invert': parameters_dict['segmentation']['cellpose']['invert'],
                     'normalize': True,
                     'diameter': parameters_dict['segmentation']['cellpose']['diameter'],
@@ -152,6 +153,7 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
                     'fast_detection': parameters_dict['fornma']['find_low_intensity_nucleus'],
                     'weakly_labeled': parameters_dict['fornma']['weakly_labeled'],
                     'use_cellpose': parameters_dict['cellpose']['use_cellpose'],
+                    'model_type': parameters_dict['cellpose'].get('model_type', 'nuclei'),
                     'invert': parameters_dict['cellpose']['invert'],
                     'normalize': True,
                     'diameter': parameters_dict['cellpose']['diameter'],
@@ -160,6 +162,7 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
                     'flow_threshold': parameters_dict['cellpose']['flow_threshold'],
                     'mask_threshold': parameters_dict['cellpose']['mask_threshold'],
                     'use_gpu': False,
+                    'cellprob_threshold': parameters_dict['cellpose'].get('cellprob_threshold', -3),
                     }
 
     return save_images, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict

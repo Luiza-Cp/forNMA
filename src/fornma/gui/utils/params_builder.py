@@ -110,6 +110,7 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
         },
         "cellpose": {
             "use_cellpose": segmentation.get("seg_method") == "cellpose",
+            "model_type": cellpose.get("model_type", "nuclei"),
             "diameter": cellpose.get("diameter", 25),
             "flow_threshold": cellpose.get("flow_threshold", 0.4),
             "mask_threshold": cellpose.get("mask_threshold", 0.0),
