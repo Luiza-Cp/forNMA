@@ -14,7 +14,10 @@ from pathlib import Path
 warnings.filterwarnings('ignore')
 import matplotlib
 
-matplotlib.use('TkAgg')
+try:
+    matplotlib.use('TkAgg')
+except ImportError:
+    matplotlib.use('Agg')
 
 CONFIG_PATH = Path(__file__).parent / "control_parameters.pickle"
 

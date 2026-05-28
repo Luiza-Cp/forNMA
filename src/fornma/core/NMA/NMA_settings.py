@@ -15,7 +15,10 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from matplotlib.widgets import Slider
 import matplotlib
-matplotlib.use('TkAgg')
+try:
+    matplotlib.use('TkAgg')
+except ImportError:
+    matplotlib.use('Agg')
 # as infos disso estção anotadas no caderno, conferir ali
 from scipy import stats
 from .NMA_draggable_line import draggable_lines

@@ -18,6 +18,8 @@ _CHANNEL_DEFAULTS = {
     "foci_min_int": False,
     "foci_max_int": False,
     "foci_proeminence": 1.2,  # nome usado no pipeline
+    "measure_nucleus": True,
+    "measure_cytoplasm": False,
 }
 
 def _norm(s):
@@ -57,6 +59,7 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     fornma       = seg.get("fornma", {})
     cellpose     = seg.get("cellpose", {})
     filters      = seg.get("filters", {})
+    cytoplasm_filters = seg.get("cytoplasm_filters", filters)
 
     # Saída e canal com núcleos (no modo interface, é NOME do canal)
     # Saving path é obrigatório
@@ -80,12 +83,31 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     elif ch_nuc_id:
         errors.append("The selected Nuclear Detection channel is no longer available. Choose one of the current channels.")
 
+    ch_cyto_id = general.get("channel_with_cytoplasm")
+    channel_with_cytoplasm = None
+    if ch_cyto_id in ch_ids:
+        channel_with_cytoplasm = ch_names[ch_ids.index(ch_cyto_id)]
+    elif ch_cyto_id:
+        errors.append("The selected Cytoplasm Detection channel is no longer available. Choose one of the current channels.")
+
+    segmentation_mode = general.get("segmentation_mode", "nucleus")
+    if segmentation_mode not in {"nucleus", "cytoplasm", "both"}:
+        errors.append("Choose a valid segmentation target: nucleus, cytoplasm, or both.")
+    if segmentation_mode in {"nucleus", "both"} and not channel_with_nuclei:
+        errors.append("Choose a Nuclear Detection channel before running.")
+    if segmentation_mode in {"cytoplasm", "both"} and not channel_with_cytoplasm:
+        errors.append("Choose a Cytoplasm Detection channel before running.")
+
+    cytoplasm_cellpose = seg.get("cytoplasm_cellpose", {})
+
     params = {
         # <<< chave 'global' primeiro: o run() usa isso para escolher o caminho "interface"
         "global": {
             "output_folder": output_folder,
+            "segmentation_mode": segmentation_mode,
             "channel_with_nuclei": channel_with_nuclei,
-            # você pode incluir "overtime" aqui quando quiser expor
+            "channel_with_cytoplasm": channel_with_cytoplasm,
+            "overtime": bool(general.get("overtime", False)),
             "magnification":  segmentation.get("magnification"),
             "pixel_size":    segmentation.get("pixel-size"),
             "rescale_intensity": bool(segmentation.get("rescale-intensity", False)),
@@ -115,9 +137,25 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
             "flow_threshold": cellpose.get("flow_threshold", 0.4),
             "mask_threshold": cellpose.get("mask_threshold", 0.0),
             "invert": bool(cellpose.get("invert", True)),
-            # o run() fixa use_gpu=False no caminho interface; manter aqui é inofensivo para futuro
             "use_gpu": bool(cellpose.get("use_gpu", False)),
             "cellprob_threshold": cellpose.get("cellprob_threshold", -3),
+        },
+        "cytoplasm_cellpose": {
+            "model_type": cytoplasm_cellpose.get("model_type", "cyto3"),
+            "diameter": cytoplasm_cellpose.get("diameter", 25),
+            "flow_threshold": cytoplasm_cellpose.get("flow_threshold", 0.4),
+            "mask_threshold": cytoplasm_cellpose.get("mask_threshold", 0.0),
+            "invert": bool(cytoplasm_cellpose.get("invert", True)),
+            "cellprob_threshold": cytoplasm_cellpose.get("cellprob_threshold", -3),
+            "rescale_intensity": bool(cytoplasm_cellpose.get("rescale_intensity", segmentation.get("rescale-intensity", False))),
+            "remove_bg": bool(cytoplasm_cellpose.get("remove_bg", segmentation.get("remove-bg", False))),
+            "radius_bg": cytoplasm_cellpose.get("radius_bg", segmentation.get("rolling-radius")),
+            "shape": cytoplasm_filters.get("shape"),
+            "eccentricity": cytoplasm_filters.get("eccentricity"),
+            "min_size": cytoplasm_filters.get("minimum_size"),
+            "max_size": cytoplasm_filters.get("maximum_size"),
+            "min_radius": cytoplasm_filters.get("minimum_radius"),
+            "max_radius": cytoplasm_filters.get("maximum_radius"),
         },
     }
 
@@ -140,12 +178,16 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
         ov = per_channel.get(ch_id, {})
 
         # básicos
+        if "measure_nucleus" in ov: ch_dict["measure_nucleus"] = bool(ov["measure_nucleus"])
+        if "measure_cytoplasm" in ov: ch_dict["measure_cytoplasm"] = bool(ov["measure_cytoplasm"])
         if "rescale_intensity" in ov: ch_dict["rescale_intensity"] = bool(ov["rescale_intensity"])
         if "remove_background" in ov: ch_dict["remove_bg"] = bool(ov["remove_background"])
         if "rolling_ball_radius" in ov: ch_dict["radius_bg"] = ov["rolling_ball_radius"]
         if "match_histograms" in ov: ch_dict["match_hist"] = bool(ov["match_histograms"])
 
         # translocation / ring
+        if "wants_ktr" in ov: ch_dict["wants_ktr"] = bool(ov["wants_ktr"])
+        if "measure_translocation" in ov: ch_dict["wants_ktr"] = bool(ov["measure_translocation"])
         if "ring_size" in ov: ch_dict["ring_size"] = ov["ring_size"]
         if "use_ellipse" in ov: ch_dict["use_ellipse"] = bool(ov["use_ellipse"])
 

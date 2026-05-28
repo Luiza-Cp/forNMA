@@ -17,7 +17,10 @@ from ..NMA.NMA_draggable_line import draggable_lines
 import matplotlib.patches as patches
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-matplotlib.use('TkAgg')
+try:
+    matplotlib.use('TkAgg')
+except ImportError:
+    matplotlib.use('Agg')
 
 
 class Graphs:
@@ -428,45 +431,46 @@ class Graphs:
         Each frame must correspond to a day"""
 
         dict_of_pd_lists = {}
-        conditions = sorted(set(list(self.subset["Condition"])))
-        if control:
+        conditions = sorted(set(list(self.subset["Condition"].dropna().astype(str))))
+        if control and control in conditions:
             conditions.remove(control)
             conditions.insert(0, control)
         if frames is None:
             frames = list(set(self.subset["Frame"]))
+        frames = sorted(dict.fromkeys([int(frame) for frame in frames]))
 
         df = self.subset[self.subset["Frame"].isin(frames)]
-        # esse função temque ser ao contrario. Tem que ser oprimeiro frame e depois condição
-        # ou tenhoq ue alterar alfo pra incluir uma contagem nos frames que não tem nada em uma dada condição
+        skipped_intervals = []
         for c in conditions:
-            df_plot = df[df["Condition"] == c]  # subsets each condition
-            num_cell = df_plot["Frame"].value_counts()  # counts number at each time
-            num_cell = list(num_cell.sort_index())
-            n_cell = [num_cell[n] for n in range(len(frames))]  # list with cell number
+            df_plot = df[df["Condition"].astype(str) == c]  # subsets each condition
+            n_cell = df_plot["Frame"].value_counts().reindex(frames, fill_value=0).astype(float).tolist()
 
-            pd_list = []
-
+            cpd_values = [0.0]
+            accumulated = 0.0
             for n in range(len(n_cell) - 1):
-                fim = math.log(n_cell[n + 1])
-                ini = math.log(n_cell[n])
-                doubling = (fim - ini) / math.log(2)
-                if n > 0:
-                    doubling = doubling + pd_list[n - 1]
-                pd_list.append(doubling)
-            pd_list.insert(0, 0)
-            dict_of_pd_lists[c] = pd_list
+                n0 = n_cell[n]
+                n1 = n_cell[n + 1]
+                if n0 <= 0 or n1 <= 0:
+                    skipped_intervals.append(f"{c}[{frames[n]}->{frames[n + 1]}]")
+                    cpd_values.append(accumulated)
+                    continue
+                accumulated += math.log(n1 / n0, 2)
+                cpd_values.append(accumulated)
+            dict_of_pd_lists[c] = cpd_values
 
         fig = plt.figure(figsize=(self.fig_width, 6))
         sns.set_theme()
         sns.set_palette('rainbow', 8)
-        x = list(range(len(frames)))
+        x = frames
         for key, value in dict_of_pd_lists.items():
             ax = sns.lineplot(y=value, x=x, marker='s', sort=False)
         plt.legend(dict_of_pd_lists.keys())
         ax.set_title("Cumulative Population Doubling")
-        plt.xlabel('Days')
+        plt.xlabel('Frame')
         plt.ylabel('CPD')
-        print (dict_of_pd_lists) # melhorar esse return aqui
+        if skipped_intervals:
+            print("CPD skipped intervals with zero counts: " + ", ".join(skipped_intervals))
+        print(dict_of_pd_lists) # melhorar esse return aqui
 
         return fig
 
@@ -485,4 +489,3 @@ class Graphs:
             print(f'Error while saving figure {title}. Check your saving path and try again.')
 
         return None
-

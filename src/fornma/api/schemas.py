@@ -122,6 +122,8 @@ class DatasetColumnsResponse(BaseModel):
     columns: List[str]
     categorical_columns: List[str] = Field(default_factory=list)
     numeric_columns: List[str] = Field(default_factory=list)
+    area_columns: List[str] = Field(default_factory=list)
+    nii_columns: List[str] = Field(default_factory=list)
 
 
 class DatasetColumnValuesRequest(BaseModel):

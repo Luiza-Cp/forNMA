@@ -7,10 +7,12 @@ Created on Fri Feb 11 15:35:41 2022
 """
 
 import numpy as np
+import cv2 as cv
 import warnings
 from cellpose import models, utils
 from typing import Optional, List
 from .find_contours import load_image
+from .filters import filter_contours
 
 CELLPOSE_MODEL_TYPES = ("nuclei", "cyto3", "cyto2", "cyto")
 _MODEL_CACHE = {}
@@ -50,9 +52,12 @@ def _valid_contours(contours: List[np.ndarray]) -> List[np.ndarray]:
     valid = []
     for cnt in contours:
         cnt = np.asarray(cnt)
-        if cnt.ndim != 2 or cnt.shape[1] != 2 or len(cnt) < 3:
+        if cnt.ndim != 2 or cnt.shape[1] != 2 or len(cnt) < 6:
             continue
-        valid.append(np.ascontiguousarray(cnt, dtype=np.int32))
+        cnt = np.ascontiguousarray(cnt, dtype=np.int32)
+        if cv.contourArea(cnt) <= 0 or cv.moments(cnt)["m00"] == 0:
+            continue
+        valid.append(cnt)
     return valid
 
 
@@ -114,16 +119,28 @@ def run_cellpose(image_path: str,
         channels=[0, 0],
         invert=invert,
         normalize=normalize,
-        resample= False,#resample,
-        flow_threshold= 0.0, #flow_threshold,
-        min_size= 5 ,#-1 if min_size is None else min_size,
-        diameter= None, #diameter,
-        cellprob_threshold= -6, # cellprob_threshold,
+        resample=resample,
+        flow_threshold=flow_threshold,
+        min_size=5,
+        diameter=diameter,
+        cellprob_threshold=cellprob_threshold,
         augment=False,
     )
 
     mask = _mask_for_outlines(masks)
     outlines_cnt = _valid_contours(utils.outlines_list(mask))
     outlines_cnt = remove_edge_cnt(outlines_cnt, image.shape)
+    outlines_cnt = filter_contours(
+        outlines_cnt,
+        mag,
+        px_s,
+        shape,
+        eccentricity,
+        min_size,
+        max_size,
+        min_radius,
+        max_radius,
+        apply_default_size_filter=False,
+    )
 
     return outlines_cnt

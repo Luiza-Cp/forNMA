@@ -2,7 +2,7 @@
 from __future__ import annotations
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+import re
 
 
 # -------------------- parsing / limpeza --------------------
@@ -18,17 +18,68 @@ def _normalize_header(cols) -> list[str]:
     return [str(c).lstrip("\ufeff").strip() for c in cols]
 
 
+_COMPARTMENT_TOKENS = {
+    "nuc", "nucleus", "nuclear", "nuclei",
+    "cyto", "cytoplasm", "cytoplasmic", "cytoplasmatic",
+}
+_MEASURE_EXCLUDE_TOKENS = {
+    "foci", "focus", "total", "mean", "median", "min", "max", "image",
+    "ring", "ellipse", "fraction", "perimeter", "ratio", "radius", "draw",
+    "fitellipse",
+}
+
+
+def _column_tokens(column: str) -> list[str]:
+    return [token for token in re.split(r"[^a-zA-Z0-9]+", str(column).casefold()) if token]
+
+
+def _is_measure_candidate(column: str, measure: str) -> bool:
+    measure = measure.casefold()
+    tokens = _column_tokens(column)
+    if measure not in tokens:
+        return False
+    other_tokens = [token for token in tokens if token != measure]
+    if any(token in _MEASURE_EXCLUDE_TOKENS for token in other_tokens):
+        return False
+    return all(token in _COMPARTMENT_TOKENS for token in other_tokens)
+
+
+def find_nma_measure_columns(cols, measure: str) -> list[str]:
+    """Return columns that can safely represent an NMA Area/NII axis."""
+    cols_norm = _normalize_header(cols)
+    exact = [c for c in cols_norm if c.casefold() == measure.casefold()]
+    compartmentalized = [
+        c for c in cols_norm
+        if c not in exact and _is_measure_candidate(c, measure)
+    ]
+    return exact + compartmentalized
+
+
 def _resolve_two_columns(raw: pd.DataFrame, a_in: str, n_in: str) -> tuple[str|None, str|None]:
-    """Resolve nomes reais das colunas de Área/NII com casefold e 'contains'."""
+    """Resolve real Area/NII columns without guessing when compartments conflict."""
     cols_norm = _normalize_header(raw.columns)
     raw.columns = cols_norm
     cmap = {c.casefold(): c for c in cols_norm}
-    a_name = cmap.get(a_in.casefold())
-    n_name = cmap.get(n_in.casefold())
-    if not a_name:
-        a_name = next((c for c in cols_norm if a_in.casefold() in c.casefold()), None)
-    if not n_name:
-        n_name = next((c for c in cols_norm if n_in.casefold() in c.casefold()), None)
+
+    def resolve(requested: str, measure: str) -> str | None:
+        requested = str(requested or "").strip()
+        if not requested:
+            return None
+        exact = cmap.get(requested.casefold())
+        if exact:
+            return exact
+        candidates = find_nma_measure_columns(cols_norm, measure)
+        if requested.casefold() == measure.casefold() and len(candidates) == 1:
+            return candidates[0]
+        requested_tokens = _column_tokens(requested)
+        matching = [
+            column for column in candidates
+            if all(token in _column_tokens(column) for token in requested_tokens)
+        ]
+        return matching[0] if len(matching) == 1 else None
+
+    a_name = resolve(a_in, "Area")
+    n_name = resolve(n_in, "NII")
     return a_name, n_name
 
 
@@ -153,6 +204,8 @@ def load_all_datasets(params: dict, sample_per_ds: int = 4000) -> tuple[pd.DataF
 
 # -------------------- gráficos --------------------
 def ellipse_trace(xc, yc, rx, ry, n=256, name="threshold"):
+    import plotly.graph_objects as go
+
     t = np.linspace(0, 2*np.pi, n)
     x = xc + rx * np.cos(t)
     y = yc + ry * np.sin(t)
@@ -204,4 +257,3 @@ def compute_axis_ranges_from_all(
     y_max = y_top * (1.0 + float(headroom))
 
     return {"x": [x_min, x_max], "y": [y_min, y_max], "xcol": xcol, "ycol": ycol}
-

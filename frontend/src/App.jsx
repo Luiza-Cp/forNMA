@@ -91,9 +91,9 @@ const HOME_MODULE_GUIDES = [
     id: "tutorial-segmentation",
     title: "Segmentation Tutorial",
     intro:
-      "Use Segmentation to detect nuclei and, if needed, measure cytoplasmic rings and foci on selected channels. This is one of the main starting points of the workflow.",
+      "Use Segmentation to detect nuclei, cytoplasm, or both compartments, and to measure selected channels against the resulting contours. Cytoplasmic rings and foci remain available as optional measurements.",
     whenToUse: [
-      "Use it to generate nuclei masks, per-cell measurements, and outputs for later steps such as gating, NMA, plotting, and tracking.",
+      "Use it to generate nuclear masks, cytoplasm masks, or both, with compartment-specific measurements for later steps such as gating, NMA, plotting, and tracking.",
       "For time-lapse experiments, enable the temporal workflow and keep a single image field per folder.",
     ],
     paramGroups: [
@@ -102,7 +102,9 @@ const HOME_MODULE_GUIDES = [
         items: [
           ["Load images", "Opens the condition × channel table used to define the full dataset structure."],
           ["Saving path", "Sets the folder where tables, previews, images, and logs will be saved."],
-          ["Nuclear Detection", "Chooses which channel will be used to find the nuclei. The nuclear contours generated here are then used for measurements in the other channels."],
+          ["Segmentation Target", "Chooses whether to segment only nuclei, only cytoplasm, or both compartments."],
+          ["Nuclear Detection", "When nuclear segmentation is selected, chooses the channel used to find nuclei."],
+          ["Cytoplasm Detection", "When cytoplasm segmentation is selected, chooses the channel used to generate whole-cell/cytoplasm masks with Cellpose."],
           ["Overtime", "Marks the dataset as a time sequence. Use this when the folders contain frames from the same field over time."],
           ["Foci", "Turns on foci detection so the software can count spot-like structures in the selected channels."],
           ["Channels for Foci", "Defines which channels should be analyzed for foci detection."],
@@ -110,31 +112,24 @@ const HOME_MODULE_GUIDES = [
           ["Channels for Cytoplasmatic Ring", "Defines which channels should be used for cytoplasmic ring measurements."],
           ["Magnification", "The microscope magnification used during image acquisition. In the original documentation, this is treated as the only mandatory segmentation value."],
           ["Pixel Size", "The real size of one pixel in micrometers."],
-          ["Segmentation Method", "Chooses which nucleus segmentation workflow will be used: the native forNMA pipeline or Cellpose."],
+          ["Nuclear Segmentation Method", "Chooses which nuclear segmentation workflow will be used: the native forNMA pipeline or Cellpose. Cytoplasm segmentation uses Cellpose."],
         ],
       },
       {
-        title: "Shared preprocessing and filters",
+        title: "Compartment preprocessing and filters",
         items: [
-          ["Rescale Intensity", "Redistributes image intensity so dim pixels move toward the lower end of the scale and bright pixels move toward the upper end. This improves contrast and is especially useful for images with strong background."],
-          ["Remove Background", "Applies rolling-ball background subtraction before segmentation."],
-          ["Rolling Ball Radius", "Defines the size of the rolling-ball background correction. It should be at least as large as the biggest structure that is not part of the background."],
-          ["Shape", "Filters nuclei by irregularity."],
-          ["Eccentricity", "Filters nuclei by how far their shape is from a circle. A circle has eccentricity 0; more elongated objects have higher eccentricity."],
-          ["Min Size", "Minimum nucleus area, in pixels, accepted by the segmentation."],
-          ["Max Size", "Maximum nucleus area, in pixels, accepted by the segmentation."],
-          ["Min Radius", "Minimum nucleus radius, in pixels, accepted by the segmentation."],
-          ["Max Radius", "Maximum nucleus radius, in pixels, accepted by the segmentation."],
+          ["Nuclear / Cytoplasm Segmentation panels", "Each compartment has its own preprocessing and advanced-filter settings. Changing cytoplasm settings does not change nuclear segmentation settings."],
+          ["Rescale Intensity", "Redistributes image intensity before segmentation of that compartment and can improve contrast."],
+          ["Remove Background", "Applies rolling-ball background subtraction before segmentation of that compartment."],
+          ["Rolling Ball Radius", "Defines the size of the rolling-ball background correction for that compartment."],
+          ["Shape and Eccentricity", "Optionally filter masks by irregularity or elongation."],
+          ["Min / Max Size and Radius", "Optionally restrict the size of accepted nuclear or cytoplasm masks."],
         ],
       },
       {
         title: "forNMA nuclear segmentation",
         items: [
           ["Threshold", "Defines how the software separates nucleus from background in the native forNMA workflow. Global and local threshold options are available."],
-          ["Offset", "Used with local thresholds. It is a constant subtracted from the neighborhood-based threshold calculation."],
-          ["Smooth", "Blurs the nuclear mask to make the final contours smoother."],
-          ["Adjust size", "Moves the contour edge inward or outward. Positive values enlarge the contour; negative values shrink it."],
-          ["Cut edges", "Helps split touching nuclei when watershed segmentation was not able to separate them correctly. Higher values make the cut more restrictive."],
           ["Weakly labeled images", "Activates extra routines for images where nuclear staining is weak and the nuclear boundary is hard to identify."],
           ["Find low-intensity nuclei", "Runs an extra search step to detect nuclei that may have been missed in low-intensity regions."],
         ],
@@ -145,15 +140,26 @@ const HOME_MODULE_GUIDES = [
           ["Cellpose Model", "Pretrained Cellpose model used for segmentation. For nuclear detection, try `nuclei`, `cyto3`, `cyto2`, or `cyto` depending on the image style."],
           ["Cellpose Diameter", "Expected nucleus diameter, in pixels, used by Cellpose."],
           ["Cellpose Flow Threshold", "Controls the allowed flow error in Cellpose. Objects with errors below the threshold are kept."],
-          ["Cellpose Mask Threshold", "Controls which pixels are kept in Cellpose masks. Lower values tend to find more and larger masks."],
           ["Cellprob Threshold", "Controls the minimum cell probability accepted by Cellpose."],
           ["Use GPU", "Allows Cellpose to run on GPU when one is available."],
           ["Invert Intensities", "Inverts the image intensity before Cellpose segmentation when needed."],
         ],
       },
       {
+        title: "Cellpose cytoplasm segmentation",
+        items: [
+          ["Model", "Pretrained Cellpose model used to create cytoplasm/whole-cell masks. For cells imaged in visible light or brightfield, start with `cyto3`."],
+          ["Visible-light / brightfield suggestion", "For visible-light or brightfield cells, we recommend starting with model `cyto3`, increasing Flow Threshold to `0.6`-`0.8`, and reducing Cellprob Threshold to `-3` or `-4`."],
+          ["Diameter", "Expected whole-cell diameter, in pixels, used by Cellpose."],
+          ["Flow Threshold", "Controls the allowed flow error. Increasing it to `0.6`-`0.8` can help retain valid masks in visible-light cell images."],
+          ["Cellprob Threshold", "Controls the minimum cell probability. Lower values such as `-3` or `-4` may help recover visible-light cell masks."],
+          ["Invert Intensities", "Inverts image intensity before Cellpose segmentation when needed."],
+        ],
+      },
+      {
         title: "Per-channel detection and measurements",
         items: [
+          ["Measure nucleus / Measure cytoplasm", "When both masks are generated, chooses whether each channel is measured inside nuclear contours, cytoplasm contours, or both. Channels measured in both compartments are processed independently."],
           ["Per-channel Rescale intensity", "Applies intensity redistribution independently to one measurement channel."],
           ["Per-channel Remove background", "Applies rolling-ball background correction independently to one measurement channel."],
           ["Per-channel Rolling-ball radius", "Defines the rolling-ball radius for that specific measurement channel."],
@@ -193,7 +199,7 @@ const HOME_MODULE_GUIDES = [
       },
       {
         title: "Nuclei Results CSV",
-        description: "This is the main per-nucleus results table. Column names are based on the channel names defined by the user.",
+        description: "This is the per-nucleus results table. For a run that includes cytoplasm segmentation, nuclear measurements are saved separately from cytoplasm measurements.",
         items: [
           "Whenever you see `ChannelName` in a column description, it means the actual channel name you entered in Load images. These columns are created once for each channel. For example, if you define the channels as `Red` and `Green`, columns such as `Mean_ChannelName` will appear in the table as `Mean_Red` and `Mean_Green`.",
           "Frame, Cell, X, Y: identify the image frame, nucleus number, and centroid position.",
@@ -209,6 +215,23 @@ const HOME_MODULE_GUIDES = [
           "Mean_Ellipse/Nucleus, Median_Ellipse/Nucleus, Mean_Nucleus/Ellipse, Median_Nucleus/Ellipse: ratios between elliptical ring and nuclear intensities.",
           "Total_foci_ChannelName, Total_foci_area_ChannelName, Total_foci_mean_ChannelName, Foci_area_fraction_ChannelName: summary foci measurements per nucleus when foci detection is enabled.",
           "Condition and Overtime: identify the user-defined condition and whether the dataset belongs to a time series.",
+        ],
+      },
+      {
+        title: "Cytoplasm Results CSV",
+        description: "When cytoplasm segmentation is selected, this table stores measurements made with cytoplasm contours.",
+        items: [
+          "Cytoplasmic measurements are kept in their own table so they do not replace or mix with per-nucleus results.",
+          "When both compartments are measured, channel-derived columns are identified with the appropriate compartment suffix, such as `_nuc` or `_cyto`.",
+        ],
+      },
+      {
+        title: "Nuclei Cytoplasm Mapping CSV",
+        description: "When both nucleus and cytoplasm segmentation are selected, this relationship table links objects without duplicating their measurements.",
+        items: [
+          "Nucleus_ID and Cytoplasm_ID refer to the `Cell` identifiers in the corresponding results tables for the same condition and frame.",
+          "Pair_status identifies matched objects, multinucleated cytoplasms, ambiguous assignments, nuclei without cytoplasm, and cytoplasms without a nucleus.",
+          "N_nuclei_in_cytoplasm and N_cytoplasms_for_nucleus make multiple or ambiguous relationships explicit before downstream analysis.",
         ],
       },
       {
@@ -315,9 +338,9 @@ const HOME_MODULE_GUIDES = [
     id: "tutorial-nma",
     title: "NMA Tutorial",
     intro:
-      "NMA compares cell populations using nuclear area and nuclear irregularity index (NII). The workflow combines dataset setup, control-based threshold definition, and final plotting.",
+      "NMA compares cell populations using a selected Area column and a selected irregularity index (NII) column. The workflow combines dataset setup, control-based threshold definition, and final plotting.",
     whenToUse: [
-      "Use it when you want to compare nuclear morphometric phenotypes across conditions.",
+      "Use it when you want to compare morphometric phenotypes across conditions using nuclear or cytoplasm measurements.",
       "When creating new NMA settings, at least one dataset must be marked as Control.",
     ],
     params: [
@@ -325,7 +348,7 @@ const HOME_MODULE_GUIDES = [
       ["Dataset name", "The label used in the interface and in plots."],
       ["Control", "Marks the reference population used to create NMA settings."],
       ["CSV path", "Path to the dataset file."],
-      ["Area column / NII column", "Select the columns used to define the morphometric space."],
+      ["Area column / NII column", "Select the columns used to define the morphometric space. If both nuclear and cytoplasm candidates exist, choose explicitly; if only one compatible column exists, the interface selects it automatically."],
       ["Create NMA settings / Load settings", "Create new thresholds from control data or load an existing configuration."],
       ["Standard Deviations from Area / NII", "Set the ellipse spread around the control population in Step 1."],
       ["Auto (DBSCAN)", "Attempts to detect the core control cluster automatically."],
@@ -889,6 +912,8 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
   const [fociChannels, setFociChannels] = useState([]);
   const [cytoEnabled, setCytoEnabled] = useState(false);
   const [cytoChannels, setCytoChannels] = useState([]);
+  const [segmentationTarget, setSegmentationTarget] = useState("nucleus");
+  const [cytoplasmChannel, setCytoplasmChannel] = useState("ch1");
   const [segMethod, setSegMethod] = useState("fornma");
   const [overtime, setOvertime] = useState(false);
   const [magnification, setMagnification] = useState(20);
@@ -906,10 +931,17 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
   const [cellposeModel, setCellposeModel] = useState("nuclei");
   const [cellposeDiameter, setCellposeDiameter] = useState(25);
   const [cellposeFlow, setCellposeFlow] = useState(0.4);
-  const [cellposeMask, setCellposeMask] = useState(0);
   const [cellposeCellprob, setCellposeCellprob] = useState(-3);
   const [cellposeUseGpu, setCellposeUseGpu] = useState(true);
   const [cellposeInvert, setCellposeInvert] = useState(true);
+  const [cytoCellposeModel, setCytoCellposeModel] = useState("cyto3");
+  const [cytoCellposeDiameter, setCytoCellposeDiameter] = useState(25);
+  const [cytoCellposeFlow, setCytoCellposeFlow] = useState(0.4);
+  const [cytoCellposeCellprob, setCytoCellposeCellprob] = useState(-3);
+  const [cytoCellposeInvert, setCytoCellposeInvert] = useState(true);
+  const [cytoRescaleIntensity, setCytoRescaleIntensity] = useState(false);
+  const [cytoRemoveBackground, setCytoRemoveBackground] = useState(false);
+  const [cytoRollingRadius, setCytoRollingRadius] = useState(50);
   const [advEnable, setAdvEnable] = useState({
     shape: true,
     eccentricity: false,
@@ -926,6 +958,22 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     min_radius: 4,
     max_radius: 120,
   });
+  const [cytoAdvEnable, setCytoAdvEnable] = useState({
+    shape: false,
+    eccentricity: false,
+    min_size: false,
+    max_size: false,
+    min_radius: false,
+    max_radius: false,
+  });
+  const [cytoAdvValues, setCytoAdvValues] = useState({
+    shape: 0.88,
+    eccentricity: 0.8,
+    min_size: 100,
+    max_size: 10000,
+    min_radius: 4,
+    max_radius: 120,
+  });
   const [channelCfg, setChannelCfg] = useState({});
   const channels = imagesData.channels || [];
   const channelIds = new Set(channels.map((c) => c.id));
@@ -934,6 +982,9 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     if (channels.length === 0) return;
     if (!channelIds.has(nuclearChannel)) {
       setNuclearChannel(channels[0].id);
+    }
+    if (!channelIds.has(cytoplasmChannel)) {
+      setCytoplasmChannel(channels[0].id);
     }
     setFociChannels((prev) => prev.filter((id) => channelIds.has(id)));
     setCytoChannels((prev) => prev.filter((id) => channelIds.has(id)));
@@ -959,6 +1010,8 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
           foci_max_int_enable: false,
           foci_max_int: 1,
           foci_prominence: 1.2,
+          measure_nucleus: true,
+          measure_cytoplasm: false,
         };
       });
       Object.keys(next).forEach((k) => {
@@ -970,6 +1023,8 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
 
   const setAdvToggle = (key, value) => setAdvEnable((prev) => ({ ...prev, [key]: value }));
   const setAdvValue = (key, value) => setAdvValues((prev) => ({ ...prev, [key]: value }));
+  const setCytoAdvToggle = (key, value) => setCytoAdvEnable((prev) => ({ ...prev, [key]: value }));
+  const setCytoAdvValue = (key, value) => setCytoAdvValues((prev) => ({ ...prev, [key]: value }));
   const setChCfg = (chId, patch) => {
     setChannelCfg((prev) => ({ ...prev, [chId]: { ...(prev[chId] || {}), ...patch } }));
   };
@@ -1088,6 +1143,9 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         remove_background: !!cfg.remove_background,
         rolling_ball_radius: Number(cfg.rolling_ball_radius ?? 40),
         match_histograms: !!cfg.match_histograms,
+        measure_nucleus: segmentationTarget !== "cytoplasm" && !!cfg.measure_nucleus,
+        measure_cytoplasm: segmentationTarget === "cytoplasm" ? true : (segmentationTarget === "both" && !!cfg.measure_cytoplasm),
+        wants_ktr: cytoEnabled && cytoChannels.includes(ch.id),
         ring_size: showNumber(cfg.ring_size, 3),
         use_ellipse: !!cfg.use_ellipse,
         wants_foci: fociEnabled && fociChannels.includes(ch.id),
@@ -1102,7 +1160,9 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     return {
       general: {
         path_to_save: savePath,
+        segmentation_mode: segmentationTarget,
         channel_with_nuclei: nuclearChannel || null,
+        channel_with_cytoplasm: cytoplasmChannel || null,
         overtime: !!overtime,
       },
       segmentation: {
@@ -1126,10 +1186,19 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         model_type: cellposeModel || "nuclei",
         diameter: showNumber(cellposeDiameter, 25),
         flow_threshold: showNumber(cellposeFlow, 0.4),
-        mask_threshold: showNumber(cellposeMask, 0),
         cellprob_threshold: showNumber(cellposeCellprob, -3),
         use_gpu: !!cellposeUseGpu,
         invert: !!cellposeInvert,
+      },
+      cytoplasm_cellpose: {
+        model_type: cytoCellposeModel || "cyto3",
+        diameter: showNumber(cytoCellposeDiameter, 25),
+        flow_threshold: showNumber(cytoCellposeFlow, 0.4),
+        cellprob_threshold: showNumber(cytoCellposeCellprob, -3),
+        invert: !!cytoCellposeInvert,
+        rescale_intensity: !!cytoRescaleIntensity,
+        remove_bg: !!cytoRemoveBackground,
+        radius_bg: showNumber(cytoRollingRadius, 50),
       },
       filters: {
         shape: advEnable.shape ? showNumber(advValues.shape, 0.88) : null,
@@ -1138,6 +1207,14 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         maximum_size: advEnable.max_size ? showNumber(advValues.max_size, 10000) : null,
         minimum_radius: advEnable.min_radius ? showNumber(advValues.min_radius, 4) : null,
         maximum_radius: advEnable.max_radius ? showNumber(advValues.max_radius, 120) : null,
+      },
+      cytoplasm_filters: {
+        shape: cytoAdvEnable.shape ? showNumber(cytoAdvValues.shape, 0.88) : null,
+        eccentricity: cytoAdvEnable.eccentricity ? showNumber(cytoAdvValues.eccentricity, 0.8) : null,
+        minimum_size: cytoAdvEnable.min_size ? showNumber(cytoAdvValues.min_size, 100) : null,
+        maximum_size: cytoAdvEnable.max_size ? showNumber(cytoAdvValues.max_size, 10000) : null,
+        minimum_radius: cytoAdvEnable.min_radius ? showNumber(cytoAdvValues.min_radius, 4) : null,
+        maximum_radius: cytoAdvEnable.max_radius ? showNumber(cytoAdvValues.max_radius, 120) : null,
       },
       channels: channelsMap,
     };
@@ -1163,6 +1240,8 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     segJob?.status === "running" ||
     segJob?.status === "queued" ||
     segJob?.status === "canceling";
+  const segCanceling = segJob?.status === "canceling";
+  const segCanceled = segJob?.status === "canceled";
 
   return (
     <>
@@ -1202,11 +1281,30 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         <details open className="seg-section">
           <summary>General Settings</summary>
           <div className="seg-body">
-            <div className="field-head">Nuclear Detection <Tip text="Pick the channel that contains nuclei for detection." /></div>
-            <select className="input" value={nuclearChannel} onChange={(e) => setNuclearChannel(e.target.value)}>
-              <option value="">Select one channel...</option>
-              {channels.map((ch) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
-            </select>
+            <div className="field-head">Segmentation Target <Tip text="Choose whether to segment nuclei, cytoplasm, or both compartments." /></div>
+            <div className="row">
+              <label className="radio"><input type="radio" checked={segmentationTarget === "nucleus"} onChange={() => setSegmentationTarget("nucleus")} /> Nucleus</label>
+              <label className="radio"><input type="radio" checked={segmentationTarget === "cytoplasm"} onChange={() => setSegmentationTarget("cytoplasm")} /> Cytoplasm</label>
+              <label className="radio"><input type="radio" checked={segmentationTarget === "both"} onChange={() => setSegmentationTarget("both")} /> Both</label>
+            </div>
+            {segmentationTarget !== "cytoplasm" && (
+              <>
+                <div className="field-head">Nuclear Detection <Tip text="Pick the channel that contains nuclei for detection." /></div>
+                <select className="input" value={nuclearChannel} onChange={(e) => setNuclearChannel(e.target.value)}>
+                  <option value="">Select one channel...</option>
+                  {channels.map((ch) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
+                </select>
+              </>
+            )}
+            {segmentationTarget !== "nucleus" && (
+              <>
+                <div className="field-head">Cytoplasm Detection <Tip text="Pick the channel used to generate cytoplasm masks with Cellpose. For cells imaged in visible light or brightfield, start with model cyto3, Flow Threshold 0.6-0.8, and Cellprob Threshold -3 or -4." /></div>
+                <select className="input" value={cytoplasmChannel} onChange={(e) => setCytoplasmChannel(e.target.value)}>
+                  <option value="">Select one channel...</option>
+                  {channels.map((ch) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
+                </select>
+              </>
+            )}
             <label className="checkbox">
               <input type="checkbox" checked={overtime} onChange={(e) => setOvertime(e.target.checked)} />
               Overtime <Tip text="Check this if images represent time sequence." />
@@ -1285,118 +1383,194 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                 <input type="number" className="input" value={pixelSize} onChange={(e) => setPixelSize(e.target.value)} step="0.1" />
               </div>
             </div>
-            <label className="checkbox">
-              <input type="checkbox" checked={rescaleIntensity} onChange={(e) => setRescaleIntensity(e.target.checked)} />
-              Rescale Intensity <Tip text="Normalize intensity values to improve contrast for segmentation." />
-            </label>
-            <label className="checkbox">
-              <input type="checkbox" checked={removeBackground} onChange={(e) => setRemoveBackground(e.target.checked)} />
-              Remove Background <Tip text="Subtract smooth background before segmentation." />
-            </label>
-            <div className="field-head">Segmentation Method <Tip text="Choose forNMA (faster) or Cellpose (more robust) pipeline." /></div>
-            <div className="row">
-              <label className="radio"><input type="radio" checked={segMethod === "fornma"} onChange={() => setSegMethod("fornma")} /> forNMA</label>
-              <label className="radio"><input type="radio" checked={segMethod === "cellpose"} onChange={() => setSegMethod("cellpose")} /> Cellpose</label>
-            </div>
-            {segMethod === "fornma" ? (
-              <>
-                <h4 className="seg-subtitle">forNMA Parameters</h4>
-                <div className="field-head">Threshold <Tip text="Threshold strategy used to separate nuclei from background." /></div>
-                <div className="seg-threshold-wrap">
-                <select className="input seg-threshold-input" value={fornmaThreshold} onChange={(e) => setFornmaThreshold(e.target.value)}>
-                  <option value="isodata">Isodata</option>
-                  <option value="li">Li</option>
-                  <option value="mean">Mean</option>
-                  <option value="minimum">Minimum</option>
-                  <option value="median">Median</option>
-                  <option value="multi_otsu">Multi-Otsu</option>
-                  <option value="otsu">Otsu</option>
-                  <option value="triangle">Triangle</option>
-                  <option value="yen">Yen</option>
-                  <option value="local_mean">Local Mean</option>
-                  <option value="local_gaussian">Local Gaussian</option>
-                </select>
+            {segmentationTarget !== "cytoplasm" && (
+              <details open className="seg-compartment seg-compartment-nuc">
+                <summary>Nuclear Segmentation</summary>
+                <div className="seg-compartment-body">
+                <label className="checkbox">
+                  <input type="checkbox" checked={rescaleIntensity} onChange={(e) => setRescaleIntensity(e.target.checked)} />
+                  Rescale Intensity <Tip text="Normalize intensity values before nuclear segmentation." />
+                </label>
+                <label className="checkbox">
+                  <input type="checkbox" checked={removeBackground} onChange={(e) => setRemoveBackground(e.target.checked)} />
+                  Remove Background <Tip text="Subtract smooth background before nuclear segmentation." />
+                </label>
+                {removeBackground && (
+                  <>
+                    <div className="field-head">Rolling Radius (px) <Tip text="Radius used for background removal before nuclear segmentation." /></div>
+                    <input className="input" type="number" value={rollingRadius} onChange={(e) => setRollingRadius(e.target.value)} />
+                  </>
+                )}
+                <div className="field-head">Segmentation Method <Tip text="Choose forNMA (faster) or Cellpose (more robust) pipeline." /></div>
+                <div className="row">
+                  <label className="radio"><input type="radio" checked={segMethod === "fornma"} onChange={() => setSegMethod("fornma")} /> forNMA</label>
+                  <label className="radio"><input type="radio" checked={segMethod === "cellpose"} onChange={() => setSegMethod("cellpose")} /> Cellpose</label>
                 </div>
+                {segMethod === "fornma" ? (
+                  <>
+                    <h4 className="seg-subtitle">forNMA Parameters</h4>
+                    <div className="field-head">Threshold <Tip text="Threshold strategy used to separate nuclei from background." /></div>
+                    <div className="seg-threshold-wrap">
+                    <select className="input seg-threshold-input" value={fornmaThreshold} onChange={(e) => setFornmaThreshold(e.target.value)}>
+                      <option value="isodata">Isodata</option>
+                      <option value="li">Li</option>
+                      <option value="mean">Mean</option>
+                      <option value="minimum">Minimum</option>
+                      <option value="median">Median</option>
+                      <option value="multi_otsu">Multi-Otsu</option>
+                      <option value="otsu">Otsu</option>
+                      <option value="triangle">Triangle</option>
+                      <option value="yen">Yen</option>
+                      <option value="local_mean">Local Mean</option>
+                      <option value="local_gaussian">Local Gaussian</option>
+                    </select>
+                    </div>
+                    <label className="checkbox">
+                      <input type="checkbox" checked={fornmaFindLow} onChange={(e) => setFornmaFindLow(e.target.checked)} />
+                      Find low-intensity nuclei <Tip text="Extra pass to recover missed nuclei in low-intensity regions." />
+                    </label>
+                    <label className="checkbox">
+                      <input type="checkbox" checked={fornmaWeakly} onChange={(e) => setFornmaWeakly(e.target.checked)} />
+                      Weakly labeled images <Tip text="Enable additional handling for weak staining/unclear contours." />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="seg-subtitle">Nuclear Cellpose Parameters</h4>
+                    <div className="field-head">Model <Tip text="Pretrained Cellpose model. If nuclei misses objects, try cyto3, cyto2, or cyto." /></div>
+                    <div className="seg-threshold-wrap">
+                      <select className="input seg-threshold-input" value={cellposeModel} onChange={(e) => setCellposeModel(e.target.value)}>
+                        <option value="nuclei">nuclei</option>
+                        <option value="cyto3">cyto3</option>
+                        <option value="cyto2">cyto2</option>
+                        <option value="cyto">cyto</option>
+                      </select>
+                    </div>
+                    <div className="field-head">Diameter (px) <Tip text="Typical cell diameter in pixels for Cellpose scale normalization." /></div>
+                    <input className="input" type="number" value={cellposeDiameter} onChange={(e) => setCellposeDiameter(e.target.value)} />
+                    <div className="field-head">Flow Threshold <Tip text="Maximum flow error allowed; lower values are stricter." /></div>
+                    <input className="input" type="number" value={cellposeFlow} onChange={(e) => setCellposeFlow(e.target.value)} step="0.05" />
+                    <div className="field-head">Cellprob Threshold <Tip text="Cell probability threshold; lower values include more cells." /></div>
+                    <input className="input" type="number" value={cellposeCellprob} onChange={(e) => setCellposeCellprob(e.target.value)} step="0.5" />
+                    <label className="checkbox">
+                      <input type="checkbox" checked={cellposeUseGpu} onChange={(e) => setCellposeUseGpu(e.target.checked)} />
+                      Use GPU <Tip text="Enable GPU acceleration if available." />
+                    </label>
+                    <label className="checkbox">
+                      <input type="checkbox" checked={cellposeInvert} onChange={(e) => setCellposeInvert(e.target.checked)} />
+                      Invert Intensities <Tip text="Invert image values before segmentation when needed." />
+                    </label>
+                  </>
+                )}
+                <h4 className="seg-subtitle">Advanced Filters</h4>
                 <label className="checkbox">
-                  <input type="checkbox" checked={fornmaFindLow} onChange={(e) => setFornmaFindLow(e.target.checked)} />
-                  Find low-intensity nuclei <Tip text="Extra pass to recover missed nuclei in low-intensity regions." />
+                  <input type="checkbox" checked={advEnable.shape} onChange={(e) => setAdvToggle("shape", e.target.checked)} />
+                  Shape <Tip text="Filter nuclear masks by irregularity/shape metric." />
+                </label>
+                {advEnable.shape && <input className="input" type="number" step="0.01" value={advValues.shape} onChange={(e) => setAdvValue("shape", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={advEnable.eccentricity} onChange={(e) => setAdvToggle("eccentricity", e.target.checked)} />
+                  Eccentricity <Tip text="Filter nuclear masks by elongation." />
+                </label>
+                {advEnable.eccentricity && <input className="input" type="number" step="0.01" value={advValues.eccentricity} onChange={(e) => setAdvValue("eccentricity", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={advEnable.min_size} onChange={(e) => setAdvToggle("min_size", e.target.checked)} />
+                  Min Size <Tip text="Minimum nuclear mask area." />
+                </label>
+                {advEnable.min_size && <input className="input" type="number" step="1" value={advValues.min_size} onChange={(e) => setAdvValue("min_size", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={advEnable.max_size} onChange={(e) => setAdvToggle("max_size", e.target.checked)} />
+                  Max Size <Tip text="Maximum nuclear mask area." />
+                </label>
+                {advEnable.max_size && <input className="input" type="number" step="1" value={advValues.max_size} onChange={(e) => setAdvValue("max_size", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={advEnable.min_radius} onChange={(e) => setAdvToggle("min_radius", e.target.checked)} />
+                  Min Radius <Tip text="Minimum nuclear mask radius." />
+                </label>
+                {advEnable.min_radius && <input className="input" type="number" step="1" value={advValues.min_radius} onChange={(e) => setAdvValue("min_radius", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={advEnable.max_radius} onChange={(e) => setAdvToggle("max_radius", e.target.checked)} />
+                  Max Radius <Tip text="Maximum nuclear mask radius." />
+                </label>
+                {advEnable.max_radius && <input className="input" type="number" step="1" value={advValues.max_radius} onChange={(e) => setAdvValue("max_radius", e.target.value)} />}
+                </div>
+              </details>
+            )}
+            {segmentationTarget !== "nucleus" && (
+              <details open className="seg-compartment seg-compartment-cyto">
+                <summary>Cytoplasm Segmentation</summary>
+                <div className="seg-compartment-body">
+                <label className="checkbox">
+                  <input type="checkbox" checked={cytoRescaleIntensity} onChange={(e) => setCytoRescaleIntensity(e.target.checked)} />
+                  Rescale Intensity <Tip text="Normalize intensity values before cytoplasm segmentation." />
                 </label>
                 <label className="checkbox">
-                  <input type="checkbox" checked={fornmaWeakly} onChange={(e) => setFornmaWeakly(e.target.checked)} />
-                  Weakly labeled images <Tip text="Enable additional handling for weak staining/unclear contours." />
+                  <input type="checkbox" checked={cytoRemoveBackground} onChange={(e) => setCytoRemoveBackground(e.target.checked)} />
+                  Remove Background <Tip text="Subtract smooth background before cytoplasm segmentation." />
                 </label>
-              </>
-            ) : (
-              <>
-                <h4 className="seg-subtitle">Cellpose Parameters</h4>
-                <div className="field-head">Model <Tip text="Pretrained Cellpose model. If nuclei misses objects, try cyto3, cyto2, or cyto." /></div>
+                {cytoRemoveBackground && (
+                  <>
+                    <div className="field-head">Rolling Radius (px) <Tip text="Radius used for background removal before cytoplasm segmentation." /></div>
+                    <input className="input" type="number" value={cytoRollingRadius} onChange={(e) => setCytoRollingRadius(e.target.value)} />
+                  </>
+                )}
+                <div className="field-head">Model <Tip text="Pretrained Cellpose model used for cytoplasm segmentation. For visible-light or brightfield cells, start with cyto3." /></div>
                 <div className="seg-threshold-wrap">
-                  <select className="input seg-threshold-input" value={cellposeModel} onChange={(e) => setCellposeModel(e.target.value)}>
-                    <option value="nuclei">nuclei</option>
+                  <select className="input seg-threshold-input" value={cytoCellposeModel} onChange={(e) => setCytoCellposeModel(e.target.value)}>
                     <option value="cyto3">cyto3</option>
                     <option value="cyto2">cyto2</option>
                     <option value="cyto">cyto</option>
+                    <option value="nuclei">nuclei</option>
                   </select>
                 </div>
-                <div className="field-head">Diameter (px) <Tip text="Typical cell diameter in pixels for Cellpose scale normalization." /></div>
-                <input className="input" type="number" value={cellposeDiameter} onChange={(e) => setCellposeDiameter(e.target.value)} />
-                <div className="field-head">Flow Threshold <Tip text="Maximum flow error allowed; lower values are stricter." /></div>
-                <input className="input" type="number" value={cellposeFlow} onChange={(e) => setCellposeFlow(e.target.value)} step="0.05" />
-                <div className="field-head">Mask Threshold <Tip text="Threshold for mask inclusion from probability maps." /></div>
-                <input className="input" type="number" value={cellposeMask} onChange={(e) => setCellposeMask(e.target.value)} step="0.5" />
-                <div className="field-head">Cellprob Threshold <Tip text="Cell probability threshold; lower values include more cells." /></div>
-                <input className="input" type="number" value={cellposeCellprob} onChange={(e) => setCellposeCellprob(e.target.value)} step="0.5" />
+                <div className="field-head">Diameter (px) <Tip text="Typical cytoplasm/cell diameter in pixels for Cellpose scale normalization." /></div>
+                <input className="input" type="number" value={cytoCellposeDiameter} onChange={(e) => setCytoCellposeDiameter(e.target.value)} />
+                <div className="field-head">Flow Threshold <Tip text="Maximum flow error allowed; lower values are stricter. For visible-light or brightfield cells, try 0.6-0.8." /></div>
+                <input className="input" type="number" value={cytoCellposeFlow} onChange={(e) => setCytoCellposeFlow(e.target.value)} step="0.05" />
+                <div className="field-head">Cellprob Threshold <Tip text="Cell probability threshold; lower values include more cells. For visible-light or brightfield cells, try -3 or -4." /></div>
+                <input className="input" type="number" value={cytoCellposeCellprob} onChange={(e) => setCytoCellposeCellprob(e.target.value)} step="0.5" />
                 <label className="checkbox">
                   <input type="checkbox" checked={cellposeUseGpu} onChange={(e) => setCellposeUseGpu(e.target.checked)} />
                   Use GPU <Tip text="Enable GPU acceleration if available." />
                 </label>
                 <label className="checkbox">
-                  <input type="checkbox" checked={cellposeInvert} onChange={(e) => setCellposeInvert(e.target.checked)} />
+                  <input type="checkbox" checked={cytoCellposeInvert} onChange={(e) => setCytoCellposeInvert(e.target.checked)} />
                   Invert Intensities <Tip text="Invert image values before segmentation when needed." />
                 </label>
-              </>
+                <h4 className="seg-subtitle">Advanced Filters</h4>
+                <label className="checkbox">
+                  <input type="checkbox" checked={cytoAdvEnable.shape} onChange={(e) => setCytoAdvToggle("shape", e.target.checked)} />
+                  Shape <Tip text="Filter cytoplasm masks by irregularity/shape metric." />
+                </label>
+                {cytoAdvEnable.shape && <input className="input" type="number" step="0.01" value={cytoAdvValues.shape} onChange={(e) => setCytoAdvValue("shape", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={cytoAdvEnable.eccentricity} onChange={(e) => setCytoAdvToggle("eccentricity", e.target.checked)} />
+                  Eccentricity <Tip text="Filter cytoplasm masks by elongation." />
+                </label>
+                {cytoAdvEnable.eccentricity && <input className="input" type="number" step="0.01" value={cytoAdvValues.eccentricity} onChange={(e) => setCytoAdvValue("eccentricity", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={cytoAdvEnable.min_size} onChange={(e) => setCytoAdvToggle("min_size", e.target.checked)} />
+                  Min Size <Tip text="Minimum cytoplasm mask area." />
+                </label>
+                {cytoAdvEnable.min_size && <input className="input" type="number" step="1" value={cytoAdvValues.min_size} onChange={(e) => setCytoAdvValue("min_size", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={cytoAdvEnable.max_size} onChange={(e) => setCytoAdvToggle("max_size", e.target.checked)} />
+                  Max Size <Tip text="Maximum cytoplasm mask area." />
+                </label>
+                {cytoAdvEnable.max_size && <input className="input" type="number" step="1" value={cytoAdvValues.max_size} onChange={(e) => setCytoAdvValue("max_size", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={cytoAdvEnable.min_radius} onChange={(e) => setCytoAdvToggle("min_radius", e.target.checked)} />
+                  Min Radius <Tip text="Minimum cytoplasm mask radius." />
+                </label>
+                {cytoAdvEnable.min_radius && <input className="input" type="number" step="1" value={cytoAdvValues.min_radius} onChange={(e) => setCytoAdvValue("min_radius", e.target.value)} />}
+                <label className="checkbox">
+                  <input type="checkbox" checked={cytoAdvEnable.max_radius} onChange={(e) => setCytoAdvToggle("max_radius", e.target.checked)} />
+                  Max Radius <Tip text="Maximum cytoplasm mask radius." />
+                </label>
+                {cytoAdvEnable.max_radius && <input className="input" type="number" step="1" value={cytoAdvValues.max_radius} onChange={(e) => setCytoAdvValue("max_radius", e.target.value)} />}
+                </div>
+              </details>
             )}
-          </div>
-        </details>
-
-        <details open className="seg-section">
-          <summary>Advanced Settings</summary>
-          <div className="seg-body">
-            <label className="checkbox">
-              <input type="checkbox" checked={advEnable.shape} onChange={(e) => setAdvToggle("shape", e.target.checked)} />
-              Shape <Tip text="Filter by irregularity/shape metric. Enable to set a threshold." />
-            </label>
-            {advEnable.shape && <input className="input" type="number" step="0.01" value={advValues.shape} onChange={(e) => setAdvValue("shape", e.target.value)} />}
-
-            <label className="checkbox">
-              <input type="checkbox" checked={advEnable.eccentricity} onChange={(e) => setAdvToggle("eccentricity", e.target.checked)} />
-              Eccentricity <Tip text="0 = circle, closer to 1 = elongated nuclei." />
-            </label>
-            {advEnable.eccentricity && <input className="input" type="number" step="0.01" value={advValues.eccentricity} onChange={(e) => setAdvValue("eccentricity", e.target.value)} />}
-
-            <label className="checkbox">
-              <input type="checkbox" checked={advEnable.min_size} onChange={(e) => setAdvToggle("min_size", e.target.checked)} />
-              Min Size <Tip text="Minimum nucleus area (px²)." />
-            </label>
-            {advEnable.min_size && <input className="input" type="number" step="1" value={advValues.min_size} onChange={(e) => setAdvValue("min_size", e.target.value)} />}
-
-            <label className="checkbox">
-              <input type="checkbox" checked={advEnable.max_size} onChange={(e) => setAdvToggle("max_size", e.target.checked)} />
-              Max Size <Tip text="Maximum nucleus area (px²)." />
-            </label>
-            {advEnable.max_size && <input className="input" type="number" step="1" value={advValues.max_size} onChange={(e) => setAdvValue("max_size", e.target.value)} />}
-
-            <label className="checkbox">
-              <input type="checkbox" checked={advEnable.min_radius} onChange={(e) => setAdvToggle("min_radius", e.target.checked)} />
-              Min Radius <Tip text="Minimum nucleus radius (px)." />
-            </label>
-            {advEnable.min_radius && <input className="input" type="number" step="1" value={advValues.min_radius} onChange={(e) => setAdvValue("min_radius", e.target.value)} />}
-
-            <label className="checkbox">
-              <input type="checkbox" checked={advEnable.max_radius} onChange={(e) => setAdvToggle("max_radius", e.target.checked)} />
-              Max Radius <Tip text="Maximum nucleus radius (px)." />
-            </label>
-            {advEnable.max_radius && <input className="input" type="number" step="1" value={advValues.max_radius} onChange={(e) => setAdvValue("max_radius", e.target.value)} />}
           </div>
         </details>
 
@@ -1414,6 +1588,29 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                   <details key={`ch-settings-${ch.id}`} className="seg-section">
                     <summary>{ch.name}</summary>
                     <div className="seg-body">
+                      <h4 className="seg-subtitle">Measurement Compartments</h4>
+                      {segmentationTarget !== "cytoplasm" && (
+                        <label className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={!!cfg.measure_nucleus}
+                            onChange={(e) => setChCfg(ch.id, { measure_nucleus: e.target.checked })}
+                          />
+                          Measure nucleus <Tip text="Measure this channel using nuclear contours." />
+                        </label>
+                      )}
+                      {segmentationTarget !== "nucleus" && (
+                        <label className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={segmentationTarget === "cytoplasm" ? true : !!cfg.measure_cytoplasm}
+                            disabled={segmentationTarget === "cytoplasm"}
+                            onChange={(e) => setChCfg(ch.id, { measure_cytoplasm: e.target.checked })}
+                          />
+                          Measure cytoplasm <Tip text="Measure this channel using cytoplasm contours." />
+                        </label>
+                      )}
+
                       <label className="checkbox">
                         <input
                           type="checkbox"
@@ -1566,7 +1763,11 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
       <div className="seg-footer">
         <button className="secondary" onClick={() => startSeg(true)} disabled={segRunning}>Preview</button>
         <button className="primary" onClick={() => startSeg(false)} disabled={segRunning}>Run</button>
-        <button className="ghost" onClick={() => onStopSegmentation()} disabled={!segRunning}>Stop</button>
+        <button className="ghost" onClick={() => onStopSegmentation()} disabled={!segRunning || segCanceling}>
+          {segCanceling ? "Stopping..." : "Stop"}
+        </button>
+        {segCanceling && <span className="seg-stop-state" role="status">Finishing current image and stopping.</span>}
+        {segCanceled && <span className="seg-stop-state stopped" role="status">Stopped. No further images will be processed.</span>}
       </div>
     </Card>
     {modalOpen && (
@@ -3328,6 +3529,8 @@ const emptyRow = () => ({
   nii_col: "NII",
   is_control: false,
   columns: null,
+  area_columns: [],
+  nii_columns: [],
 });
 const initialNmaRows = () => ([{
   ...emptyRow(),
@@ -3341,8 +3544,8 @@ function buildDatasets(rows) {
     .map((r) => ({
       name: r.name?.trim() || r.path.split("/").pop(),
       path: r.path.trim(),
-      area_col: r.area_col?.trim() || "Area",
-      nii_col: r.nii_col?.trim() || "NII",
+      area_col: r.area_col?.trim() || "",
+      nii_col: r.nii_col?.trim() || "",
       is_control: !!r.is_control,
     }));
 }
@@ -3399,6 +3602,40 @@ function Status({ level = "info", text }) {
       </div>
     </div>
   );
+}
+
+const NMA_COMPARTMENT_TOKENS = new Set(["nuc", "nucleus", "nuclear", "nuclei", "cyto", "cytoplasm", "cytoplasmic", "cytoplasmatic"]);
+const NMA_MEASURE_EXCLUDE_TOKENS = new Set(["foci", "focus", "total", "mean", "median", "min", "max", "image", "ring", "ellipse", "fraction", "perimeter", "ratio", "radius", "draw", "fitellipse"]);
+
+function nmaColumnTokens(column) {
+  return String(column || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+function isNmaMeasureColumn(column, measure) {
+  const wanted = String(measure || "").toLowerCase();
+  const tokens = nmaColumnTokens(column);
+  if (!tokens.includes(wanted)) return false;
+  const otherTokens = tokens.filter((token) => token !== wanted);
+  if (otherTokens.some((token) => NMA_MEASURE_EXCLUDE_TOKENS.has(token))) return false;
+  return otherTokens.every((token) => NMA_COMPARTMENT_TOKENS.has(token));
+}
+
+function nmaMeasureCandidates(columns, measure, serverCandidates = []) {
+  const cols = (columns || []).map((c) => String(c));
+  const exact = cols.filter((c) => c.toLowerCase() === String(measure).toLowerCase());
+  const detected = cols.filter((c) => !exact.includes(c) && isNmaMeasureColumn(c, measure));
+  const merged = [...(serverCandidates || []), ...exact, ...detected].map((c) => String(c));
+  return Array.from(new Set(merged)).filter((c) => cols.includes(c));
+}
+
+function pickNmaMeasureColumn(columns, measure, current, serverCandidates = []) {
+  const cols = (columns || []).map((c) => String(c));
+  if (current && cols.includes(current)) return current;
+  const candidates = nmaMeasureCandidates(cols, measure, serverCandidates);
+  if (candidates.length === 1) return candidates[0];
+  const exact = cols.find((c) => c.toLowerCase() === String(measure).toLowerCase());
+  if (exact && candidates.length <= 1) return exact;
+  return "";
 }
 
 function PlotPanel({ figure, config, onRelayout, onClick }) {
@@ -3922,6 +4159,15 @@ export default function App() {
     setPlotDataStatus({ text, level });
   };
 
+  const requireNmaAxes = () => {
+    const missing = datasets.filter((dataset) => !dataset.area_col || !dataset.nii_col);
+    if (missing.length === 0) return true;
+    const names = missing.map((dataset) => dataset.name || dataset.path.split("/").pop()).join(", ");
+    setStatus(`Choose Area and NII columns for: ${names}.`);
+    setStatusLevel("error");
+    return false;
+  };
+
   useEffect(() => {
     if (!showPlotConfig) return;
     const targets = rows
@@ -3943,9 +4189,14 @@ export default function App() {
           attemptedColumnsRef.current.add(path);
           try {
             const res = await callApi("/nma/datasets/columns", { path });
-            return { idx, columns: res.columns || [] };
+            return {
+              idx,
+              columns: res.columns || [],
+              areaColumns: res.area_columns || [],
+              niiColumns: res.nii_columns || [],
+            };
           } catch {
-            return { idx, columns: [] };
+            return { idx, columns: [], areaColumns: [], niiColumns: [] };
           }
         })
       );
@@ -3955,11 +4206,13 @@ export default function App() {
         prev.map((r, i) => {
           const hit = loaded.find((x) => x.idx === i);
           if (!hit || hit.columns.length === 0) return r;
-          const areaGuess = hit.columns.find((c) => c.toLowerCase().includes("area")) || hit.columns[0] || r.area_col || "Area";
-          const niiGuess = hit.columns.find((c) => c.toLowerCase().includes("nii")) || hit.columns[0] || r.nii_col || "NII";
+          const areaGuess = pickNmaMeasureColumn(hit.columns, "Area", r.area_col, hit.areaColumns);
+          const niiGuess = pickNmaMeasureColumn(hit.columns, "NII", r.nii_col, hit.niiColumns);
           return {
             ...r,
             columns: hit.columns,
+            area_columns: hit.areaColumns,
+            nii_columns: hit.niiColumns,
             area_col: r.area_col && hit.columns.includes(r.area_col) ? r.area_col : areaGuess,
             nii_col: r.nii_col && hit.columns.includes(r.nii_col) ? r.nii_col : niiGuess,
           };
@@ -4517,16 +4770,17 @@ export default function App() {
   };
 
   const handleStopSegmentation = async () => {
-    if (!segJob.job_id) return;
+    if (!segJob.job_id || segJob.status === "canceling") return;
+    const previousStatus = segJob.status;
+    setSegJob((prev) => ({ ...prev, status: "canceling", message: "Stopping..." }));
     try {
       const res = await fetch(`${API_BASE}/segmentation/stop/${segJob.job_id}`, { method: "POST" });
       if (!res.ok) {
         throw new Error(await errorFromResponse(res, "Could not stop segmentation."));
       }
-      setSegJob((prev) => ({ ...prev, status: "canceling", message: "Stop requested..." }));
-      setStatus("Stop requested...");
-      setStatusLevel("info");
+      setSegJob((prev) => ({ ...prev, status: "canceling", message: "Stopping after current image..." }));
     } catch (err) {
+      setSegJob((prev) => ({ ...prev, status: previousStatus, message: "Stop could not be requested." }));
       setStatus(err.message);
       setStatusLevel("error");
     }
@@ -4652,6 +4906,7 @@ export default function App() {
   };
 
   const handleStep1 = async () => {
+    if (!requireNmaAxes()) return;
     setShowPlotConfig(false);
     setStatus("Computing step 1...");
     setStatusLevel("info");
@@ -4685,6 +4940,7 @@ export default function App() {
   };
 
   const handleAutoDbscan = async () => {
+    if (!requireNmaAxes()) return;
     setStatus("Running DBSCAN...");
     setStatusLevel("info");
     try {
@@ -4707,6 +4963,7 @@ export default function App() {
   };
 
   const handleStep2 = async () => {
+    if (!requireNmaAxes()) return false;
     setStatus("Generating step 2 figure...");
     setStatusLevel("info");
     try {
@@ -4817,6 +5074,7 @@ export default function App() {
 
       // If datasets exist, build step2 immediately
       if (datasets.length > 0) {
+        if (!requireNmaAxes()) return;
         const payload = {
           params: { datasets },
           include_sample: true,
@@ -4906,6 +5164,7 @@ export default function App() {
   };
 
   const handlePlotAll = async () => {
+    if (!requireNmaAxes()) return;
     if (!plotSavePath.trim()) {
       setStatus("Choose an output folder before plotting.");
       setStatusLevel("error");
@@ -7016,24 +7275,26 @@ export default function App() {
                   </div>
                   <div className="row">
                     <div style={{ flex: 1 }}>
-                      <FieldTitle title="Area column" tip="Column used as the Area axis/input for NMA calculations." className="field-head" />
+                      <FieldTitle title="Area column" tip="Column used as the Area axis/input for NMA calculations. If both nuclear and cytoplasm area columns exist, choose one explicitly." className="field-head" />
                       <select
                         className="input"
                         value={row.area_col}
                         onChange={(e) => updateRow(idx, { area_col: e.target.value })}
                       >
+                        {(row.columns || []).length > 0 && <option value="">Select area column...</option>}
                         {(row.columns || ["Area"]).map((c) => (
                           <option key={`area-${idx}-${c}`} value={c}>{c}</option>
                         ))}
                       </select>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <FieldTitle title="NII column" tip="Column used as the NII axis/input for NMA calculations." className="field-head" />
+                      <FieldTitle title="NII column" tip="Column used as the NII axis/input for NMA calculations. If both nuclear and cytoplasm NII columns exist, choose one explicitly." className="field-head" />
                       <select
                         className="input"
                         value={row.nii_col}
                         onChange={(e) => updateRow(idx, { nii_col: e.target.value })}
                       >
+                        {(row.columns || []).length > 0 && <option value="">Select NII column...</option>}
                         {(row.columns || ["NII"]).map((c) => (
                           <option key={`nii-${idx}-${c}`} value={c}>{c}</option>
                         ))}
@@ -7050,11 +7311,22 @@ export default function App() {
                         try {
                           const res = await callApi("/nma/datasets/columns", { path: row.path });
                           const cols = res.columns || [];
-                          const areaGuess = cols.find((c) => c.toLowerCase().includes("area")) || cols[0] || "Area";
-                          const niiGuess = cols.find((c) => c.toLowerCase().includes("nii")) || cols[0] || "NII";
-                          updateRow(idx, { columns: cols, area_col: areaGuess, nii_col: niiGuess });
-                          setStatus("Columns loaded.");
-                          setStatusLevel("success");
+                          const areaGuess = pickNmaMeasureColumn(cols, "Area", row.area_col, res.area_columns || []);
+                          const niiGuess = pickNmaMeasureColumn(cols, "NII", row.nii_col, res.nii_columns || []);
+                          updateRow(idx, {
+                            columns: cols,
+                            area_columns: res.area_columns || [],
+                            nii_columns: res.nii_columns || [],
+                            area_col: areaGuess,
+                            nii_col: niiGuess,
+                          });
+                          if (!areaGuess || !niiGuess) {
+                            setStatus("Columns loaded. Choose Area and NII explicitly for this dataset.");
+                            setStatusLevel("warning");
+                          } else {
+                            setStatus("Columns loaded.");
+                            setStatusLevel("success");
+                          }
                         } catch (err) {
                           setStatus(err.message);
                           setStatusLevel("error");

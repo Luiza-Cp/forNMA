@@ -114,9 +114,13 @@ def drop_cols(
 
 def save_dfs(df_results: pd.DataFrame,
              path_save: str,
-             df_draw: Optional[pd.DataFrame]):
+             df_draw: Optional[pd.DataFrame],
+             result_label: Optional[str] = None):
     """ Saves dataframes"""
     tables = list(set(df_results['origin_folder']))
+    result_name = f"{result_label} Results.csv" if result_label else "Results.csv"
+    foci_name = f"{result_label} Foci Results.csv" if result_label else "Foci Results.csv"
+    pkl_label = f" {result_label}" if result_label else ""
 
     for t in tables:
         df_foci, df_results = get_foci_df(df_results)
@@ -127,21 +131,21 @@ def save_dfs(df_results: pd.DataFrame,
         df_save = df_save[cols]
         os.makedirs(os.path.join(path_save, t), exist_ok=True)
         image_name = os.path.splitext(df_results[[f for f in df_results.columns if f.startswith('Image_name')][0]].iloc[0])[0]
-        if not os.path.exists(os.path.join(path_save, t, f'Results.csv')):
-            df_save.to_csv(os.path.join(path_save, t, f'Results.csv'))
+        if not os.path.exists(os.path.join(path_save, t, result_name)):
+            df_save.to_csv(os.path.join(path_save, t, result_name))
         else:
-            df_save.to_csv(os.path.join(path_save, t, f'Results.csv'), mode='a', header=None)
+            df_save.to_csv(os.path.join(path_save, t, result_name), mode='a', header=None)
 
         if df_draw is not None:
             path_pkl = os.path.join(path_save, t, 'pkl-data')
             os.makedirs(path_pkl, exist_ok=True)
-            df_draw.to_pickle(os.path.join(path_pkl, f' {image_name} results.pkl'))
+            df_draw.to_pickle(os.path.join(path_pkl, f' {image_name}{pkl_label} results.pkl'))
 
         if df_foci is not None:
-            if not os.path.exists(os.path.join(path_save, t, f'Foci Results.csv')):
-                df_foci.to_csv(os.path.join(path_save, t, f'Foci Results.csv'))
+            if not os.path.exists(os.path.join(path_save, t, foci_name)):
+                df_foci.to_csv(os.path.join(path_save, t, foci_name))
             else:
-                df_foci.to_csv(os.path.join(path_save, t, f'Foci Results.csv'), mode='a', header=None)
+                df_foci.to_csv(os.path.join(path_save, t, foci_name), mode='a', header=None)
     return None  # print("files saved")
 
 
@@ -192,7 +196,8 @@ def draw_and_save(df: pd.DataFrame,
 def saving_images(df_draw: pd.DataFrame,
                   path_to_save: str,
                   ch_name_list: List[str],
-                  use_cellpose: bool
+                  use_cellpose: bool,
+                  result_label: Optional[str] = None
                   ):
     """
    Splits dataframe according to their folders, creates directories
@@ -204,6 +209,8 @@ def saving_images(df_draw: pd.DataFrame,
     for d in dirs:
         df_dir = df_draw[df_draw["origin_folder"] == d]
         saving_dir = os.path.join(path_to_save, d)
+        if result_label:
+            saving_dir = os.path.join(saving_dir, result_label)
         os.makedirs(saving_dir, exist_ok=True)
         #    iterates over each image channel inside the folder
         for ch in ch_name_list:
@@ -211,12 +218,6 @@ def saving_images(df_draw: pd.DataFrame,
             os.makedirs(saving_dir_ch, exist_ok=True)
             draw_and_save(df_dir, ch, saving_dir_ch, use_cellpose)
     return None
-
-
-from typing import Optional, Callable, List
-from pandas import DataFrame
-import os
-
 
 def _drawable_contours(values) -> List[np.ndarray]:
     """Return OpenCV-drawable contours from dataframe contour values."""
@@ -247,6 +248,225 @@ def _draw_contours_if_any(img: np.ndarray, contours, color, thickness: int) -> n
     return cv.drawContours(img, contours, -1, color, thickness)
 
 
+def _measurable_contours(contours: List[np.ndarray]) -> List[np.ndarray]:
+    """Return contours that can be represented in the measurement output."""
+    return [cnt for cnt in contours if len(cnt) > 5]
+
+
+def create_nuclei_cytoplasm_mapping(
+        nucleus_contours: List[np.ndarray],
+        cytoplasm_contours: List[np.ndarray],
+        frame: int,
+        condition: Optional[str],
+        is_overtime: bool,
+        nucleus_image_name: str,
+        cytoplasm_image_name: str,
+        origin_folder: str,
+) -> pd.DataFrame:
+    """
+    Relate nuclei to cytoplasm masks without copying measurement columns.
+
+    A nucleus is assigned to every cytoplasm contour containing its centroid.
+    Unmatched objects are preserved so the relationship table describes all
+    segmented objects, including ambiguous and multinucleated cases.
+    """
+    nucleus_contours = _measurable_contours(nucleus_contours)
+    cytoplasm_contours = _measurable_contours(cytoplasm_contours)
+    nucleus_to_cytoplasm = {index + 1: [] for index in range(len(nucleus_contours))}
+    cytoplasm_to_nucleus = {index + 1: [] for index in range(len(cytoplasm_contours))}
+
+    for nucleus_id, nucleus_contour in enumerate(nucleus_contours, start=1):
+        moments = cv.moments(nucleus_contour)
+        if moments["m00"] == 0:
+            continue
+        centroid = (moments["m10"] / moments["m00"], moments["m01"] / moments["m00"])
+        for cytoplasm_id, cytoplasm_contour in enumerate(cytoplasm_contours, start=1):
+            if cv.pointPolygonTest(cytoplasm_contour, centroid, False) >= 0:
+                nucleus_to_cytoplasm[nucleus_id].append(cytoplasm_id)
+                cytoplasm_to_nucleus[cytoplasm_id].append(nucleus_id)
+
+    common = {
+        "Frame": frame,
+        "Condition": condition,
+        "Overtime": is_overtime,
+        "Nucleus_image_name": nucleus_image_name,
+        "Cytoplasm_image_name": cytoplasm_image_name,
+        "origin_folder": origin_folder,
+    }
+    rows = []
+    for nucleus_id, cytoplasm_ids in nucleus_to_cytoplasm.items():
+        if not cytoplasm_ids:
+            rows.append({
+                **common,
+                "Nucleus_ID": nucleus_id,
+                "Cytoplasm_ID": pd.NA,
+                "Pair_status": "nucleus_without_cytoplasm",
+                "N_nuclei_in_cytoplasm": pd.NA,
+                "N_cytoplasms_for_nucleus": 0,
+            })
+            continue
+        for cytoplasm_id in cytoplasm_ids:
+            nuclei_ids = cytoplasm_to_nucleus[cytoplasm_id]
+            status = "ambiguous" if len(cytoplasm_ids) > 1 else (
+                "multinucleated" if len(nuclei_ids) > 1 else "matched"
+            )
+            rows.append({
+                **common,
+                "Nucleus_ID": nucleus_id,
+                "Cytoplasm_ID": cytoplasm_id,
+                "Pair_status": status,
+                "N_nuclei_in_cytoplasm": len(nuclei_ids),
+                "N_cytoplasms_for_nucleus": len(cytoplasm_ids),
+            })
+
+    for cytoplasm_id, nucleus_ids in cytoplasm_to_nucleus.items():
+        if not nucleus_ids:
+            rows.append({
+                **common,
+                "Nucleus_ID": pd.NA,
+                "Cytoplasm_ID": cytoplasm_id,
+                "Pair_status": "cytoplasm_without_nucleus",
+                "N_nuclei_in_cytoplasm": 0,
+                "N_cytoplasms_for_nucleus": pd.NA,
+            })
+
+    columns = [
+        "Frame", "Condition", "Overtime", "Nucleus_image_name", "Cytoplasm_image_name",
+        "Nucleus_ID", "Cytoplasm_ID", "Pair_status", "N_nuclei_in_cytoplasm",
+        "N_cytoplasms_for_nucleus", "origin_folder",
+    ]
+    mapping = pd.DataFrame(rows, columns=columns)
+    for column in ("Nucleus_ID", "Cytoplasm_ID", "N_nuclei_in_cytoplasm", "N_cytoplasms_for_nucleus"):
+        mapping[column] = mapping[column].astype("Int64")
+    return mapping
+
+
+def save_nuclei_cytoplasm_mapping(mapping: pd.DataFrame, path_save: str) -> None:
+    """Save a relationship-only table alongside nuclear and cytoplasm results."""
+    if mapping.empty:
+        return
+    for folder in mapping["origin_folder"].drop_duplicates():
+        path_folder = os.path.join(path_save, folder)
+        os.makedirs(path_folder, exist_ok=True)
+        output_path = os.path.join(path_folder, "Nuclei Cytoplasm Mapping.csv")
+        output = mapping[mapping["origin_folder"] == folder].drop(columns=["origin_folder"])
+        output.to_csv(
+            output_path,
+            mode="a" if os.path.exists(output_path) else "w",
+            header=not os.path.exists(output_path),
+            index=False,
+        )
+
+
+def _uses_cytoplasm(subfolder_value) -> bool:
+    return len(subfolder_value) > 3 and bool(subfolder_value[3])
+
+
+def _measurement_subfolder_dict(subfolder_dict: dict, compartment: str) -> dict:
+    suffix = "nuc" if compartment == "nucleus" else "cyto"
+    measure_key = "measure_nucleus" if compartment == "nucleus" else "measure_cytoplasm"
+    default_measure = compartment == "nucleus"
+    selected = {}
+    for channel, value in subfolder_dict.items():
+        channel_params = value[1]
+        if not bool(channel_params.get(measure_key, default_measure)):
+            continue
+        output_channel = f"{channel}_{suffix}"
+        selected[output_channel] = [value[0], channel_params, value[2]]
+    return selected
+
+
+def _make_ref_dict(subfolder_dict: dict) -> dict:
+    ref_dict = {}
+    for key, value in subfolder_dict.items():
+        ref_dict[key] = load_image(value[0][0]) if value[1]['match_hist'] else None
+    return ref_dict
+
+
+def _cellpose_segment(
+        image_path: str,
+        segment_dict: dict,
+        compartment: str,
+        model=None,
+) -> List[np.ndarray]:
+    cellpose_params = segment_dict.get("cytoplasm_cellpose", {}) if compartment == "cytoplasm" else {}
+    return run_cellpose(
+        image_path=image_path,
+        use_gpu=segment_dict['use_gpu'],
+        diameter=cellpose_params.get('diameter', segment_dict['diameter']),
+        mag=segment_dict['magnification'],
+        px_s=segment_dict['pixel_size'],
+        shape=cellpose_params.get('shape', segment_dict['shape']),
+        eccentricity=cellpose_params.get('eccentricity', segment_dict['eccentricity']),
+        min_size=cellpose_params.get('min_size', segment_dict['min_size']),
+        max_size=cellpose_params.get('max_size', segment_dict['max_size']),
+        min_radius=cellpose_params.get('min_radius', segment_dict['min_radius']),
+        max_radius=cellpose_params.get('max_radius', segment_dict['max_radius']),
+        model_type=cellpose_params.get('model_type', segment_dict.get('model_type', 'nuclei')),
+        invert=cellpose_params.get('invert', segment_dict['invert']),
+        normalize=cellpose_params.get('normalize', segment_dict['normalize']),
+        resample=cellpose_params.get('resample', segment_dict['resample']),
+        rescale_intensity=cellpose_params.get('rescale_intensity', segment_dict['rescale_intensity']),
+        remove_bg=cellpose_params.get('remove_bg', segment_dict['remove_bg']),
+        radius_bg=cellpose_params.get('radius_bg', segment_dict['radius_bg']),
+        flow_threshold=cellpose_params.get('flow_threshold', segment_dict['flow_threshold']),
+        cellprob_threshold=cellpose_params.get('cellprob_threshold', segment_dict['cellprob_threshold']),
+        model=model,
+    )
+
+
+def _process_measurement_pass(
+        contours: List[np.ndarray],
+        img_n: int,
+        compartment: str,
+        subfolder_dict: dict,
+        segment_dict: dict,
+        condition: Optional[str],
+        is_overtime: bool,
+        subfolder_images_in: str,
+        path_to_save: str,
+        wants_to_save: bool,
+) -> bool:
+    contours = _measurable_contours(contours)
+    if len(contours) == 0:
+        return False
+
+    measure_dict = _measurement_subfolder_dict(subfolder_dict, compartment)
+    if not measure_dict:
+        return False
+
+    ref_dict = _make_ref_dict(measure_dict)
+    pass_segment_dict = dict(segment_dict)
+    if compartment == "cytoplasm":
+        pass_segment_dict["use_cellpose"] = True
+
+    image_df = perform_measure(contours, img_n, measure_dict, ref_dict, pass_segment_dict)
+    image_df["Condition"] = condition
+    image_df["Overtime"] = is_overtime
+    image_df['origin_folder'] = subfolder_images_in
+    image_df = image_df.reset_index(drop=True)
+    image_df = drop_cols(image_df, measure_dict)
+
+    ch_name_list = list(measure_dict.keys())
+    df_results, df_draw = split_dfs(image_df, ch_name_list)
+    df_draw['use_cellpose'] = pass_segment_dict['use_cellpose']
+    draw = df_draw if wants_to_save else None
+    legacy_nucleus_only = segment_dict.get("segmentation_mode", "nucleus") == "nucleus" and compartment == "nucleus"
+    result_label = None if legacy_nucleus_only else ("Nuclei" if compartment == "nucleus" else "Cytoplasm")
+    save_dfs(df_results, path_to_save, draw, result_label=result_label)
+
+    if wants_to_save:
+        saving_images(
+            df_draw,
+            path_to_save,
+            ch_name_list,
+            pass_segment_dict['use_cellpose'],
+            result_label=result_label,
+        )
+
+    return True
+
+
 def analyze_dict(
         subfolder_dict: dict,  # dict of every channel
         segment_dict: dict,    # dict of global parameters
@@ -265,12 +485,13 @@ def analyze_dict(
     segmentation, returns a dataframe containing the measurements and contours of each cell in every channel.
     This function is responsible for organizing all measuring functions.
     """
-    ref_dict = {}  # reference images for matching histograms
     ch_segment = None
+    ch_cytoplasm = None
     for key, value in subfolder_dict.items():
         if value[2]:
             ch_segment = key
-        ref_dict[key] = load_image(value[0][0]) if value[1]['match_hist'] else None
+        if _uses_cytoplasm(value):
+            ch_cytoplasm = key
 
     # segurança: se nada foi marcado para segmentar, escolhe o primeiro canal
     if ch_segment is None:
@@ -286,11 +507,22 @@ def analyze_dict(
         n_imgs_used = 5 if (preview and total_images > 10) else total_images
         img_indices = list(range(n_imgs_used))
 
+    segmentation_mode = segment_dict.get("segmentation_mode", "nucleus")
+    needs_nucleus = segmentation_mode in ("nucleus", "both")
+    needs_cytoplasm = segmentation_mode in ("cytoplasm", "both")
+
     cellpose = segment_dict['use_cellpose']
     cellpose_model = None
-    if cellpose:
+    if needs_nucleus and cellpose:
         cellpose_model = get_cellpose_model(
             model_type=segment_dict.get('model_type', 'nuclei'),
+            use_gpu=segment_dict['use_gpu'],
+        )
+    cytoplasm_model = None
+    if needs_cytoplasm:
+        cytoplasm_cellpose = segment_dict.get("cytoplasm_cellpose", {})
+        cytoplasm_model = get_cellpose_model(
+            model_type=cytoplasm_cellpose.get('model_type', 'cyto3'),
             use_gpu=segment_dict['use_gpu'],
         )
 
@@ -298,56 +530,94 @@ def analyze_dict(
     for img_n in track(img_indices, description=f'Analyzing {subfolder_images_in} images...'):
         img_to_segment = subfolder_dict[ch_segment][0][img_n]
 
-        if cellpose:  # calls cellpose
-            contours = run_cellpose(
-                image_path=img_to_segment,
-                use_gpu=segment_dict['use_gpu'],
-                diameter=segment_dict['diameter'],
-                mag=segment_dict['magnification'],
-                px_s=segment_dict['pixel_size'],
-                shape=segment_dict['shape'],
-                eccentricity=segment_dict['eccentricity'],
-                min_size=segment_dict['min_size'],
-                max_size=segment_dict['max_size'],
-                min_radius=segment_dict['min_radius'],
-                max_radius=segment_dict['max_radius'],
-                model_type=segment_dict.get('model_type', 'nuclei'),
-                invert=segment_dict['invert'],
-                normalize=segment_dict['normalize'],
-                resample=segment_dict['resample'],
-                rescale_intensity=segment_dict['rescale_intensity'],
-                remove_bg=segment_dict['remove_bg'],
-                radius_bg=segment_dict['radius_bg'],
-                flow_threshold=segment_dict['flow_threshold'],
-                cellprob_threshold=segment_dict['cellprob_threshold'],
-                model=cellpose_model,
-            )
-        else:  # calls forNMA pipeline
-            contours = fornma_contour_finding(
-                img_to_segment,
-                magnification=segment_dict['magnification'],
-                pixel_size=segment_dict['pixel_size'],
-                rescale_intensity=segment_dict['rescale_intensity'],
-                remove_bg=segment_dict['remove_bg'],
-                radius_bg=segment_dict['radius_bg'],
-                threshold=segment_dict['threshold'],
-                offset=segment_dict['offset'],
-                blur=segment_dict['blur'],
-                adjust_size=segment_dict['adjust_size'],
-                cut_edges=segment_dict['cut_edges'],
-                shape=segment_dict['shape'],
-                eccentricity=segment_dict['eccentricity'],
-                min_size=segment_dict['min_size'],
-                max_size=segment_dict['max_size'],
-                min_radius=segment_dict['min_radius'],
-                max_radius=segment_dict['max_radius'],
-                fast_detection=segment_dict['fast_detection'],
-                weakly_labeled=segment_dict['weakly_labeled']
-            )
+        processed_any = False
+        nucleus_contours = []
+        cytoplasm_contours = []
 
-        contours = [f for f in contours if len(f) > 5]  # remove contours with less than 5 points
+        if needs_nucleus:
+            if cellpose:  # calls cellpose
+                nucleus_contours = _cellpose_segment(
+                    image_path=img_to_segment,
+                    segment_dict=segment_dict,
+                    compartment="nucleus",
+                    model=cellpose_model,
+                )
+            else:  # calls forNMA pipeline
+                nucleus_contours = fornma_contour_finding(
+                    img_to_segment,
+                    magnification=segment_dict['magnification'],
+                    pixel_size=segment_dict['pixel_size'],
+                    rescale_intensity=segment_dict['rescale_intensity'],
+                    remove_bg=segment_dict['remove_bg'],
+                    radius_bg=segment_dict['radius_bg'],
+                    threshold=segment_dict['threshold'],
+                    offset=segment_dict['offset'],
+                    blur=segment_dict['blur'],
+                    adjust_size=segment_dict['adjust_size'],
+                    cut_edges=segment_dict['cut_edges'],
+                    shape=segment_dict['shape'],
+                    eccentricity=segment_dict['eccentricity'],
+                    min_size=segment_dict['min_size'],
+                    max_size=segment_dict['max_size'],
+                    min_radius=segment_dict['min_radius'],
+                    max_radius=segment_dict['max_radius'],
+                    fast_detection=segment_dict['fast_detection'],
+                    weakly_labeled=segment_dict['weakly_labeled']
+                )
+            processed_any = _process_measurement_pass(
+                nucleus_contours,
+                img_n,
+                "nucleus",
+                subfolder_dict,
+                segment_dict,
+                condition,
+                is_overtime,
+                subfolder_images_in,
+                path_to_save,
+                wants_to_save,
+            ) or processed_any
 
-        if len(contours) == 0:
+        if needs_cytoplasm:
+            cytoplasm_channel = ch_cytoplasm or ch_segment
+            img_to_segment_cyto = subfolder_dict[cytoplasm_channel][0][img_n]
+            cytoplasm_contours = _cellpose_segment(
+                image_path=img_to_segment_cyto,
+                segment_dict=segment_dict,
+                compartment="cytoplasm",
+                model=cytoplasm_model,
+            )
+            processed_any = _process_measurement_pass(
+                cytoplasm_contours,
+                img_n,
+                "cytoplasm",
+                subfolder_dict,
+                segment_dict,
+                condition,
+                is_overtime,
+                subfolder_images_in,
+                path_to_save,
+                wants_to_save,
+            ) or processed_any
+
+        if (
+            needs_nucleus
+            and needs_cytoplasm
+            and _measurement_subfolder_dict(subfolder_dict, "nucleus")
+            and _measurement_subfolder_dict(subfolder_dict, "cytoplasm")
+        ):
+            mapping = create_nuclei_cytoplasm_mapping(
+                nucleus_contours=nucleus_contours,
+                cytoplasm_contours=cytoplasm_contours,
+                frame=img_n,
+                condition=condition,
+                is_overtime=is_overtime,
+                nucleus_image_name=os.path.basename(img_to_segment),
+                cytoplasm_image_name=os.path.basename(img_to_segment_cyto),
+                origin_folder=subfolder_images_in,
+            )
+            save_nuclei_cytoplasm_mapping(mapping, path_to_save)
+
+        if not processed_any:
             # imagem “vazia”: mesmo assim contamos 1 passo de progresso
             message = f'Image {os.path.basename(img_to_segment)} has no objects.'
             print(message)
@@ -356,23 +626,6 @@ def analyze_dict(
             if progress_cb is not None:
                 progress_cb()
             continue
-
-        image_df = perform_measure(contours, img_n, subfolder_dict, ref_dict, segment_dict)
-        image_df["Condition"] = condition
-        image_df["Overtime"] = is_overtime
-        image_df['origin_folder'] = subfolder_images_in
-        image_df = image_df.reset_index(drop=True)
-        image_df = drop_cols(image_df, subfolder_dict)  # drop columns
-
-        # split e salvamento
-        df_results, df_draw = split_dfs(image_df, ch_name_list)
-        df_draw['use_cellpose'] = cellpose
-        draw = df_draw if wants_to_save else None
-        save_dfs(df_results, path_to_save, draw)
-
-        # save images, se habilitado
-        if wants_to_save:
-            saving_images(df_draw, path_to_save, ch_name_list, segment_dict['use_cellpose'])
 
         # 🔔 tick de progresso por imagem processada
         if progress_cb is not None:

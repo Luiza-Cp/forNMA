@@ -3,6 +3,7 @@ import pytest
 
 from fornma.core.Segmentation.check_user_inputs import check_user_inputs
 from fornma.core.Segmentation.analyze import _drawable_contours
+from fornma.core.Segmentation.measure.Cell import Cell
 from fornma.core.Segmentation.segmentation import cellpose_integration
 
 
@@ -92,6 +93,7 @@ def test_check_user_inputs_rejects_unknown_cellpose_model(tmp_path):
 
 def test_run_cellpose_passes_selected_model_to_cellpose(monkeypatch):
     created = {}
+    eval_kwargs = {}
     outline_inputs = []
     cellpose_integration.clear_cellpose_model_cache()
 
@@ -101,6 +103,7 @@ def test_run_cellpose_passes_selected_model_to_cellpose(monkeypatch):
             created["gpu"] = gpu
 
         def eval(self, *args, **kwargs):
+            eval_kwargs.update(kwargs)
             return np.zeros((1, 5, 5), dtype=np.uint8), None, None
 
     monkeypatch.setattr(cellpose_integration.models, "CellposeModel", FakeCellposeModel)
@@ -115,7 +118,7 @@ def test_run_cellpose_passes_selected_model_to_cellpose(monkeypatch):
     contours = cellpose_integration.run_cellpose(
         image_path="image.tif",
         use_gpu=True,
-        diameter=25,
+        diameter=50,
         mag=20,
         px_s=0.5,
         shape=None,
@@ -125,10 +128,17 @@ def test_run_cellpose_passes_selected_model_to_cellpose(monkeypatch):
         min_radius=None,
         max_radius=None,
         model_type="cyto2",
+        resample=True,
+        flow_threshold=0.55,
+        cellprob_threshold=-2,
     )
 
     assert contours == []
     assert created == {"pretrained_model": "cyto2", "gpu": True}
+    assert eval_kwargs["diameter"] == 50
+    assert eval_kwargs["flow_threshold"] == 0.55
+    assert eval_kwargs["cellprob_threshold"] == -2
+    assert eval_kwargs["resample"] is True
     assert outline_inputs == [(5, 5)]
     cellpose_integration.clear_cellpose_model_cache()
 
@@ -170,7 +180,11 @@ def test_run_cellpose_ignores_empty_outlines(monkeypatch):
     monkeypatch.setattr(
         cellpose_integration.utils,
         "outlines_list",
-        lambda masks: [np.array([], dtype=float).reshape(0, 2), np.array([[1, 1], [1, 2]], dtype=np.int64)],
+        lambda masks: [
+            np.array([], dtype=float).reshape(0, 2),
+            np.array([[1, 1], [1, 2]], dtype=np.int64),
+            np.array([[1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1]], dtype=np.int64),
+        ],
     )
 
     contours = cellpose_integration.run_cellpose(
@@ -191,7 +205,7 @@ def test_run_cellpose_ignores_empty_outlines(monkeypatch):
     cellpose_integration.clear_cellpose_model_cache()
 
 
-def test_run_cellpose_does_not_apply_fornma_contour_filters(monkeypatch):
+def test_run_cellpose_applies_selected_contour_filters_without_automatic_size_bounds(monkeypatch):
     class FakeCellposeModel:
         def __init__(self, pretrained_model, gpu):
             pass
@@ -201,7 +215,7 @@ def test_run_cellpose_does_not_apply_fornma_contour_filters(monkeypatch):
             masks[5:8, 5:8] = 1
             return masks, None, None
 
-    tiny_contour = np.array([[5, 5], [7, 5], [7, 7], [5, 7]], dtype=np.int64)
+    tiny_contour = np.array([[5, 5], [6, 5], [7, 6], [7, 7], [6, 8], [5, 7]], dtype=np.int64)
 
     monkeypatch.setattr(cellpose_integration.models, "CellposeModel", FakeCellposeModel)
     monkeypatch.setattr(cellpose_integration, "load_image", lambda path, **kwargs: np.zeros((20, 20), dtype=np.uint8))
@@ -213,17 +227,59 @@ def test_run_cellpose_does_not_apply_fornma_contour_filters(monkeypatch):
         diameter=25,
         mag=20,
         px_s=0.5,
-        shape=0.99,
+        shape=None,
         eccentricity=None,
-        min_size=1000,
-        max_size=1001,
+        min_size=None,
+        max_size=None,
         min_radius=None,
         max_radius=None,
     )
 
     assert len(contours) == 1
     np.testing.assert_array_equal(contours[0], tiny_contour.astype(np.int32))
+
+    contours = cellpose_integration.run_cellpose(
+        image_path="image.tif",
+        use_gpu=False,
+        diameter=25,
+        mag=20,
+        px_s=0.5,
+        shape=None,
+        eccentricity=None,
+        min_size=1000,
+        max_size=None,
+        min_radius=None,
+        max_radius=None,
+    )
+
+    assert contours == []
     cellpose_integration.clear_cellpose_model_cache()
+
+
+def test_cell_measurement_handles_constant_intensity_images():
+    contour = np.array([[[2, 2]], [[4, 2]], [[5, 3]], [[4, 5]], [[2, 5]], [[1, 3]]], dtype=np.int32)
+    image = np.full((10, 10), 12, dtype=np.uint8)
+
+    cell = Cell(
+        1,
+        contour,
+        20,
+        0.6,
+        image,
+        "constant.tif",
+        "Channel",
+        False,
+        3,
+        False,
+        7,
+        False,
+        False,
+        False,
+        1.2,
+        False,
+    )
+
+    assert cell.mean_int == 0
 
 
 def test_drawable_contours_accepts_cellpose_and_fornma_formats():

@@ -41,12 +41,15 @@ from fornma.core.Tracking.tracking import (
 )
 from fornma.core.Segmentation.analyze import saving_images
 from fornma.core.image_io import imread, imwrite
+from fornma.gui.utils.progress import update_progress
 
 from fornma.gui.utils.nma_helpers import (
     load_controls_pool,
     load_all_datasets,
     compute_axis_ranges_from_all,
     ellipse_trace,
+    find_nma_measure_columns,
+    _resolve_two_columns,
 )
 from .schemas import (
     NMAComputeRequest,
@@ -146,6 +149,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
     ],
@@ -194,7 +199,13 @@ def nma_datasets_columns(req: DatasetColumnsRequest):
         if nun > 0 and nun <= 20:
             categorical_cols.append(c)
     numeric_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
-    return DatasetColumnsResponse(columns=cols, categorical_columns=categorical_cols, numeric_columns=numeric_cols)
+    return DatasetColumnsResponse(
+        columns=cols,
+        categorical_columns=categorical_cols,
+        numeric_columns=numeric_cols,
+        area_columns=find_nma_measure_columns(cols, "Area"),
+        nii_columns=find_nma_measure_columns(cols, "NII"),
+    )
 
 
 @app.post("/datasets/column-values", response_model=DatasetColumnValuesResponse)
@@ -388,8 +399,8 @@ def _latest_active_job(jobs: Dict[str, Dict], active_states: set[str]) -> Dict |
 def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
     output_dir = Path(req.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    paths = [d.path for d in req.params.datasets if str(d.path).strip()]
-    if not paths:
+    datasets = [d for d in req.params.datasets if str(d.path).strip()]
+    if not datasets:
         _set_plot_job(job_id, status="failed", progress=100, error="No dataset paths provided.", message="No dataset paths provided.")
         return
 
@@ -426,6 +437,31 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
     original_save_figs = NMAClass.save_figs
     created_png_files: list[str] = []
 
+    def _normalized_plot_paths() -> list[str]:
+        normalized_dir = output_dir / ".nma-normalized-inputs"
+        normalized_dir.mkdir(parents=True, exist_ok=True)
+        normalized_paths = []
+        for index, dataset in enumerate(datasets, start=1):
+            raw_path = Path(dataset.path).expanduser()
+            try:
+                raw = pd.read_csv(raw_path)
+            except Exception as e:
+                raise RuntimeError(f"Failed to read NMA dataset '{raw_path}': {e}") from e
+            area_col, nii_col = _resolve_two_columns(raw, dataset.area_col, dataset.nii_col)
+            if not area_col or not nii_col:
+                raise RuntimeError(
+                    "Could not resolve Area/NII columns for "
+                    f"'{raw_path}'. Choose explicit columns in NMA Settings."
+                )
+            normalized = raw.copy()
+            normalized["Area"] = pd.to_numeric(normalized[area_col], errors="coerce")
+            normalized["NII"] = pd.to_numeric(normalized[nii_col], errors="coerce")
+            safe_name = hashlib.sha1(str(raw_path).encode("utf-8")).hexdigest()[:10]
+            out_path = normalized_dir / f"{index:03d}-{safe_name}-Results.csv"
+            normalized.to_csv(out_path, index=False)
+            normalized_paths.append(str(out_path))
+        return normalized_paths
+
     def _save_with_progress(self, fig, title):
         original_save_figs(self, fig, title)
         png_name = f"{title.lstrip()} {self.graph_type}.png"
@@ -447,6 +483,7 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
         import matplotlib
         matplotlib.use("Agg", force=True)
         NMAClass.save_figs = _save_with_progress
+        paths = _normalized_plot_paths()
         run_nma_plot(
             path_list=paths,
             saving_path=str(output_dir),
@@ -574,6 +611,15 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
     except Exception:
         pass
 
+    with SEG_JOBS_LOCK:
+        stop_before_start = bool(SEG_JOBS.get(job_id, {}).get("cancel_requested"))
+    if stop_before_start:
+        update_progress(progress_file, status="canceled", cancel=True, message="Segmentation was canceled before processing started.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled before processing started.")
+        with SEG_JOBS_LOCK:
+            SEG_THREADS.pop(job_id, None)
+        return
+
     try:
         os.environ["FORNMA_PROGRESS_FILE"] = progress_file
         run_segmentation_pipeline(params, preview=bool(preview), preview_index=preview_index)
@@ -587,7 +633,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             message=(
                 f"Segmentation finished successfully. Outputs were saved to {params['global']['output_folder']}."
                 if st == "done"
-                else (d.get("message") or st)
+                else ("Segmentation stopped." if st == "canceled" else (d.get("message") or st))
             ),
             log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path"),
@@ -627,6 +673,7 @@ def segmentation_start(req: SegmentationStartRequest):
             "preview_paths": [],
             "preview_index": req.preview_index,
             "progress_file": None,
+            "cancel_requested": False,
             "error": None,
         }
         t = threading.Thread(
@@ -653,6 +700,7 @@ def segmentation_status(job_id: str):
         mapped = {
             "starting": "running",
             "running": "running",
+            "canceling": "canceling",
             "done": "completed",
             "error": "failed",
             "canceled": "canceled",
@@ -678,7 +726,7 @@ def segmentation_status(job_id: str):
         cancel_flag = bool(d.get("cancel")) if d else False
         forced_status = "canceled" if cancel_flag else "failed"
         forced_message = (
-            "Segmentation was canceled."
+            "Segmentation stopped."
             if cancel_flag
             else (job.get("message") or "Segmentation stopped unexpectedly before reporting completion. Check the log for the last processed image.")
         )
@@ -712,21 +760,21 @@ def segmentation_stop(job_id: str):
         job = SEG_JOBS.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Segmentation job not found.")
+    _set_seg_job(job_id, cancel_requested=True, status="canceling", message="Stopping after current image...")
     pf = job.get("progress_file")
     if not _seg_thread_alive(job_id):
-        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation stopped.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
-        return {"status": "canceled"}
+        return {"status": "canceling"}
     d = _safe_read_json(pf)
-    d.update({"cancel": True, "status": d.get("status", "running")})
+    d.update({"cancel": True, "status": "canceling", "message": "Stopping after current image..."})
     try:
         with open(pf, "w") as f:
             json.dump(d, f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to request stop: {e}")
-    _set_seg_job(job_id, message="Stop requested...", status="canceling")
+    _set_seg_job(job_id, message="Stopping after current image...", status="canceling")
     return {"status": "canceling"}
 
 
@@ -3171,8 +3219,8 @@ def _build_plotly_figure(df: pd.DataFrame | None, xcol: str, ycol: str,
         height=640,
         margin=dict(l=60, r=10, t=50, b=60),
         title=dict(text="NMA thresholds", x=0.5, xanchor="center"),
-        xaxis_title="NII",
-        yaxis_title="Area",
+        xaxis_title=xcol,
+        yaxis_title=ycol,
         xaxis_range=[graph_limits[2], graph_limits[3]],
         yaxis_range=[graph_limits[0], graph_limits[1]],
     )

@@ -3,7 +3,10 @@ import pickle
 import os
 import matplotlib
 from pathlib import Path
-matplotlib.use('TkAgg')
+try:
+    matplotlib.use('TkAgg')
+except ImportError:
+    matplotlib.use('Agg')
 
 HERE = Path(__file__).resolve().parent
 PICKLE_PATH = HERE / "control_parameters.pickle"   # 2) caminho estável
