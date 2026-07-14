@@ -827,13 +827,16 @@ body {
 
 .table-wrap {
   overflow: auto;
+  max-width: 100%;
+  max-height: min(520px, 70vh);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fff;
 }
 
 .results-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }

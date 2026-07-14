@@ -1700,31 +1700,70 @@ def _redraw_gated_images(kept: pd.DataFrame, datasets: list[dict], out_dir: Path
     return list(dict.fromkeys(files))
 
 
-def _gate_summary_table(df: pd.DataFrame) -> StatsTable:
-    grouped = (
-        df.groupby("__source__", as_index=False)
-        .agg(
-            total=("__gate_keep__", "size"),
-            kept=("__gate_keep__", "sum"),
-        )
-    )
-    grouped["removed"] = grouped["total"] - grouped["kept"]
-    grouped["kept_pct"] = np.where(grouped["total"] > 0, grouped["kept"] * 100.0 / grouped["total"], 0.0)
-    grouped["removed_pct"] = 100.0 - grouped["kept_pct"]
+def _percentile_rank(series: pd.Series, value: float) -> float:
+    values = pd.to_numeric(series, errors="coerce").dropna()
+    if values.empty:
+        return 0.0
+    return float((values <= value).mean() * 100.0)
 
+
+def _gate_summary_row(
+        df: pd.DataFrame,
+        dataset: str,
+        condition: str,
+        req: GatingPreviewRequest,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+) -> dict:
     total = int(df["__gate_keep__"].shape[0])
     kept = int(df["__gate_keep__"].sum())
-    overall = pd.DataFrame(
-        [{
-            "__source__": "All datasets",
-            "total": total,
-            "kept": kept,
-            "removed": total - kept,
-            "kept_pct": (kept * 100.0 / total) if total > 0 else 0.0,
-            "removed_pct": ((total - kept) * 100.0 / total) if total > 0 else 0.0,
-        }]
-    )
-    full = pd.concat([grouped, overall], ignore_index=True)
+    removed = total - kept
+    return {
+        "dataset": dataset,
+        "condition": condition,
+        "total": total,
+        "kept": kept,
+        "removed": removed,
+        "kept_pct": (kept * 100.0 / total) if total > 0 else 0.0,
+        "removed_pct": (removed * 100.0 / total) if total > 0 else 0.0,
+        f"{req.x_col}_min": x_min,
+        f"{req.x_col}_min_percentile": _percentile_rank(df[req.x_col], x_min),
+        f"{req.x_col}_max": x_max,
+        f"{req.x_col}_max_percentile": _percentile_rank(df[req.x_col], x_max),
+        f"{req.y_col}_min": y_min,
+        f"{req.y_col}_min_percentile": _percentile_rank(df[req.y_col], y_min),
+        f"{req.y_col}_max": y_max,
+        f"{req.y_col}_max_percentile": _percentile_rank(df[req.y_col], y_max),
+    }
+
+
+def _gate_summary_table(
+        df: pd.DataFrame,
+        req: GatingPreviewRequest,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+) -> StatsTable:
+    df_summary = df.copy()
+    if "Condition" in df_summary.columns:
+        df_summary["__gate_condition__"] = (
+            df_summary["Condition"]
+            .fillna("Unknown")
+            .astype(str)
+            .map(lambda value: value.strip() or "Unknown")
+        )
+    else:
+        df_summary["__gate_condition__"] = "All conditions"
+
+    rows = []
+    for (dataset, condition), part in df_summary.groupby(["__source__", "__gate_condition__"], sort=False):
+        rows.append(_gate_summary_row(part, str(dataset), str(condition), req, x_min, x_max, y_min, y_max))
+
+    rows.append(_gate_summary_row(df_summary, "All datasets", "All conditions", req, x_min, x_max, y_min, y_max))
+    full = pd.DataFrame(rows)
     rows = json.loads(full.to_json(orient="records"))
     return StatsTable(name="gating_summary", columns=[str(c) for c in full.columns], rows=rows)
 
@@ -1772,7 +1811,7 @@ def filters_preview(req: GatingPreviewRequest):
     df = _load_gate_dataframe(req)
     x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
     df["__gate_keep__"] = _apply_gate(df, req.x_col, req.y_col, x_min, x_max, y_min, y_max)
-    summary = _gate_summary_table(df)
+    summary = _gate_summary_table(df, req, x_min, x_max, y_min, y_max)
     total = int(df["__gate_keep__"].shape[0])
     kept = int(df["__gate_keep__"].sum())
     return GatingPreviewResponse(
@@ -1792,7 +1831,7 @@ def filters_apply(req: GatingApplyRequest):
     df = _load_gate_dataframe(req)
     x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
     df["__gate_keep__"] = _apply_gate(df, req.x_col, req.y_col, x_min, x_max, y_min, y_max)
-    summary = _gate_summary_table(df)
+    summary = _gate_summary_table(df, req, x_min, x_max, y_min, y_max)
 
     files = []
     kept = df.loc[df["__gate_keep__"]].copy()
