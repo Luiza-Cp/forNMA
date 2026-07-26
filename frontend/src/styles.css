@@ -1474,7 +1474,7 @@ button:not(:disabled):hover {
 
 .plot-shell {
   display: grid;
-  grid-template-columns: 64px 640px;
+  grid-template-columns: 92px 640px;
   gap: 12px;
   align-items: stretch;
 }
@@ -1509,7 +1509,7 @@ button:not(:disabled):hover {
   appearance: slider-vertical;
   writing-mode: vertical-rl;
   direction: rtl;
-  height: 560px;
+  height: 520px;
   width: 24px;
   accent-color: var(--accent);
 }
@@ -1529,6 +1529,35 @@ button:not(:disabled):hover {
   text-align: center;
 }
 
+.workflow-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.slider-inline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sd-number-input {
+  width: 72px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+  text-align: right;
+}
+
 .readonly {
   font-size: 12px;
   color: var(--muted);
@@ -1540,7 +1569,9 @@ button:not(:disabled):hover {
   text-align: right;
 }
 .wizard-actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   background: transparent;
 }

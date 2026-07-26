@@ -4034,7 +4034,7 @@ function buildStep2Figure(
   sdNii,
   sdArea,
   withLabels = false,
-  verticalColor = "#8E7CC3",
+  verticalColor = "#7C3AED",
   horizontalColor = "#3A6EA5"
 ) {
   const data = [...(traces || [])];
@@ -4073,7 +4073,7 @@ function buildStep2Figure(
       x1: thresholds.v_down,
       y0: y_bottom,
       y1: y_low,
-      line: { color: verticalColor, width: 4 },
+      line: { color: verticalColor, width: 5, dash: "solid" },
       editable: true,
     },
     {
@@ -4082,7 +4082,7 @@ function buildStep2Figure(
       x1: thresholds.v_down2,
       y0: y_bottom,
       y1: y_low,
-      line: { color: verticalColor, width: 4 },
+      line: { color: verticalColor, width: 5, dash: "solid" },
       editable: true,
     },
     {
@@ -4091,7 +4091,7 @@ function buildStep2Figure(
       x1: thresholds.v_mid,
       y0: y_low,
       y1: y_high,
-      line: { color: verticalColor, width: 4 },
+      line: { color: verticalColor, width: 5, dash: "solid" },
       editable: true,
     },
     {
@@ -4100,7 +4100,7 @@ function buildStep2Figure(
       x1: thresholds.v_up,
       y0: y_high,
       y1: y_top,
-      line: { color: verticalColor, width: 4 },
+      line: { color: verticalColor, width: 5, dash: "solid" },
       editable: true,
     },
   ];
@@ -6721,6 +6721,65 @@ export default function App() {
     setTrackingEditing(false);
   };
 
+  const updateNmaAreaSd = (value) => {
+    const v = round2(value);
+    setSdArea(v);
+    if (step1Stats && step1GraphLimits && step1Sample) {
+      setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, sdNii, v));
+      setThresholds(computeThresholds(step1Stats, sdNii, v));
+    }
+  };
+
+  const updateNmaNiiSd = (value) => {
+    const v = round2(value);
+    setSdNii(v);
+    if (step1Stats && step1GraphLimits && step1Sample) {
+      setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, v, sdArea));
+      setThresholds(computeThresholds(step1Stats, v, sdArea));
+    }
+  };
+
+  const renderNmaStepControls = () => {
+    if (!(controlGateReady || step1Ready) || showPlotConfig) return null;
+    return (
+      <div className="workflow-bar">
+        <div className="stepper">
+          <div className={`chip ${step === 0 ? "active" : ""}`}>Step 1</div>
+          <div className={`chip ${step === 1 ? "active" : ""}`}>Step 2</div>
+          <div className={`chip ${step === 2 ? "active" : ""}`}>Step 3</div>
+        </div>
+        <div className="wizard-actions">
+          {step1Ready && (
+            <Button
+              className="secondary"
+              onClick={() => setStep(step === 2 ? 1 : 0)}
+              disabled={step === 0 || (step === 1 && !controlGateReady)}
+            >
+              Previous
+            </Button>
+          )}
+          {!step1Ready ? (
+            <Button className="primary" onClick={handleStep1} disabled={!controlGateReady}>Use gate for Step 2</Button>
+          ) : step === 1 ? (
+            <Button
+              className="primary"
+              onClick={async () => {
+                const ok = await handleStep2();
+                if (ok) setStep(2);
+              }}
+            >
+              Next
+            </Button>
+          ) : step === 0 ? (
+            <Button className="primary" onClick={handleStep1} disabled={!controlGateReady}>Use gate for Step 2</Button>
+          ) : (
+            <Button className="primary" onClick={handleComplete}>Complete</Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const handleResetActiveModule = () => {
     if (activeModule === "Home") {
       setHomeSection("about");
@@ -7962,45 +8021,9 @@ export default function App() {
         </Card>
 
         <main className="content">
-          {(controlGateReady || step1Ready) && !showPlotConfig && (
-            <div className="row row-between" style={{ marginBottom: 12 }}>
-              <div className="stepper">
-                <div className={`chip ${step === 0 ? "active" : ""}`}>Step 1</div>
-                <div className={`chip ${step === 1 ? "active" : ""}`}>Step 2</div>
-                <div className={`chip ${step === 2 ? "active" : ""}`}>Step 3</div>
-              </div>
-              <div className="wizard-actions">
-                {step1Ready && (
-                  <Button
-                    className="secondary"
-                    onClick={() => setStep(step === 2 ? 1 : 0)}
-                    disabled={step === 0 || (step === 1 && !controlGateReady)}
-                  >
-                    Previous
-                  </Button>
-                )}
-                {!step1Ready ? (
-                  <Button className="primary" onClick={handleStep1} disabled={!controlGateReady}>Use gate for Step 2</Button>
-                ) : step === 1 ? (
-                  <Button
-                    className="primary"
-                    onClick={async () => {
-                      const ok = await handleStep2();
-                      if (ok) setStep(2);
-                    }}
-                  >
-                    Next
-                  </Button>
-                ) : step === 0 ? (
-                  <Button className="primary" onClick={handleStep1} disabled={!controlGateReady}>Use gate for Step 2</Button>
-                ) : (
-                  <Button className="primary" onClick={handleComplete}>Complete</Button>
-                )}
-              </div>
-            </div>
-          )}
           {!step1Ready ? (
             <section>
+              {renderNmaStepControls()}
               <h2>Step 1 · Control gate</h2>
               <p className="hint">
                 Use the box to remove control cells that look like outliers. Cells with unusually high or low Area or NII can distort the NMA settings, so keep the clean central control population for the ellipse in the next step.
@@ -8039,6 +8062,7 @@ export default function App() {
             <>
           {step === 0 && (
             <section>
+              {renderNmaStepControls()}
               <h2>Step 1 · Control gate</h2>
               <p className="hint">
                 Use the box to remove control cells that look like outliers. Cells with unusually high or low Area or NII can distort the NMA settings, so keep the clean central control population for the ellipse in Step 2.
@@ -8074,8 +8098,11 @@ export default function App() {
           )}
           {step === 1 && (
             <section>
+              {renderNmaStepControls()}
               <h2>Step 2 · Control ellipse</h2>
-              <p className="hint">The ellipse is drawn over the gated normal control cells from Step 1. Adjust SDs or use auto-DBSCAN.</p>
+              <p className="hint">
+                The ellipse defines the Normal subpopulation used in the nuclear morphometry analysis. It is based on the gated control cells from Step 1 and represents nuclei expected to be healthy; adjust the Area and NII SDs manually or use auto-DBSCAN.
+              </p>
               <div className="row row-right" style={{ marginBottom: 8 }}>
                 <Button className="secondary" onClick={handleAutoDbscan}>Auto (DBSCAN)</Button>
               </div>
@@ -8083,18 +8110,22 @@ export default function App() {
                 <div className="slider-vertical">
                   <label>Area SD <Tip text="Adjust Area standard deviation for threshold and ellipse height." /></label>
                   <input
+                    className="sd-number-input"
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={Number.isFinite(sdArea) ? sdArea.toFixed(2) : ""}
+                    onChange={(e) => updateNmaAreaSd(parseFloat(e.target.value || "0"))}
+                  />
+                  <input
                     type="range"
                     min="0"
                     max="5"
                     step="0.1"
                     value={5 - sdArea}
                   onChange={(e) => {
-                      const v = round2(5 - parseFloat(e.target.value || "0"));
-                      setSdArea(v);
-                      if (step1Stats && step1GraphLimits && step1Sample) {
-                        setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, sdNii, v));
-                        setThresholds(computeThresholds(step1Stats, sdNii, v));
-                      }
+                      updateNmaAreaSd(5 - parseFloat(e.target.value || "0"));
                     }}
                   />
                   <span className="slider-value">{sdArea.toFixed(2)}</span>
@@ -8102,7 +8133,18 @@ export default function App() {
                 <PlotPanel figure={step1Figure} />
               </div>
               <div className="slider-horizontal">
-                <label>NII SD <Tip text="Adjust NII standard deviation for threshold and ellipse width." /></label>
+                <div className="slider-inline-head">
+                  <label>NII SD <Tip text="Adjust NII standard deviation for threshold and ellipse width." /></label>
+                  <input
+                    className="sd-number-input"
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={Number.isFinite(sdNii) ? sdNii.toFixed(2) : ""}
+                    onChange={(e) => updateNmaNiiSd(parseFloat(e.target.value || "0"))}
+                  />
+                </div>
                 <input
                   type="range"
                   min="0"
@@ -8110,12 +8152,7 @@ export default function App() {
                   step="0.1"
                   value={sdNii}
                   onChange={(e) => {
-                    const v = round2(parseFloat(e.target.value || "0"));
-                    setSdNii(v);
-                    if (step1Stats && step1GraphLimits && step1Sample) {
-                      setStep1Figure(buildStep1Figure(step1Sample, step1Stats, step1GraphLimits, v, sdArea));
-                      setThresholds(computeThresholds(step1Stats, v, sdArea));
-                    }
+                    updateNmaNiiSd(parseFloat(e.target.value || "0"));
                   }}
                 />
                 <span className="slider-value">{sdNii.toFixed(2)}</span>
@@ -8125,8 +8162,13 @@ export default function App() {
 
           {step === 2 && (
             <section>
+              {renderNmaStepControls()}
               <h2>Step 3 · Threshold lines</h2>
-              {!showPlotConfig && <p className="hint">Use additional datasets for reference.</p>}
+              {!showPlotConfig && (
+                <p className="hint">
+                  Drag and drop the purple vertical lines to set the NMA population thresholds. The horizontal lines are fixed, and the percentage boxes update automatically from the line positions.
+                </p>
+              )}
               {(showPlotConfig && hasPlotRun && !showNmaPreviewWhilePlotting) ? (
                 <div className="hint">
                   NMA preview and quadrant table are minimized while plotting.
