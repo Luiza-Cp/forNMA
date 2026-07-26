@@ -1539,6 +1539,22 @@ button:not(:disabled):hover {
   border-bottom: 1px solid var(--border);
 }
 
+.workflow-bar-done {
+  align-items: flex-start;
+}
+
+.workflow-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.workflow-bar .hint {
+  margin: 0;
+  max-width: 560px;
+}
+
 .slider-inline-head {
   display: flex;
   align-items: center;

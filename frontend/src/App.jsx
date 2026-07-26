@@ -4034,7 +4034,7 @@ function buildStep2Figure(
   sdNii,
   sdArea,
   withLabels = false,
-  verticalColor = "#7C3AED",
+  verticalColor = "#D000FF",
   horizontalColor = "#3A6EA5"
 ) {
   const data = [...(traces || [])];
@@ -4073,7 +4073,7 @@ function buildStep2Figure(
       x1: thresholds.v_down,
       y0: y_bottom,
       y1: y_low,
-      line: { color: verticalColor, width: 5, dash: "solid" },
+      line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
     },
     {
@@ -4082,7 +4082,7 @@ function buildStep2Figure(
       x1: thresholds.v_down2,
       y0: y_bottom,
       y1: y_low,
-      line: { color: verticalColor, width: 5, dash: "solid" },
+      line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
     },
     {
@@ -4091,7 +4091,7 @@ function buildStep2Figure(
       x1: thresholds.v_mid,
       y0: y_low,
       y1: y_high,
-      line: { color: verticalColor, width: 5, dash: "solid" },
+      line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
     },
     {
@@ -4100,7 +4100,7 @@ function buildStep2Figure(
       x1: thresholds.v_up,
       y0: y_high,
       y1: y_top,
-      line: { color: verticalColor, width: 5, dash: "solid" },
+      line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
     },
   ];
@@ -5359,7 +5359,7 @@ export default function App() {
       });
       setDownloadReady(true);
       setShowPlotConfig(true);
-      setStatus("Completed. Final figure ready.");
+      setStatus("Settings ready. Choose the plot style, saving path, and output options in the left panel.");
       setStatusLevel("success");
     } catch (err) {
       setStatus(errorMessageFromException(err, "The final NMA figure could not be completed. Check the selected graph limits and settings."));
@@ -6740,7 +6740,40 @@ export default function App() {
   };
 
   const renderNmaStepControls = () => {
-    if (!(controlGateReady || step1Ready) || showPlotConfig) return null;
+    if (!(controlGateReady || step1Ready)) return null;
+    if (finalMode && downloadReady) {
+      return (
+        <div className="workflow-bar workflow-bar-done">
+          <div>
+            <div className="workflow-title">Settings ready</div>
+            <p className="hint">
+              Your NMA settings were created successfully. Use the left panel to choose plot style, saving path, and output options.
+            </p>
+          </div>
+          <div className="wizard-actions">
+            <Button
+              className="primary"
+              onClick={() => {
+                window.location.href = `${API_BASE}/nma/settings/download`;
+              }}
+            >
+              Download settings
+            </Button>
+            <Button
+              className="secondary"
+              onClick={() => {
+                setShowPlotConfig(true);
+                setStatus("Settings are ready. Choose plot style and saving path in the left panel.");
+                setStatusLevel("info");
+              }}
+            >
+              Configure plots
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    if (showPlotConfig) return null;
     return (
       <div className="workflow-bar">
         <div className="stepper">
@@ -8290,14 +8323,6 @@ export default function App() {
               )}
               {(!showPlotConfig || !hasPlotRun || showNmaPreviewWhilePlotting) && finalMode && downloadReady && (
                 <div className="section">
-                  <Button
-                    className="primary"
-                    onClick={() => {
-                      window.location.href = `${API_BASE}/nma/settings/download`;
-                    }}
-                  >
-                    Download settings
-                  </Button>
                   <Button
                     className="secondary"
                     onClick={handleDownloadTable}
