@@ -16,6 +16,15 @@ class NMAParams(BaseModel):
     datasets: List[DatasetSpec] = Field(default_factory=list)
 
 
+class NMAControlGate(BaseModel):
+    enabled: bool = False
+    sd: float = 2.0
+    x_min: Optional[float] = None
+    x_max: Optional[float] = None
+    y_min: Optional[float] = None
+    y_max: Optional[float] = None
+
+
 class NMAComputeRequest(BaseModel):
     params: NMAParams
     sample_per_ds: int = 2000
@@ -23,6 +32,7 @@ class NMAComputeRequest(BaseModel):
     axis_headroom: float = 0.05
     axis_quantile: Optional[float] = None
     axis_k_neg: float = 2.0
+    control_gate: Optional[NMAControlGate] = None
 
 
 class NMAComputeResponse(BaseModel):
@@ -32,6 +42,7 @@ class NMAComputeResponse(BaseModel):
     sample: Dict[str, List[float]]
     sd_factors: Dict[str, float]
     figure: Dict[str, Any]
+    gate: Optional[Dict[str, Any]] = None
 
 
 class NMAAutoDbscanRequest(BaseModel):
@@ -39,6 +50,7 @@ class NMAAutoDbscanRequest(BaseModel):
     sample_per_ds: int = 2000
     pctl: int = 90
     eps_percentile: int = 90
+    control_gate: Optional[NMAControlGate] = None
 
 
 class NMAAutoDbscanResponse(BaseModel):
@@ -91,6 +103,7 @@ class NMAPreviewResponse(BaseModel):
     sd_factors: Dict[str, float]
     graph_limits: List[float]
     thresholds: NMAThresholds
+    gate: Optional[Dict[str, Any]] = None
 
 
 class NMAFigureRequest(BaseModel):
@@ -106,6 +119,7 @@ class NMAFigureRequest(BaseModel):
     thresholds: Optional[NMAThresholds] = None
     include_sample: bool = True
     include_all_datasets: bool = False
+    control_gate: Optional[NMAControlGate] = None
 
 
 class NMAFigureResponse(BaseModel):

@@ -3807,6 +3807,92 @@ function buildStep1Figure(sample, stats, graphLimits, sdNii, sdArea) {
   return { data, layout };
 }
 
+function buildControlGateFigure(gate, stats, graphLimits) {
+  const preview = gate?.preview || {};
+  const xs = preview.x || [];
+  const ys = preview.y || [];
+  const keep = preview.keep || [];
+  const keptX = [];
+  const keptY = [];
+  const removedX = [];
+  const removedY = [];
+  xs.forEach((x, idx) => {
+    if (keep[idx]) {
+      keptX.push(x);
+      keptY.push(ys[idx]);
+    } else {
+      removedX.push(x);
+      removedY.push(ys[idx]);
+    }
+  });
+  const data = [];
+  if (removedX.length) {
+    data.push({
+      x: removedX,
+      y: removedY,
+      mode: "markers",
+      type: "scattergl",
+      marker: { size: 5, opacity: 0.3, color: "#9AA6B2" },
+      name: "Removed from control gate",
+    });
+  }
+  if (keptX.length) {
+    data.push({
+      x: keptX,
+      y: keptY,
+      mode: "markers",
+      type: "scattergl",
+      marker: { size: 6, opacity: 0.72, color: "#2F855A" },
+      name: "Kept as normal control",
+    });
+  }
+  const bounds = gate?.bounds || {};
+  const x0 = bounds.x_min ?? graphLimits?.[2] ?? 0;
+  const x1 = bounds.x_max ?? graphLimits?.[3] ?? 1;
+  const y0 = bounds.y_min ?? graphLimits?.[0] ?? 0;
+  const y1 = bounds.y_max ?? graphLimits?.[1] ?? 1;
+  const layout = {
+    autosize: false,
+    width: 640,
+    height: 640,
+    margin: { l: 60, r: 10, t: 50, b: 60 },
+    title: { text: "NMA · Gate do controle", x: 0.5, xanchor: "center" },
+    xaxis: { title: "NII", range: [graphLimits?.[2] ?? x0, graphLimits?.[3] ?? x1], fixedrange: true },
+    yaxis: { title: "Area", range: [graphLimits?.[0] ?? y0, graphLimits?.[1] ?? y1], fixedrange: true },
+    shapes: [
+      {
+        type: "rect",
+        x0,
+        x1,
+        y0,
+        y1,
+        line: { color: "#2F855A", width: 2 },
+        fillcolor: "rgba(47, 133, 90, 0.08)",
+        editable: false,
+      },
+    ],
+    annotations: stats
+      ? [
+          {
+            text: `Gate: ${gate?.kept ?? 0}/${gate?.total ?? 0} cells`,
+            x: stats.mu_x,
+            y: y1,
+            xref: "x",
+            yref: "y",
+            showarrow: false,
+            yanchor: "bottom",
+            font: { size: 12, color: "#1F2D3D" },
+            bgcolor: "rgba(247, 249, 252, 0.94)",
+            bordercolor: "rgba(217, 226, 236, 0.95)",
+            borderwidth: 1,
+            borderpad: 4,
+          },
+        ]
+      : [],
+  };
+  return { data, layout };
+}
+
 function computeThresholds(stats, sdNii, sdArea) {
   if (!stats) {
     return {
@@ -3859,7 +3945,12 @@ function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea, percen
     text: makeText(a.label),
     x: a.x,
     y: a.y,
+    xref: "x",
+    yref: "y",
+    xanchor: "center",
+    yanchor: "middle",
     showarrow: false,
+    captureevents: false,
     font: { size: 12, color: "#1F2D3D" },
     bgcolor: "rgba(247, 249, 252, 0.94)",
     bordercolor: "rgba(217, 226, 236, 0.95)",
@@ -4045,7 +4136,12 @@ export default function App() {
   const [rows, setRows] = useState(initialNmaRows());
   const [collapsedById, setCollapsedById] = useState({});
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
+  const [controlGateReady, setControlGateReady] = useState(false);
+  const [controlGateSd, setControlGateSd] = useState("2");
+  const [controlGateBounds, setControlGateBounds] = useState({ x_min: "", x_max: "", y_min: "", y_max: "" });
+  const [controlGateMeta, setControlGateMeta] = useState(null);
+  const [controlGateFigure, setControlGateFigure] = useState(null);
   const [step1Ready, setStep1Ready] = useState(false);
   const [status, setStatus] = useState("");
   const [statusLevel, setStatusLevel] = useState("info");
@@ -4249,6 +4345,42 @@ export default function App() {
     setStatus(`Choose both Area and NII columns for: ${names}. Open each dataset row and select the columns that contain those numeric measurements.`);
     setStatusLevel("error");
     return false;
+  };
+
+  const parseNmaOptionalNumber = (value) => {
+    if (value === "" || value == null) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const makeControlGatePayload = () => {
+    const sd = Number(controlGateSd);
+    return {
+      enabled: true,
+      sd: Number.isFinite(sd) && sd > 0 ? sd : 2,
+      x_min: parseNmaOptionalNumber(controlGateBounds.x_min),
+      x_max: parseNmaOptionalNumber(controlGateBounds.x_max),
+      y_min: parseNmaOptionalNumber(controlGateBounds.y_min),
+      y_max: parseNmaOptionalNumber(controlGateBounds.y_max),
+    };
+  };
+
+  const markControlGateDirty = () => {
+    setControlGateReady(false);
+    setStep1Ready(false);
+    setStep(0);
+    setStep1Figure(null);
+    setStep1Stats(null);
+    setStep1GraphLimits(null);
+    setStep1Sample(null);
+    setStep2Figure(null);
+    setStep2Traces(null);
+    setStep2Stats(null);
+    setStep2GraphLimits(null);
+    setStep2Percentages(null);
+    setFinalMode(false);
+    setDownloadReady(false);
+    setShowPlotConfig(false);
   };
 
   useEffect(() => {
@@ -4988,8 +5120,54 @@ export default function App() {
     setSegPanelResetKey((k) => k + 1);
   };
 
+  const handleControlGate = async () => {
+    if (!requireNmaAxes()) return false;
+    setShowPlotConfig(false);
+    setStatus("Checking the normal control gate...");
+    setStatusLevel("info");
+    try {
+      const payload = {
+        params: { datasets },
+        sample_per_ds: 2000,
+        control_gate: makeControlGatePayload(),
+      };
+      const data = await callApi("/nma/settings/compute", payload);
+      const graphLimits = data.axis ? [data.axis.y[0], data.axis.y[1], data.axis.x[0], data.axis.x[1]] : null;
+      setControlGateMeta(data.gate || null);
+      setControlGateFigure(buildControlGateFigure(data.gate, data.stats, graphLimits));
+      setControlGateReady(true);
+      setStep1Ready(false);
+      setStep1Figure(null);
+      setStep1Stats(null);
+      setStep1GraphLimits(null);
+      setStep1Sample(null);
+      setStep2Figure(null);
+      setStep2Traces(null);
+      setStep2Stats(null);
+      setStep2GraphLimits(null);
+      setStep2Percentages(null);
+      setFinalMode(false);
+      const kept = data.gate?.kept ?? 0;
+      const total = data.gate?.total ?? 0;
+      const pct = Number(data.gate?.kept_percent ?? 0).toFixed(1);
+      setStatus(`Control gate ready: ${kept}/${total} cells kept (${pct}%). Use this gate to build Step 1.`);
+      setStatusLevel("success");
+      return true;
+    } catch (err) {
+      setStatus(errorMessageFromException(err, "The control gate could not be created. Check that the control dataset has numeric Area/NII values, then widen the gate or use the automatic 2 SD limits."));
+      setStatusLevel("error");
+      return false;
+    }
+  };
+
   const handleStep1 = async () => {
     if (!requireNmaAxes()) return;
+    if (!controlGateReady) {
+      setStatus("Create the control gate first. This extra step keeps the normal control cells used to draw the Step 1 ellipse.");
+      setStatusLevel("error");
+      setStep(0);
+      return;
+    }
     setShowPlotConfig(false);
     setStatus("Computing step 1...");
     setStatusLevel("info");
@@ -4997,6 +5175,7 @@ export default function App() {
       const payload = {
         params: { datasets },
         sample_per_ds: 2000,
+        control_gate: makeControlGatePayload(),
       };
       const data = await callApi("/nma/settings/compute", payload);
       setStep1Sample(data.sample);
@@ -5013,9 +5192,10 @@ export default function App() {
       );
       setStep1Figure(fig);
       setThresholds(computeThresholds(data.stats, data.sd_factors.sd_nii, data.sd_factors.sd_area));
-      setStatus("Step 1 ready. Adjust sliders and continue when OK.");
+      setStatus("Step 1 ready. The ellipse is based only on the gated normal control cells.");
       setStatusLevel("success");
       setStep1Ready(true);
+      setStep(1);
     } catch (err) {
       setStatus(errorMessageFromException(err, "Step 1 could not be computed. Check that at least one control dataset is selected and that Area/NII columns are numeric."));
       setStatusLevel("error");
@@ -5027,7 +5207,7 @@ export default function App() {
     setStatus("Running DBSCAN...");
     setStatusLevel("info");
     try {
-      const payload = { params: { datasets } };
+      const payload = { params: { datasets }, control_gate: makeControlGatePayload() };
       const data = await callApi("/nma/settings/auto-dbscan", payload);
       setSdNii(round2(data.sd_factors.sd_nii));
       setSdArea(round2(data.sd_factors.sd_area));
@@ -5057,6 +5237,7 @@ export default function App() {
         sd_nii: sdNii,
         sd_area: sdArea,
         thresholds,
+        control_gate: makeControlGatePayload(),
       };
       const data = await callApi("/nma/settings/figure", payload);
       const traces = (data.figure?.data || []).filter(
@@ -6364,7 +6545,12 @@ export default function App() {
     if (!ok) return;
     setRows(initialNmaRows());
     setCollapsedById({});
-    setStep(1);
+    setStep(0);
+    setControlGateReady(false);
+    setControlGateSd("2");
+    setControlGateBounds({ x_min: "", x_max: "", y_min: "", y_max: "" });
+    setControlGateMeta(null);
+    setControlGateFigure(null);
     setStep1Ready(false);
     setStatus("");
     setStatusLevel("info");
@@ -6519,8 +6705,9 @@ export default function App() {
               <div className="subtitle">{activeModule}</div>
             </div>
           </div>
-          {activeModule === "NMA" && step1Ready && (
+          {activeModule === "NMA" && (controlGateReady || step1Ready) && (
             <div className="stepper">
+              <div className={`chip ${step === 0 ? "active" : ""}`}>Gate</div>
               <div className={`chip ${step === 1 ? "active" : ""}`}>Step 1</div>
               <div className={`chip ${step === 2 ? "active" : ""}`}>Step 2</div>
             </div>
@@ -7430,6 +7617,88 @@ export default function App() {
 
           <Button className="secondary" onClick={addRow}>Add dataset</Button>
 
+          {!showPlotConfig && (
+            <div className="section">
+              <h4>Control gate</h4>
+              <p className="hint">
+                First keep only the control cells that look like the normal population. By default, the gate uses about 2 standard deviations around the control center; Step 1 draws the ellipse only from the cells kept here.
+              </p>
+              <div className="row">
+                <div className="metric">
+                  <label>Gate SD <Tip text="Automatic gate width around the control mean. About 2 SD keeps the central, more normal control population." /></label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={controlGateSd}
+                    onChange={(e) => {
+                      setControlGateSd(e.target.value);
+                      markControlGateDirty();
+                    }}
+                  />
+                </div>
+                {controlGateMeta && (
+                  <div className="metric">
+                    <label>Kept cells</label>
+                    <div className="readonly">
+                      {controlGateMeta.kept}/{controlGateMeta.total} ({Number(controlGateMeta.kept_percent || 0).toFixed(1)}%)
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="row">
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="NII min (optional)"
+                  value={controlGateBounds.x_min}
+                  onChange={(e) => {
+                    setControlGateBounds((prev) => ({ ...prev, x_min: e.target.value }));
+                    markControlGateDirty();
+                  }}
+                />
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="NII max (optional)"
+                  value={controlGateBounds.x_max}
+                  onChange={(e) => {
+                    setControlGateBounds((prev) => ({ ...prev, x_max: e.target.value }));
+                    markControlGateDirty();
+                  }}
+                />
+              </div>
+              <div className="row">
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="Area min (optional)"
+                  value={controlGateBounds.y_min}
+                  onChange={(e) => {
+                    setControlGateBounds((prev) => ({ ...prev, y_min: e.target.value }));
+                    markControlGateDirty();
+                  }}
+                />
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="Area max (optional)"
+                  value={controlGateBounds.y_max}
+                  onChange={(e) => {
+                    setControlGateBounds((prev) => ({ ...prev, y_max: e.target.value }));
+                    markControlGateDirty();
+                  }}
+                />
+              </div>
+              {controlGateMeta?.bounds && (
+                <div className="hint">
+                  Active limits: NII {Number(controlGateMeta.bounds.x_min).toFixed(3)} to {Number(controlGateMeta.bounds.x_max).toFixed(3)}; Area {Number(controlGateMeta.bounds.y_min).toFixed(3)} to {Number(controlGateMeta.bounds.y_max).toFixed(3)}.
+                </div>
+              )}
+              <Button className="secondary" onClick={handleControlGate} disabled={!hasControl}>Preview control gate</Button>
+            </div>
+          )}
+
           <div className="section">
             {!showPlotConfig ? (
               <>
@@ -7747,12 +8016,21 @@ export default function App() {
               >
                 Load settings
               </Button>
-              {!step1Ready && (
-                <Button className="primary" onClick={handleStep1} disabled={!hasControl}>Create Settings</Button>
+              {!controlGateReady && !step1Ready && (
+                <Button className="primary" onClick={handleControlGate} disabled={!hasControl}>Preview control gate</Button>
+              )}
+              {controlGateReady && !step1Ready && (
+                <Button className="primary" onClick={handleStep1} disabled={!hasControl}>Use gate for Step 1</Button>
               )}
               {step1Ready && (
                 <div className="wizard-actions">
-                  <Button className="secondary" onClick={() => setStep(1)} disabled={step === 1}>Previous</Button>
+                  <Button
+                    className="secondary"
+                    onClick={() => setStep(step === 2 ? 1 : 0)}
+                    disabled={step === 0 || (step === 1 && !controlGateReady)}
+                  >
+                    Previous
+                  </Button>
                   {step === 1 ? (
                     <Button
                       className="primary"
@@ -7763,6 +8041,8 @@ export default function App() {
                     >
                       Next
                     </Button>
+                  ) : step === 0 ? (
+                    <Button className="primary" onClick={handleStep1}>Use gate for Step 1</Button>
                   ) : (
                     <Button className="primary" onClick={handleComplete}>Complete</Button>
                   )}
@@ -7788,14 +8068,39 @@ export default function App() {
           </div>
           {!step1Ready ? (
             <section>
-              <p className="hint">No settings loaded yet. Use `Load settings` or `Create Settings` to start.</p>
+              <h2>Control gate · Normal population</h2>
+              <p className="hint">
+                Before Step 1, select a clean control population. The automatic gate keeps cells within about 2 standard deviations of the control center, so the ellipse is drawn from cells that represent the normal control pattern.
+              </p>
+              {controlGateFigure ? (
+                <PlotPanel figure={controlGateFigure} config={{ displayModeBar: false, editable: false }} />
+              ) : (
+                <p className="hint">Mark at least one dataset as control, choose Area/NII columns, then preview the control gate.</p>
+              )}
+              {controlGateReady && (
+                <div className="row row-right" style={{ marginTop: 12 }}>
+                  <Button className="primary" onClick={handleStep1}>Use this gate for Step 1</Button>
+                </div>
+              )}
             </section>
           ) : (
             <>
+          {step === 0 && (
+            <section>
+              <h2>Control gate · Normal population</h2>
+              <p className="hint">
+                This gate defines which control cells count as the normal population. If you change the gate, preview it again before returning to Step 1.
+              </p>
+              {controlGateFigure && <PlotPanel figure={controlGateFigure} config={{ displayModeBar: false, editable: false }} />}
+              <div className="row row-right" style={{ marginTop: 12 }}>
+                <Button className="primary" onClick={handleStep1}>Use gate for Step 1</Button>
+              </div>
+            </section>
+          )}
           {step === 1 && (
             <section>
               <h2>Step 1 · Control ellipse</h2>
-              <p className="hint">Adjust SDs or use auto-DBSCAN.</p>
+              <p className="hint">The ellipse is drawn over the gated normal control cells from the previous step. Adjust SDs or use auto-DBSCAN.</p>
               <div className="plot-shell">
                 <div className="slider-vertical">
                   <label>Area SD <Tip text="Adjust Area standard deviation for threshold and ellipse height." /></label>
@@ -7870,26 +8175,53 @@ export default function App() {
                   {step2Figure ? (
                     <PlotPanel
                       figure={step2Figure}
-                      config={{ displayModeBar: false, editable: !finalMode, edits: { shapePosition: true } }}
+                      config={{
+                        displayModeBar: false,
+                        displaylogo: false,
+                        editable: !finalMode,
+                        edits: {
+                          shapePosition: !finalMode,
+                          annotationPosition: false,
+                          annotationText: false,
+                          titleText: false,
+                          axisTitleText: false,
+                          legendPosition: false,
+                          colorbarPosition: false,
+                        },
+                      }}
                       onRelayout={(ev) => {
                         if (finalMode) return;
                         if (!step2GraphLimits || !step2Stats || !step2Traces) return;
+                        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+                        const toFinite = (value) => {
+                          const n = Number(value);
+                          return Number.isFinite(n) ? n : null;
+                        };
                         const getShape = (idx) => {
                           const x0 = ev[`shapes[${idx}].x0`];
                           const x1 = ev[`shapes[${idx}].x1`];
-                          return x0 ?? x1;
+                          const n0 = toFinite(x0);
+                          const n1 = toFinite(x1);
+                          if (n0 != null && n1 != null) return (n0 + n1) / 2;
+                          return n0 ?? n1;
                         };
+                        const shapeChanged = (idx) =>
+                          Object.keys(ev || {}).some((key) => key.startsWith(`shapes[${idx}]`));
+                        const horizontalChanged = shapeChanged(0) || shapeChanged(1);
+                        const verticalChanged = [2, 3, 4, 5].some(shapeChanged);
                         const v_down = getShape(2);
                         const v_down2 = getShape(3);
                         const v_mid = getShape(4);
                         const v_up = getShape(5);
-                        if (v_down == null && v_down2 == null && v_mid == null && v_up == null) return;
+                        if (!horizontalChanged && !verticalChanged) return;
+                        const xMin = step2GraphLimits[2];
+                        const xMax = step2GraphLimits[3];
                         const next = {
                           ...thresholds,
-                          v_down: v_down ?? thresholds.v_down,
-                          v_down2: v_down2 ?? thresholds.v_down2,
-                          v_mid: v_mid ?? thresholds.v_mid,
-                          v_up: v_up ?? thresholds.v_up,
+                          v_down: v_down == null ? thresholds.v_down : clamp(v_down, xMin, xMax),
+                          v_down2: v_down2 == null ? thresholds.v_down2 : clamp(v_down2, xMin, xMax),
+                          v_mid: v_mid == null ? thresholds.v_mid : clamp(v_mid, xMin, xMax),
+                          v_up: v_up == null ? thresholds.v_up : clamp(v_up, xMin, xMax),
                         };
                         setThresholds(next);
                         setStep2Figure(buildStep2Figure(step2Traces, step2Stats, step2GraphLimits, next, sdNii, sdArea, true));

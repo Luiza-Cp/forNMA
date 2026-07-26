@@ -1269,6 +1269,81 @@ def _compute_stats(pool: pd.DataFrame, xcol: str, ycol: str) -> Dict[str, float]
     return {"mu_x": mu_x, "mu_y": mu_y, "sd_x": sd_x, "sd_y": sd_y}
 
 
+def _clean_nma_xy(pool: pd.DataFrame, xcol: str, ycol: str) -> pd.DataFrame:
+    clean = pool.copy()
+    clean[xcol] = pd.to_numeric(clean[xcol], errors="coerce")
+    clean[ycol] = pd.to_numeric(clean[ycol], errors="coerce")
+    clean = clean.dropna(subset=[xcol, ycol])
+    return clean
+
+
+def _apply_control_gate(pool: pd.DataFrame, xcol: str, ycol: str, gate) -> tuple[pd.DataFrame, Dict | None]:
+    clean = _clean_nma_xy(pool, xcol, ycol)
+    if clean.empty:
+        raise HTTPException(
+            status_code=400,
+            detail="The control data has no valid numeric rows for the selected Area and NII columns. Choose numeric columns or upload a CSV with measured cells.",
+        )
+    if gate is None or not gate.enabled:
+        return clean, None
+
+    base_stats = _compute_stats(clean, xcol, ycol)
+    sd_span = float(gate.sd or 2.0)
+    if not np.isfinite(sd_span) or sd_span <= 0:
+        sd_span = 2.0
+
+    x_min = float(gate.x_min) if gate.x_min is not None else base_stats["mu_x"] - sd_span * base_stats["sd_x"]
+    x_max = float(gate.x_max) if gate.x_max is not None else base_stats["mu_x"] + sd_span * base_stats["sd_x"]
+    y_min = float(gate.y_min) if gate.y_min is not None else base_stats["mu_y"] - sd_span * base_stats["sd_y"]
+    y_max = float(gate.y_max) if gate.y_max is not None else base_stats["mu_y"] + sd_span * base_stats["sd_y"]
+    if x_min > x_max:
+        x_min, x_max = x_max, x_min
+    if y_min > y_max:
+        y_min, y_max = y_max, y_min
+
+    keep_mask = (
+        clean[xcol].between(x_min, x_max, inclusive="both")
+        & clean[ycol].between(y_min, y_max, inclusive="both")
+    )
+    gated = clean.loc[keep_mask].copy()
+    total = int(len(clean))
+    kept = int(len(gated))
+    if gated.empty:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The control gate removed every cell. Widen the gate limits or increase the SD range so Step 1 has a normal control population to draw the ellipse."
+            ),
+        )
+
+    max_preview = min(total, 4000)
+    preview = clean.sample(n=max_preview, random_state=42) if total > max_preview else clean
+    preview_mask = (
+        preview[xcol].between(x_min, x_max, inclusive="both")
+        & preview[ycol].between(y_min, y_max, inclusive="both")
+    )
+    meta = {
+        "enabled": True,
+        "sd": float(sd_span),
+        "bounds": {
+            "x_min": float(x_min),
+            "x_max": float(x_max),
+            "y_min": float(y_min),
+            "y_max": float(y_max),
+        },
+        "total": total,
+        "kept": kept,
+        "removed": total - kept,
+        "kept_percent": float((kept / total) * 100.0) if total else 0.0,
+        "preview": {
+            "x": preview[xcol].astype(float).tolist(),
+            "y": preview[ycol].astype(float).tolist(),
+            "keep": preview_mask.astype(bool).tolist(),
+        },
+    }
+    return gated, meta
+
+
 def _json_safe(value):
     if isinstance(value, np.ndarray):
         return [_json_safe(item) for item in value.tolist()]
@@ -3331,7 +3406,8 @@ def nma_settings_compute(req: NMAComputeRequest):
     pool, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool, log)
 
-    stats = _compute_stats(pool, xcol, ycol)
+    pool_stats, gate_meta = _apply_control_gate(pool, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
 
     axis = compute_axis_ranges_from_all(
         params,
@@ -3351,11 +3427,11 @@ def nma_settings_compute(req: NMAComputeRequest):
         sd_area=1.0,
     )
 
-    fig = _build_plotly_figure(pool, xcol, ycol, stats, graph_limits, thresholds)
+    fig = _build_plotly_figure(pool_stats, xcol, ycol, stats, graph_limits, thresholds)
 
     sample = {
-        "x": pool[xcol].astype(float).tolist(),
-        "y": pool[ycol].astype(float).tolist(),
+        "x": pool_stats[xcol].astype(float).tolist(),
+        "y": pool_stats[ycol].astype(float).tolist(),
     }
 
     return NMAComputeResponse(
@@ -3365,6 +3441,7 @@ def nma_settings_compute(req: NMAComputeRequest):
         sample=sample,
         sd_factors={"sd_nii": 1.0, "sd_area": 1.0},
         figure=_json_safe(fig.to_dict()),
+        gate=_json_safe(gate_meta),
     )
 
 
@@ -3374,7 +3451,8 @@ def nma_settings_preview(req: NMAComputeRequest):
     pool, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool, log)
 
-    stats = _compute_stats(pool, xcol, ycol)
+    pool_stats, gate_meta = _apply_control_gate(pool, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
 
     axis = compute_axis_ranges_from_all(
         params,
@@ -3400,6 +3478,7 @@ def nma_settings_preview(req: NMAComputeRequest):
         sd_factors={"sd_nii": 1.0, "sd_area": 1.0},
         graph_limits=[float(x) for x in graph_limits],
         thresholds=NMAThresholds(**thresholds),
+        gate=_json_safe(gate_meta),
     )
 
 
@@ -3412,7 +3491,8 @@ def nma_settings_figure(req: NMAFigureRequest):
     pool_ctrl, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool_ctrl, log)
 
-    stats = _compute_stats(pool_ctrl, xcol, ycol)
+    pool_stats, _gate_meta = _apply_control_gate(pool_ctrl, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
 
     axis = compute_axis_ranges_from_all(
         params,
@@ -3446,7 +3526,7 @@ def nma_settings_figure(req: NMAFigureRequest):
             xcol = xcol_all
             ycol = ycol_all
         else:
-            df_plot = pool_ctrl
+            df_plot = pool_stats
 
     fig = _build_plotly_figure(df_plot, xcol, ycol, stats, graph_limits, thresholds)
 
@@ -3463,13 +3543,14 @@ def nma_settings_auto_dbscan(req: NMAAutoDbscanRequest):
     pool, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool, log)
 
-    stats = _compute_stats(pool, xcol, ycol)
+    pool_stats, _gate_meta = _apply_control_gate(pool, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
     mu_x = stats["mu_x"]
     mu_y = stats["mu_y"]
     sd_x_all = stats["sd_x"]
     sd_y_all = stats["sd_y"]
 
-    df = pool[[xcol, ycol]].copy().dropna()
+    df = pool_stats[[xcol, ycol]].copy().dropna()
 
     X = df[[xcol, ycol]].to_numpy(dtype=float)
     Xs = StandardScaler().fit_transform(X)
