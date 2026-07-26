@@ -40,20 +40,24 @@ def size_filter(
         area_list: List[float], 
         min_size: int, 
         max_size: int,
-        
+        use_defaults: bool = True,
 )-> Tuple[List[np.ndarray], List[float], List[float]]:
     """ 
     Filter objects according to the input values or sets 1/4 of the mean
     area as minimum value and 10 times the median as maximum value.
     """
     area_list2 =  copy.deepcopy(area_list)
-    if min_size is None:
+    if min_size is None and use_defaults:
         min_size = (sum(area_list2)/len(area_list2))/4
-    if max_size is None:
+    if max_size is None and use_defaults:
         i = round( len(area_list2)/2)
         area_list2.sort()
         median = area_list[i]
         max_size = 30*median
+    if min_size is None:
+        min_size = float("-inf")
+    if max_size is None:
+        max_size = float("inf")
     filtered_contours = [b for a, b in zip(area_list, contours) if  min_size < a < max_size]  
 
     return filtered_contours
@@ -78,6 +82,8 @@ def radius_and_eccentricity_filter(
     if eccentricity is None:
         eccentricity = 1
     for i in range(len(contours)):
+        if len(contours[i]) < 5:
+            continue
         center, axis, rotation = cv.fitEllipse(contours[i])
         w = axis[0]      # minor axis
         h = axis[1]         # major axis
@@ -105,7 +111,7 @@ def hull_filter(
         hull = cv.convexHull(cnt)
         hull_a = cv.contourArea(hull)
         if hull_a == 0:
-            extent_hull = 0
+            extent_hull.append(0)
         else:
             ex = a/hull_a
             extent_hull.append(ex)
@@ -124,20 +130,30 @@ def filter_contours(
         max_size: int, 
         min_radius: int, 
         max_radius: int,
-        
+        apply_default_size_filter: bool = True,
 ) -> Union[list[Any], list[ndarray]]:
     """
     Given a set of standard and user-defined parameters, it filters the contours 
     that does not match the conditions. Returns the filtered contour list.
     """
-    areas = []
-    for cnt in contour_list:
-        areas.append(cv.contourArea(cnt))
-    contours = size_filter(contour_list, areas, min_size, max_size)         
+    if len(contour_list) == 0:
+        return []
+
+    contours = contour_list
+    if apply_default_size_filter or min_size is not None or max_size is not None:
+        areas = [cv.contourArea(cnt) for cnt in contour_list]
+        contours = size_filter(
+            contour_list,
+            areas,
+            min_size,
+            max_size,
+            use_defaults=apply_default_size_filter,
+        )
 
     if len(contours) == 0:
         return []
-    contours = hull_filter(contours, shape)
+    if shape is not None:
+        contours = hull_filter(contours, shape)
     
     if len(contours) == 0:
         return []

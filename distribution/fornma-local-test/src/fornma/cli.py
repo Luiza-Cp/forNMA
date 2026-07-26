@@ -41,6 +41,11 @@ def main():
         help='path to parameters.toml'
     )
     parser_segmentation.add_argument('--preview', action='store_true', help='Preview images before running')
+    parser_segmentation.add_argument(
+        '--cellpose-model',
+        choices=['nuclei', 'cyto3', 'cyto2', 'cyto'],
+        help='Override segmentation.cellpose.model_type from the parameters file'
+    )
 
     # subcomando para exportar template
     seg_sub = parser_segmentation.add_subparsers(dest='seg_cmd')
@@ -406,6 +411,8 @@ def main():
             import toml
             from fornma.Segmentation import run, check_user_inputs
             dic = toml.load(args.parameters)
+            if args.cellpose_model:
+                dic['segmentation']['cellpose']['model_type'] = args.cellpose_model
             check_user_inputs(dic)
             run(dic, preview=args.preview)
 

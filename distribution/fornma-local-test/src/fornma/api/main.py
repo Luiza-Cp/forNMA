@@ -41,12 +41,15 @@ from fornma.core.Tracking.tracking import (
 )
 from fornma.core.Segmentation.analyze import saving_images
 from fornma.core.image_io import imread, imwrite
+from fornma.shared.progress import update_progress
 
 from fornma.shared.nma_helpers import (
     load_controls_pool,
     load_all_datasets,
     compute_axis_ranges_from_all,
     ellipse_trace,
+    find_nma_measure_columns,
+    _resolve_two_columns,
 )
 from .schemas import (
     NMAComputeRequest,
@@ -146,6 +149,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
     ],
@@ -194,7 +199,13 @@ def nma_datasets_columns(req: DatasetColumnsRequest):
         if nun > 0 and nun <= 20:
             categorical_cols.append(c)
     numeric_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
-    return DatasetColumnsResponse(columns=cols, categorical_columns=categorical_cols, numeric_columns=numeric_cols)
+    return DatasetColumnsResponse(
+        columns=cols,
+        categorical_columns=categorical_cols,
+        numeric_columns=numeric_cols,
+        area_columns=find_nma_measure_columns(cols, "Area"),
+        nii_columns=find_nma_measure_columns(cols, "NII"),
+    )
 
 
 @app.post("/datasets/column-values", response_model=DatasetColumnValuesResponse)
@@ -388,8 +399,8 @@ def _latest_active_job(jobs: Dict[str, Dict], active_states: set[str]) -> Dict |
 def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
     output_dir = Path(req.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    paths = [d.path for d in req.params.datasets if str(d.path).strip()]
-    if not paths:
+    datasets = [d for d in req.params.datasets if str(d.path).strip()]
+    if not datasets:
         _set_plot_job(job_id, status="failed", progress=100, error="No dataset paths provided.", message="No dataset paths provided.")
         return
 
@@ -426,6 +437,31 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
     original_save_figs = NMAClass.save_figs
     created_png_files: list[str] = []
 
+    def _normalized_plot_paths() -> list[str]:
+        normalized_dir = output_dir / ".nma-normalized-inputs"
+        normalized_dir.mkdir(parents=True, exist_ok=True)
+        normalized_paths = []
+        for index, dataset in enumerate(datasets, start=1):
+            raw_path = Path(dataset.path).expanduser()
+            try:
+                raw = pd.read_csv(raw_path)
+            except Exception as e:
+                raise RuntimeError(f"Failed to read NMA dataset '{raw_path}': {e}") from e
+            area_col, nii_col = _resolve_two_columns(raw, dataset.area_col, dataset.nii_col)
+            if not area_col or not nii_col:
+                raise RuntimeError(
+                    "Could not resolve Area/NII columns for "
+                    f"'{raw_path}'. Choose explicit columns in NMA Settings."
+                )
+            normalized = raw.copy()
+            normalized["Area"] = pd.to_numeric(normalized[area_col], errors="coerce")
+            normalized["NII"] = pd.to_numeric(normalized[nii_col], errors="coerce")
+            safe_name = hashlib.sha1(str(raw_path).encode("utf-8")).hexdigest()[:10]
+            out_path = normalized_dir / f"{index:03d}-{safe_name}-Results.csv"
+            normalized.to_csv(out_path, index=False)
+            normalized_paths.append(str(out_path))
+        return normalized_paths
+
     def _save_with_progress(self, fig, title):
         original_save_figs(self, fig, title)
         png_name = f"{title.lstrip()} {self.graph_type}.png"
@@ -447,6 +483,7 @@ def _run_plot_job(job_id: str, req: NMAPlotRunRequest):
         import matplotlib
         matplotlib.use("Agg", force=True)
         NMAClass.save_figs = _save_with_progress
+        paths = _normalized_plot_paths()
         run_nma_plot(
             path_list=paths,
             saving_path=str(output_dir),
@@ -574,6 +611,15 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
     except Exception:
         pass
 
+    with SEG_JOBS_LOCK:
+        stop_before_start = bool(SEG_JOBS.get(job_id, {}).get("cancel_requested"))
+    if stop_before_start:
+        update_progress(progress_file, status="canceled", cancel=True, message="Segmentation was canceled before processing started.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled before processing started.")
+        with SEG_JOBS_LOCK:
+            SEG_THREADS.pop(job_id, None)
+        return
+
     try:
         os.environ["FORNMA_PROGRESS_FILE"] = progress_file
         run_segmentation_pipeline(params, preview=bool(preview), preview_index=preview_index)
@@ -587,7 +633,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             message=(
                 f"Segmentation finished successfully. Outputs were saved to {params['global']['output_folder']}."
                 if st == "done"
-                else (d.get("message") or st)
+                else ("Segmentation stopped." if st == "canceled" else (d.get("message") or st))
             ),
             log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path"),
@@ -627,6 +673,7 @@ def segmentation_start(req: SegmentationStartRequest):
             "preview_paths": [],
             "preview_index": req.preview_index,
             "progress_file": None,
+            "cancel_requested": False,
             "error": None,
         }
         t = threading.Thread(
@@ -653,6 +700,7 @@ def segmentation_status(job_id: str):
         mapped = {
             "starting": "running",
             "running": "running",
+            "canceling": "canceling",
             "done": "completed",
             "error": "failed",
             "canceled": "canceled",
@@ -678,7 +726,7 @@ def segmentation_status(job_id: str):
         cancel_flag = bool(d.get("cancel")) if d else False
         forced_status = "canceled" if cancel_flag else "failed"
         forced_message = (
-            "Segmentation was canceled."
+            "Segmentation stopped."
             if cancel_flag
             else (job.get("message") or "Segmentation stopped unexpectedly before reporting completion. Check the log for the last processed image.")
         )
@@ -712,21 +760,21 @@ def segmentation_stop(job_id: str):
         job = SEG_JOBS.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Segmentation job not found.")
+    _set_seg_job(job_id, cancel_requested=True, status="canceling", message="Stopping after current image...")
     pf = job.get("progress_file")
     if not _seg_thread_alive(job_id):
-        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
+        _set_seg_job(job_id, status="canceled", message="Segmentation stopped.")
         return {"status": "canceled"}
     if not pf or not os.path.exists(pf):
-        _set_seg_job(job_id, status="canceled", message="Segmentation was canceled.")
-        return {"status": "canceled"}
+        return {"status": "canceling"}
     d = _safe_read_json(pf)
-    d.update({"cancel": True, "status": d.get("status", "running")})
+    d.update({"cancel": True, "status": "canceling", "message": "Stopping after current image..."})
     try:
         with open(pf, "w") as f:
             json.dump(d, f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to request stop: {e}")
-    _set_seg_job(job_id, message="Stop requested...", status="canceling")
+    _set_seg_job(job_id, message="Stopping after current image...", status="canceling")
     return {"status": "canceling"}
 
 
@@ -1221,6 +1269,81 @@ def _compute_stats(pool: pd.DataFrame, xcol: str, ycol: str) -> Dict[str, float]
     return {"mu_x": mu_x, "mu_y": mu_y, "sd_x": sd_x, "sd_y": sd_y}
 
 
+def _clean_nma_xy(pool: pd.DataFrame, xcol: str, ycol: str) -> pd.DataFrame:
+    clean = pool.copy()
+    clean[xcol] = pd.to_numeric(clean[xcol], errors="coerce")
+    clean[ycol] = pd.to_numeric(clean[ycol], errors="coerce")
+    clean = clean.dropna(subset=[xcol, ycol])
+    return clean
+
+
+def _apply_control_gate(pool: pd.DataFrame, xcol: str, ycol: str, gate) -> tuple[pd.DataFrame, Dict | None]:
+    clean = _clean_nma_xy(pool, xcol, ycol)
+    if clean.empty:
+        raise HTTPException(
+            status_code=400,
+            detail="The control data has no valid numeric rows for the selected Area and NII columns. Choose numeric columns or upload a CSV with measured cells.",
+        )
+    if gate is None or not gate.enabled:
+        return clean, None
+
+    base_stats = _compute_stats(clean, xcol, ycol)
+    sd_span = float(gate.sd or 2.0)
+    if not np.isfinite(sd_span) or sd_span <= 0:
+        sd_span = 2.0
+
+    x_min = float(gate.x_min) if gate.x_min is not None else base_stats["mu_x"] - sd_span * base_stats["sd_x"]
+    x_max = float(gate.x_max) if gate.x_max is not None else base_stats["mu_x"] + sd_span * base_stats["sd_x"]
+    y_min = float(gate.y_min) if gate.y_min is not None else base_stats["mu_y"] - sd_span * base_stats["sd_y"]
+    y_max = float(gate.y_max) if gate.y_max is not None else base_stats["mu_y"] + sd_span * base_stats["sd_y"]
+    if x_min > x_max:
+        x_min, x_max = x_max, x_min
+    if y_min > y_max:
+        y_min, y_max = y_max, y_min
+
+    keep_mask = (
+        clean[xcol].between(x_min, x_max, inclusive="both")
+        & clean[ycol].between(y_min, y_max, inclusive="both")
+    )
+    gated = clean.loc[keep_mask].copy()
+    total = int(len(clean))
+    kept = int(len(gated))
+    if gated.empty:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The control gate removed every cell. Widen the gate limits or increase the SD range so Step 1 has a normal control population to draw the ellipse."
+            ),
+        )
+
+    max_preview = min(total, 4000)
+    preview = clean.sample(n=max_preview, random_state=42) if total > max_preview else clean
+    preview_mask = (
+        preview[xcol].between(x_min, x_max, inclusive="both")
+        & preview[ycol].between(y_min, y_max, inclusive="both")
+    )
+    meta = {
+        "enabled": True,
+        "sd": float(sd_span),
+        "bounds": {
+            "x_min": float(x_min),
+            "x_max": float(x_max),
+            "y_min": float(y_min),
+            "y_max": float(y_max),
+        },
+        "total": total,
+        "kept": kept,
+        "removed": total - kept,
+        "kept_percent": float((kept / total) * 100.0) if total else 0.0,
+        "preview": {
+            "x": preview[xcol].astype(float).tolist(),
+            "y": preview[ycol].astype(float).tolist(),
+            "keep": preview_mask.astype(bool).tolist(),
+        },
+    }
+    return gated, meta
+
+
 def _json_safe(value):
     if isinstance(value, np.ndarray):
         return [_json_safe(item) for item in value.tolist()]
@@ -1652,31 +1775,70 @@ def _redraw_gated_images(kept: pd.DataFrame, datasets: list[dict], out_dir: Path
     return list(dict.fromkeys(files))
 
 
-def _gate_summary_table(df: pd.DataFrame) -> StatsTable:
-    grouped = (
-        df.groupby("__source__", as_index=False)
-        .agg(
-            total=("__gate_keep__", "size"),
-            kept=("__gate_keep__", "sum"),
-        )
-    )
-    grouped["removed"] = grouped["total"] - grouped["kept"]
-    grouped["kept_pct"] = np.where(grouped["total"] > 0, grouped["kept"] * 100.0 / grouped["total"], 0.0)
-    grouped["removed_pct"] = 100.0 - grouped["kept_pct"]
+def _percentile_rank(series: pd.Series, value: float) -> float:
+    values = pd.to_numeric(series, errors="coerce").dropna()
+    if values.empty:
+        return 0.0
+    return float((values <= value).mean() * 100.0)
 
+
+def _gate_summary_row(
+        df: pd.DataFrame,
+        dataset: str,
+        condition: str,
+        req: GatingPreviewRequest,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+) -> dict:
     total = int(df["__gate_keep__"].shape[0])
     kept = int(df["__gate_keep__"].sum())
-    overall = pd.DataFrame(
-        [{
-            "__source__": "All datasets",
-            "total": total,
-            "kept": kept,
-            "removed": total - kept,
-            "kept_pct": (kept * 100.0 / total) if total > 0 else 0.0,
-            "removed_pct": ((total - kept) * 100.0 / total) if total > 0 else 0.0,
-        }]
-    )
-    full = pd.concat([grouped, overall], ignore_index=True)
+    removed = total - kept
+    return {
+        "dataset": dataset,
+        "condition": condition,
+        "total": total,
+        "kept": kept,
+        "removed": removed,
+        "kept_pct": (kept * 100.0 / total) if total > 0 else 0.0,
+        "removed_pct": (removed * 100.0 / total) if total > 0 else 0.0,
+        f"{req.x_col}_min": x_min,
+        f"{req.x_col}_min_percentile": _percentile_rank(df[req.x_col], x_min),
+        f"{req.x_col}_max": x_max,
+        f"{req.x_col}_max_percentile": _percentile_rank(df[req.x_col], x_max),
+        f"{req.y_col}_min": y_min,
+        f"{req.y_col}_min_percentile": _percentile_rank(df[req.y_col], y_min),
+        f"{req.y_col}_max": y_max,
+        f"{req.y_col}_max_percentile": _percentile_rank(df[req.y_col], y_max),
+    }
+
+
+def _gate_summary_table(
+        df: pd.DataFrame,
+        req: GatingPreviewRequest,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+) -> StatsTable:
+    df_summary = df.copy()
+    if "Condition" in df_summary.columns:
+        df_summary["__gate_condition__"] = (
+            df_summary["Condition"]
+            .fillna("Unknown")
+            .astype(str)
+            .map(lambda value: value.strip() or "Unknown")
+        )
+    else:
+        df_summary["__gate_condition__"] = "All conditions"
+
+    rows = []
+    for (dataset, condition), part in df_summary.groupby(["__source__", "__gate_condition__"], sort=False):
+        rows.append(_gate_summary_row(part, str(dataset), str(condition), req, x_min, x_max, y_min, y_max))
+
+    rows.append(_gate_summary_row(df_summary, "All datasets", "All conditions", req, x_min, x_max, y_min, y_max))
+    full = pd.DataFrame(rows)
     rows = json.loads(full.to_json(orient="records"))
     return StatsTable(name="gating_summary", columns=[str(c) for c in full.columns], rows=rows)
 
@@ -1685,37 +1847,56 @@ def _gate_preview_figure(df: pd.DataFrame, req: GatingPreviewRequest, x_min: flo
     max_points = max(1000, int(req.max_points or 12000))
     df_plot = df.sample(n=max_points, random_state=42) if len(df) > max_points else df
     df_plot = df_plot.copy()
-    df_plot["Gate"] = np.where(df_plot["__gate_keep__"], "kept", "removed")
-    if req.color_by_dataset:
-        fig = px.scatter(
-            df_plot,
-            x=req.x_col,
-            y=req.y_col,
-            color="__source__",
-            symbol="Gate",
-            hover_data=["__source__"],
-            symbol_map={"kept": "circle", "removed": "x"},
-        )
-    else:
-        fig = px.scatter(
-            df_plot,
-            x=req.x_col,
-            y=req.y_col,
-            color="Gate",
-            symbol="__source__",
-            hover_data=["__source__"],
-            color_discrete_map={"kept": "#1e8449", "removed": "#c0392b"},
-        )
+    palette = list(qual_colors.Safe) or list(qual_colors.Plotly)
+    fig = go.Figure()
+    sources = [str(s) for s in pd.Series(df_plot["__source__"]).dropna().astype(str).unique()]
+    for idx, source in enumerate(sources):
+        color = palette[idx % len(palette)]
+        source_df = df_plot[df_plot["__source__"].astype(str) == source]
+        kept_df = source_df[source_df["__gate_keep__"]]
+        removed_df = source_df[~source_df["__gate_keep__"]]
+        if not kept_df.empty:
+            fig.add_trace(go.Scattergl(
+                x=kept_df[req.x_col],
+                y=kept_df[req.y_col],
+                mode="markers",
+                name=f"{source} kept",
+                legendgroup=source,
+                marker=dict(color=color, size=6, opacity=0.78, symbol="circle"),
+                customdata=np.stack([kept_df["__source__"].astype(str), np.full(len(kept_df), "kept")], axis=-1),
+                hovertemplate=f"{req.x_col}: %{{x}}<br>{req.y_col}: %{{y}}<br>Dataset: %{{customdata[0]}}<br>Status: %{{customdata[1]}}<extra></extra>",
+            ))
+        if not removed_df.empty:
+            fig.add_trace(go.Scattergl(
+                x=removed_df[req.x_col],
+                y=removed_df[req.y_col],
+                mode="markers",
+                name=f"{source} removed",
+                legendgroup=source,
+                showlegend=False,
+                marker=dict(color=color, size=6, opacity=0.78, symbol="circle-open"),
+                customdata=np.stack([removed_df["__source__"].astype(str), np.full(len(removed_df), "removed")], axis=-1),
+                hovertemplate=f"{req.x_col}: %{{x}}<br>{req.y_col}: %{{y}}<br>Dataset: %{{customdata[0]}}<br>Status: %{{customdata[1]}}<extra></extra>",
+            ))
+    if not sources:
+        fig.add_trace(go.Scattergl(
+            x=df_plot[req.x_col],
+            y=df_plot[req.y_col],
+            mode="markers",
+            name="Dataset",
+            marker=dict(color="#3a6ea5", size=6, opacity=0.72),
+            hovertemplate=f"{req.x_col}: %{{x}}<br>{req.y_col}: %{{y}}<extra></extra>",
+        ))
     fig.add_shape(type="rect", x0=x_min, x1=x_max, y0=y_min, y1=y_max, line=dict(color="#0f5b96", width=2), fillcolor="rgba(15,91,150,0.08)")
     fig.update_layout(
         template="plotly_white",
-        margin=dict(l=45, r=20, t=45, b=45),
-        width=max(760, min(1400, 700 + int(len(df_plot) / 40))),
-        legend_title_text="Gate result",
+        margin=dict(l=65, r=35, t=45, b=60),
+        autosize=True,
+        legend_title_text="Dataset",
         dragmode=False,
     )
-    fig.update_xaxes(fixedrange=True)
-    fig.update_yaxes(fixedrange=True)
+    fig.update_xaxes(title_text=req.x_col, fixedrange=True)
+    fig.update_yaxes(title_text=req.y_col, fixedrange=True)
     return json.loads(fig.to_json())
 
 
@@ -1724,7 +1905,7 @@ def filters_preview(req: GatingPreviewRequest):
     df = _load_gate_dataframe(req)
     x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
     df["__gate_keep__"] = _apply_gate(df, req.x_col, req.y_col, x_min, x_max, y_min, y_max)
-    summary = _gate_summary_table(df)
+    summary = _gate_summary_table(df, req, x_min, x_max, y_min, y_max)
     total = int(df["__gate_keep__"].shape[0])
     kept = int(df["__gate_keep__"].sum())
     return GatingPreviewResponse(
@@ -1744,7 +1925,7 @@ def filters_apply(req: GatingApplyRequest):
     df = _load_gate_dataframe(req)
     x_min, x_max, y_min, y_max = _resolve_gate_bounds(req, df)
     df["__gate_keep__"] = _apply_gate(df, req.x_col, req.y_col, x_min, x_max, y_min, y_max)
-    summary = _gate_summary_table(df)
+    summary = _gate_summary_table(df, req, x_min, x_max, y_min, y_max)
 
     files = []
     kept = df.loc[df["__gate_keep__"]].copy()
@@ -2968,12 +3149,9 @@ def stats_run(req: StatsRunRequest):
     if method == "oneway":
         if not req.numeric_col or not req.group_col:
             raise HTTPException(status_code=400, detail="oneway requires numeric_col and group_col.")
-        norm_ok = helper.normality_ok(df=df, factors=[req.group_col], y=req.numeric_col)
-        homo_ok = helper.homoscedasticity_ok(df=df, factors=[req.group_col], y=req.numeric_col)
-        helper.log(f"\nAssumption summary (oneway):")
-        helper.log(f"- Normality (Shapiro): {'OK' if norm_ok else 'NOT OK'}")
-        helper.log(f"- Homoscedasticity (Levene): {'OK' if homo_ok else 'NOT OK'}")
-        helper.log(f"- Decision: {'ANOVA' if (norm_ok and homo_ok) else 'Kruskal-Wallis'}")
+        group_count = int(df[[req.group_col, req.numeric_col]].dropna().groupby(req.group_col).size().gt(0).sum())
+        if group_count < 2:
+            raise HTTPException(status_code=400, detail=f"At least two non-empty groups are required in '{req.group_col}'.")
         from fornma.core.Statistics.OneWayAnalysis import OneWayAnalysis
         ana = OneWayAnalysis(
             df=df,
@@ -2991,7 +3169,8 @@ def stats_run(req: StatsRunRequest):
         else:
             if isinstance(main, pd.DataFrame):
                 main_df = main.copy()
-                main_df.insert(0, "test_used", test_used)
+                if "test_used" not in main_df.columns:
+                    main_df.insert(0, "test_used", test_used)
             else:
                 main_df = None
         for t in [
@@ -3005,12 +3184,6 @@ def stats_run(req: StatsRunRequest):
     elif method == "twoway":
         if not req.numeric_col or not req.group_col1 or not req.group_col2:
             raise HTTPException(status_code=400, detail="twoway requires numeric_col, group_col1 and group_col2.")
-        norm_ok = helper.normality_ok(df=df, factors=[req.group_col1, req.group_col2], y=req.numeric_col)
-        homo_ok = helper.homoscedasticity_ok(df=df, factors=[req.group_col1, req.group_col2], y=req.numeric_col)
-        helper.log(f"\nAssumption summary (twoway):")
-        helper.log(f"- Normality (Shapiro): {'OK' if norm_ok else 'NOT OK'}")
-        helper.log(f"- Homoscedasticity (Levene): {'OK' if homo_ok else 'NOT OK'}")
-        helper.log(f"- Decision: {'Two-way ANOVA' if (norm_ok and homo_ok) else 'Scheirer-Ray-Hare'}")
         from fornma.core.Statistics.TwoWayAnalysis import TwoWayAnalysis
         ana = TwoWayAnalysis(
             df=df,
@@ -3171,8 +3344,8 @@ def _build_plotly_figure(df: pd.DataFrame | None, xcol: str, ycol: str,
         height=640,
         margin=dict(l=60, r=10, t=50, b=60),
         title=dict(text="NMA thresholds", x=0.5, xanchor="center"),
-        xaxis_title="NII",
-        yaxis_title="Area",
+        xaxis_title=xcol,
+        yaxis_title=ycol,
         xaxis_range=[graph_limits[2], graph_limits[3]],
         yaxis_range=[graph_limits[0], graph_limits[1]],
     )
@@ -3244,7 +3417,8 @@ def nma_settings_compute(req: NMAComputeRequest):
     pool, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool, log)
 
-    stats = _compute_stats(pool, xcol, ycol)
+    pool_stats, gate_meta = _apply_control_gate(pool, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
 
     axis = compute_axis_ranges_from_all(
         params,
@@ -3264,11 +3438,11 @@ def nma_settings_compute(req: NMAComputeRequest):
         sd_area=1.0,
     )
 
-    fig = _build_plotly_figure(pool, xcol, ycol, stats, graph_limits, thresholds)
+    fig = _build_plotly_figure(pool_stats, xcol, ycol, stats, graph_limits, thresholds)
 
     sample = {
-        "x": pool[xcol].astype(float).tolist(),
-        "y": pool[ycol].astype(float).tolist(),
+        "x": pool_stats[xcol].astype(float).tolist(),
+        "y": pool_stats[ycol].astype(float).tolist(),
     }
 
     return NMAComputeResponse(
@@ -3278,6 +3452,7 @@ def nma_settings_compute(req: NMAComputeRequest):
         sample=sample,
         sd_factors={"sd_nii": 1.0, "sd_area": 1.0},
         figure=_json_safe(fig.to_dict()),
+        gate=_json_safe(gate_meta),
     )
 
 
@@ -3287,7 +3462,8 @@ def nma_settings_preview(req: NMAComputeRequest):
     pool, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool, log)
 
-    stats = _compute_stats(pool, xcol, ycol)
+    pool_stats, gate_meta = _apply_control_gate(pool, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
 
     axis = compute_axis_ranges_from_all(
         params,
@@ -3313,6 +3489,7 @@ def nma_settings_preview(req: NMAComputeRequest):
         sd_factors={"sd_nii": 1.0, "sd_area": 1.0},
         graph_limits=[float(x) for x in graph_limits],
         thresholds=NMAThresholds(**thresholds),
+        gate=_json_safe(gate_meta),
     )
 
 
@@ -3325,7 +3502,8 @@ def nma_settings_figure(req: NMAFigureRequest):
     pool_ctrl, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool_ctrl, log)
 
-    stats = _compute_stats(pool_ctrl, xcol, ycol)
+    pool_stats, gate_meta = _apply_control_gate(pool_ctrl, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
 
     axis = compute_axis_ranges_from_all(
         params,
@@ -3359,7 +3537,7 @@ def nma_settings_figure(req: NMAFigureRequest):
             xcol = xcol_all
             ycol = ycol_all
         else:
-            df_plot = pool_ctrl
+            df_plot = pool_stats
 
     fig = _build_plotly_figure(df_plot, xcol, ycol, stats, graph_limits, thresholds)
 
@@ -3376,13 +3554,14 @@ def nma_settings_auto_dbscan(req: NMAAutoDbscanRequest):
     pool, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool, log)
 
-    stats = _compute_stats(pool, xcol, ycol)
+    pool_stats, _gate_meta = _apply_control_gate(pool, xcol, ycol, req.control_gate)
+    stats = _compute_stats(pool_stats, xcol, ycol)
     mu_x = stats["mu_x"]
     mu_y = stats["mu_y"]
     sd_x_all = stats["sd_x"]
     sd_y_all = stats["sd_y"]
 
-    df = pool[[xcol, ycol]].copy().dropna()
+    df = pool_stats[[xcol, ycol]].copy().dropna()
 
     X = df[[xcol, ycol]].to_numpy(dtype=float)
     Xs = StandardScaler().fit_transform(X)

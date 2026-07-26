@@ -76,8 +76,8 @@ def check_user_inputs(dic: dict):
                 'cellpose']
     fornma_keys = ['use_fornma', 'threshold', 'offset', 'smooth', 'adjust_size', 'cut_edges',
                    'find_low_intensity_nucleus', 'weakly_labeled']
-    cellpose_keys = ['use_cellpose', 'diameter', 'flow_threshold', 'mask_threshold', 'use_gpu', 'cellprob_threshold',
-                     'invert']
+    cellpose_keys = ['use_cellpose', 'model_type', 'diameter', 'flow_threshold', 'mask_threshold', 'use_gpu',
+                     'cellprob_threshold', 'invert']
     channel_keys = ['rescale_intensity', 'remove_background', 'rolling_ball_radius', 'match_histograms',
                     'measure_translocation', 'ring_size', 'use_ellipse', 'measure_foci', 'foci_min_size',
                     'foci_max_size', 'foci_min_int', 'foci_max_int', 'foci_prominence']
@@ -153,6 +153,13 @@ def check_user_inputs(dic: dict):
 
     segc = dic['segmentation']['cellpose']
     basic_bool_check(segc['use_cellpose'], 'use_cellpose')
+    model_type = segc.get('model_type', 'nuclei')
+    basic_str_check(model_type, 'model_type')
+    available_cellpose_models = ['nuclei', 'cyto3', 'cyto2', 'cyto']
+    if model_type not in available_cellpose_models:
+        raise Exception(
+            f'The Cellpose model you chose does not exist. Choose between: {", ".join(available_cellpose_models)}.'
+        )
     basic_float_check(segc['diameter'], 'diameter')
     basic_float_check(segc['flow_threshold'], 'flow_threshold')
     basic_float_check(segc['mask_threshold'], 'mask_threshold')

@@ -138,8 +138,11 @@ class Cell:
         self.nuc_mask, self.nuc_mask_ex, self.expand_nuc = self.calc_expand_nuc()
 
         self.min_int, self.max_int, __, __ = cv.minMaxLoc(self.image)
+        self.intensity_range = self.max_int - self.min_int
+        if self.intensity_range == 0:
+            self.intensity_range = 1
         self.image_mean = cv.mean(self.image)[0]
-        self.mean_int = (cv.mean(self.nuc, mask=self.nuc_mask)[0] - self.min_int) / (self.max_int - self.min_int)
+        self.mean_int = (cv.mean(self.nuc, mask=self.nuc_mask)[0] - self.min_int) / self.intensity_range
         self.median_int = self.calc_median(self.nuc, self.nuc_mask)
 
         # add 1 caso para não dar float division by 0
@@ -178,9 +181,8 @@ class Cell:
         if wants_ktr == True:
             self.ring_mask, self.ring_cnt = self.find_ring_mask()
             self.ellipse_mask, self.ellipse_cnt = self.find_ring_from_ellipse()
-            self.ring_mean = (cv.mean(self.nuc2, mask=self.ring_mask)[0] - self.min_int) / (self.max_int - self.min_int)
-            self.ellipse_mean = (cv.mean(self.nuc2, mask=self.ellipse_mask)[0] - self.min_int) / (
-                        self.max_int - self.min_int)
+            self.ring_mean = (cv.mean(self.nuc2, mask=self.ring_mask)[0] - self.min_int) / self.intensity_range
+            self.ellipse_mean = (cv.mean(self.nuc2, mask=self.ellipse_mask)[0] - self.min_int) / self.intensity_range
             self.cyto_ring_cnt = self.ellipse_cnt if self.use_el == True else self.ring_cnt
             if self.mean_int == 0:
                 self.cn_ring = None
@@ -378,7 +380,7 @@ class Cell:
         else:
             for i in range(len(self.foci_cnt)):
                 new_foci = Foci(i, self.foci_cnt[i], nuc_masked, self.tophat,
-                                self.mask_foci, self.min_int, self.max_int)
+                                self.mask_foci, self.min_int, self.min_int + self.intensity_range)
                 foci_list.append(new_foci)
         foci_list2 = []
         for foc in foci_list:
@@ -410,7 +412,7 @@ class Cell:
                 new_foci_list.append(foc)
                 cv.drawContours(new_mask, [foc.cnt], -1, (0, 0, 0), -1)
 
-        mean_no_foci = (cv.mean(self.nuc, mask=new_mask)[0] - self.min_int) / (self.max_int - self.min_int)
+        mean_no_foci = (cv.mean(self.nuc, mask=new_mask)[0] - self.min_int) / self.intensity_range
 
         new_foci_list2 = []
         for foc2 in new_foci_list:
@@ -452,7 +454,7 @@ class Cell:
             blank_mask = np.zeros(((self.nuc).shape), np.uint8)
             for i in range(len(self.foci_list)):
                 blank_mask = cv.drawContours(blank_mask, self.foci_list[i].cnt, -1, (255, 255, 255), -1)
-            mean = (cv.mean(self.nuc, mask=blank_mask)[0] - self.min_int) / (self.max_int - self.min_int + 1)
+            mean = (cv.mean(self.nuc, mask=blank_mask)[0] - self.min_int) / self.intensity_range
 
         return mean
 

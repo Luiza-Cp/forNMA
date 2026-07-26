@@ -87,6 +87,7 @@ def adjust_parameters(parameters_dict) -> tuple[
                                                                           'maximum_radius'] != False else None
 
     segment_dict = {'magnification': parameters_dict['segmentation']['magnification'],
+                    'segmentation_mode': 'nucleus',
                     'pixel_size': parameters_dict['segmentation']['pixel_size'],
                     'rescale_intensity': parameters_dict['segmentation']['rescale_intensity'],
                     'remove_bg': parameters_dict['segmentation']['remove_background'],
@@ -105,6 +106,7 @@ def adjust_parameters(parameters_dict) -> tuple[
                     'fast_detection': parameters_dict['segmentation']['forNMA']['find_low_intensity_nucleus'],
                     'weakly_labeled': parameters_dict['segmentation']['forNMA']['weakly_labeled'],
                     'use_cellpose': parameters_dict['segmentation']['cellpose']['use_cellpose'],
+                    'model_type': parameters_dict['segmentation']['cellpose'].get('model_type', 'nuclei'),
                     'invert': parameters_dict['segmentation']['cellpose']['invert'],
                     'normalize': True,
                     'diameter': parameters_dict['segmentation']['cellpose']['diameter'],
@@ -129,11 +131,11 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
     channel_items = _interface_channel_items(parameters_dict)
     ch_name_list = [name for _, name, _ in channel_items]
     ch_with_nuc = parameters_dict['global']['channel_with_nuclei']
-    # overtime = parameters_dict['global']['overtime']
-    overtime = False
+    overtime = parameters_dict['global'].get('overtime', False)
     parameter_list = [params for _, _, params in channel_items]
     conditions = list(parameter_list[0]['paths'].keys())
     segment_dict = {'magnification': parameters_dict['global']['magnification'],
+                    'segmentation_mode': parameters_dict['global'].get('segmentation_mode', 'nucleus'),
                     'pixel_size': parameters_dict['global']['pixel_size'],
                     'rescale_intensity': parameters_dict['global']['rescale_intensity'],
                     'remove_bg': parameters_dict['global']['remove_background'],
@@ -152,6 +154,7 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
                     'fast_detection': parameters_dict['fornma']['find_low_intensity_nucleus'],
                     'weakly_labeled': parameters_dict['fornma']['weakly_labeled'],
                     'use_cellpose': parameters_dict['cellpose']['use_cellpose'],
+                    'model_type': parameters_dict['cellpose'].get('model_type', 'nuclei'),
                     'invert': parameters_dict['cellpose']['invert'],
                     'normalize': True,
                     'diameter': parameters_dict['cellpose']['diameter'],
@@ -159,7 +162,9 @@ def adjust_parameters_interface(parameters_dict) -> Tuple[bool, str, List[str], 
                     'resample': True,
                     'flow_threshold': parameters_dict['cellpose']['flow_threshold'],
                     'mask_threshold': parameters_dict['cellpose']['mask_threshold'],
-                    'use_gpu': False,
+                    'use_gpu': parameters_dict['cellpose'].get('use_gpu', False),
+                    'cellprob_threshold': parameters_dict['cellpose'].get('cellprob_threshold', -3),
+                    'cytoplasm_cellpose': parameters_dict.get('cytoplasm_cellpose', {}),
                     }
 
     return save_images, path_to_save, ch_name_list, ch_with_nuc, overtime, parameter_list, conditions, segment_dict
@@ -206,6 +211,8 @@ def create_subfolder_dict(folder_dict: dict,
         files = sorted(os.listdir(value[0][iterator]))
         files = [os.path.join(value[0][iterator], f) for f in files]
         subfolder_dict[key] = [files, value[1], value[2]]
+        if len(value) > 3:
+            subfolder_dict[key].append(value[3])
 
     return subfolder_dict
 
@@ -263,7 +270,8 @@ def run(parameters_dict: dict,
         for key, channel, channel_params in _interface_channel_items(parameters_dict):
             folder_dict[channel] = [list(channel_params['paths'].values()),
                                     channel_params,
-                                    parameters_dict['global']['channel_with_nuclei'] == channel]
+                                    parameters_dict['global']['channel_with_nuclei'] == channel,
+                                    parameters_dict['global'].get('channel_with_cytoplasm') == channel]
     else:
         wants_to_save, path_to_save, ch_name_list, ch_path_list, ch_with_nuc, overtime, parameter_list, conditions, \
             segment_dict = adjust_parameters(parameters_dict)
