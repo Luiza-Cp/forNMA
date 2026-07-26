@@ -1585,17 +1585,23 @@ button:not(:disabled):hover {
   text-align: right;
 }
 
-.nma-panel-highlight,
 .nma-plot-config-highlight {
-  animation: nma-focus-pulse 1.6s ease-out;
+  animation: nma-focus-pulse 1.8s ease-out;
 }
 
 @keyframes nma-focus-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(47, 125, 104, 0.38), var(--shadow);
-    border-color: rgba(47, 125, 104, 0.45);
+    background: rgba(208, 0, 255, 0.14);
+    border-color: rgba(126, 34, 206, 0.78);
+    box-shadow: 0 0 0 4px rgba(208, 0, 255, 0.16), var(--shadow);
+  }
+  55% {
+    background: rgba(58, 110, 165, 0.12);
+    border-color: rgba(58, 110, 165, 0.62);
+    box-shadow: 0 0 0 3px rgba(58, 110, 165, 0.14), var(--shadow);
   }
   100% {
+    background: rgba(255, 255, 255, 0.9);
     box-shadow: var(--shadow);
   }
 }

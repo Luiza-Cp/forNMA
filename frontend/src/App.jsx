@@ -6741,6 +6741,7 @@ export default function App() {
   };
 
   const focusNmaPlotConfig = (level = "info") => {
+    setAllCollapsed(true);
     setShowPlotConfig(true);
     setHighlightPlotConfig(true);
     setStatus("Settings are ready. Choose plot style, saving path, and output options in the left panel.");
@@ -7631,7 +7632,7 @@ export default function App() {
           </>
         ) : (
           <>
-        <Card as="aside" className={`panel nma-panel ${highlightPlotConfig ? "nma-panel-highlight" : ""}`} variant="panel">
+        <Card as="aside" className="panel nma-panel" variant="panel">
           <h3>NMA Settings</h3>
           <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
           <div className="row row-right">
