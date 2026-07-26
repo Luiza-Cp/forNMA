@@ -42,7 +42,7 @@ from fornma.core.Tracking.tracking import (
 from fornma.core.Segmentation.analyze import saving_images
 from fornma.core.image_io import imread, imwrite
 
-from fornma.gui.utils.nma_helpers import (
+from fornma.shared.nma_helpers import (
     load_controls_pool,
     load_all_datasets,
     compute_axis_ranges_from_all,
@@ -118,7 +118,7 @@ from .schemas import (
     TrackingEditResponse,
     TrackingSaveResponse,
 )
-from fornma.gui.utils.params_builder import build_interface_params
+from fornma.shared.params_builder import build_interface_params
 
 
 APP_ROOT = Path(__file__).resolve().parent

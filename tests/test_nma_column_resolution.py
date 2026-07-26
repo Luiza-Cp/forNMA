@@ -1,6 +1,6 @@
 import pandas as pd
 
-from fornma.gui.utils.nma_helpers import find_nma_measure_columns, _resolve_two_columns
+from fornma.shared.nma_helpers import find_nma_measure_columns, _resolve_two_columns
 
 
 def test_nma_measure_candidates_ignore_derived_area_columns():

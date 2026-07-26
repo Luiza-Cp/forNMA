@@ -1,8 +1,8 @@
-# src/fornma/gui/utils/params_builder.py
+# src/fornma/shared/params_builder.py
 from pathlib import Path
 
 
-# === GUI (flex) builder: não exige root comum; usa formato "interface" ===
+# === Interface (flex) builder: does not require a common root; uses interface format ===
 
 _CHANNEL_DEFAULTS = {
     "rescale_intensity": True,
@@ -17,7 +17,7 @@ _CHANNEL_DEFAULTS = {
     "foci_max_size": False,
     "foci_min_int": False,
     "foci_max_int": False,
-    "foci_proeminence": 1.2,  # nome usado no pipeline
+    "foci_proeminence": 1.2,  # name used by pipeline
     "measure_nucleus": True,
     "measure_cytoplasm": False,
 }
@@ -30,19 +30,19 @@ def _default_channel_name(index: int) -> str:
 
 def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, list[str]]:
     """
-    Constrói o dicionário no formato aceito por adjust_parameters_interface()
-    (chave 'global' + 'fornma' + 'cellpose' + 'Channel <name>' com 'paths').
-    Não exige mesmo root por canal.
-    Retorna (params, errors).
+    Build the parameter dictionary accepted by adjust_parameters_interface().
+
+    The returned format has 'global', 'fornma', 'cellpose', and per-channel
+    sections with condition-to-path mappings.
     """
     errors: list[str] = []
 
     images = images_data or {}
     seg    = seg_data or {}
-    per_channel = seg.get("channels", {})  # <- NOVO
+    per_channel = seg.get("channels", {})
 
-    channels = images.get("channels", [])       # [{"id":"ch1","name":"Channel 1"}, ...]
-    rows     = images.get("rows", [])           # [{"condition":"...", "ch1":"/abs/..", ...}, ...]
+    channels = images.get("channels", [])
+    rows     = images.get("rows", [])
 
     if not channels:
         errors.append("No image channels were loaded. Click 'Load images' and add at least one channel.")
@@ -61,14 +61,11 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     filters      = seg.get("filters", {})
     cytoplasm_filters = seg.get("cytoplasm_filters", filters)
 
-    # Saída e canal com núcleos (no modo interface, é NOME do canal)
-    # Saving path é obrigatório
     output_folder = (general.get("path_to_save") or "").strip()
     if not output_folder:
         errors.append("Choose a Saving path before running. This is where forNMA will write tables, images, and logs.")
         return {}, errors
 
-    # (opcional, recomendado) tentar criar a pasta se não existir
     import os
     try:
         os.makedirs(output_folder, exist_ok=True)
@@ -101,7 +98,6 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
     cytoplasm_cellpose = seg.get("cytoplasm_cellpose", {})
 
     params = {
-        # <<< chave 'global' primeiro: o run() usa isso para escolher o caminho "interface"
         "global": {
             "output_folder": output_folder,
             "segmentation_mode": segmentation_mode,
@@ -113,7 +109,6 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
             "rescale_intensity": bool(segmentation.get("rescale-intensity", False)),
             "remove_background": bool(segmentation.get("remove-bg", False)),
             "radius_bg":         segmentation.get("rolling-radius"),
-            # filtros globais
             "shape":        filters.get("shape"),
             "eccentricity": filters.get("eccentricity"),
             "min_size":     filters.get("minimum_size"),
@@ -159,7 +154,6 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
         },
     }
 
-    # Por-canal: 'Channel <name>' com 'paths' mapeando condition -> path absoluto
     for ch_id, ch_name in zip(ch_ids, ch_names):
         cond_to_path = {}
         for r in rows:
@@ -173,11 +167,8 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
             cond_to_path[cond] = p
 
         ch_dict = dict(_CHANNEL_DEFAULTS)
-
-        # overrides vindos do store-seg (se existirem) — mapeia nomes da UI p/ nomes do pipeline
         ov = per_channel.get(ch_id, {})
 
-        # básicos
         if "measure_nucleus" in ov: ch_dict["measure_nucleus"] = bool(ov["measure_nucleus"])
         if "measure_cytoplasm" in ov: ch_dict["measure_cytoplasm"] = bool(ov["measure_cytoplasm"])
         if "rescale_intensity" in ov: ch_dict["rescale_intensity"] = bool(ov["rescale_intensity"])
@@ -185,13 +176,11 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
         if "rolling_ball_radius" in ov: ch_dict["radius_bg"] = ov["rolling_ball_radius"]
         if "match_histograms" in ov: ch_dict["match_hist"] = bool(ov["match_histograms"])
 
-        # translocation / ring
         if "wants_ktr" in ov: ch_dict["wants_ktr"] = bool(ov["wants_ktr"])
         if "measure_translocation" in ov: ch_dict["wants_ktr"] = bool(ov["measure_translocation"])
         if "ring_size" in ov: ch_dict["ring_size"] = ov["ring_size"]
         if "use_ellipse" in ov: ch_dict["use_ellipse"] = bool(ov["use_ellipse"])
 
-        # foci
         if "wants_foci" in ov: ch_dict["wants_foci"] = bool(ov["wants_foci"])
         if "foci_min_size" in ov: ch_dict["foci_min_size"] = ov["foci_min_size"]
         if "foci_max_size" in ov: ch_dict["foci_max_size"] = ov["foci_max_size"]
@@ -200,10 +189,8 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
         if ("foci_prominence" in ov) or ("foci_proeminence" in ov):
             ch_dict["foci_proeminence"] = ov.get("foci_prominence", ov.get("foci_proeminence"))
 
-        # por fim, os paths
         ch_dict["channel_name"] = ch_name
         ch_dict["paths"] = cond_to_path
         params[f"Channel {ch_id}"] = ch_dict
-
 
     return params, errors

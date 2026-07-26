@@ -21,7 +21,7 @@ from .df_managing.organize import get_foci_df, split_dfs
 from fornma.core.image_io import imwrite
 
 pd.options.mode.chained_assignment = None  # default='warn'
-from fornma.gui.utils.progress import update_progress
+from fornma.shared.progress import update_progress
 
 
 def measure_image(

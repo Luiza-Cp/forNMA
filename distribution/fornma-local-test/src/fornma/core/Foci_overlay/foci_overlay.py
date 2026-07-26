@@ -24,7 +24,7 @@ import os, time, json, inspect
 
 # ===== Progresso (GUI) =====
 try:
-    from fornma.gui.utils.progress import update_progress, cancel_requested
+    from fornma.shared.progress import update_progress, cancel_requested
 except Exception:
     from progress import update_progress, cancel_requested
 

@@ -1,4 +1,4 @@
-from fornma.gui.utils.params_builder import build_interface_params
+from fornma.shared.params_builder import build_interface_params
 
 
 def test_empty_channel_name_uses_visible_default():

@@ -1,4 +1,4 @@
-# src/fornma/gui/utils/progress.py
+# src/fornma/shared/progress.py
 import json, os
 from typing import Any, Dict
 

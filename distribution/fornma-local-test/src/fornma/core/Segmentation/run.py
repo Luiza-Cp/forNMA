@@ -17,7 +17,7 @@ from .df_managing.organize import (
     filter_dataframe, get_foci_df, split_dfs
 )
 import os
-from fornma.gui.utils.progress import update_progress, cancel_requested
+from fornma.shared.progress import update_progress, cancel_requested
 
 
 pd.options.mode.chained_assignment = None  # default='warn'
