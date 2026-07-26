@@ -311,7 +311,7 @@ body {
 
 .layout {
   display: grid;
-  grid-template-columns: 390px 1fr;
+  grid-template-columns: 390px minmax(0, 1fr);
   gap: 20px;
   padding: 24px 32px 32px;
   min-height: calc(100vh - 72px);
@@ -853,27 +853,46 @@ body {
 }
 
 .table-wrap {
-  overflow: auto;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow-x: scroll;
+  overflow-y: auto;
   max-width: 100%;
   max-height: min(520px, 70vh);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fff;
+  overscroll-behavior-x: contain;
+}
+
+.table-section {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.content .table-section .table-wrap {
+  max-width: min(100%, calc(100vw - 520px));
 }
 
 .results-table {
   width: max-content;
-  min-width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
   font-size: 12px;
 }
 
 .results-table th,
 .results-table td {
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-bottom: 1px solid var(--border);
   padding: 6px 8px;
   text-align: left;
-  white-space: nowrap;
 }
 
 .results-table thead th {
@@ -946,6 +965,8 @@ body {
 
 .content > section:not(.home-stack) {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
   min-height: calc(100vh - 124px);
   padding: 24px;
   border: 1px solid var(--border);
@@ -1430,6 +1451,8 @@ button .btn-icon,
 }
 
 .section {
+  min-width: 0;
+  max-width: 100%;
   margin-top: 18px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
@@ -1674,12 +1697,56 @@ button:not(:disabled):hover {
 
 .content {
   background: transparent;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .plot-host {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.gate-manual-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(360px, 1.8fr) auto;
+  gap: 14px;
+  align-items: end;
+  margin: 0 auto 16px;
+  padding: 14px;
+  width: min(100%, 980px);
+  border: 1px solid rgba(58, 110, 165, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.gate-manual-controls h3 {
+  margin: 0 0 4px;
+  color: var(--accent-dark);
+  font-size: 16px;
+}
+
+.gate-limit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  gap: 10px;
+}
+
+.gate-limit-grid label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gate-limit-actions {
+  margin: 0;
+  justify-content: flex-end;
 }
 
 .preview-loading {
@@ -1714,7 +1781,9 @@ button:not(:disabled):hover {
 }
 
 .plot {
-  width: min(100%, var(--plot-width, 640px));
+  width: 100%;
+  max-width: 1120px;
+  flex: 0 0 auto;
   min-height: 640px;
   margin: 0 auto;
   background: rgba(255, 255, 255, 0.9);
@@ -1963,6 +2032,18 @@ button:not(:disabled):hover {
   .home-panel {
     position: static;
     max-height: unset;
+  }
+
+  .gate-manual-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .gate-limit-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .content .table-section .table-wrap {
+    max-width: calc(100vw - 36px);
   }
 }
 

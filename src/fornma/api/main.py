@@ -1847,37 +1847,56 @@ def _gate_preview_figure(df: pd.DataFrame, req: GatingPreviewRequest, x_min: flo
     max_points = max(1000, int(req.max_points or 12000))
     df_plot = df.sample(n=max_points, random_state=42) if len(df) > max_points else df
     df_plot = df_plot.copy()
-    df_plot["Gate"] = np.where(df_plot["__gate_keep__"], "kept", "removed")
-    if req.color_by_dataset:
-        fig = px.scatter(
-            df_plot,
-            x=req.x_col,
-            y=req.y_col,
-            color="__source__",
-            symbol="Gate",
-            hover_data=["__source__"],
-            symbol_map={"kept": "circle", "removed": "x"},
-        )
-    else:
-        fig = px.scatter(
-            df_plot,
-            x=req.x_col,
-            y=req.y_col,
-            color="Gate",
-            symbol="__source__",
-            hover_data=["__source__"],
-            color_discrete_map={"kept": "#1e8449", "removed": "#c0392b"},
-        )
+    palette = list(qual_colors.Safe) or list(qual_colors.Plotly)
+    fig = go.Figure()
+    sources = [str(s) for s in pd.Series(df_plot["__source__"]).dropna().astype(str).unique()]
+    for idx, source in enumerate(sources):
+        color = palette[idx % len(palette)]
+        source_df = df_plot[df_plot["__source__"].astype(str) == source]
+        kept_df = source_df[source_df["__gate_keep__"]]
+        removed_df = source_df[~source_df["__gate_keep__"]]
+        if not kept_df.empty:
+            fig.add_trace(go.Scattergl(
+                x=kept_df[req.x_col],
+                y=kept_df[req.y_col],
+                mode="markers",
+                name=f"{source} kept",
+                legendgroup=source,
+                marker=dict(color=color, size=6, opacity=0.78, symbol="circle"),
+                customdata=np.stack([kept_df["__source__"].astype(str), np.full(len(kept_df), "kept")], axis=-1),
+                hovertemplate=f"{req.x_col}: %{{x}}<br>{req.y_col}: %{{y}}<br>Dataset: %{{customdata[0]}}<br>Status: %{{customdata[1]}}<extra></extra>",
+            ))
+        if not removed_df.empty:
+            fig.add_trace(go.Scattergl(
+                x=removed_df[req.x_col],
+                y=removed_df[req.y_col],
+                mode="markers",
+                name=f"{source} removed",
+                legendgroup=source,
+                showlegend=False,
+                marker=dict(color=color, size=6, opacity=0.78, symbol="circle-open"),
+                customdata=np.stack([removed_df["__source__"].astype(str), np.full(len(removed_df), "removed")], axis=-1),
+                hovertemplate=f"{req.x_col}: %{{x}}<br>{req.y_col}: %{{y}}<br>Dataset: %{{customdata[0]}}<br>Status: %{{customdata[1]}}<extra></extra>",
+            ))
+    if not sources:
+        fig.add_trace(go.Scattergl(
+            x=df_plot[req.x_col],
+            y=df_plot[req.y_col],
+            mode="markers",
+            name="Dataset",
+            marker=dict(color="#3a6ea5", size=6, opacity=0.72),
+            hovertemplate=f"{req.x_col}: %{{x}}<br>{req.y_col}: %{{y}}<extra></extra>",
+        ))
     fig.add_shape(type="rect", x0=x_min, x1=x_max, y0=y_min, y1=y_max, line=dict(color="#0f5b96", width=2), fillcolor="rgba(15,91,150,0.08)")
     fig.update_layout(
         template="plotly_white",
-        margin=dict(l=45, r=20, t=45, b=45),
-        width=max(760, min(1400, 700 + int(len(df_plot) / 40))),
-        legend_title_text="Gate result",
+        margin=dict(l=65, r=35, t=45, b=60),
+        autosize=True,
+        legend_title_text="Dataset",
         dragmode=False,
     )
-    fig.update_xaxes(fixedrange=True)
-    fig.update_yaxes(fixedrange=True)
+    fig.update_xaxes(title_text=req.x_col, fixedrange=True)
+    fig.update_yaxes(title_text=req.y_col, fixedrange=True)
     return json.loads(fig.to_json())
 
 

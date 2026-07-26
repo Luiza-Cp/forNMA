@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Plotly from "plotly.js-dist-min";
 import { Button, Card, FieldTitle } from "./design-system/index.js";
 
@@ -674,7 +675,7 @@ const initialGatingState = () => ({
   q_low: 0.05,
   q_high: 0.95,
   max_points: 12000,
-  color_by_dataset: false,
+  color_by_dataset: true,
   draw_images: false,
   output_dir: "",
   figure: null,
@@ -791,10 +792,19 @@ function Tip({ text }) {
   const [open, setOpen] = React.useState(false);
   const [position, setPosition] = React.useState({ left: 0, top: 0 });
   const buttonRef = React.useRef(null);
+  const closeTimerRef = React.useRef(null);
+
+  React.useEffect(() => () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+  }, []);
 
   const toggleTip = (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect && typeof window !== "undefined") {
       setPosition({
@@ -814,18 +824,22 @@ function Tip({ text }) {
         aria-label={text}
         aria-expanded={open}
         onClick={toggleTip}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onBlur={() => {
+          closeTimerRef.current = window.setTimeout(() => setOpen(false), 160);
+        }}
       >
         i
       </button>
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <span
           className="tip-popover"
           role="tooltip"
           style={{ left: position.left, top: position.top }}
+          onMouseDown={(event) => event.preventDefault()}
         >
           {text}
-        </span>
+        </span>,
+        document.body
       )}
     </span>
   );
@@ -3138,9 +3152,25 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   );
 }
 
-function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, status, loading, applying, state, setState }) {
+function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxesChanged, status, loading, applying, state, setState }) {
   const [collapsedDatasets, setCollapsedDatasets] = React.useState({});
   const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
+  const setAxisField = (k, v) => setState((prev) => ({
+    ...prev,
+    [k]: v,
+    x_min: "",
+    x_max: "",
+    y_min: "",
+    y_max: "",
+    figure: null,
+    tables: [],
+    files: [],
+    message: "",
+  }));
+  const handleAxisChange = (k, v) => {
+    setAxisField(k, v);
+    onAxesChanged?.();
+  };
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", pkl_dir: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
   const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
@@ -3239,37 +3269,17 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
             <div className="row">
               <div style={{ flex: 1 }}>
                 <div className="field-head">X column <Tip text="Numeric column plotted on the horizontal axis of the gate." /></div>
-                <select className="input" value={state.x_col || ""} onChange={(e) => setField("x_col", e.target.value)}>
+                <select className="input" value={state.x_col || ""} onChange={(e) => handleAxisChange("x_col", e.target.value)}>
                 <option value="">X column</option>
                 {numeric.map((c) => <option key={`gx-${c}`} value={c}>{c}</option>)}
                 </select>
               </div>
               <div style={{ flex: 1 }}>
                 <div className="field-head">Y column <Tip text="Numeric column plotted on the vertical axis of the gate." /></div>
-                <select className="input" value={state.y_col || ""} onChange={(e) => setField("y_col", e.target.value)}>
+                <select className="input" value={state.y_col || ""} onChange={(e) => handleAxisChange("y_col", e.target.value)}>
                 <option value="">Y column</option>
                 {numeric.map((c) => <option key={`gy-${c}`} value={c}>{c}</option>)}
                 </select>
-              </div>
-            </div>
-            <div className="row">
-              <div style={{ flex: 1 }}>
-                <div className="field-head">X minimum <Tip text="Optional lower horizontal bound for the gate." /></div>
-                <input className="input" type="number" value={state.x_min} onChange={(e) => setField("x_min", e.target.value)} placeholder="X minimum (optional)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="field-head">X maximum <Tip text="Optional upper horizontal bound for the gate." /></div>
-                <input className="input" type="number" value={state.x_max} onChange={(e) => setField("x_max", e.target.value)} placeholder="X maximum (optional)" />
-              </div>
-            </div>
-            <div className="row">
-              <div style={{ flex: 1 }}>
-                <div className="field-head">Y minimum <Tip text="Optional lower vertical bound for the gate." /></div>
-                <input className="input" type="number" value={state.y_min} onChange={(e) => setField("y_min", e.target.value)} placeholder="Y minimum (optional)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="field-head">Y maximum <Tip text="Optional upper vertical bound for the gate." /></div>
-                <input className="input" type="number" value={state.y_max} onChange={(e) => setField("y_max", e.target.value)} placeholder="Y maximum (optional)" />
               </div>
             </div>
             <div className="row">
@@ -3282,10 +3292,6 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
                 <input className="input" type="number" min="0.51" max="1" step="0.01" value={state.q_high ?? 0.95} onChange={(e) => setField("q_high", Number(e.target.value || 0.95))} placeholder="High quantile" />
               </div>
             </div>
-            <label className="checkbox">
-              <input type="checkbox" checked={!!state.color_by_dataset} onChange={(e) => setField("color_by_dataset", e.target.checked)} />
-              Color by dataset <Tip text="Color each dataset differently in the gating preview." />
-            </label>
             <div className="hint">If bounds are empty, they are estimated from quantiles (legacy filters behavior).</div>
           </div>
         </details>
@@ -3634,7 +3640,7 @@ function StatsTableView({ table, onDownload }) {
     await copyText(`${lines.join("\n")}\n`);
   };
   return (
-    <div className="section">
+    <div className="section table-section">
       <div className="row row-between">
         <h3>{table?.name || "Table"}</h3>
         <div className="row">
@@ -3873,10 +3879,9 @@ function pickNmaMeasureColumn(columns, measure, current, serverCandidates = []) 
 }
 
 function PlotPanel({ figure, config, onRelayout, onClick }) {
+  const hostRef = React.useRef(null);
   const ref = React.useRef(null);
-  const requestedWidth = Number(figure?.layout?.width);
-  const panelWidth = Number.isFinite(requestedWidth) && requestedWidth > 0 ? Math.round(requestedWidth) : 640;
-  const effectiveWidth = Math.min(panelWidth, Math.max(640, (typeof window !== "undefined" ? window.innerWidth - 500 : panelWidth)));
+  const [plotWidth, setPlotWidth] = React.useState(960);
   const defaultConfig = {
     displayModeBar: true,
     displaylogo: false,
@@ -3890,8 +3895,28 @@ function PlotPanel({ figure, config, onRelayout, onClick }) {
   };
 
   React.useEffect(() => {
+    if (!hostRef.current || typeof ResizeObserver === "undefined") return undefined;
+    const updateWidth = () => {
+      const rect = hostRef.current?.getBoundingClientRect();
+      if (!rect?.width) return;
+      setPlotWidth(Math.max(640, Math.min(1120, Math.floor(rect.width))));
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(hostRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  React.useEffect(() => {
     if (!ref.current || !figure) return;
-    Plotly.react(ref.current, figure.data, figure.layout, config || defaultConfig);
+    const layout = {
+      ...(figure.layout || {}),
+      autosize: false,
+      width: plotWidth,
+    };
+    Plotly.react(ref.current, figure.data || [], layout, config || defaultConfig).then(() => {
+      if (ref.current) Plotly.Plots.resize(ref.current);
+    });
     if (ref.current?.on) {
       if (ref.current.removeAllListeners) {
         ref.current.removeAllListeners("plotly_relayout");
@@ -3904,11 +3929,11 @@ function PlotPanel({ figure, config, onRelayout, onClick }) {
         ref.current.on("plotly_click", onClick);
       }
     }
-  }, [figure, config, onRelayout, onClick]);
+  }, [figure, config, onRelayout, onClick, plotWidth]);
 
   return (
-    <div className="plot-host">
-      <div className="plot" style={{ "--plot-width": `${effectiveWidth}px` }} ref={ref} />
+    <div className="plot-host" ref={hostRef}>
+      <div className="plot" style={{ width: `${plotWidth}px` }} ref={ref} />
     </div>
   );
 }
@@ -4367,6 +4392,7 @@ export default function App() {
   const gatingColsCacheRef = React.useRef({});
   const trackingColsCacheRef = React.useRef({});
   const gatingRelayoutTimerRef = React.useRef(null);
+  const gatingPreviewRequestRef = React.useRef(0);
   const nmaGateRelayoutTimerRef = React.useRef(null);
   const plotDataPathsKey = useMemo(
     () => (plotData.datasets || []).map((d) => String(d.path || "").trim()).join("||"),
@@ -5956,13 +5982,6 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!gatingState.figure) return;
-    if (gatingLoading || gatingApplying) return;
-    handleGatingPreview({ fromDrag: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gatingState.color_by_dataset]);
-
   const handleSave = async () => {
     setStatus("Saving settings...");
     setStatusLevel("info");
@@ -6258,7 +6277,7 @@ export default function App() {
     return Number.isFinite(n) ? n : null;
   };
 
-  const handleGatingPreview = async ({ overrideBounds = null, fromDrag = false } = {}) => {
+  const handleGatingPreview = async ({ overrideBounds = null, fromDrag = false, resetBounds = false } = {}) => {
     const datasets = (gatingState.datasets || [])
       .filter((d) => d.enabled !== false)
       .map((d) => ({
@@ -6280,21 +6299,31 @@ export default function App() {
     }
     setGatingLoading(true);
     setGatingStatus({ level: "info", text: fromDrag ? "Updating gate preview..." : "Generating gating preview..." });
+    const requestId = gatingPreviewRequestRef.current + 1;
+    gatingPreviewRequestRef.current = requestId;
     try {
+      const readBound = (key) => {
+        if (resetBounds) return null;
+        if (overrideBounds && Object.prototype.hasOwnProperty.call(overrideBounds, key)) {
+          return overrideBounds[key];
+        }
+        return parseOptNumber(gatingState[key]);
+      };
       const payload = {
         datasets,
         x_col: gatingState.x_col,
         y_col: gatingState.y_col,
-        x_min: overrideBounds?.x_min ?? parseOptNumber(gatingState.x_min),
-        x_max: overrideBounds?.x_max ?? parseOptNumber(gatingState.x_max),
-        y_min: overrideBounds?.y_min ?? parseOptNumber(gatingState.y_min),
-        y_max: overrideBounds?.y_max ?? parseOptNumber(gatingState.y_max),
+        x_min: readBound("x_min"),
+        x_max: readBound("x_max"),
+        y_min: readBound("y_min"),
+        y_max: readBound("y_max"),
         q_low: Number(gatingState.q_low ?? 0.05),
         q_high: Number(gatingState.q_high ?? 0.95),
         max_points: Number(gatingState.max_points || 12000),
-        color_by_dataset: !!gatingState.color_by_dataset,
+        color_by_dataset: true,
       };
       const res = await callApi("/filters/preview", payload);
+      if (requestId !== gatingPreviewRequestRef.current) return;
       setGatingState((prev) => ({
         ...prev,
         figure: res.figure || null,
@@ -6307,9 +6336,12 @@ export default function App() {
       }));
       setGatingStatus({ level: "success", text: res.message || "Preview ready." });
     } catch (err) {
+      if (requestId !== gatingPreviewRequestRef.current) return;
       setGatingStatus({ level: "error", text: errorMessageFromException(err, "Gating preview failed. Check that X and Y are numeric columns with valid rows.") });
     } finally {
-      setGatingLoading(false);
+      if (requestId === gatingPreviewRequestRef.current) {
+        setGatingLoading(false);
+      }
     }
   };
 
@@ -7321,6 +7353,7 @@ export default function App() {
               }}
               onPreview={handleGatingPreview}
               onApply={handleGatingApply}
+              onAxesChanged={() => setGatingStatus({ level: "info", text: "Columns changed. Click Preview gate to draw a new gate for the selected axes." })}
               status={gatingStatus}
               loading={gatingLoading}
               applying={gatingApplying}
@@ -7344,17 +7377,64 @@ export default function App() {
                   </div>
                 )}
                 {gatingState.figure ? (
-                  <PlotPanel
-                    figure={gatingState.figure}
-                    onRelayout={handleGatingRelayout}
-                    config={{
-                      displayModeBar: false,
-                      displaylogo: false,
-                      responsive: true,
-                      scrollZoom: false,
-                      edits: { shapePosition: true },
-                    }}
-                  />
+                  <>
+                    <div className="gate-manual-controls">
+                      <div>
+                        <h3>Manual gate limits</h3>
+                        <p className="hint hint-muted">
+                          Optional. Adjust the box directly on the plot, or type exact limits here and apply them.
+                        </p>
+                      </div>
+                      <div className="gate-limit-grid">
+                        <label>
+                          <span>X min</span>
+                          <input className="input" type="number" value={gatingState.x_min} onChange={(e) => setGatingState((prev) => ({ ...prev, x_min: e.target.value }))} />
+                        </label>
+                        <label>
+                          <span>X max</span>
+                          <input className="input" type="number" value={gatingState.x_max} onChange={(e) => setGatingState((prev) => ({ ...prev, x_max: e.target.value }))} />
+                        </label>
+                        <label>
+                          <span>Y min</span>
+                          <input className="input" type="number" value={gatingState.y_min} onChange={(e) => setGatingState((prev) => ({ ...prev, y_min: e.target.value }))} />
+                        </label>
+                        <label>
+                          <span>Y max</span>
+                          <input className="input" type="number" value={gatingState.y_max} onChange={(e) => setGatingState((prev) => ({ ...prev, y_max: e.target.value }))} />
+                        </label>
+                      </div>
+                      <div className="row gate-limit-actions">
+                        <button
+                          className="secondary"
+                          onClick={() => handleGatingPreview()}
+                          disabled={gatingLoading || gatingApplying}
+                        >
+                          Apply limits
+                        </button>
+                        <button
+                          className="ghost"
+                          onClick={() => {
+                            setGatingState((prev) => ({ ...prev, x_min: "", x_max: "", y_min: "", y_max: "" }));
+                            handleGatingPreview({ resetBounds: true });
+                          }}
+                          disabled={gatingLoading || gatingApplying}
+                        >
+                          Auto limits
+                        </button>
+                      </div>
+                    </div>
+                    <PlotPanel
+                      figure={gatingState.figure}
+                      onRelayout={handleGatingRelayout}
+                      config={{
+                        displayModeBar: false,
+                        displaylogo: false,
+                        responsive: true,
+                        scrollZoom: false,
+                        edits: { shapePosition: true },
+                      }}
+                    />
+                  </>
                 ) : (
                   <EmptyState
                     title="Gate preview will appear here"
