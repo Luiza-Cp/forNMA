@@ -2329,7 +2329,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                         const picked = await onPickCsv();
                         if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
                       } catch (err) {
-                        setStatusExternal(err.message || "Failed to pick CSV.", "error");
+                        setStatusExternal(errorMessageFromException(err, "Could not open the CSV picker. Check that the backend is running and try again."), "error");
                       }
                     }}
                   >
@@ -3550,27 +3550,109 @@ function buildDatasets(rows) {
     }));
 }
 
+function cleanTechnicalMessage(value) {
+  return String(value || "")
+    .replace(/\b(TypeError|ValueError|KeyError|RuntimeError|Exception):\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractQuotedValue(value) {
+  const match = String(value || "").match(/['"]([^'"]+)['"]/);
+  return match ? match[1] : "";
+}
+
+function extractFileName(value) {
+  const match = String(value || "").match(/['"]?([^'"\s/\\]+\.(?:csv|pkl|pickle|tif|tiff|png|jpg|jpeg))['"]?/i);
+  return match ? match[1] : "";
+}
+
+function humanizeErrorMessage(value, fallback = "The operation could not be completed. Check the selected inputs and try again.") {
+  const raw = cleanTechnicalMessage(value);
+  if (!raw) return fallback;
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("no columns to parse from file") || lower.includes("emptydataerror")) {
+    return "The selected CSV appears to be empty or does not contain a readable table. Choose a CSV with column headers and at least one data row.";
+  }
+
+  if (lower.includes("not supported between instances") || lower.includes("unsupported operand type")) {
+    return "The selected data contains incompatible values, such as numbers mixed with empty cells or text. Check the chosen columns and remove blank or non-numeric values where numeric measurements are required.";
+  }
+
+  if (lower.includes("nonetype") || lower.includes("none type")) {
+    return "A required value is missing. Check that every required file, folder, channel, condition, and column is selected before running.";
+  }
+
+  if (lower.includes("could not convert string to float") || lower.includes("unable to parse string")) {
+    return "A numeric column contains text or symbols. Select a measurement column that contains only numbers, or clean the CSV and try again.";
+  }
+
+  if (lower.includes("file not found") || lower.includes("no such file or directory")) {
+    return "One of the selected files or folders was not found. Check that the path still exists and select it again if it was moved, renamed, or deleted.";
+  }
+
+  if (lower.includes("permission denied")) {
+    return "The software does not have permission to read or write in the selected location. Choose a folder you can access, or adjust the folder permissions.";
+  }
+
+  if (lower.includes("is not in list") || lower.includes("keyerror")) {
+    const column = extractQuotedValue(raw);
+    return column
+      ? `The column "${column}" was not found in the selected data. Check the CSV headers and choose an existing column.`
+      : "A required column was not found in the selected data. Check the CSV headers and choose columns that exist in the file.";
+  }
+
+  if (lower.includes("all csvs must have exactly the same columns")) {
+    return "The selected CSV files do not have the same columns. Use files with the same column names in the same order, or analyze them separately.";
+  }
+
+  if (lower.includes("no data left after") || lower.includes("no valid rows")) {
+    return "No rows were left after applying the selected filters or removing empty values. Relax the filters, choose different columns, or use a CSV with more valid data.";
+  }
+
+  if (lower.includes("dbscan found no core clusters") || lower.includes("all noise")) {
+    return "The automatic clustering could not find a stable control group. Try increasing the neighborhood size, relaxing DBSCAN settings, or checking that the control CSV has enough comparable cells.";
+  }
+
+  if (lower.includes("failed to read csv") || lower.includes("error tokenizing data") || lower.includes("parsererror")) {
+    const fileName = extractFileName(raw);
+    return `The CSV${fileName ? ` "${fileName}"` : ""} could not be read as a table. Check that it is a valid CSV with consistent separators, column headers, and rows.`;
+  }
+
+  if (/traceback|stack trace|at\s+\w+\s*\(|\.jsx:\d+|\.py:\d+/i.test(raw)) {
+    return fallback;
+  }
+
+  return raw;
+}
+
+function errorMessageFromException(error, fallback) {
+  return humanizeErrorMessage(error?.message || error, fallback);
+}
+
 function friendlyApiError(text, fallback = "Request failed.") {
   const raw = String(text || "").trim();
   if (!raw) return fallback;
   try {
     const parsed = JSON.parse(raw);
-    if (typeof parsed?.detail === "string") return parsed.detail;
+    if (typeof parsed?.detail === "string") return humanizeErrorMessage(parsed.detail, fallback);
     if (Array.isArray(parsed?.detail)) {
-      return parsed.detail
+      const message = parsed.detail
         .map((item) => {
           const loc = Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(" > ") : "";
           const msg = item.msg || item.message || JSON.stringify(item);
           return loc ? `${loc}: ${msg}` : msg;
         })
         .join("\n");
+      return humanizeErrorMessage(message, fallback);
     }
-    if (typeof parsed?.message === "string") return parsed.message;
-    if (typeof parsed?.error === "string") return parsed.error;
+    if (typeof parsed?.message === "string") return humanizeErrorMessage(parsed.message, fallback);
+    if (typeof parsed?.error === "string") return humanizeErrorMessage(parsed.error, fallback);
   } catch {
     // Plain-text responses are already user-readable.
   }
-  return raw;
+  return humanizeErrorMessage(raw, fallback);
 }
 
 async function errorFromResponse(res, fallback = "Request failed.") {
@@ -3593,12 +3675,13 @@ function Status({ level = "info", text }) {
     info: "i",
   };
   const statusLevel = labels[level] ? level : "info";
+  const displayText = statusLevel === "error" ? humanizeErrorMessage(text) : text;
   return (
     <div className={`status ${statusLevel}`} role={statusLevel === "error" ? "alert" : "status"} aria-live="polite">
       <span className="status-icon" aria-hidden="true">{icons[statusLevel]}</span>
       <div className="status-body">
         <strong>{labels[statusLevel]}</strong>
-        <span>{text}</span>
+        <span>{displayText}</span>
       </div>
     </div>
   );
@@ -4163,7 +4246,7 @@ export default function App() {
     const missing = datasets.filter((dataset) => !dataset.area_col || !dataset.nii_col);
     if (missing.length === 0) return true;
     const names = missing.map((dataset) => dataset.name || dataset.path.split("/").pop()).join(", ");
-    setStatus(`Choose Area and NII columns for: ${names}.`);
+    setStatus(`Choose both Area and NII columns for: ${names}. Open each dataset row and select the columns that contain those numeric measurements.`);
     setStatusLevel("error");
     return false;
   };
@@ -4764,7 +4847,7 @@ export default function App() {
       setSegPreviewNonce((n) => n + 1);
     } catch (err) {
       setSegJob((prev) => ({ ...prev, status: "idle" }));
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "Segmentation could not start. Check the image folders, output folder, and selected channels."));
       setStatusLevel("error");
     }
   };
@@ -4781,7 +4864,7 @@ export default function App() {
       setSegJob((prev) => ({ ...prev, status: "canceling", message: "Stopping after current image..." }));
     } catch (err) {
       setSegJob((prev) => ({ ...prev, status: previousStatus, message: "Stop could not be requested." }));
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "The stop request could not be sent. Wait a moment and try Stop again."));
       setStatusLevel("error");
     }
   };
@@ -4830,7 +4913,7 @@ export default function App() {
       });
     } catch (err) {
       setRegJob((prev) => ({ ...prev, status: "idle" }));
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "Registration could not start. Check the selected image folders, reference channel, moving channels, and saving path."));
       setStatusLevel("error");
     }
   };
@@ -4846,7 +4929,7 @@ export default function App() {
       setStatus("Registration stop requested...");
       setStatusLevel("info");
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "The registration stop request could not be sent. Wait a moment and try Stop again."));
       setStatusLevel("error");
     }
   };
@@ -4874,7 +4957,7 @@ export default function App() {
       });
     } catch (err) {
       setFociJob((prev) => ({ ...prev, status: "idle" }));
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "Foci overlay could not start. Check the Pickles folder, output folder, selected channels, and actions."));
       setStatusLevel("error");
     }
   };
@@ -4890,7 +4973,7 @@ export default function App() {
       setStatus("Foci stop requested...");
       setStatusLevel("info");
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "The foci overlay stop request could not be sent. Wait a moment and try Stop again."));
       setStatusLevel("error");
     }
   };
@@ -4934,7 +5017,7 @@ export default function App() {
       setStatusLevel("success");
       setStep1Ready(true);
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "Step 1 could not be computed. Check that at least one control dataset is selected and that Area/NII columns are numeric."));
       setStatusLevel("error");
     }
   };
@@ -4957,7 +5040,7 @@ export default function App() {
       setStatus("DBSCAN applied. Update the step 2 figure.");
       setStatusLevel("success");
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "DBSCAN could not be applied. Check that the control data has enough valid numeric rows, then try different clustering settings."));
       setStatusLevel("error");
     }
   };
@@ -4991,7 +5074,7 @@ export default function App() {
       setStatusLevel("success");
       return true;
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "Step 2 figure could not be generated. Check the selected axes, thresholds, and loaded settings."));
       setStatusLevel("error");
       return false;
     }
@@ -5004,7 +5087,7 @@ export default function App() {
       return;
     }
     if (!step1Stats) {
-      setStatus("Run step 1 first.");
+      setStatus("Run step 1 first. Step 2 needs the control data prepared before it can continue.");
       setStatusLevel("error");
       return;
     }
@@ -5039,7 +5122,7 @@ export default function App() {
       setStatus("Completed. Final figure ready.");
       setStatusLevel("success");
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "The final NMA figure could not be completed. Check the selected graph limits and settings."));
       setStatusLevel("error");
     }
   };
@@ -5144,7 +5227,7 @@ export default function App() {
       setStatus("Settings loaded.");
       setStatusLevel("success");
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "The settings file could not be loaded. Choose a valid forNMA settings file and try again."));
       setStatusLevel("error");
     }
   };
@@ -5166,7 +5249,7 @@ export default function App() {
   const handlePlotAll = async () => {
     if (!requireNmaAxes()) return;
     if (!plotSavePath.trim()) {
-      setStatus("Choose an output folder before plotting.");
+      setStatus("Choose an output folder before plotting. This is where the generated images and result files will be saved.");
       setStatusLevel("error");
       return;
     }
@@ -5210,7 +5293,7 @@ export default function App() {
         error: "",
       });
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "Plot generation could not start. Check the output folder and selected datasets."));
       setStatusLevel("error");
     }
   };
@@ -5233,7 +5316,7 @@ export default function App() {
           setStatus(data.message || "Plot generation finished. Check the preview panel and output folder for the generated image files.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
-          setStatus(data.error || data.message || "Plot failed.");
+          setStatus(humanizeErrorMessage(data.error || data.message, "Plot generation failed. Check that the selected CSVs, columns, and output folder are valid."));
           setStatusLevel("error");
         }
       } catch {
@@ -5284,7 +5367,7 @@ export default function App() {
           setStatus(data.message || "Segmentation finished successfully. Review the preview, log, and output folder before continuing.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
-          setStatus(data.error || data.message || "Segmentation failed.");
+          setStatus(humanizeErrorMessage(data.error || data.message, "Segmentation failed. Check the image folders, channel selections, and output folder."));
           setStatusLevel("error");
         } else if (data.status === "canceled") {
           setStatus(data.message || "Segmentation canceled.");
@@ -5316,7 +5399,7 @@ export default function App() {
           setStatus(data.message || "Registration finished successfully. Registered images were written to the selected saving path.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
-          setStatus(data.error || data.message || "Registration failed.");
+          setStatus(humanizeErrorMessage(data.error || data.message, "Registration failed. Check the reference channel, moving channels, image folders, and saving path."));
           setStatusLevel("error");
         } else if (data.status === "canceled") {
           setStatus(data.message || "Registration canceled.");
@@ -5347,7 +5430,7 @@ export default function App() {
           setStatus(data.message || "Foci overlay finished successfully. Output files were written to the selected saving path.");
           setStatusLevel("success");
         } else if (data.status === "failed") {
-          setStatus(data.error || data.message || "Foci overlay failed.");
+          setStatus(humanizeErrorMessage(data.error || data.message, "Foci overlay failed. Check the Pickles folder, selected channels, actions, and saving path."));
           setStatusLevel("error");
         } else if (data.status === "canceled") {
           setStatus(data.message || "Foci overlay canceled.");
@@ -5482,7 +5565,7 @@ export default function App() {
       setStatus("Settings saved successfully.");
       setStatusLevel("success");
     } catch (err) {
-      setStatus(err.message);
+      setStatus(errorMessageFromException(err, "Settings could not be saved. Choose a folder you can write to and try again."));
       setStatusLevel("error");
     }
   };
@@ -5506,7 +5589,7 @@ export default function App() {
       }))
       .filter((d) => d.path);
     if (!datasets.length) {
-      setPlotDataStatusMsg("Select at least one dataset with a valid CSV path.", "error");
+      setPlotDataStatusMsg("Select at least one dataset with a valid CSV path. Use Browse CSV or type the full path to a readable CSV file.", "error");
       return;
     }
     if (plotData.columnsWarning) {
@@ -5515,30 +5598,30 @@ export default function App() {
     }
     const gt = plotData.graph_type || "scatter";
     if (PLOT_TYPES_REQUIRE_XY.has(gt) && (!plotData.x || !plotData.y)) {
-      setPlotDataStatusMsg("Select X and Y for this plot type.", "error");
+      setPlotDataStatusMsg("Select both X and Y columns for this plot type. Use numeric measurement columns for scatter, line, AUC, rolling average, and CPD plots.", "error");
       return;
     }
     if (!PLOT_TYPES_REQUIRE_XY.has(gt) && PLOT_TYPES_REQUIRE_Y.has(gt) && !plotData.y) {
-      setPlotDataStatusMsg("Select Y for this plot type.", "error");
+      setPlotDataStatusMsg("Select a Y column for this plot type. Choose the measurement column you want to plot.", "error");
       return;
     }
     const effectiveGraphType = (gt === "line" && !!plotData.line_rolling) ? "rolling-average" : gt;
     if (effectiveGraphType === "rolling-average") {
       const nVal = plotData.n === "" ? null : Number(plotData.n);
       if (!Number.isFinite(nVal) || nVal <= 0) {
-        setPlotDataStatusMsg("Rolling average requires n > 0.", "error");
+        setPlotDataStatusMsg("Rolling average needs a window size greater than 0. Increase n and try again.", "error");
         return;
       }
     }
     if (effectiveGraphType === "cpd") {
       const fs = parseIntList(plotData.framesText);
       if (fs.length < 2) {
-        setPlotDataStatusMsg("CPD requires at least 2 frames.", "error");
+        setPlotDataStatusMsg("CPD needs at least 2 frames. Increase the frame range or choose data with more time points.", "error");
         return;
       }
     }
     if ((gt === "violin" || gt === "box" || gt === "dot" || gt === "bar") && plotData.x && !(plotData.categoricalColumns || []).includes(plotData.x)) {
-      setPlotDataStatusMsg("For violin/box/dot/bar, choose a categorical column on X (or leave it empty).", "error");
+      setPlotDataStatusMsg("For violin, box, dot, or bar plots, X must be a category such as Condition or Treatment. Choose a categorical column, or leave X empty.", "error");
       return;
     }
     scrollToTopSmooth();
@@ -5578,7 +5661,7 @@ export default function App() {
       }
       setPlotDataStatusMsg(res.message || "Preview ready.", "success");
     } catch (err) {
-      setPlotDataStatusMsg(err.message, "error");
+      setPlotDataStatusMsg(errorMessageFromException(err, "Preview could not be generated. Check that the selected CSV and columns match this graph type."), "error");
     } finally {
       setPlotDataLoading(false);
     }
@@ -5593,11 +5676,11 @@ export default function App() {
       }))
       .filter((d) => d.path);
     if (!datasets.length) {
-      setClusteringStatus({ level: "error", text: "Select at least one dataset." });
+      setClusteringStatus({ level: "error", text: "Select at least one dataset. Use Add dataset or enable an existing dataset with a readable CSV path." });
       return;
     }
     if (!(clustering.columns || []).length) {
-      setClusteringStatus({ level: "error", text: "Select at least one numeric feature." });
+      setClusteringStatus({ level: "error", text: "Select at least one numeric feature. Choose measurement columns that contain numbers, not labels or names." });
       return;
     }
     scrollToTopSmooth();
@@ -5627,7 +5710,7 @@ export default function App() {
       }));
       setClusteringStatus({ level: "success", text: res.message || "Preview ready." });
     } catch (err) {
-      setClusteringStatus({ level: "error", text: err.message || "UMAP preview failed." });
+      setClusteringStatus({ level: "error", text: errorMessageFromException(err, "UMAP preview failed. Check that the selected features are numeric and contain valid values.") });
     } finally {
       setClusteringLoading(false);
     }
@@ -5642,11 +5725,11 @@ export default function App() {
       }))
       .filter((d) => d.path);
     if (!datasets.length) {
-      setClusteringStatus({ level: "error", text: "Select at least one dataset." });
+      setClusteringStatus({ level: "error", text: "Select at least one dataset. Use Add dataset or enable an existing dataset with a readable CSV path." });
       return;
     }
     if (!(clustering.columns || []).length) {
-      setClusteringStatus({ level: "error", text: "Select at least one numeric feature." });
+      setClusteringStatus({ level: "error", text: "Select at least one numeric feature. Choose measurement columns that contain numbers, not labels or names." });
       return;
     }
     scrollToTopSmooth();
@@ -5669,7 +5752,7 @@ export default function App() {
       setClustering((prev) => ({ ...prev, elbowFigure: res.figure || null }));
       setClusteringStatus({ level: "success", text: res.message || "Elbow plot ready." });
     } catch (err) {
-      setClusteringStatus({ level: "error", text: err.message || "Elbow plot failed." });
+      setClusteringStatus({ level: "error", text: errorMessageFromException(err, "Elbow plot failed. Check that the selected features are numeric and have enough valid rows.") });
     } finally {
       setClusteringElbowLoading(false);
     }
@@ -5682,23 +5765,23 @@ export default function App() {
       .map((d) => String(d.path || "").trim())
       .filter(Boolean);
     if (!datasets.length) {
-      setStatsStatus({ level: "error", text: "Select at least one dataset." });
+      setStatsStatus({ level: "error", text: "Select at least one dataset with a readable CSV path before running statistics." });
       return;
     }
     if (method === "oneway" && (!statsState.numeric_col || !statsState.group_col)) {
-      setStatsStatus({ level: "error", text: "One-way requires numeric and group columns." });
+      setStatsStatus({ level: "error", text: "One-way analysis needs one numeric measurement column and one grouping column, such as Condition." });
       return;
     }
     if (method === "twoway" && (!statsState.numeric_col || !statsState.group_col1 || !statsState.group_col2)) {
-      setStatsStatus({ level: "error", text: "Two-way requires numeric, factor A and factor B." });
+      setStatsStatus({ level: "error", text: "Two-way analysis needs one numeric measurement column plus two grouping columns: Factor A and Factor B." });
       return;
     }
     if (method === "chi2" && (!statsState.group_col || !statsState.category_col)) {
-      setStatsStatus({ level: "error", text: "Chi-square requires group and category columns." });
+      setStatsStatus({ level: "error", text: "Chi-square analysis needs a group column and a category column. Choose columns with labels/categories, not continuous measurements." });
       return;
     }
     if (method === "chi2-subgroups" && (!statsState.group_col || !statsState.condition_col)) {
-      setStatsStatus({ level: "error", text: "Chi-square subgroups requires group and condition columns." });
+      setStatsStatus({ level: "error", text: "Chi-square subgroups needs a group column and a condition column. Choose columns that identify the categories to compare." });
       return;
     }
 
@@ -5713,7 +5796,7 @@ export default function App() {
       }))
       .filter((filter) => filter.column);
     if (filters.some((filter) => filter.values.length === 0)) {
-      setStatsStatus({ level: "error", text: "Each active subset filter needs at least one selected value." });
+      setStatsStatus({ level: "error", text: "Each active subset filter needs at least one selected value. Pick values for the filter or turn that filter off." });
       return;
     }
 
@@ -5745,7 +5828,7 @@ export default function App() {
       }));
       setStatsStatus({ level: "success", text: res.message || "Analysis complete." });
     } catch (err) {
-      setStatsStatus({ level: "error", text: err.message || "Stats run failed." });
+      setStatsStatus({ level: "error", text: errorMessageFromException(err, "The statistical analysis could not run. Check that the selected columns match the analysis type and contain enough valid data.") });
     } finally {
       setStatsLoading(false);
     }
@@ -5767,11 +5850,11 @@ export default function App() {
       }))
       .filter((d) => d.path);
     if (!datasets.length) {
-      setGatingStatus({ level: "error", text: "Select at least one dataset." });
+      setGatingStatus({ level: "error", text: "Select at least one dataset with a readable CSV path before previewing a gate." });
       return;
     }
     if (!gatingState.x_col || !gatingState.y_col) {
-      setGatingStatus({ level: "error", text: "Select X and Y columns." });
+      setGatingStatus({ level: "error", text: "Select both X and Y columns. Choose numeric measurement columns to define the gate axes." });
       return;
     }
     if (!fromDrag) {
@@ -5806,7 +5889,7 @@ export default function App() {
       }));
       setGatingStatus({ level: "success", text: res.message || "Preview ready." });
     } catch (err) {
-      setGatingStatus({ level: "error", text: err.message || "Gating preview failed." });
+      setGatingStatus({ level: "error", text: errorMessageFromException(err, "Gating preview failed. Check that X and Y are numeric columns with valid rows.") });
     } finally {
       setGatingLoading(false);
     }
@@ -5822,19 +5905,19 @@ export default function App() {
       }))
       .filter((d) => d.path);
     if (!datasets.length) {
-      setGatingStatus({ level: "error", text: "Select at least one dataset." });
+      setGatingStatus({ level: "error", text: "Select at least one dataset with a readable CSV path before applying a gate." });
       return;
     }
     if (!gatingState.x_col || !gatingState.y_col) {
-      setGatingStatus({ level: "error", text: "Select X and Y columns." });
+      setGatingStatus({ level: "error", text: "Select both X and Y columns. Choose numeric measurement columns to define the gate axes." });
       return;
     }
     if (!String(gatingState.output_dir || "").trim()) {
-      setGatingStatus({ level: "error", text: "Choose an output directory to save gated CSVs." });
+      setGatingStatus({ level: "error", text: "Choose an output directory to save gated CSVs. Use a folder where you have write permission." });
       return;
     }
     if (gatingState.draw_images && datasets.some((d) => !d.pkl_dir)) {
-      setGatingStatus({ level: "error", text: "Choose a PKL folder for every active dataset before applying the gate to images." });
+      setGatingStatus({ level: "error", text: "Choose a PKL folder for every active dataset before applying the gate to images. Each PKL folder must match its dataset." });
       return;
     }
     scrollToTopSmooth();
@@ -5870,7 +5953,7 @@ export default function App() {
       }));
       setGatingStatus({ level: "success", text: res.message || "Gating complete." });
     } catch (err) {
-      setGatingStatus({ level: "error", text: err.message || "Gating apply failed." });
+      setGatingStatus({ level: "error", text: errorMessageFromException(err, "The gate could not be applied. Check the output folder, PKL folders, and selected numeric columns.") });
     } finally {
       setGatingApplying(false);
     }
@@ -5967,15 +6050,15 @@ export default function App() {
 
   const handleTrackingRunAutomatic = async () => {
     if (!String(trackingState.path_to_table || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Select the input Results.csv table." });
+      setTrackingStatus({ level: "error", text: "Select the input Results.csv table. This table should contain the segmentation results for the images you want to track." });
       return;
     }
     if (!String(trackingState.image_dir || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Select the image folder. It is required for tracking preview and validation." });
+      setTrackingStatus({ level: "error", text: "Select the image folder. It must contain the images referenced by the Results.csv table." });
       return;
     }
     if (!String(trackingState.image_col || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Select the CSV column that contains image file names." });
+      setTrackingStatus({ level: "error", text: "Select the CSV column that contains image file names, such as Image_name_channel. The tracker uses it to match table rows to images." });
       return;
     }
     scrollToTopSmooth();
@@ -5996,7 +6079,7 @@ export default function App() {
       setTrackingState((prev) => ({ ...prev, selected: [] }));
       setTrackingStatus({ level: "success", text: res.message || "Automatic tracking complete." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Tracking run failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "Automatic tracking could not run. Check the Results.csv table, image folder, and image-name column.") });
     } finally {
       setTrackingRunning(false);
     }
@@ -6004,7 +6087,7 @@ export default function App() {
 
   const handleTrackingGoToCorrection = () => {
     if (!String(trackingState.table_path || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first. The correction tools need an initial tracked table before they can open." });
       return;
     }
     setTrackingState((prev) => ({ ...prev, workflow_stage: "menu" }));
@@ -6013,7 +6096,7 @@ export default function App() {
 
   const handleTrackingOpenCorrection = () => {
     if (!String(trackingState.table_path || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first. Saving requires tracking results to exist." });
       return;
     }
     setTrackingState((prev) => ({ ...prev, workflow_stage: "correction" }));
@@ -6022,11 +6105,11 @@ export default function App() {
 
   const handleTrackingSaveResults = async (includeImages = true) => {
     if (!String(trackingState.table_path || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first. There is no tracked table to save yet." });
       return;
     }
     if (!String(trackingState.save_results_dir || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Select a destination folder to save results." });
+      setTrackingStatus({ level: "error", text: "Select a destination folder to save results. Use a folder where you have write permission." });
       return;
     }
     setTrackingLoadingFrame(true);
@@ -6040,7 +6123,7 @@ export default function App() {
       });
       setTrackingStatus({ level: "success", text: res.message || "Results saved." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Failed to save tracking results." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "Tracking results could not be saved. Choose a destination folder you can write to and try again.") });
     } finally {
       setTrackingLoadingFrame(false);
     }
@@ -6049,7 +6132,7 @@ export default function App() {
   const handleTrackingUndo = async () => {
     const checkpointPath = String(trackingState.undo_checkpoint_path || "").trim();
     if (!checkpointPath) {
-      setTrackingStatus({ level: "error", text: "No undo checkpoint is available yet." });
+      setTrackingStatus({ level: "error", text: "No undo checkpoint is available yet. Make an edit first, then Undo will become available." });
       return;
     }
     setTrackingEditing(true);
@@ -6068,7 +6151,7 @@ export default function App() {
       }));
       setTrackingStatus({ level: "success", text: res.message || "Last action undone." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Undo failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "Undo failed. There may be no saved checkpoint for the last edit.") });
     } finally {
       setTrackingEditing(false);
     }
@@ -6076,7 +6159,7 @@ export default function App() {
 
   const handleTrackingSaveProgress = async () => {
     if (!String(trackingState.table_path || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Run automatic tracking first." });
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first. Progress can only be saved after a tracked table exists." });
       return;
     }
     setTrackingEditing(true);
@@ -6091,7 +6174,7 @@ export default function App() {
       }));
       setTrackingStatus({ level: "success", text: res.message || "Progress saved." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Save progress failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "Progress could not be saved. Choose a writable folder and try again.") });
     } finally {
       setTrackingEditing(false);
     }
@@ -6099,7 +6182,7 @@ export default function App() {
 
   const handleTrackingRefreshFrame = async (override = {}) => {
     if (!String(trackingState.table_path || "").trim()) {
-      setTrackingStatus({ level: "error", text: "Run automatic tracking first or provide a tracked table." });
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first or provide a tracked table. The preview needs tracking results to show." });
       return;
     }
     setTrackingLoadingFrame(true);
@@ -6109,7 +6192,7 @@ export default function App() {
       applyTrackingPreviewResponse(res);
       setTrackingStatus({ level: "success", text: res.message || "Preview updated." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Tracking preview failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "Tracking preview failed. Check that the tracked table and image folder still match.") });
     } finally {
       setTrackingLoadingFrame(false);
     }
@@ -6167,13 +6250,13 @@ export default function App() {
       });
       setTrackingStatus({ level: "success", text: res.message || "Track selected." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "No track found at clicked position." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "No track was found at the clicked position. Click closer to a visible cell marker and try again.") });
     }
   };
 
   const handleTrackingDelete = async () => {
     if (!(trackingState.selected || []).length) {
-      setTrackingStatus({ level: "error", text: "Select at least one point/track first." });
+      setTrackingStatus({ level: "error", text: "Select at least one point or track first. Click a visible cell marker before deleting." });
       return;
     }
     setTrackingEditing(true);
@@ -6188,7 +6271,7 @@ export default function App() {
       setTrackingState((prev) => ({ ...prev, selected: [], selected_markers: [], undo_checkpoint_path: undoCheckpointPath }));
       setTrackingStatus({ level: "success", text: res.message || "Tracks deleted." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Delete tracks failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "The selected tracks could not be deleted. Select one or more visible tracks and try again.") });
     } finally {
       setTrackingEditing(false);
     }
@@ -6196,7 +6279,7 @@ export default function App() {
 
   const handleTrackingLink = async () => {
     if ((trackingState.selected || []).length < 2) {
-      setTrackingStatus({ level: "error", text: "Select at least two points to link tracks." });
+      setTrackingStatus({ level: "error", text: "Select at least two points to link tracks. Click the cells that should belong to the same track, then try again." });
       return;
     }
     setTrackingEditing(true);
@@ -6217,7 +6300,7 @@ export default function App() {
       }));
       setTrackingStatus({ level: "success", text: res.message || "Tracks linked." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Link tracks failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "The selected tracks could not be linked. Select at least two points from the tracks you want to connect.") });
     } finally {
       setTrackingEditing(false);
     }
@@ -6225,7 +6308,7 @@ export default function App() {
 
   const handleTrackingDivision = async () => {
     if ((trackingState.selected || []).length !== 3) {
-      setTrackingStatus({ level: "error", text: "Select exactly 3 cells: one mother and two daughters." });
+      setTrackingStatus({ level: "error", text: "Select exactly 3 cells: one mother cell and two daughter cells. The mother must be from an earlier frame." });
       return;
     }
     setTrackingEditing(true);
@@ -6246,7 +6329,7 @@ export default function App() {
       }));
       setTrackingStatus({ level: "success", text: res.message || "Cell division linked." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Cell division failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "Cell division could not be linked. Select exactly one mother cell and two daughter cells in the expected frames.") });
     } finally {
       setTrackingEditing(false);
     }
@@ -6254,7 +6337,7 @@ export default function App() {
 
   const handleTrackingUnlink = async () => {
     if (!(trackingState.selected || []).length) {
-      setTrackingStatus({ level: "error", text: "Select one or more cells first." });
+      setTrackingStatus({ level: "error", text: "Select one or more linked cells first. Click the cells you want to unlink, then try again." });
       return;
     }
     setTrackingEditing(true);
@@ -6270,7 +6353,7 @@ export default function App() {
       setTrackingState((prev) => ({ ...prev, selected: [], selected_markers: [], undo_checkpoint_path: undoCheckpointPath }));
       setTrackingStatus({ level: "success", text: res.message || "Selected cells unlinked." });
     } catch (err) {
-      setTrackingStatus({ level: "error", text: err.message || "Unlink failed." });
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "The selected cells could not be unlinked. Select one or more linked cells and try again.") });
     } finally {
       setTrackingEditing(false);
     }
@@ -7265,7 +7348,7 @@ export default function App() {
                           setStatus("Path selected.");
                           setStatusLevel("success");
                         } catch (err) {
-                          setStatus(err.message);
+                          setStatus(errorMessageFromException(err, "Could not open the CSV picker. Check that the backend is running, then choose the file again."));
                           setStatusLevel("error");
                         }
                       }}
@@ -7328,7 +7411,7 @@ export default function App() {
                             setStatusLevel("success");
                           }
                         } catch (err) {
-                          setStatus(err.message);
+                          setStatus(errorMessageFromException(err, "Columns could not be loaded from this CSV. Check that the file exists, is not empty, and has readable column headers."));
                           setStatusLevel("error");
                         }
                       }}
@@ -7610,7 +7693,7 @@ export default function App() {
                         const res = await pickDirectoryPath();
                         setPlotSavePath(res.path || "");
                       } catch (err) {
-                        setStatus(err.message);
+                        setStatus(errorMessageFromException(err, "Could not open the folder picker. Check that the backend is running, then choose the output folder again."));
                         setStatusLevel("error");
                       }
                     }}
