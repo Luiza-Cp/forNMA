@@ -1,13 +1,11 @@
 import numpy as np
 import pandas as pd
-from datetime import datetime
 
 from statsmodels.formula.api import ols
 import statsmodels.api as sm
 from statsmodels.stats.multitest import multipletests
 import scikit_posthocs as sp
 
-# imports absolutos enquanto você testa; depois podemos trocar para relativos
 from .Helpers import AnalysisHelper
 from .ScheirerRayHare import ScheirerRayHare
 
@@ -41,15 +39,15 @@ class TwoWayAnalysis:
 
     # -------- ANOVA 2 vias + Tukey (sem dupla correção) --------
     def run_two_way_anova(self):
-        self.log("\n✅ Assumptions met. Performing 2-way ANOVA (Type II)...")
+        self.helper.log_section("Main test: Two-way ANOVA (Type II)")
         formula = f"{self.numeric_col} ~ C({self.group_col1}) * C({self.group_col2})"
         model = ols(formula, data=self.df).fit()
         anova_table = sm.stats.anova_lm(model, typ=2)
-        self.log("\n📊 ANOVA table:"); self.log(anova_table.to_string())
+        self.helper.log_table("ANOVA table", anova_table)
 
         posthoc = None
         if (anova_table["PR(>F)"] < self.alpha).any():
-            self.log("\n📌 At least one significant effect. Applying Tukey's post-test to cells (A|B)...")
+            self.log("Post-hoc: Tukey HSD will run because at least one effect is significant.")
             posthoc = self.helper.tukey(
                 df=self.df,
                 value_col=self.numeric_col,
@@ -58,7 +56,7 @@ class TwoWayAnalysis:
                 pairs_of_interest=self.pairs_of_interest or None
             )
         else:
-            self.log("\nTwo-way ANOVA not significant; no post-test.")
+            self.log("Post-hoc: not run because no ANOVA effect was significant.")
 
         # (opcional) correção Bonferroni nos 3 efeitos (A, B, A:B)
         pvals = anova_table["PR(>F)"].astype(float).values
@@ -69,13 +67,13 @@ class TwoWayAnalysis:
 
     # -------- Dunn (com/sem pairs_of_interest) --------
     def dunn_post_hoc(self):
-        self.log("\n📌 Applying Dunn's post-test...")
+        self.helper.log_section("Post-hoc: Dunn test")
 
         def _ordenar_par(a, b):
             return tuple(sorted([str(a), str(b)]))
 
         if self.pairs_of_interest:
-            self.log("Applying Mode: Pairs of Interest (Fit only these pairs) Dunn's post-test)")
+            self.log("Mode: pairs of interest only.")
             comps_ordenados = {_ordenar_par(x, y) for (x, y) in self.pairs_of_interest}
             grupos_desejados = sorted({g for par in comps_ordenados for g in par})
 
@@ -98,11 +96,10 @@ class TwoWayAnalysis:
 
             dunn_matrix = None
             letters_df = None
-            self.log("\n=== Dunn (interest pairs) ===")
-            self.log(dunn_long.drop(columns=['par']).to_string(index=False))
+            self.helper.log_table("Dunn results", dunn_long.drop(columns=['par']), index=False)
 
         else:
-            self.log("Mode: full matrix (Bonferroni adjustment on all pairs)")
+            self.log("Mode: full matrix with Bonferroni adjustment.")
             dunn_matrix = sp.posthoc_dunn(self.df, val_col=self.numeric_col, group_col="group", p_adjust="bonferroni")
 
             dunn_long = (dunn_matrix.reset_index()
@@ -122,10 +119,8 @@ class TwoWayAnalysis:
                          .merge(letters_df, left_on='grupo2', right_on='grupo', how='left')
                          .rename(columns={'CLD': 'CLD2'}).drop(columns=['grupo']))
 
-            self.log("\n=== Dunn (full matrix; Bonferroni) ===")
-            self.log(dunn_long.to_string(index=False))
-            self.log("\n=== Letters (CLD) ===")
-            self.log(letters_df.to_string(index=False))
+            self.helper.log_table("Dunn results", dunn_long, index=False)
+            self.helper.log_table("Compact letter display", letters_df, index=False)
 
         # salvar
         self.results['dunn'] = dunn_long
@@ -135,30 +130,42 @@ class TwoWayAnalysis:
 
     # -------- Orquestrador --------
     def run(self):
-        self.log(f"\n === On {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
-        self.log(f">>> Two-factor analysis of '{self.numeric_col}' by '{self.group_col1}' and '{self.group_col2}'")
+        self.helper.log_header(
+            "Two-way comparison",
+            numeric_column=self.numeric_col,
+            factor_a=self.group_col1,
+            factor_b=self.group_col2,
+            alpha=self.alpha,
+        )
 
         summary = self.descriptive()
         self.results['summary_stats'] = summary.reset_index()
+        self.helper.log_section("Assumption checks")
         norm = self.normality_ok()
         homo = self.homoscedasticity_ok()
 
+        self.helper.log_section("Decision")
+        self.helper.log_kv("Normality", "OK" if norm else "NOT OK")
+        self.helper.log_kv("Homoscedasticity", "OK" if homo else "NOT OK")
+
         if norm and homo:
+            self.helper.log_kv("Selected test", "Two-way ANOVA")
             anova_table, tukey_df = self.run_two_way_anova()
             main = anova_table
             post = tukey_df
         else:
-            self.log("\n⚠️ Assumpltions violated. Applying the Scheirer-Ray-Hare (SRH) test...")
+            self.helper.log_kv("Selected test", "Scheirer-Ray-Hare")
+            self.helper.log_section("Main test: Scheirer-Ray-Hare")
             srh = ScheirerRayHare(type=2, tie_correct=True, ss=True, verbose=False)
             srh.fit(data=self.df, y=self.numeric_col, x1=self.group_col1, x2=self.group_col2)
             self.results["srh"] = srh.to_dataframe()
-            self.log("\n📊 SRH Results:"); self.log(srh.summary())
+            self.log(srh.summary())
 
             if hasattr(srh, "any_significant") and srh.any_significant(self.alpha):
-                self.log("\n📌 Significant SRH. Applying Dunn's post-test...")
+                self.log("Post-hoc: Dunn test will run because at least one SRH effect is significant.")
                 post = self.dunn_post_hoc()
             else:
-                self.log("\nℹ️ SRH not significant. Post-test not applied.")
+                self.log("Post-hoc: not run because no SRH effect was significant.")
                 post = None
             main = self.results["srh"]
 

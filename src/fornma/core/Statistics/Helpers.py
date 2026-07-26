@@ -41,6 +41,31 @@ class AnalysisHelper:
             with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(msg + "\n")
 
+    def log_header(self, analysis: str, **details):
+        self.log("")
+        self.log("=" * 72)
+        self.log(f"Analysis: {analysis}")
+        self.log(f"Started at: {datetime.now():%Y-%m-%d %H:%M:%S}")
+        for key, value in details.items():
+            label = str(key).replace("_", " ").capitalize()
+            self.log(f"{label}: {value}")
+        self.log("=" * 72)
+
+    def log_section(self, title: str):
+        self.log("")
+        self.log(f"-- {title} --")
+
+    def log_kv(self, key: str, value):
+        self.log(f"{key}: {value}")
+
+    def log_table(self, title: str, table: pd.DataFrame | None, *, index: bool = True, round_digits: int | None = None):
+        self.log_section(title)
+        if table is None or table.empty:
+            self.log("No rows.")
+            return
+        out = table.round(round_digits) if round_digits is not None else table
+        self.log(out.to_string(index=index))
+
     # descritivas
     def descriptive(self, df: pd.DataFrame, by: list[str], y: str) -> pd.DataFrame:
         """Funciona p/ 1 ou 2 fatores: by=['grupo'] (one-way) ou by=['A','B'] (two-way)."""
@@ -52,8 +77,7 @@ class AnalysisHelper:
             ('q25', lambda x: x.quantile(0.25)), ('q75', lambda x: x.quantile(0.75)),
         ])
         summary['sem'] = summary['std'] / np.sqrt(summary['n'])
-        self.log("\n=== Descriptive statistics ===")
-        self.log(summary.round(3).to_string())
+        self.log_table("Descriptive statistics", summary, round_digits=3)
         return summary
 
 
@@ -76,12 +100,12 @@ class AnalysisHelper:
             vals = df.loc[mask, y].dropna()
             if len(vals) >= min_n:
                 stat, p = shapiro(vals)
-                self.log(f"{label}: p = {p:.4f}")
+                self.log(f"Shapiro | {label} | n={len(vals)} | W={stat:.4f} | p={p:.4f}")
                 rows.append({"cell": label, "n": len(vals), "W": stat, "p": p})
                 if p < alpha:
                     ok = False
             else:
-                self.log(f"{label}: n<{min_n}, Shapiro ignorado")
+                self.log(f"Shapiro | {label} | n={len(vals)} | skipped because n<{min_n}")
                 rows.append({"cell": label, "n": len(vals), "W": None, "p": None})
 
         if return_table:
@@ -100,11 +124,11 @@ class AnalysisHelper:
             groups.append(df.loc[mask, y].dropna())
 
         if any(len(g) == 0 for g in groups):
-            self.log("Some cells empty; treating as heteroscedastic.")
+            self.log("Levene | skipped because at least one group/cell is empty | result=NOT OK")
             return False
 
-        _, p = levene(*groups)
-        self.log(f"Levene p = {p:.4f}")
+        stat, p = levene(*groups)
+        self.log(f"Levene | statistic={stat:.4f} | p={p:.4f} | result={'OK' if p >= alpha else 'NOT OK'}")
         return p >= alpha
 
 
@@ -133,8 +157,7 @@ class AnalysisHelper:
             )
             out = out.loc[mask].reset_index(drop=True)
 
-        self.log("\n=== Tukey HSD (FWER by Tukey) ===")
-        self.log(out.to_string(index=False))
+        self.log_table("Post-hoc: Tukey HSD (FWER controlled by Tukey)", out, index=False)
         return out
 
     def _resolve_alpha(self, alpha: float | None) -> float:
@@ -228,5 +251,4 @@ class AnalysisHelper:
         }
         (out / f"{prefix}_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
         return paths
-
 

@@ -3149,12 +3149,9 @@ def stats_run(req: StatsRunRequest):
     if method == "oneway":
         if not req.numeric_col or not req.group_col:
             raise HTTPException(status_code=400, detail="oneway requires numeric_col and group_col.")
-        norm_ok = helper.normality_ok(df=df, factors=[req.group_col], y=req.numeric_col)
-        homo_ok = helper.homoscedasticity_ok(df=df, factors=[req.group_col], y=req.numeric_col)
-        helper.log(f"\nAssumption summary (oneway):")
-        helper.log(f"- Normality (Shapiro): {'OK' if norm_ok else 'NOT OK'}")
-        helper.log(f"- Homoscedasticity (Levene): {'OK' if homo_ok else 'NOT OK'}")
-        helper.log(f"- Decision: {'ANOVA' if (norm_ok and homo_ok) else 'Kruskal-Wallis'}")
+        group_count = int(df[[req.group_col, req.numeric_col]].dropna().groupby(req.group_col).size().gt(0).sum())
+        if group_count < 2:
+            raise HTTPException(status_code=400, detail=f"At least two non-empty groups are required in '{req.group_col}'.")
         from fornma.core.Statistics.OneWayAnalysis import OneWayAnalysis
         ana = OneWayAnalysis(
             df=df,
@@ -3172,7 +3169,8 @@ def stats_run(req: StatsRunRequest):
         else:
             if isinstance(main, pd.DataFrame):
                 main_df = main.copy()
-                main_df.insert(0, "test_used", test_used)
+                if "test_used" not in main_df.columns:
+                    main_df.insert(0, "test_used", test_used)
             else:
                 main_df = None
         for t in [
@@ -3186,12 +3184,6 @@ def stats_run(req: StatsRunRequest):
     elif method == "twoway":
         if not req.numeric_col or not req.group_col1 or not req.group_col2:
             raise HTTPException(status_code=400, detail="twoway requires numeric_col, group_col1 and group_col2.")
-        norm_ok = helper.normality_ok(df=df, factors=[req.group_col1, req.group_col2], y=req.numeric_col)
-        homo_ok = helper.homoscedasticity_ok(df=df, factors=[req.group_col1, req.group_col2], y=req.numeric_col)
-        helper.log(f"\nAssumption summary (twoway):")
-        helper.log(f"- Normality (Shapiro): {'OK' if norm_ok else 'NOT OK'}")
-        helper.log(f"- Homoscedasticity (Levene): {'OK' if homo_ok else 'NOT OK'}")
-        helper.log(f"- Decision: {'Two-way ANOVA' if (norm_ok and homo_ok) else 'Scheirer-Ray-Hare'}")
         from fornma.core.Statistics.TwoWayAnalysis import TwoWayAnalysis
         ana = TwoWayAnalysis(
             df=df,

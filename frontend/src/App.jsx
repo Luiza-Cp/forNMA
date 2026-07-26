@@ -779,12 +779,23 @@ function confirmRemoveFilled(item, label = "this item") {
 function EmptyState({ title, text }) {
   return (
     <div className="empty-state">
-      <div className="empty-state-icon" aria-hidden="true">+</div>
+      <ForNmaLogo className="empty-state-logo" />
       <div>
         <h3>{title}</h3>
         <p>{text}</p>
       </div>
     </div>
+  );
+}
+
+function ForNmaLogo({ className = "", decorative = false }) {
+  return (
+    <img
+      className={`fornma-logo-img ${className}`.trim()}
+      src="/fornma-logo-AP.png"
+      alt={decorative ? "" : "forNMA"}
+      aria-hidden={decorative ? "true" : undefined}
+    />
   );
 }
 
@@ -873,7 +884,10 @@ function HomeLeftPanel({ activeSection, onSelectSection }) {
 function HomeTutorialSection({ title, intro, whenToUse = [], params = [], paramGroups = [], outputs = [], notes = [] }) {
   return (
     <>
-      <h3>{title}</h3>
+      <div className="home-tutorial-heading">
+        <ForNmaLogo className="home-tutorial-logo" decorative />
+        <h3>{title}</h3>
+      </div>
       <p className="hint hint-muted">{intro}</p>
       {whenToUse.length > 0 && (
         <details className="home-detail-block home-copy-block" open>
@@ -2885,7 +2899,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   const method = state.method || "oneway";
   const canRun = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim()) && !loading;
   const methodHelp = {
-    oneway: "Compares one numeric variable across multiple groups (e.g., Control vs Treatments).",
+    oneway: "Compares one numeric variable across groups. With two groups it uses t-test/Welch or Mann-Whitney; with 3+ groups it uses ANOVA or Kruskal-Wallis.",
     twoway: "Evaluates two factors simultaneously and their possible interaction effect.",
     chi2: "Tests association between two categorical variables using a contingency table.",
     "chi2-subgroups": "Compares conditions within each categorical subgroup (2x2 tests per subgroup).",
@@ -7070,8 +7084,8 @@ export default function App() {
       <div className="top-shell">
         <nav className="module-menu" aria-label="forNMA stages">
           <div className="topbar-brand">
-            <div className="topbar-logo-slot" aria-hidden="true">
-              <span className="topbar-logo-mark">FN</span>
+            <div className="topbar-logo-slot">
+              <ForNmaLogo className="topbar-logo-img" />
             </div>
             <div>
               <div className="logo">forNMA</div>
@@ -7125,7 +7139,9 @@ export default function App() {
               <section className="home-stack">
                 <div id="home-about" className="section home-section-card">
                   <div className="home-hero">
-                    <div className="home-logo-box">forNMA</div>
+                    <div className="home-logo-box">
+                      <ForNmaLogo className="home-logo-img" />
+                    </div>
                     <div>
                       <h2>About forNMA</h2>
                       <p className="hint hint-muted">
