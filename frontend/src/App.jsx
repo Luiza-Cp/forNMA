@@ -4044,11 +4044,9 @@ function buildStep2Figure(
 
   const y_high = stats.mu_y + (sdArea || 1) * (stats.sd_y || 1);
   const y_low = stats.mu_y - (sdArea || 1) * (stats.sd_y || 1);
-  const v_up_top = stats.mu_y + (2 + (sdArea || 1)) * (stats.sd_y || 1);
-  const v_down_bottom = stats.mu_y - (1 + (sdArea || 1)) * (stats.sd_y || 1);
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const y_top = clamp(v_up_top, graphLimits[0], graphLimits[1]);
-  const y_bottom = clamp(v_down_bottom, graphLimits[0], graphLimits[1]);
+  const y_top = graphLimits[1];
+  const y_bottom = graphLimits[0];
 
   const shapes = [
     {
@@ -4075,7 +4073,7 @@ function buildStep2Figure(
       x1: thresholds.v_down,
       y0: y_bottom,
       y1: y_low,
-      line: { color: verticalColor, width: 3 },
+      line: { color: verticalColor, width: 4 },
       editable: true,
     },
     {
@@ -4084,7 +4082,7 @@ function buildStep2Figure(
       x1: thresholds.v_down2,
       y0: y_bottom,
       y1: y_low,
-      line: { color: verticalColor, width: 3 },
+      line: { color: verticalColor, width: 4 },
       editable: true,
     },
     {
@@ -4093,7 +4091,7 @@ function buildStep2Figure(
       x1: thresholds.v_mid,
       y0: y_low,
       y1: y_high,
-      line: { color: verticalColor, width: 3 },
+      line: { color: verticalColor, width: 4 },
       editable: true,
     },
     {
@@ -4102,7 +4100,7 @@ function buildStep2Figure(
       x1: thresholds.v_up,
       y0: y_high,
       y1: y_top,
-      line: { color: verticalColor, width: 3 },
+      line: { color: verticalColor, width: 4 },
       editable: true,
     },
   ];
@@ -6770,13 +6768,6 @@ export default function App() {
               <div className="subtitle">{activeModule}</div>
             </div>
           </div>
-          {activeModule === "NMA" && (controlGateReady || step1Ready) && (
-            <div className="stepper">
-              <div className={`chip ${step === 0 ? "active" : ""}`}>Step 1</div>
-              <div className={`chip ${step === 1 ? "active" : ""}`}>Step 2</div>
-              <div className={`chip ${step === 2 ? "active" : ""}`}>Step 3</div>
-            </div>
-          )}
         </header>
         <nav className="module-menu" aria-label="forNMA stages">
           <div className="module-menu-list">
@@ -7682,45 +7673,8 @@ export default function App() {
 
           <Button className="secondary" onClick={addRow}>Add dataset</Button>
 
+          {showPlotConfig && (
           <div className="section">
-            {!showPlotConfig ? (
-              <>
-                <h4>Control</h4>
-                <div className="row">
-                  <div className="metric">
-                    <label>Area SD <Tip text="Number of standard deviations applied to Area to define vertical spread of thresholds/ellipse." /></label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={Number.isFinite(sdArea) ? sdArea.toFixed(2) : ""}
-                      onChange={(e) => {
-                        const v = round2(parseFloat(e.target.value || "0"));
-                        setSdArea(v);
-                        if (step1Stats) {
-                          setThresholds(computeThresholds(step1Stats, sdNii, v));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="metric">
-                    <label>NII SD <Tip text="Number of standard deviations applied to NII to define horizontal spread of thresholds/ellipse." /></label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={Number.isFinite(sdNii) ? sdNii.toFixed(2) : ""}
-                      onChange={(e) => {
-                        const v = round2(parseFloat(e.target.value || "0"));
-                        setSdNii(v);
-                        if (step1Stats) {
-                          setThresholds(computeThresholds(step1Stats, v, sdArea));
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-                <Button className="secondary" onClick={handleAutoDbscan}>Auto (DBSCAN)</Button>
-              </>
-            ) : (
               <>
                 <div className="row row-between">
                   <h4 style={{ margin: 0 }}>NMA analysis</h4>
@@ -7965,8 +7919,8 @@ export default function App() {
                   Generate plots with current settings and save them to the chosen folder.
                 </div>
               </>
-            )}
           </div>
+          )}
 
           {!showPlotConfig && step === 2 && (
             <div className="section">
@@ -8002,11 +7956,21 @@ export default function App() {
               {!controlGateReady && !step1Ready && (
                 <Button className="primary" onClick={handleControlGate} disabled={!hasControl}>Create Settings</Button>
               )}
-              {controlGateReady && !step1Ready && (
-                <Button className="primary" onClick={handleStep1} disabled={!hasControl}>Use gate for Step 2</Button>
-              )}
-              {step1Ready && (
-                <div className="wizard-actions">
+            </div>
+          )}
+          <Status level={statusLevel} text={status} />
+        </Card>
+
+        <main className="content">
+          {(controlGateReady || step1Ready) && !showPlotConfig && (
+            <div className="row row-between" style={{ marginBottom: 12 }}>
+              <div className="stepper">
+                <div className={`chip ${step === 0 ? "active" : ""}`}>Step 1</div>
+                <div className={`chip ${step === 1 ? "active" : ""}`}>Step 2</div>
+                <div className={`chip ${step === 2 ? "active" : ""}`}>Step 3</div>
+              </div>
+              <div className="wizard-actions">
+                {step1Ready && (
                   <Button
                     className="secondary"
                     onClick={() => setStep(step === 2 ? 1 : 0)}
@@ -8014,46 +7978,32 @@ export default function App() {
                   >
                     Previous
                   </Button>
-                  {step === 1 ? (
-                    <Button
-                      className="primary"
-                      onClick={async () => {
-                        const ok = await handleStep2();
-                        if (ok) setStep(2);
-                      }}
-                    >
-                      Next
-                    </Button>
-                  ) : step === 0 ? (
-                    <Button className="primary" onClick={handleStep1}>Use gate for Step 2</Button>
-                  ) : (
-                    <Button className="primary" onClick={handleComplete}>Complete</Button>
-                  )}
-                </div>
-              )}
+                )}
+                {!step1Ready ? (
+                  <Button className="primary" onClick={handleStep1} disabled={!controlGateReady}>Use gate for Step 2</Button>
+                ) : step === 1 ? (
+                  <Button
+                    className="primary"
+                    onClick={async () => {
+                      const ok = await handleStep2();
+                      if (ok) setStep(2);
+                    }}
+                  >
+                    Next
+                  </Button>
+                ) : step === 0 ? (
+                  <Button className="primary" onClick={handleStep1} disabled={!controlGateReady}>Use gate for Step 2</Button>
+                ) : (
+                  <Button className="primary" onClick={handleComplete}>Complete</Button>
+                )}
+              </div>
             </div>
           )}
-          <Status level={statusLevel} text={status} />
-        </Card>
-
-        <main className="content">
-          <div className="row row-right">
-            <button className="ghost btn-small" onClick={() => handleOpenTutorial("NMA")}>
-              Tutorial
-            </button>
-            <button
-              className="ghost btn-small"
-              onClick={handleResetNma}
-              disabled={plotJob.status === "running" || plotJob.status === "queued"}
-            >
-              Reset
-            </button>
-          </div>
           {!step1Ready ? (
             <section>
               <h2>Step 1 · Control gate</h2>
               <p className="hint">
-                Draw and adjust the box around the control cells that represent the normal population. The next step will draw the ellipse only from cells kept inside this gate.
+                Use the box to remove control cells that look like outliers. Cells with unusually high or low Area or NII can distort the NMA settings, so keep the clean central control population for the ellipse in the next step.
               </p>
               {controlGateFigure ? (
                 <>
@@ -8084,11 +8034,6 @@ export default function App() {
               ) : (
                 <p className="hint">Mark at least one dataset as control, choose Area/NII columns, then click Create Settings to open the gate.</p>
               )}
-              {controlGateReady && (
-                <div className="row row-right" style={{ marginTop: 12 }}>
-                  <Button className="primary" onClick={handleStep1}>Use this gate for Step 2</Button>
-                </div>
-              )}
             </section>
           ) : (
             <>
@@ -8096,7 +8041,7 @@ export default function App() {
             <section>
               <h2>Step 1 · Control gate</h2>
               <p className="hint">
-                Adjust the box around the normal control population. Step 2 uses only the cells inside this box to draw the ellipse.
+                Use the box to remove control cells that look like outliers. Cells with unusually high or low Area or NII can distort the NMA settings, so keep the clean central control population for the ellipse in Step 2.
               </p>
               {controlGateFigure && (
                 <>
@@ -8125,15 +8070,15 @@ export default function App() {
                   )}
                 </>
               )}
-              <div className="row row-right" style={{ marginTop: 12 }}>
-                <Button className="primary" onClick={handleStep1} disabled={!controlGateReady}>Use gate for Step 2</Button>
-              </div>
             </section>
           )}
           {step === 1 && (
             <section>
               <h2>Step 2 · Control ellipse</h2>
               <p className="hint">The ellipse is drawn over the gated normal control cells from Step 1. Adjust SDs or use auto-DBSCAN.</p>
+              <div className="row row-right" style={{ marginBottom: 8 }}>
+                <Button className="secondary" onClick={handleAutoDbscan}>Auto (DBSCAN)</Button>
+              </div>
               <div className="plot-shell">
                 <div className="slider-vertical">
                   <label>Area SD <Tip text="Adjust Area standard deviation for threshold and ellipse height." /></label>
