@@ -725,10 +725,108 @@ function readStorage(key, fallback) {
   }
 }
 
-function Tip({ text }) {
+function FolderIcon() {
   return (
-    <span className="tip-badge" title={text} aria-label={text}>
-      i
+    <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 6.5h6.2l1.8 2h9v9.8a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2Z" />
+      <path d="M3.5 8.5h17" />
+    </svg>
+  );
+}
+
+function BrowseLabel({ children = "Browse" }) {
+  return (
+    <span className="browse-label">
+      <FolderIcon />
+      <span className="sr-only">{children}</span>
+    </span>
+  );
+}
+
+function DatasetBadge({ children }) {
+  return <span className="dataset-badge">{children}</span>;
+}
+
+function DatasetCollapseButton({ collapsed, onClick, label = "dataset" }) {
+  return (
+    <button
+      type="button"
+      className="collapse-toggle"
+      aria-label={`${collapsed ? "Expand" : "Collapse"} ${label}`}
+      aria-expanded={!collapsed}
+      onClick={onClick}
+    >
+      <span className={`collapse-caret ${collapsed ? "collapsed" : "expanded"}`} aria-hidden="true" />
+    </button>
+  );
+}
+
+function hasFilledFields(item = {}) {
+  return Object.entries(item).some(([key, value]) => {
+    if (["id", "enabled", "is_control", "columns", "area_columns", "nii_columns"].includes(key)) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (value && typeof value === "object") return Object.keys(value).length > 0;
+    return String(value ?? "").trim() !== "";
+  });
+}
+
+function confirmRemoveFilled(item, label = "this item") {
+  if (!hasFilledFields(item)) return true;
+  return window.confirm(`Remove ${label}? This item already has filled fields, and this action cannot be undone.`);
+}
+
+function EmptyState({ title, text }) {
+  return (
+    <div className="empty-state">
+      <div className="empty-state-icon" aria-hidden="true">+</div>
+      <div>
+        <h3>{title}</h3>
+        <p>{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function Tip({ text }) {
+  const [open, setOpen] = React.useState(false);
+  const [position, setPosition] = React.useState({ left: 0, top: 0 });
+  const buttonRef = React.useRef(null);
+
+  const toggleTip = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect && typeof window !== "undefined") {
+      setPosition({
+        left: Math.min(window.innerWidth - 150, Math.max(150, rect.left + rect.width / 2)),
+        top: Math.max(12, rect.top - 10),
+      });
+    }
+    setOpen((v) => !v);
+  };
+
+  return (
+    <span className="tip-wrap">
+      <button
+        ref={buttonRef}
+        type="button"
+        className="tip-badge"
+        aria-label={text}
+        aria-expanded={open}
+        onClick={toggleTip}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+      >
+        i
+      </button>
+      {open && (
+        <span
+          className="tip-popover"
+          role="tooltip"
+          style={{ left: position.left, top: position.top }}
+        >
+          {text}
+        </span>
+      )}
     </span>
   );
 }
@@ -737,7 +835,7 @@ function HomeLeftPanel({ activeSection, onSelectSection }) {
   return (
     <Card as="aside" className="panel seg-panel home-panel" variant="panel">
       <div className="seg-header">
-        <h3>Home Settings</h3>
+        <h3>Get Started</h3>
         <p className="hint">Use this sidebar as an index for the software overview, tutorials, and useful links.</p>
       </div>
       <div className="seg-scroll">
@@ -1249,6 +1347,10 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
       <div className="seg-header">
         <h3>Segmentation Settings</h3>
         <p className="hint">Configure image inputs, nucleus detection, and per-channel measurement options.</p>
+      </div>
+
+      <div className="seg-scroll">
+        <div className="sidebar-control-block">
         <div className="row">
           <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
           <button className="ghost" onClick={resetSegForm} disabled={segRunning}>Reset settings</button>
@@ -1262,22 +1364,20 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
             placeholder="Folder to save results..."
           />
           <button
-            className="ghost"
+            className="secondary"
             onClick={async () => {
               const p = await onPickDirectory();
               if (p) setSavePath(p);
             }}
           >
-            Browse
+            <BrowseLabel>Browse</BrowseLabel>
           </button>
         </div>
         <details className="seg-summary">
           <summary>Image selection summary</summary>
           <pre>{summaryText}</pre>
         </details>
-      </div>
-
-      <div className="seg-scroll">
+        </div>
         <details open className="seg-section">
           <summary>General Settings</summary>
           <div className="seg-body">
@@ -1763,7 +1863,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
       <div className="seg-footer">
         <button className="secondary" onClick={() => startSeg(true)} disabled={segRunning}>Preview</button>
         <button className="primary" onClick={() => startSeg(false)} disabled={segRunning}>Run</button>
-        <button className="ghost" onClick={() => onStopSegmentation()} disabled={!segRunning || segCanceling}>
+        <button className="danger" onClick={() => onStopSegmentation()} disabled={!segRunning || segCanceling}>
           {segCanceling ? "Stopping..." : "Stop"}
         </button>
         {segCanceling && <span className="seg-stop-state" role="status">Finishing current image and stopping.</span>}
@@ -1826,7 +1926,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                           </button>
                         </div>
                       </td>
-                      {channels.map((ch) => (
+                      {channels.map((ch, cIdx) => (
                         <td key={`c-${rIdx}-${ch.id}`}>
                           <div className="row path-row">
                             <input
@@ -1835,7 +1935,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                               onChange={(e) => updatePathCell(rIdx, ch.id, e.target.value)}
                               placeholder={`Path to ${ch.name}`}
                             />
-                            <button className="ghost btn-small" onClick={() => browsePathCell(rIdx, ch.id)}>Browse</button>
+                        <button className="secondary btn-small" onClick={() => browsePathCell(rIdx, ch.id)}><BrowseLabel>Browse</BrowseLabel></button>
                           </div>
                         </td>
                       ))}
@@ -2003,22 +2103,24 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
         <div className="seg-header">
           <h3>Image Registration Settings</h3>
           <p className="hint">Set the reference channel, optional moving channels, and output options for registration.</p>
+        </div>
+
+        <div className="seg-scroll">
+          <div className="sidebar-control-block">
           <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
           <div className="field-head">Saving path <Tip text="Directory where registered outputs will be saved." /></div>
           <div className="row path-row">
             <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save results..." />
-            <button className="ghost" title="Choose where registration outputs should be written." onClick={async () => {
+            <button className="secondary" title="Choose where registration outputs should be written." onClick={async () => {
               const p = await onPickDirectory();
               if (p) setSavePath(p);
-            }}>Browse</button>
+            }}><BrowseLabel>Browse</BrowseLabel></button>
           </div>
           <details className="seg-summary">
             <summary>Image selection summary</summary>
             <pre>{summaryText}</pre>
           </details>
-        </div>
-
-        <div className="seg-scroll">
+          </div>
           <details open className="seg-section">
             <summary>Channel mapping</summary>
             <div className="seg-body">
@@ -2066,7 +2168,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 
         <div className="seg-footer">
           <button className="primary" title="Run image registration with the current mapping and options." onClick={startRegistration} disabled={regRunning}>Run Registration</button>
-          <button className="ghost" title="Request cancellation of the current registration job." onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
+          <button className="danger" title="Request cancellation of the current registration job." onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
         </div>
       </Card>
 
@@ -2085,7 +2187,9 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
                         <th key={`h-reg-${ch.id}`}>
                           <div className="row row-between">
                             <input className="input" value={ch.name} onChange={(e) => updateChannelName(ch.id, e.target.value)} placeholder="Channel name" />
-                            <button className="ghost btn-small" onClick={() => removeChannel(ch.id)} disabled={channels.length <= 1}>Remove</button>
+                            <button className="ghost btn-small" onClick={() => {
+                              if (confirmRemoveFilled(ch, `Channel ${cIdx + 1}`)) removeChannel(ch.id);
+                            }} disabled={channels.length <= 1}>Remove</button>
                           </div>
                         </th>
                       ))}
@@ -2097,14 +2201,16 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
                         <td>
                           <div className="row row-between">
                             <input className="input" value={row.condition || ""} onChange={(e) => updateCondition(rIdx, e.target.value)} placeholder="Condition name" />
-                            <button className="ghost btn-small" onClick={() => removeCondition(rIdx)} disabled={(imagesData.rows || []).length <= 1}>Remove</button>
+                            <button className="ghost btn-small" onClick={() => {
+                              if (confirmRemoveFilled(row, `Condition ${rIdx + 1}`)) removeCondition(rIdx);
+                            }} disabled={(imagesData.rows || []).length <= 1}>Remove</button>
                           </div>
                         </td>
                         {channels.map((ch) => (
                           <td key={`reg-c-${rIdx}-${ch.id}`}>
                             <div className="row path-row">
                               <input className="input" value={row[ch.id] || ""} onChange={(e) => updatePathCell(rIdx, ch.id, e.target.value)} placeholder={`Path to ${ch.name}`} />
-                              <button className="ghost btn-small" onClick={() => browsePathCell(rIdx, ch.id)}>Browse</button>
+                              <button className="secondary btn-small" onClick={() => browsePathCell(rIdx, ch.id)}><BrowseLabel>Browse</BrowseLabel></button>
                             </div>
                           </td>
                         ))}
@@ -2158,28 +2264,30 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
       <div className="seg-header">
         <h3>Foci Overlay Settings</h3>
         <p className="hint">Generate overlay views and profile outputs from previously processed `.pkl` files.</p>
+      </div>
+
+      <div className="seg-scroll">
+        <div className="sidebar-control-block">
         <div className="field-head">Pickle (.pkl) folder <Tip text="Folder containing the `.pkl` files used to generate the selected foci outputs." /></div>
         <div className="row path-row">
           <input className="input" value={pklPath} onChange={(e) => setPklPath(e.target.value)} placeholder="Folder with .pkl result files..." />
-          <button className="ghost" title="Choose the folder containing the `.pkl` files." onClick={async () => {
+          <button className="secondary" title="Choose the folder containing the `.pkl` files." onClick={async () => {
             const p = await onPickDirectory();
             if (p) {
               setPklPath(p);
               await loadChannels(p);
             }
-          }}>Browse</button>
+          }}><BrowseLabel>Browse</BrowseLabel></button>
         </div>
         <div className="field-head">Saving path <Tip text="Directory where the overlay outputs and optional rendered images will be saved." /></div>
         <div className="row path-row">
           <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save overlay outputs..." />
-          <button className="ghost" title="Choose where the foci overlay outputs should be written." onClick={async () => {
+          <button className="secondary" title="Choose where the foci overlay outputs should be written." onClick={async () => {
             const p = await onPickDirectory();
             if (p) setSavePath(p);
-          }}>Browse</button>
+          }}><BrowseLabel>Browse</BrowseLabel></button>
         </div>
-      </div>
-
-      <div className="seg-scroll">
+        </div>
         <details open className="seg-section">
           <summary>Channels</summary>
           <div className="seg-body">
@@ -2254,7 +2362,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
         >
           Run Overlay
         </button>
-        <button className="ghost" title="Request cancellation of the current foci overlay job." onClick={() => onStopFoci()} disabled={!running}>Stop</button>
+        <button className="danger" title="Request cancellation of the current foci overlay job." onClick={() => onStopFoci()} disabled={!running}>Stop</button>
       </div>
     </Card>
   );
@@ -2262,11 +2370,13 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
 
 function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, graphState, setGraphState, loading }) {
   const graphTypes = ["scatter", "violin", "box", "dot", "bar", "line", "cpd"];
+  const [collapsedDatasets, setCollapsedDatasets] = React.useState({});
 
   const setField = (k, v) => setGraphState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(graphState.datasets || []), { id: makeRowId(), name: `Dataset ${(graphState.datasets || []).length + 1}`, path: "", columns: null, enabled: true }]);
   const removeDataset = (id) => setField("datasets", (graphState.datasets || []).filter((d) => d.id !== id));
   const updateDataset = (id, patch) => setField("datasets", (graphState.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const cols = graphState.columns || [];
   const categoricalCols = graphState.categoricalColumns || [];
@@ -2289,61 +2399,69 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
         <p className="hint">Use CSV outputs to build interactive plots.</p>
       </div>
       <div className="seg-scroll">
-        <details open className="seg-section">
-          <summary>Data</summary>
-          <div className="seg-body">
+        <div className="dataset-list">
             {(graphState.datasets || []).map((d, idx) => (
               <div className="dataset" key={d.id}>
-                <div className="row">
-                  <label className="checkbox" style={{ minWidth: 62 }}>
-                    <input
-                      type="checkbox"
-                      checked={d.enabled !== false}
-                      onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
-                    />
-                    plot
-                  </label>
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">Dataset name <Tip text="Friendly label used in legends and plot summaries." /></div>
-                    <input
-                      className="input"
-                      value={d.name || ""}
-                      onChange={(e) => updateDataset(d.id, { name: e.target.value })}
-                      placeholder={`Dataset ${idx + 1} name`}
-                    />
-                  </div>
+                <div className="row dataset-header-row">
+                  <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
+                  <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(graphState.datasets || []).length > 1 && (
-                    <button className="ghost btn-small" title="Remove this dataset from the plotting configuration." onClick={() => removeDataset(d.id)}>Remove</button>
+                    <button className="ghost btn-small" title="Remove this dataset from the plotting configuration." onClick={() => {
+                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                    }}>Remove</button>
                   )}
+                  <DatasetBadge>#{idx + 1}</DatasetBadge>
                 </div>
-                <div className="row path-row">
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">CSV path <Tip text="Local CSV file containing the measurements to plot." /></div>
-                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
-                  </div>
-                  <button
-                    className="ghost"
-                    title="Choose a CSV file for this plot dataset."
-                    onClick={async () => {
-                      try {
-                        const picked = await onPickCsv();
-                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
-                      } catch (err) {
-                        setStatusExternal(errorMessageFromException(err, "Could not open the CSV picker. Check that the backend is running and try again."), "error");
-                      }
-                    }}
-                  >
-                    Browse CSV
-                  </button>
-                </div>
+                {!collapsedDatasets[d.id] && (
+                  <>
+                    <div className="row">
+                      <label className="checkbox" style={{ minWidth: 62 }}>
+                        <input
+                          type="checkbox"
+                          checked={d.enabled !== false}
+                          onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
+                        />
+                        plot
+                      </label>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Dataset name <Tip text="Friendly label used in legends and plot summaries." /></div>
+                        <input
+                          className="input"
+                          value={d.name || ""}
+                          onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                          placeholder={`Dataset ${idx + 1} name`}
+                        />
+                      </div>
+                    </div>
+                    <div className="row path-row">
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">CSV path <Tip text="Local CSV file containing the measurements to plot." /></div>
+                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                      </div>
+                      <button
+                        className="secondary"
+                        title="Choose a CSV file for this plot dataset."
+                        onClick={async () => {
+                          try {
+                            const picked = await onPickCsv();
+                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                          } catch (err) {
+                            setStatusExternal(errorMessageFromException(err, "Could not open the CSV picker. Check that the backend is running and try again."), "error");
+                          }
+                        }}
+                      >
+                        <BrowseLabel>Browse CSV</BrowseLabel>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
-            <button className="secondary" title="Add another CSV dataset to the plot configuration." onClick={addDataset}>Add CSV</button>
+            <button className="secondary add-dataset-button" title="Add another CSV dataset to the plot configuration." onClick={addDataset}>Add dataset</button>
             {graphState.columnsWarning && (
               <Status level="error" text={graphState.columnsWarning} />
             )}
-          </div>
-        </details>
+        </div>
 
         <details open className="seg-section">
           <summary>Plot options</summary>
@@ -2542,10 +2660,12 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
 }
 
 function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, elbowLoading, state, setState }) {
+  const [collapsedDatasets, setCollapsedDatasets] = React.useState({});
   const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
   const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const numeric = state.numericColumns || [];
   const selectedSet = new Set(state.columns || []);
@@ -2558,58 +2678,66 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
         <p className="hint">Interactive embedding preview with optional KMeans coloring.</p>
       </div>
       <div className="seg-scroll">
-        <details open className="seg-section">
-          <summary>Data</summary>
-          <div className="seg-body">
+        <div className="dataset-list">
             {(state.datasets || []).map((d, idx) => (
               <div className="dataset" key={d.id}>
-                <div className="row">
-                  <label className="checkbox" style={{ minWidth: 62 }}>
-                    <input
-                      type="checkbox"
-                      checked={d.enabled !== false}
-                      onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
-                    />
-                    use
-                  </label>
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">Dataset name <Tip text="Friendly label used to identify this dataset in the embedding preview." /></div>
-                    <input
-                      className="input"
-                      value={d.name || ""}
-                      onChange={(e) => updateDataset(d.id, { name: e.target.value })}
-                      placeholder={`Dataset ${idx + 1} name`}
-                    />
-                  </div>
+                <div className="row dataset-header-row">
+                  <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
+                  <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(state.datasets || []).length > 1 && (
-                    <button className="ghost btn-small" title="Remove this dataset from the clustering configuration." onClick={() => removeDataset(d.id)}>Remove</button>
+                    <button className="ghost btn-small" title="Remove this dataset from the clustering configuration." onClick={() => {
+                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                    }}>Remove</button>
                   )}
+                  <DatasetBadge>#{idx + 1}</DatasetBadge>
                 </div>
-                <div className="row path-row">
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">CSV path <Tip text="Local CSV file used to compute the embedding." /></div>
-                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
-                  </div>
-                  <button
-                    className="ghost"
-                    title="Choose a CSV file for this clustering dataset."
-                    onClick={async () => {
-                      try {
-                        const picked = await onPickCsv();
-                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
-                      } catch {
-                        // no-op
-                      }
-                    }}
-                  >
-                    Browse CSV
-                  </button>
-                </div>
+                {!collapsedDatasets[d.id] && (
+                  <>
+                    <div className="row">
+                      <label className="checkbox" style={{ minWidth: 62 }}>
+                        <input
+                          type="checkbox"
+                          checked={d.enabled !== false}
+                          onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
+                        />
+                        use
+                      </label>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Dataset name <Tip text="Friendly label used to identify this dataset in the embedding preview." /></div>
+                        <input
+                          className="input"
+                          value={d.name || ""}
+                          onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                          placeholder={`Dataset ${idx + 1} name`}
+                        />
+                      </div>
+                    </div>
+                    <div className="row path-row">
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">CSV path <Tip text="Local CSV file used to compute the embedding." /></div>
+                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                      </div>
+                      <button
+                        className="secondary"
+                        title="Choose a CSV file for this clustering dataset."
+                        onClick={async () => {
+                          try {
+                            const picked = await onPickCsv();
+                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                          } catch {
+                            // no-op
+                          }
+                        }}
+                      >
+                        <BrowseLabel>Browse CSV</BrowseLabel>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
-            <button className="secondary" title="Add another CSV dataset to the clustering configuration." onClick={addDataset}>Add CSV</button>
-          </div>
-        </details>
+            <button className="secondary add-dataset-button" title="Add another CSV dataset to the clustering configuration." onClick={addDataset}>Add dataset</button>
+        </div>
 
         <details open className="seg-section">
           <summary>Features</summary>
@@ -2729,10 +2857,12 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
 }
 
 function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) {
+  const [collapsedDatasets, setCollapsedDatasets] = React.useState({});
   const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
   const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
   const addFilter = () => setField("filters", [...(state.filters || []), makeStatsFilterRow()]);
   const removeFilter = (id) => setField("filters", (state.filters || []).filter((f) => f.id !== id));
   const updateFilter = (id, patch) => setField("filters", (state.filters || []).map((f) => (f.id === id ? { ...f, ...patch } : f)));
@@ -2754,57 +2884,65 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
         <p className="hint">Run statistical tests and inspect result tables.</p>
       </div>
       <div className="seg-scroll">
-        <details open className="seg-section">
-          <summary>Data</summary>
-          <div className="seg-body">
+        <div className="dataset-list">
             {(state.datasets || []).map((d, idx) => (
               <div className="dataset" key={d.id}>
-                <div className="row">
-                  <label className="checkbox" style={{ minWidth: 62 }}>
-                    <input
-                      type="checkbox"
-                      checked={d.enabled !== false}
-                      onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
-                    />
-                    use
-                  </label>
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">Dataset name <Tip text="Friendly name used to identify this file in the analysis." /></div>
-                    <input
-                      className="input"
-                      value={d.name || ""}
-                      onChange={(e) => updateDataset(d.id, { name: e.target.value })}
-                      placeholder={`Dataset ${idx + 1} name`}
-                    />
-                  </div>
+                <div className="row dataset-header-row">
+                  <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
+                  <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(state.datasets || []).length > 1 && (
-                    <button className="ghost btn-small" onClick={() => removeDataset(d.id)}>Remove</button>
+                    <button className="ghost btn-small" onClick={() => {
+                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                    }}>Remove</button>
                   )}
+                  <DatasetBadge>#{idx + 1}</DatasetBadge>
                 </div>
-                <div className="row path-row">
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">CSV path <Tip text="Local path to the CSV file containing your data." /></div>
-                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
-                  </div>
-                  <button
-                    className="ghost"
-                    onClick={async () => {
-                      try {
-                        const picked = await onPickCsv();
-                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
-                      } catch {
-                        // noop
-                      }
-                    }}
-                  >
-                    Browse CSV
-                  </button>
-                </div>
+                {!collapsedDatasets[d.id] && (
+                  <>
+                    <div className="row">
+                      <label className="checkbox" style={{ minWidth: 62 }}>
+                        <input
+                          type="checkbox"
+                          checked={d.enabled !== false}
+                          onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
+                        />
+                        use
+                      </label>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Dataset name <Tip text="Friendly name used to identify this file in the analysis." /></div>
+                        <input
+                          className="input"
+                          value={d.name || ""}
+                          onChange={(e) => updateDataset(d.id, { name: e.target.value })}
+                          placeholder={`Dataset ${idx + 1} name`}
+                        />
+                      </div>
+                    </div>
+                    <div className="row path-row">
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">CSV path <Tip text="Local path to the CSV file containing your data." /></div>
+                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                      </div>
+                      <button
+                        className="secondary"
+                        onClick={async () => {
+                          try {
+                            const picked = await onPickCsv();
+                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                          } catch {
+                            // noop
+                          }
+                        }}
+                      >
+                        <BrowseLabel>Browse CSV</BrowseLabel>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
-            <button className="secondary" onClick={addDataset}>Add CSV</button>
-          </div>
-        </details>
+            <button className="secondary add-dataset-button" onClick={addDataset}>Add dataset</button>
+        </div>
 
         <details open className="seg-section">
           <summary>Test</summary>
@@ -2941,6 +3079,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
               return (
                 <div className="dataset" key={filter.id}>
                   <div className="row">
+                    <DatasetBadge>Filter #{idx + 1}</DatasetBadge>
                     <div style={{ flex: 1 }}>
                       <div className="field-head">Filter column <Tip text="Column used to subset rows before running the analysis." /></div>
                       <select
@@ -2953,7 +3092,9 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                       </select>
                     </div>
                     {(state.filters || []).length > 1 && (
-                      <button className="ghost btn-small" onClick={() => removeFilter(filter.id)}>Remove</button>
+                      <button className="ghost btn-small" onClick={() => {
+                        if (confirmRemoveFilled(filter, `Filter ${idx + 1}`)) removeFilter(filter.id);
+                      }}>Remove</button>
                     )}
                   </div>
                   {filter.column ? (
@@ -2998,10 +3139,12 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
 }
 
 function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, status, loading, applying, state, setState }) {
+  const [collapsedDatasets, setCollapsedDatasets] = React.useState({});
   const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", pkl_dir: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
   const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
   const numeric = state.numericColumns || [];
   const busy = !!loading || !!applying;
   const hasDatasets = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim());
@@ -3016,71 +3159,79 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
         <p className="hint">Filter populations by rectangular gates on two numeric columns, including cleanup of segmentation errors/debris.</p>
       </div>
       <div className="seg-scroll">
-        <details open className="seg-section">
-          <summary>Data</summary>
-          <div className="seg-body">
+        <div className="dataset-list">
             {(state.datasets || []).map((d, idx) => (
               <div className="dataset" key={d.id}>
-                <div className="row">
-                  <label className="checkbox" style={{ minWidth: 62 }}>
-                    <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
-                    use
-                  </label>
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">Dataset name <Tip text="Friendly label shown in the gating preview and saved outputs." /></div>
-                    <input className="input" value={d.name || ""} onChange={(e) => updateDataset(d.id, { name: e.target.value })} placeholder={`Dataset ${idx + 1} name`} />
-                  </div>
+                <div className="row dataset-header-row">
+                  <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
+                  <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(state.datasets || []).length > 1 && (
-                    <button className="ghost btn-small" title="Remove this dataset from the gating analysis." onClick={() => removeDataset(d.id)}>Remove</button>
+                    <button className="ghost btn-small" title="Remove this dataset from the gating analysis." onClick={() => {
+                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                    }}>Remove</button>
                   )}
+                  <DatasetBadge>#{idx + 1}</DatasetBadge>
                 </div>
-                <div className="row path-row">
-                  <div style={{ flex: 1 }}>
-                    <div className="field-head">CSV path <Tip text="Local CSV file that will be filtered by the gate." /></div>
-                    <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
-                  </div>
-                  <button
-                    className="ghost"
-                    title="Choose a CSV file for this gating dataset."
-                    onClick={async () => {
-                      try {
-                        const picked = await onPickCsv();
-                        if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
-                      } catch {
-                        // no-op
-                      }
-                    }}
-                  >
-                    Browse CSV
-                  </button>
-                </div>
-                {state.draw_images && (
-                  <div className="row path-row">
-                    <div style={{ flex: 1 }}>
-                      <div className="field-head">PKL folder <Tip text="Folder containing the segmentation `.pkl` files for this dataset. Needed only if you want to redraw filtered images after gating." /></div>
-                      <input className="input" value={d.pkl_dir || ""} onChange={(e) => updateDataset(d.id, { pkl_dir: e.target.value })} placeholder="/path/pkl-data" />
+                {!collapsedDatasets[d.id] && (
+                  <>
+                    <div className="row">
+                      <label className="checkbox" style={{ minWidth: 62 }}>
+                        <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
+                        use
+                      </label>
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">Dataset name <Tip text="Friendly label shown in the gating preview and saved outputs." /></div>
+                        <input className="input" value={d.name || ""} onChange={(e) => updateDataset(d.id, { name: e.target.value })} placeholder={`Dataset ${idx + 1} name`} />
+                      </div>
                     </div>
-                    <button
-                      className="ghost"
-                      title="Choose the PKL folder associated with this dataset."
-                      onClick={async () => {
-                        try {
-                          const picked = await onPickDirectory();
-                          if (picked) updateDataset(d.id, { pkl_dir: picked });
-                        } catch {
-                          // no-op
-                        }
-                      }}
-                    >
-                      Browse PKL
-                    </button>
-                  </div>
+                    <div className="row path-row">
+                      <div style={{ flex: 1 }}>
+                        <div className="field-head">CSV path <Tip text="Local CSV file that will be filtered by the gate." /></div>
+                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                      </div>
+                      <button
+                        className="secondary"
+                        title="Choose a CSV file for this gating dataset."
+                        onClick={async () => {
+                          try {
+                            const picked = await onPickCsv();
+                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                          } catch {
+                            // no-op
+                          }
+                        }}
+                      >
+                        <BrowseLabel>Browse CSV</BrowseLabel>
+                      </button>
+                    </div>
+                    {state.draw_images && (
+                      <div className="row path-row">
+                        <div style={{ flex: 1 }}>
+                          <div className="field-head">PKL folder <Tip text="Folder containing the segmentation `.pkl` files for this dataset. Needed only if you want to redraw filtered images after gating." /></div>
+                          <input className="input" value={d.pkl_dir || ""} onChange={(e) => updateDataset(d.id, { pkl_dir: e.target.value })} placeholder="/path/pkl-data" />
+                        </div>
+                        <button
+                          className="secondary"
+                          title="Choose the PKL folder associated with this dataset."
+                          onClick={async () => {
+                            try {
+                              const picked = await onPickDirectory();
+                              if (picked) updateDataset(d.id, { pkl_dir: picked });
+                            } catch {
+                              // no-op
+                            }
+                          }}
+                        >
+                          <BrowseLabel>Browse PKL</BrowseLabel>
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}
-            <button className="secondary" title="Add another CSV dataset to the gating analysis." onClick={addDataset}>Add CSV</button>
-          </div>
-        </details>
+            <button className="secondary add-dataset-button" title="Add another CSV dataset to the gating analysis." onClick={addDataset}>Add dataset</button>
+        </div>
 
         <details open className="seg-section">
           <summary>Gate setup</summary>
@@ -3153,7 +3304,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
             <div className="row path-row">
               <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save gating outputs" />
               <button
-                className="ghost"
+                className="secondary"
                 title="Choose where gated CSV files should be saved."
                 onClick={async () => {
                   try {
@@ -3164,7 +3315,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, statu
                   }
                 }}
               >
-                Browse
+                <BrowseLabel>Browse</BrowseLabel>
               </button>
             </div>
             {hasMissingPkl && (
@@ -3241,7 +3392,7 @@ function TrackingLeftPanel({
             <div className="row path-row">
               <input className="input" value={state.path_to_table || ""} onChange={(e) => setField("path_to_table", e.target.value)} placeholder="/path/Results.csv" />
               <button
-                className="ghost"
+                className="secondary"
                 title="Open a file picker to choose the tracking Results.csv input table."
                 onClick={async () => {
                   try {
@@ -3252,14 +3403,14 @@ function TrackingLeftPanel({
                   }
                 }}
               >
-                Browse CSV
+                <BrowseLabel>Browse CSV</BrowseLabel>
               </button>
             </div>
             <div className="field-head">Image folder</div>
             <div className="row path-row">
               <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder (required)" />
               <button
-                className="ghost"
+                className="secondary"
                 title="Choose the folder containing the source images used by the tracking viewer."
                 onClick={async () => {
                   try {
@@ -3270,7 +3421,7 @@ function TrackingLeftPanel({
                   }
                 }}
               >
-                Browse
+                <BrowseLabel>Browse</BrowseLabel>
               </button>
             </div>
             <div className="hint">This folder is used to render the tracking viewer images.</div>
@@ -3330,7 +3481,7 @@ function TrackingLeftPanel({
               <div className="row path-row">
                 <input className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save table and tracking images" />
                 <button
-                  className="ghost"
+                  className="secondary"
                   title="Choose where the final table and rendered tracking images should be exported."
                   onClick={async () => {
                     try {
@@ -3341,7 +3492,7 @@ function TrackingLeftPanel({
                     }
                   }}
                 >
-                  Browse
+                  <BrowseLabel>Browse</BrowseLabel>
                 </button>
               </div>
               <button className="secondary" title="Export the current tracked table and the cached tracking images to the selected folder." onClick={onSaveResults} disabled={!canSaveResults}>
@@ -3366,7 +3517,7 @@ function TrackingLeftPanel({
               <div className="row path-row">
                 <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder for viewer" />
                 <button
-                  className="ghost"
+                  className="secondary"
                   title="Choose the image folder used by the correction viewer."
                   onClick={async () => {
                     try {
@@ -3377,7 +3528,7 @@ function TrackingLeftPanel({
                     }
                   }}
                 >
-                  Browse
+                  <BrowseLabel>Browse</BrowseLabel>
                 </button>
               </div>
               <div className="hint">{state.preview_cache_dir ? "Viewer cache ready." : "Viewer cache will be generated automatically."}</div>
@@ -3397,7 +3548,7 @@ function TrackingLeftPanel({
                   <div className="row path-row">
                     <input className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save final tracking outputs" />
                     <button
-                      className="ghost"
+                      className="secondary"
                       title="Choose the folder where the final tracking outputs will be exported."
                       onClick={async () => {
                         try {
@@ -3408,7 +3559,7 @@ function TrackingLeftPanel({
                         }
                       }}
                     >
-                      Browse
+                      <BrowseLabel>Browse</BrowseLabel>
                     </button>
                   </div>
                   <div className="row">
@@ -4131,6 +4282,7 @@ function buildStep2Figure(
 export default function App() {
   const [activeModule, setActiveModule] = useState("Home");
   const [homeSection, setHomeSection] = useState("about");
+  const homeScrollRef = React.useRef(null);
   const [rows, setRows] = useState(initialNmaRows());
   const [collapsedById, setCollapsedById] = useState({});
 
@@ -4255,7 +4407,15 @@ export default function App() {
     if (typeof window === "undefined") return;
     window.requestAnimationFrame(() => {
       const target = document.getElementById(`home-${sectionId}`);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      const scrollHost = homeScrollRef.current;
+      if (target && scrollHost) {
+        const hostRect = scrollHost.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        scrollHost.scrollTo({
+          top: scrollHost.scrollTop + targetRect.top - hostRect.top,
+          behavior: "smooth",
+        });
+      }
     });
   };
 
@@ -6876,18 +7036,15 @@ export default function App() {
   return (
     <div className="app">
       <div className="top-shell">
-        <header className="topbar">
+        <nav className="module-menu" aria-label="forNMA stages">
           <div className="topbar-brand">
             <div className="topbar-logo-slot" aria-hidden="true">
               <span className="topbar-logo-mark">FN</span>
             </div>
             <div>
               <div className="logo">forNMA</div>
-              <div className="subtitle">{activeModule}</div>
             </div>
           </div>
-        </header>
-        <nav className="module-menu" aria-label="forNMA stages">
           <div className="module-menu-list">
             {FORNMA_STAGES.map((stage) => (
               <Button
@@ -6932,7 +7089,7 @@ export default function App() {
         {activeModule === "Home" ? (
           <>
             <HomeLeftPanel activeSection={homeSection} onSelectSection={handleSelectHomeSection} />
-            <main className="content">
+            <main className="content home-content" ref={homeScrollRef}>
               <section className="home-stack">
                 <div id="home-about" className="section home-section-card">
                   <div className="home-hero">
@@ -7031,7 +7188,6 @@ export default function App() {
                     Reset
                   </button>
                 </div>
-                <p className="hint">Run segmentation and monitor progress in real time.</p>
                 {hasSegSession ? (
                   <div className="section tracking-viewer-section">
                     <h3>Execution progress</h3>
@@ -7143,7 +7299,10 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="section">
-                    <p className="hint">No execution started yet. Use Preview or Run to begin.</p>
+                    <EmptyState
+                      title="Segmentation results will appear here"
+                      text="Use Preview to inspect a sample image, or Run to process the selected images and follow progress, logs, and generated previews."
+                    />
                   </div>
                 )}
               </section>
@@ -7197,7 +7356,10 @@ export default function App() {
                     }}
                   />
                 ) : (
-                  <p className="hint">Select datasets, set gate axes, and run Preview gate.</p>
+                  <EmptyState
+                    title="Gate preview will appear here"
+                    text="Select one or more datasets, choose the X and Y columns, then run Preview gate to adjust the population box before saving."
+                  />
                 )}
                 {(gatingState.tables || []).length ? (
                   <>
@@ -7377,7 +7539,10 @@ export default function App() {
                     )}
                   </div>
                 ) : (
-                  <p className="hint hint-muted">Run automatic tracking first. The tracking viewer will appear when frames are available.</p>
+                  <EmptyState
+                    title="Tracking viewer will appear here"
+                    text="Run automatic tracking first. Once frames are available, this area becomes the viewer for inspection and manual correction."
+                  />
                 )}
 	                {trackingState.saved_progress_path && (
 	                  <p className="hint hint-muted">Saved progress file: {trackingState.saved_progress_path}</p>
@@ -7438,7 +7603,10 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="section">
-                    <p className="hint">No foci overlay started yet. Use Run Overlay to begin.</p>
+                    <EmptyState
+                      title="Foci overlay results will appear here"
+                      text="Choose the PKL folder and output options, then run the overlay to monitor progress and review the generated logs."
+                    />
                   </div>
                 )}
               </section>
@@ -7494,7 +7662,10 @@ export default function App() {
                     </div>
                   </>
                 ) : (
-                  <p className="hint">Select datasets, configure a test, and click Run.</p>
+                  <EmptyState
+                    title="Statistics tables will appear here"
+                    text="Select the datasets, choose the statistical test, then run the analysis to view result tables and the execution log."
+                  />
                 )}
               </section>
             </main>
@@ -7533,7 +7704,10 @@ export default function App() {
                 {clustering.figure ? (
                   <PlotPanel figure={clustering.figure} />
                 ) : (
-                  <p className="hint">Select datasets and numeric features, then run UMAP.</p>
+                  <EmptyState
+                    title="Embedding preview will appear here"
+                    text="Load datasets, select numeric features, then run the embedding to inspect clusters or metadata coloring."
+                  />
                 )}
                 {clustering.elbowFigure && (
                   <div className="section">
@@ -7577,7 +7751,10 @@ export default function App() {
                 {plotData.figure ? (
                   <PlotPanel figure={plotData.figure} />
                 ) : (
-                  <p className="hint">Configure data and click `Plot preview` to render an interactive graph.</p>
+                  <EmptyState
+                    title="Plot preview will appear here"
+                    text="Add at least one CSV dataset, choose the graph options, then click Plot to render an interactive preview."
+                  />
                 )}
               </section>
             </main>
@@ -7640,7 +7817,10 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="section">
-                    <p className="hint">No registration started yet. Use Run Registration to begin.</p>
+                    <EmptyState
+                      title="Registration progress will appear here"
+                      text="Load image folders and run registration to monitor progress, status messages, and the execution log."
+                    />
                   </div>
                 )}
               </section>
@@ -7648,23 +7828,28 @@ export default function App() {
           </>
         ) : (
           <>
-        <Card as="aside" className="panel nma-panel" variant="panel">
-          <h3>NMA Settings</h3>
-          <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
+        <Card as="aside" className="panel nma-panel seg-panel" variant="panel">
+          <div className="seg-header">
+            <h3>NMA Settings</h3>
+            <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
+          </div>
           <div className="row row-right">
-            <Button className="ghost btn-small" onClick={() => setAllCollapsed(true)}>Minimize all</Button>
-            <Button className="ghost btn-small" onClick={() => setAllCollapsed(false)}>Expand all</Button>
+            <Button className="ghost btn-small bulk-expander-button" onClick={() => setAllCollapsed(true)}>
+              <span>Collapse all</span>
+            </Button>
+            <Button className="ghost btn-small bulk-expander-button" onClick={() => setAllCollapsed(false)}>
+              <span>Expand all</span>
+            </Button>
           </div>
 
           {rows.map((row, idx) => (
             <Card className="dataset" variant="dataset" key={row.id}>
               <div className="row dataset-header-row">
+                <DatasetCollapseButton collapsed={!!collapsedById[row.id]} onClick={() => toggleDatasetCollapse(row.id)} label={row.name || `Dataset ${idx + 1}`} />
                 <div className="dataset-title">
                   {row.name?.trim() || `Dataset ${idx + 1}`}{row.is_control ? " (Control)" : ""}
                 </div>
-                <Button className="ghost btn-small" onClick={() => toggleDatasetCollapse(row.id)}>
-                  {collapsedById[row.id] ? "Expand" : "Minimize"}
-                </Button>
+                <DatasetBadge>#{idx + 1}</DatasetBadge>
               </div>
               {!collapsedById[row.id] && (
                 <>
@@ -7698,7 +7883,7 @@ export default function App() {
                       />
                     </div>
                     <Button
-                      className="ghost"
+                      className="secondary"
                       title="Choose a CSV file for this NMA dataset."
                       onClick={async () => {
                         setStatus("Opening file picker...");
@@ -7714,7 +7899,7 @@ export default function App() {
                         }
                       }}
                     >
-                      Browse CSV
+                      <BrowseLabel>Browse CSV</BrowseLabel>
                     </Button>
                   </div>
                   <div className="row">
@@ -7781,7 +7966,9 @@ export default function App() {
                       Load columns
                     </Button>
                     {rows.length > 1 && (
-                      <Button className="ghost" onClick={() => removeRow(idx)}>Remove</Button>
+                      <Button className="ghost" onClick={() => {
+                        if (confirmRemoveFilled(row, `Dataset ${idx + 1}`)) removeRow(idx);
+                      }}>Remove</Button>
                     )}
                   </div>
                 </>
@@ -7789,7 +7976,7 @@ export default function App() {
             </Card>
           ))}
 
-          <Button className="secondary" onClick={addRow}>Add dataset</Button>
+          <Button className="secondary add-dataset-button" onClick={addRow}>Add dataset</Button>
 
           {showPlotConfig && (
           <div className={`section nma-plot-config ${highlightPlotConfig ? "nma-plot-config-highlight" : ""}`}>
@@ -8010,7 +8197,7 @@ export default function App() {
                     onChange={(e) => setPlotSavePath(e.target.value)}
                   />
                   <Button
-                    className="ghost"
+                    className="secondary"
                     title="Choose where the generated NMA plots should be saved."
                     onClick={async () => {
                       try {
@@ -8022,7 +8209,7 @@ export default function App() {
                       }
                     }}
                   >
-                    Browse
+                    <BrowseLabel>Browse</BrowseLabel>
                   </Button>
                 </div>
                 <Button
@@ -8114,7 +8301,10 @@ export default function App() {
                   )}
                 </>
               ) : (
-                <p className="hint">Mark at least one dataset as control, choose Area/NII columns, then click Create Settings to open the gate.</p>
+                <EmptyState
+                  title="Control gate will appear here"
+                  text="Mark at least one dataset as control, choose the Area and NII columns, then click Create Settings to draw the initial normal-population gate."
+                />
               )}
             </section>
           ) : (

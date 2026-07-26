@@ -7,13 +7,14 @@
   --ds-secondary-lilac: #c8b6e2;
   --ds-secondary-green: #6bb7a8;
   --ds-secondary-pink: #c8b6e2;
-  --ds-text: #143b63;
-  --ds-text-soft: #6b7c8f;
+  --ds-text: #0a2540;
+  --ds-text-medium: #3d4d5e;
+  --ds-text-soft: #425160;
   --ds-background: #f7f9fc;
   --ds-background-soft: #eef2f7;
   --ds-surface: rgba(255, 255, 255, 0.88);
   --ds-surface-strong: #ffffff;
-  --ds-border: #d9e2ec;
+  --ds-border: #cdd8e4;
   --ds-white: #ffffff;
   --ds-gradient: linear-gradient(135deg, #3a6ea5 0%, #7db7d9 58%, #c8b6e2 100%);
   --ds-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78));
@@ -26,15 +27,17 @@
   --ds-radius-lg: 18px;
   --ds-radius-xl: 18px;
   --ds-radius-pill: 999px;
-  --ds-font-sans: "Inter", "Montserrat", system-ui, sans-serif;
-  --ds-font-serif: "Inter", "Montserrat", system-ui, sans-serif;
+  --ds-font-sans: "Plus Jakarta Sans", "Inter", "Montserrat", system-ui, sans-serif;
+  --ds-font-serif: "Plus Jakarta Sans", "Inter", "Montserrat", system-ui, sans-serif;
 
   --bg: var(--ds-background);
   --panel: var(--ds-surface);
   --ink: var(--ds-text);
   --muted: var(--ds-text-soft);
-  --accent: var(--ds-primary-dark);
+  --accent: var(--ds-primary);
+  --accent-dark: var(--ds-primary-dark);
   --accent-2: var(--ds-secondary-blue);
+  --accent-3: var(--ds-secondary-purple);
   --border: var(--ds-border);
   --danger: #b84a43;
   --success: #2f7d68;

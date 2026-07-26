@@ -3491,7 +3491,7 @@ def nma_settings_figure(req: NMAFigureRequest):
     pool_ctrl, xcol, ycol, log = load_controls_pool(params, sample_per_ds=req.sample_per_ds)
     _require_controls(pool_ctrl, log)
 
-    pool_stats, _gate_meta = _apply_control_gate(pool_ctrl, xcol, ycol, req.control_gate)
+    pool_stats, gate_meta = _apply_control_gate(pool_ctrl, xcol, ycol, req.control_gate)
     stats = _compute_stats(pool_stats, xcol, ycol)
 
     axis = compute_axis_ranges_from_all(
