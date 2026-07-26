@@ -4169,6 +4169,7 @@ export default function App() {
   const [downloadReady, setDownloadReady] = useState(false);
   const [step2Percentages, setStep2Percentages] = useState(null);
   const [showPlotConfig, setShowPlotConfig] = useState(false);
+  const [highlightPlotConfig, setHighlightPlotConfig] = useState(false);
   const [plotConfig, setPlotConfig] = useState({
     ...initialPlotConfig(),
   });
@@ -5358,9 +5359,9 @@ export default function App() {
         thresholds,
       });
       setDownloadReady(true);
-      setShowPlotConfig(true);
       setStatus("Settings ready. Choose the plot style, saving path, and output options in the left panel.");
       setStatusLevel("success");
+      focusNmaPlotConfig("success");
     } catch (err) {
       setStatus(errorMessageFromException(err, "The final NMA figure could not be completed. Check the selected graph limits and settings."));
       setStatusLevel("error");
@@ -6739,6 +6740,18 @@ export default function App() {
     }
   };
 
+  const focusNmaPlotConfig = (level = "info") => {
+    setShowPlotConfig(true);
+    setHighlightPlotConfig(true);
+    setStatus("Settings are ready. Choose plot style, saving path, and output options in the left panel.");
+    setStatusLevel(level);
+    window.setTimeout(() => {
+      const target = document.querySelector(".nma-plot-config");
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    window.setTimeout(() => setHighlightPlotConfig(false), 1800);
+  };
+
   const renderNmaStepControls = () => {
     if (!(controlGateReady || step1Ready)) return null;
     if (finalMode && downloadReady) {
@@ -6761,11 +6774,7 @@ export default function App() {
             </Button>
             <Button
               className="secondary"
-              onClick={() => {
-                setShowPlotConfig(true);
-                setStatus("Settings are ready. Choose plot style and saving path in the left panel.");
-                setStatusLevel("info");
-              }}
+              onClick={() => focusNmaPlotConfig()}
             >
               Configure plots
             </Button>
@@ -7622,7 +7631,7 @@ export default function App() {
           </>
         ) : (
           <>
-        <Card as="aside" className="panel" variant="panel">
+        <Card as="aside" className={`panel nma-panel ${highlightPlotConfig ? "nma-panel-highlight" : ""}`} variant="panel">
           <h3>NMA Settings</h3>
           <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
           <div className="row row-right">
@@ -7766,7 +7775,7 @@ export default function App() {
           <Button className="secondary" onClick={addRow}>Add dataset</Button>
 
           {showPlotConfig && (
-          <div className="section">
+          <div className={`section nma-plot-config ${highlightPlotConfig ? "nma-plot-config-highlight" : ""}`}>
               <>
                 <div className="row row-between">
                   <h4 style={{ margin: 0 }}>NMA analysis</h4>
@@ -8166,8 +8175,18 @@ export default function App() {
                 <PlotPanel figure={step1Figure} />
               </div>
               <div className="slider-horizontal">
-                <div className="slider-inline-head">
-                  <label>NII SD <Tip text="Adjust NII standard deviation for threshold and ellipse width." /></label>
+                <label>NII SD <Tip text="Adjust NII standard deviation for threshold and ellipse width." /></label>
+                <div className="sd-range-row">
+                  <input
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={sdNii}
+                    onChange={(e) => {
+                      updateNmaNiiSd(parseFloat(e.target.value || "0"));
+                    }}
+                  />
                   <input
                     className="sd-number-input"
                     type="number"
@@ -8178,16 +8197,6 @@ export default function App() {
                     onChange={(e) => updateNmaNiiSd(parseFloat(e.target.value || "0"))}
                   />
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={sdNii}
-                  onChange={(e) => {
-                    updateNmaNiiSd(parseFloat(e.target.value || "0"));
-                  }}
-                />
                 <span className="slider-value">{sdNii.toFixed(2)}</span>
               </div>
             </section>

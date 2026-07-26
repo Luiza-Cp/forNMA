@@ -1541,12 +1541,16 @@ button:not(:disabled):hover {
 
 .workflow-bar-done {
   align-items: flex-start;
+  padding: 14px;
+  border: 1px solid rgba(47, 125, 104, 0.28);
+  border-radius: var(--ds-radius-md);
+  background: rgba(47, 125, 104, 0.08);
 }
 
 .workflow-title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--ink);
+  color: var(--success);
   margin-bottom: 4px;
 }
 
@@ -1562,6 +1566,13 @@ button:not(:disabled):hover {
   gap: 10px;
 }
 
+.sd-range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 10px;
+}
+
 .sd-number-input {
   width: 72px;
   min-width: 0;
@@ -1572,6 +1583,21 @@ button:not(:disabled):hover {
   color: var(--ink);
   font-size: 12px;
   text-align: right;
+}
+
+.nma-panel-highlight,
+.nma-plot-config-highlight {
+  animation: nma-focus-pulse 1.6s ease-out;
+}
+
+@keyframes nma-focus-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(47, 125, 104, 0.38), var(--shadow);
+    border-color: rgba(47, 125, 104, 0.45);
+  }
+  100% {
+    box-shadow: var(--shadow);
+  }
 }
 
 .readonly {
