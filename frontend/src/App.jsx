@@ -4177,6 +4177,7 @@ export default function App() {
   const [plotJob, setPlotJob] = useState(() => ({ ...DEFAULT_PLOT_JOB, ...readStorage(STORAGE_KEYS.plotJob, {}) }));
   const [currentPlotIndex, setCurrentPlotIndex] = useState(0);
   const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
+  const [showPlotProgress, setShowPlotProgress] = useState(false);
   const [segJob, setSegJob] = useState(() => ({ ...DEFAULT_SEG_JOB, ...readStorage(STORAGE_KEYS.segJob, {}) }));
   const [regJob, setRegJob] = useState(() => ({ ...DEFAULT_REG_JOB, ...readStorage(STORAGE_KEYS.regJob, {}) }));
   const [fociJob, setFociJob] = useState(() => ({ ...DEFAULT_FOCI_JOB, ...readStorage(STORAGE_KEYS.fociJob, {}) }));
@@ -5495,6 +5496,16 @@ export default function App() {
       return;
     }
     scrollToTopSmooth();
+    setShowPlotProgress(true);
+    setShowNmaPreviewWhilePlotting(false);
+    setCurrentPlotIndex(0);
+    setPlotJob({
+      ...DEFAULT_PLOT_JOB,
+      status: "queued",
+      progress: 0,
+      message: "Starting plot generation...",
+      output_dir: plotSavePath.trim(),
+    });
     setStatus("Starting plot generation...");
     setStatusLevel("info");
 
@@ -5534,6 +5545,8 @@ export default function App() {
         error: "",
       });
     } catch (err) {
+      setShowPlotProgress(false);
+      setPlotJob({ ...DEFAULT_PLOT_JOB });
       setStatus(errorMessageFromException(err, "Plot generation could not start. Check the output folder and selected datasets."));
       setStatusLevel("error");
     }
@@ -6645,6 +6658,7 @@ export default function App() {
     setPlotJob({ ...DEFAULT_PLOT_JOB });
     setCurrentPlotIndex(0);
     setShowNmaPreviewWhilePlotting(false);
+    setShowPlotProgress(false);
     attemptedColumnsRef.current = new Set();
   };
 
@@ -6743,6 +6757,7 @@ export default function App() {
   const focusNmaPlotConfig = (level = "info") => {
     setAllCollapsed(true);
     setShowPlotConfig(true);
+    setShowPlotProgress(false);
     setHighlightPlotConfig(true);
     setStatus("Settings are ready. Choose plot style, saving path, and output options in the left panel.");
     setStatusLevel(level);
@@ -6758,11 +6773,12 @@ export default function App() {
     if (finalMode && downloadReady) {
       return (
         <div className="workflow-bar workflow-bar-done">
-          <div>
-            <div className="workflow-title">Settings ready</div>
-            <p className="hint">
-              Your NMA settings were created successfully. Use the left panel to choose plot style, saving path, and output options.
-            </p>
+          <div className="workflow-done-message">
+            <div className="status-icon">OK</div>
+            <div className="status-body">
+              <strong>Success</strong>
+              <span>Your NMA settings were created successfully. Use the left panel to choose plot style, saving path, and output options.</span>
+            </div>
           </div>
           <div className="wizard-actions">
             <Button
@@ -8212,7 +8228,7 @@ export default function App() {
                   Drag and drop the purple vertical lines to set the NMA population thresholds. The horizontal lines are fixed, and the percentage boxes update automatically from the line positions.
                 </p>
               )}
-              {(showPlotConfig && hasPlotRun && !showNmaPreviewWhilePlotting) ? (
+              {(showPlotConfig && showPlotProgress && !showNmaPreviewWhilePlotting) ? (
                 <div className="hint">
                   NMA preview and quadrant table are minimized while plotting.
                   <Button
@@ -8225,7 +8241,7 @@ export default function App() {
                 </div>
               ) : (
                 <>
-                  {showPlotConfig && hasPlotRun && (
+                  {showPlotConfig && showPlotProgress && (
                     <div className="row row-right" style={{ marginBottom: 8 }}>
                       <Button
                         className="ghost btn-small"
@@ -8331,7 +8347,7 @@ export default function App() {
                   )}
                 </>
               )}
-              {(!showPlotConfig || !hasPlotRun || showNmaPreviewWhilePlotting) && finalMode && downloadReady && (
+              {(!showPlotConfig || !showPlotProgress || !hasPlotRun || showNmaPreviewWhilePlotting) && finalMode && downloadReady && (
                 <div className="section">
                   <Button
                     className="secondary"
@@ -8342,7 +8358,7 @@ export default function App() {
                   </Button>
                 </div>
               )}
-              {showPlotConfig && (
+              {showPlotConfig && showPlotProgress && (
                 <div className="section">
                   <h3>Plot progress</h3>
                   <div className="progress-wrap">

@@ -89,6 +89,17 @@ class NMA:
         self.sample_percentages = None
         self.plot()
 
+    def heatmap_background_color(self):
+        """Return the lowest-density color from the selected heatmap palette."""
+        try:
+            cmap = plt.get_cmap(self.palette or 'viridis')
+            return cmap(0.0)
+        except Exception:
+            try:
+                return sns.color_palette(self.palette or 'viridis', as_cmap=True)(0.0)
+            except Exception:
+                return plt.get_cmap('viridis')(0.0)
+
     def subset_df(self, condition_time_tuple):
         """ Subsets the self dataframe based in a condition or time frame or both."""
 
@@ -238,9 +249,9 @@ class NMA:
         """  Plots ONE heatmap NMA ignoring values passed as hue and size."""
 
         subset_of_df = self.subset_df(condition_time_tuple)
+        background_color = self.heatmap_background_color()
         fig, ax = plt.subplots()
-        # Keep background style local to this axis (avoid leaking to other plots).
-        ax.set_facecolor('#7e03ff')
+        ax.set_facecolor(background_color)
         sns.kdeplot(data=subset_of_df, x="NII", y="Area", cmap=self.palette,
                     fill=True, thresh=None, levels=60, ax=ax)
         ax.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
@@ -261,13 +272,13 @@ class NMA:
         """  Plots ONE jointplot NMA ignoring values passed as hue and size."""
 
         subset_of_df = self.subset_df(condition_time_tuple)
+        background_color = self.heatmap_background_color()
 
         fig = sns.jointplot(data=subset_of_df, x="NII", y="Area", kind='kde', space=0, fill=True, thresh=0,
                             cmap=self.palette)
-        # Remove colored background from marginal panels.
-        fig.ax_marg_x.patch.set_alpha(0.0)
-        fig.ax_marg_y.patch.set_alpha(0.0)
-        fig.ax_joint.set_facecolor("white")
+        fig.ax_joint.set_facecolor(background_color)
+        fig.ax_marg_x.set_facecolor(background_color)
+        fig.ax_marg_y.set_facecolor(background_color)
         fig.ax_marg_x.set_xlim(self.graph_limits[2], self.graph_limits[3])
         fig.ax_marg_y.set_ylim(self.graph_limits[0], self.graph_limits[1])
         #.plot(self.h_x, self.h_y_up, self.h_x, self.h_y_down,
@@ -412,8 +423,11 @@ class NMA:
         svg = f'{title.lstrip()} {self.graph_type}.svg'
 
         try:
-            fig.savefig(os.path.join(self.path_save, png))
-            fig.savefig(os.path.join(self.path_save, svg))
+            save_kwargs = {}
+            if self.graph_type in {'heatmap', 'jointplot'}:
+                save_kwargs['facecolor'] = 'auto'
+            fig.savefig(os.path.join(self.path_save, png), **save_kwargs)
+            fig.savefig(os.path.join(self.path_save, svg), **save_kwargs)
             dt = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             with open(os.path.join(self.path_save, "logs-fornma.txt"), "a+") as logs:
                 logs.write(f'\n{dt} - Save {title} plot')

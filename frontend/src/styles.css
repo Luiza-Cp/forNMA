@@ -1540,23 +1540,20 @@ button:not(:disabled):hover {
 }
 
 .workflow-bar-done {
-  align-items: flex-start;
-  padding: 14px;
-  border: 1px solid rgba(47, 125, 104, 0.28);
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #7bd69b;
   border-radius: var(--ds-radius-md);
-  background: rgba(47, 125, 104, 0.08);
+  background: #e2f7ea;
+  color: #0f6938;
+  box-shadow: 0 12px 30px rgba(30, 132, 73, 0.18);
 }
 
-.workflow-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--success);
-  margin-bottom: 4px;
-}
-
-.workflow-bar .hint {
-  margin: 0;
-  max-width: 560px;
+.workflow-done-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
 }
 
 .slider-inline-head {
