@@ -7118,15 +7118,17 @@ export default function App() {
                 <span>Tutorial</span>
               </Button>
             )}
-            <Button type="button" className="top-action" onClick={handleResetActiveModule} disabled={resetActiveDisabled}>
-              <span className="top-action-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-                  <path d="M20 4v5h-5" />
-                </svg>
-              </span>
-              <span>Reset</span>
-            </Button>
+            {activeModule !== "Home" && (
+              <Button type="button" className="top-action" onClick={handleResetActiveModule} disabled={resetActiveDisabled}>
+                <span className="top-action-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                    <path d="M20 4v5h-5" />
+                  </svg>
+                </span>
+                <span>Reset</span>
+              </Button>
+            )}
           </div>
         </nav>
       </div>
