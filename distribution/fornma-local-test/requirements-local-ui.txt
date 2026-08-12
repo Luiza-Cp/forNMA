@@ -3,3 +3,6 @@ fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30,<1.0
 python-multipart>=0.0.9,<1.0
 plotly>=5.22,<6.0
+# Bundled tracking curator (napari-TRACE, from PyPI). Pulls napari[all] + Qt into
+# the same env so the curator launches from forNMA with no extra setup and no git.
+napari-TRACE>=0.6,<0.7

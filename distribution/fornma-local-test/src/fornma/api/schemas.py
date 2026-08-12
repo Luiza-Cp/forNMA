@@ -559,3 +559,20 @@ class TrackingSaveResponse(BaseModel):
     images_dir: Optional[str] = None
     saved_images: int = 0
     message: str = ""
+
+
+class TrackingCurateLaunchRequest(BaseModel):
+    table_path: str                          # Tracked Results.csv
+    pkl_dir: str                             # segmentation pkl-data folder (contours)
+    image_dir: str                           # raw image frames folder
+    curator_dir: Optional[str] = None        # folder holding run_curator.py (else env)
+    curator_python: Optional[str] = None     # python exe of the napari-TRACE env (else env)
+
+
+class TrackingCurateLaunchResponse(BaseModel):
+    status: str
+    mask_path: str
+    staging_dir: str
+    curated_dir: str
+    exports_dir: str
+    message: str = ""

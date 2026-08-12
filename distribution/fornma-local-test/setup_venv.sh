@@ -12,9 +12,14 @@ else
   exit 1
 fi
 
+# Force the official PyPI index: some networks (e.g. university mirrors) point
+# pip at an incomplete mirror where common packages (pillow, napari-TRACE) are
+# missing, which breaks setup with "No matching distribution found".
+PIP_INDEX="--index-url https://pypi.org/simple/"
+
 "$PYTHON_BIN" -m venv "$ROOT_DIR/.venv"
-"$ROOT_DIR/.venv/bin/python" -m pip install --upgrade pip
-"$ROOT_DIR/.venv/bin/pip" install -r "$ROOT_DIR/requirements-local-ui.txt"
+"$ROOT_DIR/.venv/bin/python" -m pip install $PIP_INDEX --upgrade pip
+"$ROOT_DIR/.venv/bin/pip" install $PIP_INDEX -r "$ROOT_DIR/requirements-local-ui.txt"
 
 echo
 echo "Setup complete."
