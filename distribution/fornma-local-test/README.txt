@@ -41,3 +41,6 @@ If the browser does not open automatically
 If setup fails
 - Confirm Python is installed and available in PATH
 - Try running the setup script from a terminal to read the error message
+- If setup says packages are satisfied but start_fornma still reports missing packages,
+  delete the .venv folder inside this package and run setup_venv.bat again.
+- Always run setup_venv.bat and start_fornma.bat from the same extracted package folder.
