@@ -83,6 +83,49 @@ def test_interface_params_support_nucleus_and_cytoplasm_measurements(tmp_path):
     assert params["Channel ch2"]["wants_ktr"] is True
 
 
+def test_interface_params_normalize_foci_detection_payload(tmp_path):
+    nuc = tmp_path / "nuc"
+    out = tmp_path / "out"
+    nuc.mkdir()
+
+    images = {
+        "channels": [{"id": "ch1", "name": "DAPI"}],
+        "rows": [{"condition": "Control", "ch1": str(nuc)}],
+    }
+    seg = {
+        "general": {
+            "path_to_save": str(out),
+            "segmentation_mode": "nucleus",
+            "channel_with_nuclei": "ch1",
+        },
+        "segmentation": {},
+        "fornma": {},
+        "cellpose": {},
+        "filters": {},
+        "channels": {
+            "ch1": {
+                "wants_foci": True,
+                "foci_min_size": 7,
+                "foci_max_size": False,
+                "foci_min_int": False,
+                "foci_max_int": False,
+                "foci_prominence": 1.2,
+            },
+        },
+    }
+
+    params, errors = build_interface_params(images, seg)
+
+    assert errors == []
+    channel_params = params["Channel ch1"]
+    assert channel_params["wants_foci"] is True
+    assert channel_params["foci_min_size"] == 7
+    assert channel_params["foci_max_size"] is None
+    assert channel_params["foci_min_int"] is None
+    assert channel_params["foci_max_int"] is None
+    assert channel_params["foci_proeminence"] == 1.2
+
+
 def test_create_subfolder_dict_preserves_cytoplasm_segmentation_flag(tmp_path):
     from fornma.core.Segmentation.run import create_subfolder_dict
 

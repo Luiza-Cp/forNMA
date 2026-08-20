@@ -14,9 +14,9 @@ _CHANNEL_DEFAULTS = {
     "use_ellipse": False,
     "wants_foci": True,      # measure_foci
     "foci_min_size": 7,
-    "foci_max_size": False,
-    "foci_min_int": False,
-    "foci_max_int": False,
+    "foci_max_size": None,
+    "foci_min_int": None,
+    "foci_max_int": None,
     "foci_proeminence": 1.2,  # name used by pipeline
     "measure_nucleus": True,
     "measure_cytoplasm": False,
@@ -27,6 +27,9 @@ def _norm(s):
 
 def _default_channel_name(index: int) -> str:
     return f"Channel {index + 1}"
+
+def _none_if_false(value):
+    return None if value is False else value
 
 def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, list[str]]:
     """
@@ -182,12 +185,12 @@ def build_interface_params(images_data: dict, seg_data: dict) -> tuple[dict, lis
         if "use_ellipse" in ov: ch_dict["use_ellipse"] = bool(ov["use_ellipse"])
 
         if "wants_foci" in ov: ch_dict["wants_foci"] = bool(ov["wants_foci"])
-        if "foci_min_size" in ov: ch_dict["foci_min_size"] = ov["foci_min_size"]
-        if "foci_max_size" in ov: ch_dict["foci_max_size"] = ov["foci_max_size"]
-        if "foci_min_int" in ov: ch_dict["foci_min_int"] = ov["foci_min_int"]
-        if "foci_max_int" in ov: ch_dict["foci_max_int"] = ov["foci_max_int"]
+        if "foci_min_size" in ov: ch_dict["foci_min_size"] = _none_if_false(ov["foci_min_size"])
+        if "foci_max_size" in ov: ch_dict["foci_max_size"] = _none_if_false(ov["foci_max_size"])
+        if "foci_min_int" in ov: ch_dict["foci_min_int"] = _none_if_false(ov["foci_min_int"])
+        if "foci_max_int" in ov: ch_dict["foci_max_int"] = _none_if_false(ov["foci_max_int"])
         if ("foci_prominence" in ov) or ("foci_proeminence" in ov):
-            ch_dict["foci_proeminence"] = ov.get("foci_prominence", ov.get("foci_proeminence"))
+            ch_dict["foci_proeminence"] = _none_if_false(ov.get("foci_prominence", ov.get("foci_proeminence")))
 
         ch_dict["channel_name"] = ch_name
         ch_dict["paths"] = cond_to_path
