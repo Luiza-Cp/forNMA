@@ -1041,8 +1041,8 @@ def foci_channels(req: FociChannelsRequest):
     if not pkl_files:
         return FociChannelsResponse(channels=[])
     cols = _extract_df_columns_from_pkl(pkl_files[0])
-    image_name_cols = [c for c in cols if str(c).startswith("Image_name_")]
-    channels = [str(c).split("Image_name_")[-1] for c in image_name_cols]
+    foci_cols = [c for c in cols if str(c).startswith("Foci_cnt_")]
+    channels = [str(c).split("Foci_cnt_")[-1] for c in foci_cols]
     return FociChannelsResponse(channels=channels)
 
 

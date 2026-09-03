@@ -75,9 +75,12 @@ def draw_foci_ch(group: pd.DataFrame,
         ch_image_dict[channel_list[i]] = image2
         image_list.append(image2)
 
-    overlay = cv.bitwise_and(image_list[0], image_list[1])
-    for i in range(2, len(image_list)):
-        overlay = cv.bitwise_and(overlay, image_list[i])
+    if len(image_list) == 1:
+        overlay = image_list[0].copy()
+    else:
+        overlay = cv.bitwise_and(image_list[0], image_list[1])
+        for i in range(2, len(image_list)):
+            overlay = cv.bitwise_and(overlay, image_list[i])
     ch_image_dict['overlay'] = overlay
     return ch_image_dict, image_list
 
@@ -173,8 +176,10 @@ def perform_foci_overlay(dfs: List[pd.DataFrame],
     Percorre cada DF/canal e executa a lógica de overlay por linha,
     disparando progresso fino dentro do processamento (medição/crop).
     """
-    # Detecta canais a partir das colunas Image_name_
-    channel_list = [f.replace('Image_name_', '') for f in dfs[0].columns if 'Image_name_' in f]
+    # Only channels with foci contour columns can be used for foci overlays.
+    channel_list = [f.replace('Foci_cnt_', '') for f in dfs[0].columns if f.startswith('Foci_cnt_')]
+    if not channel_list:
+        raise Exception("No foci contour columns were found in the .pkl data. Run segmentation with Foci enabled for at least one channel.")
     color_list = [(0, 0, 255), (255, 0, 0), (0, 255, 0), (0, 128, 255),
                   (0, 255, 255), (255, 255, 0), (255, 0, 255), (127, 0, 255),
                   (128, 128, 0), (0, 128, 128), (128, 0, 128)]
