@@ -1181,10 +1181,6 @@ button.chip:disabled {
   z-index: 1;
 }
 
-.content > section:not(.home-stack) > .row.row-right:first-child {
-  display: none;
-}
-
 .content .row.row-between > .ghost.btn-small {
   color: var(--accent);
   border-color: rgba(58, 110, 165, 0.18);

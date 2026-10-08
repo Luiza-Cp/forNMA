@@ -852,7 +852,7 @@ function PanelTitle({ children }) {
             className="panel-icon-action"
             onClick={actions.onReset}
             disabled={actions.resetDisabled}
-            title={actions.resetDisabled ? "Reset is unavailable while a process is running" : "Reset this module to a clean state"}
+            title={actions.resetDisabled ? "Reset is unavailable while a process is running" : "Reset this module: clears its settings and results"}
             aria-label="Reset module"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -1542,12 +1542,6 @@ function channelNameOrDefault(channel, index) {
 }
 
 function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSegmentation, onResetSegmentation, segJob }) {
-  const resetSegForm = () => {
-    const ok = window.confirm("Reset all segmentation settings to defaults?");
-    if (!ok) return;
-    onResetSegmentation?.();
-  };
-
   const [savePath, setSavePath] = usePersistentState("seg.savePath", "");
   const [imagesData, setImagesData] = usePersistentState("seg.imagesData", {
     channels: [{ id: "ch1", name: "Channel 1" }],
@@ -1910,7 +1904,6 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         <div className="sidebar-control-block">
         <div className="row">
           <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>{isImageSelectionSaved(summaryText) ? "Edit images" : "Load images"}</button>
-          <button className="ghost" onClick={resetSegForm} disabled={segRunning}>Reset settings</button>
         </div>
         <ImageSelectionBadge summaryText={summaryText} imagesData={imagesData} />
         <div className="field-head">Saving path <Tip text="Where outputs (tables, images, logs) will be written." /></div>
@@ -2421,9 +2414,11 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
       <div className="seg-footer">
         <button className="secondary" onClick={() => startSeg(true)} disabled={segRunning || segMissing.length > 0}>Preview</button>
         <button className="primary" onClick={() => startSeg(false)} disabled={segRunning || segMissing.length > 0}>Run</button>
-        <button className="danger" onClick={() => onStopSegmentation()} disabled={!segRunning || segCanceling}>
-          {segCanceling ? "Stopping..." : "Stop"}
-        </button>
+        {segRunning && (
+          <button className="danger" onClick={() => onStopSegmentation()} disabled={segCanceling}>
+            {segCanceling ? "Stopping..." : "Stop"}
+          </button>
+        )}
         {segCanceling && <span className="seg-stop-state" role="status">Finishing current image and stopping.</span>}
         {segCanceled && <span className="seg-stop-state stopped" role="status">Stopped. No further images will be processed.</span>}
         <MissingSetup items={segMissing} />
@@ -2733,7 +2728,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 
         <div className="seg-footer">
           <button className="primary" title="Run image registration with the current mapping and options." onClick={startRegistration} disabled={regRunning || regMissing.length > 0}>Run Registration</button>
-          <button className="danger" title="Request cancellation of the current registration job." onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
+          {regRunning && <button className="danger" title="Request cancellation of the current registration job." onClick={() => onStopRegistration()}>Stop</button>}
           <MissingSetup items={regMissing} />
         </div>
       </Card>
@@ -2932,7 +2927,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
         >
           Run Overlay
         </button>
-        <button className="danger" title="Request cancellation of the current foci overlay job." onClick={() => onStopFoci()} disabled={!running}>Stop</button>
+        {running && <button className="danger" title="Request cancellation of the current foci overlay job." onClick={() => onStopFoci()}>Stop</button>}
         <MissingSetup items={fociMissing} />
       </div>
     </Card>
@@ -7855,7 +7850,7 @@ export default function App() {
     } else if (activeModule === "Image Registration") {
       handleResetRegistrationUi();
     } else if (activeModule === "Segmentation") {
-      handleResetSegmentationUi();
+      if (window.confirm("Reset Segmentation screen to a clean state?")) handleResetSegmentationUi();
     } else if (activeModule === "Gating") {
       handleResetGatingUi();
     } else if (activeModule === "Foci Overlay") {
@@ -8002,18 +7997,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Segmentation")}>
-                    Tutorial
-                  </button>
-                  <button
-                    className="ghost btn-small"
-                    onClick={handleResetSegmentationUi}
-                    disabled={["starting", "queued", "running", "canceling"].includes(segJob.status || "idle")}
-                  >
-                    Reset
-                  </button>
-                </div>
                 {hasSegSession ? (
                   <div className="section tracking-viewer-section">
                     <h3>Execution progress</h3>
@@ -8074,14 +8057,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Gating")}>
-                    Tutorial
-                  </button>
-                  <button className="ghost btn-small" onClick={handleResetGatingUi} disabled={gatingLoading || gatingApplying}>
-                    Reset
-                  </button>
-                </div>
                 {(gatingLoading || gatingApplying) && (
                   <div className="preview-loading">
                     <div className="spinner" />
@@ -8199,14 +8174,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Tracking")}>
-                    Tutorial
-                  </button>
-                  <button className="ghost btn-small" onClick={handleResetTrackingUi} disabled={trackingRunning || trackingLoadingFrame || trackingEditing}>
-                    Reset
-                  </button>
-                </div>
                 {String(trackingState.workflow_stage || "step1") === "step1" && trackingRunning && (
                   <div className="tracking-run-feedback">
                     <div className="spinner" />
@@ -8388,18 +8355,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Foci Overlay")}>
-                    Tutorial
-                  </button>
-                  <button
-                    className="ghost btn-small"
-                    onClick={handleResetFociUi}
-                    disabled={["starting", "queued", "running", "canceling"].includes(fociJob.status || "idle")}
-                  >
-                    Reset
-                  </button>
-                </div>
                 {fociJob.job_id ? (
                   <div className="section">
                     <h3>Execution progress</h3>
@@ -8435,14 +8390,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Statistics")}>
-                    Tutorial
-                  </button>
-                  <button className="ghost btn-small" onClick={handleResetStatisticsUi} disabled={statsLoading}>
-                    Reset
-                  </button>
-                </div>
                 {statsLoading && (
                   <div className="preview-loading">
                     <div className="spinner" />
@@ -8496,14 +8443,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Clustering")}>
-                    Tutorial
-                  </button>
-                  <button className="ghost btn-small" onClick={handleResetClusteringUi} disabled={clusteringLoading || clusteringElbowLoading}>
-                    Reset
-                  </button>
-                </div>
                 {(clusteringLoading || clusteringElbowLoading) && (
                   <div className="preview-loading">
                     <div className="spinner" />
@@ -8543,14 +8482,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Plot Data")}>
-                    Tutorial
-                  </button>
-                  <button className="ghost btn-small" onClick={handleResetPlotDataUi} disabled={plotDataLoading}>
-                    Reset
-                  </button>
-                </div>
                 {plotDataLoading && (
                   <div className="preview-loading">
                     <div className="spinner" />
@@ -8586,18 +8517,6 @@ export default function App() {
             />
             <main className="content">
               <section>
-                <div className="row row-right">
-                  <button className="ghost btn-small" onClick={() => handleOpenTutorial("Image Registration")}>
-                    Tutorial
-                  </button>
-                  <button
-                    className="ghost btn-small"
-                    onClick={handleResetRegistrationUi}
-                    disabled={["starting", "queued", "running", "canceling"].includes(regJob.status || "idle")}
-                  >
-                    Reset
-                  </button>
-                </div>
                 {regJob.job_id ? (
                   <div className="section">
                     <Status
