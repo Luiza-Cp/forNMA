@@ -729,6 +729,240 @@ function readStorage(key, fallback) {
   }
 }
 
+// UI inputs that survive tab switches and page reloads. Results (figures, tables) are never stored.
+const PERSIST_PREFIX = "fornma.ui.";
+const persistCache = new Map();
+
+function writePersisted(key, value) {
+  persistCache.set(key, value);
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PERSIST_PREFIX + key, JSON.stringify(value));
+  } catch {
+    // Storage full or blocked: the in-memory cache still covers tab switches.
+  }
+}
+
+function readPersisted(key, fallback) {
+  if (persistCache.has(key)) return persistCache.get(key);
+  return readStorage(PERSIST_PREFIX + key, fallback);
+}
+
+function clearPersisted(prefix) {
+  Array.from(persistCache.keys()).forEach((key) => {
+    if (key.startsWith(prefix)) persistCache.delete(key);
+  });
+  if (typeof window === "undefined") return;
+  try {
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith(PERSIST_PREFIX + prefix))
+      .forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // Ignore blocked storage.
+  }
+}
+
+function usePersistentState(key, initial) {
+  const [value, setValue] = useState(() => {
+    const missing = {};
+    const stored = readPersisted(key, missing);
+    if (stored !== missing) return stored;
+    return typeof initial === "function" ? initial() : initial;
+  });
+  useEffect(() => {
+    writePersisted(key, value);
+  }, [key, value]);
+  return [value, setValue];
+}
+
+const omitKeys = (obj, keys) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => !keys.includes(k)));
+const pickKeys = (obj, keys) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => keys.includes(k)));
+
+function restoreSnapshot(key, base) {
+  const saved = readPersisted(key, null);
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return base;
+  return { ...base, ...saved };
+}
+
+const GENERIC_FOLDER_NAMES = new Set([
+  "results", "result", "output", "outputs", "segmentation", "data", "csv", "csvs", "tables", "analysis", "nma",
+]);
+
+function suggestDatasetName(path) {
+  const parts = String(path || "").trim().replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts.length === 0) return "";
+  const stem = parts[parts.length - 1].replace(/\.[^.]+$/, "");
+  const parent = parts.length > 1 ? parts[parts.length - 2] : "";
+  if (parent && !GENERIC_FOLDER_NAMES.has(parent.toLowerCase())) return parent;
+  return stem;
+}
+
+function uniqueDatasetName(base, takenNames) {
+  if (!base) return base;
+  const taken = new Set(takenNames.map((n) => String(n || "").trim().toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  let i = 2;
+  while (taken.has(`${base} (${i})`.toLowerCase())) i += 1;
+  return `${base} (${i})`;
+}
+
+function isAutoDatasetName(item) {
+  if (item.name_auto === false) return false;
+  if (item.name_auto === true) return true;
+  const name = String(item.name || "").trim();
+  return !name || /^Dataset \d+$/.test(name);
+}
+
+// Typing a name marks it as user-owned; changing the path renames datasets whose name is still automatic.
+function applyDatasetPatch(item, patch, siblings) {
+  if ("name" in patch) return { ...item, ...patch, name_auto: false };
+  if ("path" in patch && isAutoDatasetName(item)) {
+    const suggested = suggestDatasetName(patch.path);
+    if (suggested) {
+      const others = siblings.filter((s) => s.id !== item.id).map((s) => s.name);
+      return { ...item, ...patch, name: uniqueDatasetName(suggested, others), name_auto: true };
+    }
+  }
+  return { ...item, ...patch };
+}
+
+const ModuleActionsContext = React.createContext(null);
+
+function PanelTitle({ children }) {
+  const actions = React.useContext(ModuleActionsContext);
+  return (
+    <div className="panel-title-row">
+      <h3>{children}</h3>
+      {actions && (
+        <div className="panel-title-actions">
+          <button
+            type="button"
+            className="panel-icon-action"
+            onClick={actions.onTutorial}
+            title="Open the tutorial for this module"
+            aria-label="Open tutorial"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M4 5.5c0-.83.67-1.5 1.5-1.5H10c1.1 0 2 .9 2 2v14c0-1.1-.9-2-2-2H5.5C4.67 18 4 17.33 4 16.5v-11Z" />
+              <path d="M20 5.5c0-.83-.67-1.5-1.5-1.5H14c-1.1 0-2 .9-2 2v14c0-1.1.9-2 2-2h4.5c.83 0 1.5-.67 1.5-1.5v-11Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="panel-icon-action"
+            onClick={actions.onReset}
+            disabled={actions.resetDisabled}
+            title={actions.resetDisabled ? "Reset is unavailable while a process is running" : "Reset this module to a clean state"}
+            aria-label="Reset module"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+              <path d="M20 4v5h-5" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModuleTabs({ stages, active, onSelect }) {
+  const listRef = React.useRef(null);
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+
+  const measure = React.useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    setOverflow({
+      left: el.scrollLeft > 2,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+    });
+  }, []);
+
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+
+  useEffect(() => {
+    const el = listRef.current?.querySelector('[data-state="active"]');
+    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    measure();
+  }, [active, measure]);
+
+  const scrollBy = (dir) => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.6, behavior: "smooth" });
+  };
+
+  return (
+    <div className={`module-tabs ${overflow.left ? "fade-left" : ""} ${overflow.right ? "fade-right" : ""}`}>
+      {overflow.left && (
+        <button type="button" className="module-tabs-arrow left" onClick={() => scrollBy(-1)} aria-label="Show previous modules">‹</button>
+      )}
+      <div className="module-menu-list" ref={listRef} onScroll={measure}>
+        {stages.map((stage) => (
+          <Button
+            key={stage}
+            type="button"
+            className={`module-chip ${stage === active ? "active" : ""}`}
+            data-state={stage === active ? "active" : "inactive"}
+            aria-current={stage === active ? "page" : undefined}
+            onClick={() => onSelect(stage)}
+          >
+            <span className="module-chip-label">{stage}</span>
+          </Button>
+        ))}
+      </div>
+      {overflow.right && (
+        <button type="button" className="module-tabs-arrow right" onClick={() => scrollBy(1)} aria-label="Show more modules">›</button>
+      )}
+    </div>
+  );
+}
+
+function TutorialDrawer({ moduleName, onClose }) {
+  const guide = HOME_MODULE_GUIDES.find((g) => g.id === MODULE_TUTORIAL_SECTION[moduleName]);
+  const closeRef = React.useRef(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  if (!guide) return null;
+  return createPortal(
+    <div className="tutorial-drawer-backdrop" onMouseDown={onClose}>
+      <aside
+        className="tutorial-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={guide.title}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="tutorial-drawer-head">
+          <span className="tutorial-drawer-kicker">{moduleName} · Tutorial</span>
+          <button ref={closeRef} type="button" className="panel-icon-action" onClick={onClose} aria-label="Close tutorial" title="Close (Esc)">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <div className="tutorial-drawer-body">
+          <HomeTutorialSection {...guide} />
+        </div>
+      </aside>
+    </div>,
+    document.body
+  );
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -767,7 +1001,7 @@ function DatasetCollapseButton({ collapsed, onClick, label = "dataset" }) {
 
 function hasFilledFields(item = {}) {
   return Object.entries(item).some(([key, value]) => {
-    if (["id", "enabled", "is_control", "columns", "area_columns", "nii_columns"].includes(key)) return false;
+    if (["id", "enabled", "is_control", "name_auto", "columns", "area_columns", "nii_columns"].includes(key)) return false;
     if (Array.isArray(value)) return value.length > 0;
     if (value && typeof value === "object") return Object.keys(value).length > 0;
     return String(value ?? "").trim() !== "";
@@ -1028,50 +1262,50 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     onResetSegmentation?.();
   };
 
-  const [savePath, setSavePath] = useState("");
-  const [imagesData, setImagesData] = useState({
+  const [savePath, setSavePath] = usePersistentState("seg.savePath", "");
+  const [imagesData, setImagesData] = usePersistentState("seg.imagesData", {
     channels: [{ id: "ch1", name: "Channel 1" }],
     rows: [{ condition: "Control", ch1: "" }],
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [modalError, setModalError] = useState("");
-  const [summaryText, setSummaryText] = useState("No images loaded yet.");
-  const [nuclearChannel, setNuclearChannel] = useState("ch1");
-  const [fociEnabled, setFociEnabled] = useState(false);
-  const [fociChannels, setFociChannels] = useState([]);
-  const [cytoEnabled, setCytoEnabled] = useState(false);
-  const [cytoChannels, setCytoChannels] = useState([]);
-  const [segmentationTarget, setSegmentationTarget] = useState("nucleus");
-  const [cytoplasmChannel, setCytoplasmChannel] = useState("ch1");
-  const [segMethod, setSegMethod] = useState("fornma");
-  const [overtime, setOvertime] = useState(false);
-  const [magnification, setMagnification] = useState(20);
-  const [pixelSize, setPixelSize] = useState(0.6);
-  const [rescaleIntensity, setRescaleIntensity] = useState(false);
-  const [removeBackground, setRemoveBackground] = useState(false);
-  const [rollingRadius, setRollingRadius] = useState(50);
-  const [fornmaThreshold, setFornmaThreshold] = useState("triangle");
-  const [fornmaOffset, setFornmaOffset] = useState(5);
-  const [fornmaSmooth, setFornmaSmooth] = useState(12);
-  const [fornmaAdjustSize, setFornmaAdjustSize] = useState(0);
-  const [fornmaCutEdges, setFornmaCutEdges] = useState(0.7);
-  const [fornmaFindLow, setFornmaFindLow] = useState(false);
-  const [fornmaWeakly, setFornmaWeakly] = useState(false);
-  const [cellposeModel, setCellposeModel] = useState("nuclei");
-  const [cellposeDiameter, setCellposeDiameter] = useState(25);
-  const [cellposeFlow, setCellposeFlow] = useState(0.4);
-  const [cellposeCellprob, setCellposeCellprob] = useState(-3);
-  const [cellposeUseGpu, setCellposeUseGpu] = useState(true);
-  const [cellposeInvert, setCellposeInvert] = useState(true);
-  const [cytoCellposeModel, setCytoCellposeModel] = useState("cyto3");
-  const [cytoCellposeDiameter, setCytoCellposeDiameter] = useState(25);
-  const [cytoCellposeFlow, setCytoCellposeFlow] = useState(0.4);
-  const [cytoCellposeCellprob, setCytoCellposeCellprob] = useState(-3);
-  const [cytoCellposeInvert, setCytoCellposeInvert] = useState(true);
-  const [cytoRescaleIntensity, setCytoRescaleIntensity] = useState(false);
-  const [cytoRemoveBackground, setCytoRemoveBackground] = useState(false);
-  const [cytoRollingRadius, setCytoRollingRadius] = useState(50);
-  const [advEnable, setAdvEnable] = useState({
+  const [summaryText, setSummaryText] = usePersistentState("seg.summaryText", "No images loaded yet.");
+  const [nuclearChannel, setNuclearChannel] = usePersistentState("seg.nuclearChannel", "ch1");
+  const [fociEnabled, setFociEnabled] = usePersistentState("seg.fociEnabled", false);
+  const [fociChannels, setFociChannels] = usePersistentState("seg.fociChannels", []);
+  const [cytoEnabled, setCytoEnabled] = usePersistentState("seg.cytoEnabled", false);
+  const [cytoChannels, setCytoChannels] = usePersistentState("seg.cytoChannels", []);
+  const [segmentationTarget, setSegmentationTarget] = usePersistentState("seg.segmentationTarget", "nucleus");
+  const [cytoplasmChannel, setCytoplasmChannel] = usePersistentState("seg.cytoplasmChannel", "ch1");
+  const [segMethod, setSegMethod] = usePersistentState("seg.segMethod", "fornma");
+  const [overtime, setOvertime] = usePersistentState("seg.overtime", false);
+  const [magnification, setMagnification] = usePersistentState("seg.magnification", 20);
+  const [pixelSize, setPixelSize] = usePersistentState("seg.pixelSize", 0.6);
+  const [rescaleIntensity, setRescaleIntensity] = usePersistentState("seg.rescaleIntensity", false);
+  const [removeBackground, setRemoveBackground] = usePersistentState("seg.removeBackground", false);
+  const [rollingRadius, setRollingRadius] = usePersistentState("seg.rollingRadius", 50);
+  const [fornmaThreshold, setFornmaThreshold] = usePersistentState("seg.fornmaThreshold", "triangle");
+  const [fornmaOffset, setFornmaOffset] = usePersistentState("seg.fornmaOffset", 5);
+  const [fornmaSmooth, setFornmaSmooth] = usePersistentState("seg.fornmaSmooth", 12);
+  const [fornmaAdjustSize, setFornmaAdjustSize] = usePersistentState("seg.fornmaAdjustSize", 0);
+  const [fornmaCutEdges, setFornmaCutEdges] = usePersistentState("seg.fornmaCutEdges", 0.7);
+  const [fornmaFindLow, setFornmaFindLow] = usePersistentState("seg.fornmaFindLow", false);
+  const [fornmaWeakly, setFornmaWeakly] = usePersistentState("seg.fornmaWeakly", false);
+  const [cellposeModel, setCellposeModel] = usePersistentState("seg.cellposeModel", "nuclei");
+  const [cellposeDiameter, setCellposeDiameter] = usePersistentState("seg.cellposeDiameter", 25);
+  const [cellposeFlow, setCellposeFlow] = usePersistentState("seg.cellposeFlow", 0.4);
+  const [cellposeCellprob, setCellposeCellprob] = usePersistentState("seg.cellposeCellprob", -3);
+  const [cellposeUseGpu, setCellposeUseGpu] = usePersistentState("seg.cellposeUseGpu", true);
+  const [cellposeInvert, setCellposeInvert] = usePersistentState("seg.cellposeInvert", true);
+  const [cytoCellposeModel, setCytoCellposeModel] = usePersistentState("seg.cytoCellposeModel", "cyto3");
+  const [cytoCellposeDiameter, setCytoCellposeDiameter] = usePersistentState("seg.cytoCellposeDiameter", 25);
+  const [cytoCellposeFlow, setCytoCellposeFlow] = usePersistentState("seg.cytoCellposeFlow", 0.4);
+  const [cytoCellposeCellprob, setCytoCellposeCellprob] = usePersistentState("seg.cytoCellposeCellprob", -3);
+  const [cytoCellposeInvert, setCytoCellposeInvert] = usePersistentState("seg.cytoCellposeInvert", true);
+  const [cytoRescaleIntensity, setCytoRescaleIntensity] = usePersistentState("seg.cytoRescaleIntensity", false);
+  const [cytoRemoveBackground, setCytoRemoveBackground] = usePersistentState("seg.cytoRemoveBackground", false);
+  const [cytoRollingRadius, setCytoRollingRadius] = usePersistentState("seg.cytoRollingRadius", 50);
+  const [advEnable, setAdvEnable] = usePersistentState("seg.advEnable", {
     shape: true,
     eccentricity: false,
     min_size: false,
@@ -1079,7 +1313,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     min_radius: false,
     max_radius: false,
   });
-  const [advValues, setAdvValues] = useState({
+  const [advValues, setAdvValues] = usePersistentState("seg.advValues", {
     shape: 0.88,
     eccentricity: 0.8,
     min_size: 100,
@@ -1087,7 +1321,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     min_radius: 4,
     max_radius: 120,
   });
-  const [cytoAdvEnable, setCytoAdvEnable] = useState({
+  const [cytoAdvEnable, setCytoAdvEnable] = usePersistentState("seg.cytoAdvEnable", {
     shape: false,
     eccentricity: false,
     min_size: false,
@@ -1095,7 +1329,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     min_radius: false,
     max_radius: false,
   });
-  const [cytoAdvValues, setCytoAdvValues] = useState({
+  const [cytoAdvValues, setCytoAdvValues] = usePersistentState("seg.cytoAdvValues", {
     shape: 0.88,
     eccentricity: 0.8,
     min_size: 100,
@@ -1103,7 +1337,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     min_radius: 4,
     max_radius: 120,
   });
-  const [channelCfg, setChannelCfg] = useState({});
+  const [channelCfg, setChannelCfg] = usePersistentState("seg.channelCfg", {});
   const channels = imagesData.channels || [];
   const channelIds = new Set(channels.map((c) => c.id));
 
@@ -1376,7 +1610,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     <>
     <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Segmentation Settings</h3>
+        <PanelTitle>Segmentation Settings</PanelTitle>
         <p className="hint">Configure image inputs, nucleus detection, and per-channel measurement options.</p>
       </div>
 
@@ -1991,17 +2225,17 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
 }
 
 function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopRegistration, regJob }) {
-  const [savePath, setSavePath] = useState("");
-  const [imagesData, setImagesData] = useState({
+  const [savePath, setSavePath] = usePersistentState("reg.savePath", "");
+  const [imagesData, setImagesData] = usePersistentState("reg.imagesData", {
     channels: [{ id: "ch1", name: "Channel 1" }],
     rows: [{ condition: "Control", ch1: "" }],
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [modalError, setModalError] = useState("");
-  const [summaryText, setSummaryText] = useState("No images loaded yet.");
-  const [referenceChannel, setReferenceChannel] = useState("");
-  const [movingChannels, setMovingChannels] = useState([]);
-  const [cropOutput, setCropOutput] = useState(true);
+  const [summaryText, setSummaryText] = usePersistentState("reg.summaryText", "No images loaded yet.");
+  const [referenceChannel, setReferenceChannel] = usePersistentState("reg.referenceChannel", "");
+  const [movingChannels, setMovingChannels] = usePersistentState("reg.movingChannels", []);
+  const [cropOutput, setCropOutput] = usePersistentState("reg.cropOutput", true);
 
   const channels = imagesData.channels || [];
   const channelIds = new Set(channels.map((c) => c.id));
@@ -2132,7 +2366,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
     <>
       <Card as="aside" className="panel seg-panel" variant="panel">
         <div className="seg-header">
-          <h3>Image Registration Settings</h3>
+          <PanelTitle>Image Registration Settings</PanelTitle>
           <p className="hint">Set the reference channel, optional moving channels, and output options for registration.</p>
         </div>
 
@@ -2266,12 +2500,12 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 }
 
 function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoadFociChannels, fociJob }) {
-  const [pklPath, setPklPath] = useState("");
-  const [savePath, setSavePath] = useState("");
-  const [channelsOptions, setChannelsOptions] = useState([]);
-  const [channels, setChannels] = useState([]);
-  const [actions, setActions] = useState(["overlay"]);
-  const [saveImages, setSaveImages] = useState(true);
+  const [pklPath, setPklPath] = usePersistentState("foci.pklPath", "");
+  const [savePath, setSavePath] = usePersistentState("foci.savePath", "");
+  const [channelsOptions, setChannelsOptions] = usePersistentState("foci.channelsOptions", []);
+  const [channels, setChannels] = usePersistentState("foci.channels", []);
+  const [actions, setActions] = usePersistentState("foci.actions", ["overlay"]);
+  const [saveImages, setSaveImages] = usePersistentState("foci.saveImages", true);
   const running = ["starting", "queued", "running", "canceling"].includes(fociJob?.status || "idle");
 
   const loadChannels = async (path) => {
@@ -2293,7 +2527,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Foci Overlay Settings</h3>
+        <PanelTitle>Foci Overlay Settings</PanelTitle>
         <p className="hint">Generate overlay views and profile outputs from previously processed `.pkl` files.</p>
       </div>
 
@@ -2406,7 +2640,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
   const setField = (k, v) => setGraphState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(graphState.datasets || []), { id: makeRowId(), name: `Dataset ${(graphState.datasets || []).length + 1}`, path: "", columns: null, enabled: true }]);
   const removeDataset = (id) => setField("datasets", (graphState.datasets || []).filter((d) => d.id !== id));
-  const updateDataset = (id, patch) => setField("datasets", (graphState.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const updateDataset = (id, patch) => setField("datasets", (graphState.datasets || []).map((d, _, all) => (d.id === id ? applyDatasetPatch(d, patch, all) : d)));
   const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const cols = graphState.columns || [];
@@ -2426,7 +2660,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Plot Data Settings</h3>
+        <PanelTitle>Plot Data Settings</PanelTitle>
         <p className="hint">Use CSV outputs to build interactive plots.</p>
       </div>
       <div className="seg-scroll">
@@ -2475,7 +2709,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                         onClick={async () => {
                           try {
                             const picked = await onPickCsv();
-                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                            if (picked) updateDataset(d.id, { path: picked });
                           } catch (err) {
                             setStatusExternal(errorMessageFromException(err, "Could not open the CSV picker. Check that the backend is running and try again."), "error");
                           }
@@ -2695,7 +2929,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
   const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
-  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d, _, all) => (d.id === id ? applyDatasetPatch(d, patch, all) : d)));
   const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const numeric = state.numericColumns || [];
@@ -2705,7 +2939,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Clustering Settings</h3>
+        <PanelTitle>Clustering Settings</PanelTitle>
         <p className="hint">Interactive embedding preview with optional KMeans coloring.</p>
       </div>
       <div className="seg-scroll">
@@ -2754,7 +2988,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                         onClick={async () => {
                           try {
                             const picked = await onPickCsv();
-                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                            if (picked) updateDataset(d.id, { path: picked });
                           } catch {
                             // no-op
                           }
@@ -2892,7 +3126,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   const setField = (k, v) => setState((prev) => ({ ...prev, [k]: v }));
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
-  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d, _, all) => (d.id === id ? applyDatasetPatch(d, patch, all) : d)));
   const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
   const addFilter = () => setField("filters", [...(state.filters || []), makeStatsFilterRow()]);
   const removeFilter = (id) => setField("filters", (state.filters || []).filter((f) => f.id !== id));
@@ -2911,7 +3145,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Statistics Settings</h3>
+        <PanelTitle>Statistics Settings</PanelTitle>
         <p className="hint">Run statistical tests and inspect result tables.</p>
       </div>
       <div className="seg-scroll">
@@ -2959,7 +3193,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                         onClick={async () => {
                           try {
                             const picked = await onPickCsv();
-                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                            if (picked) updateDataset(d.id, { path: picked });
                           } catch {
                             // noop
                           }
@@ -3190,7 +3424,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
   };
   const addDataset = () => setField("datasets", [...(state.datasets || []), { id: makeRowId(), name: `Dataset ${(state.datasets || []).length + 1}`, path: "", pkl_dir: "", enabled: true }]);
   const removeDataset = (id) => setField("datasets", (state.datasets || []).filter((d) => d.id !== id));
-  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const updateDataset = (id, patch) => setField("datasets", (state.datasets || []).map((d, _, all) => (d.id === id ? applyDatasetPatch(d, patch, all) : d)));
   const toggleDataset = (id) => setCollapsedDatasets((prev) => ({ ...prev, [id]: !prev[id] }));
   const numeric = state.numericColumns || [];
   const busy = !!loading || !!applying;
@@ -3202,7 +3436,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Gating Settings</h3>
+        <PanelTitle>Gating Settings</PanelTitle>
         <p className="hint">Filter populations by rectangular gates on two numeric columns, including cleanup of segmentation errors/debris.</p>
       </div>
       <div className="seg-scroll">
@@ -3242,7 +3476,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
                         onClick={async () => {
                           try {
                             const picked = await onPickCsv();
-                            if (picked) updateDataset(d.id, { path: picked, name: (d.name || "").trim() ? d.name : String(picked).split("/").pop() || d.name });
+                            if (picked) updateDataset(d.id, { path: picked });
                           } catch {
                             // no-op
                           }
@@ -3401,7 +3635,7 @@ function TrackingLeftPanel({
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
       <div className="seg-header">
-        <h3>Tracking Settings</h3>
+        <PanelTitle>Tracking Settings</PanelTitle>
         <p className="hint">
           Automatic tracking is simple and may produce errors. Step 2 is manual correction and becomes available only
           after running automatic tracking.
@@ -3748,6 +3982,7 @@ const emptyRow = () => ({
 const initialNmaRows = () => ([{
   ...emptyRow(),
   name: "Control",
+  name_auto: true,
   is_control: true,
 }]);
 
@@ -3755,7 +3990,7 @@ function buildDatasets(rows) {
   return rows
     .filter((r) => r.path.trim())
     .map((r) => ({
-      name: r.name?.trim() || r.path.split("/").pop(),
+      name: r.name?.trim() || suggestDatasetName(r.path),
       path: r.path.trim(),
       area_col: r.area_col?.trim() || "",
       nii_col: r.nii_col?.trim() || "",
@@ -4361,15 +4596,19 @@ function buildStep2Figure(
 }
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState("Home");
+  const [activeModule, setActiveModule] = useState(() => {
+    const saved = readStorage(STORAGE_KEYS.activeModule, "Home");
+    return FORNMA_STAGES.includes(saved) ? saved : "Home";
+  });
+  const [tutorialModule, setTutorialModule] = useState(null);
   const [homeSection, setHomeSection] = useState("about");
   const homeScrollRef = React.useRef(null);
-  const [rows, setRows] = useState(initialNmaRows());
+  const [rows, setRows] = useState(() => readPersisted("nma.rows", null) || initialNmaRows());
   const [collapsedById, setCollapsedById] = useState({});
 
   const [step, setStep] = useState(0);
   const [controlGateReady, setControlGateReady] = useState(false);
-  const [controlGateSd, setControlGateSd] = useState("2");
+  const [controlGateSd, setControlGateSd] = useState(() => readPersisted("nma.controlGateSd", "2"));
   const [controlGateBounds, setControlGateBounds] = useState({ x_min: "", x_max: "", y_min: "", y_max: "" });
   const [controlGateMeta, setControlGateMeta] = useState(null);
   const [controlGateFigure, setControlGateFigure] = useState(null);
@@ -4403,10 +4642,8 @@ export default function App() {
   const [step2Percentages, setStep2Percentages] = useState(null);
   const [showPlotConfig, setShowPlotConfig] = useState(false);
   const [highlightPlotConfig, setHighlightPlotConfig] = useState(false);
-  const [plotConfig, setPlotConfig] = useState({
-    ...initialPlotConfig(),
-  });
-  const [plotSavePath, setPlotSavePath] = useState("");
+  const [plotConfig, setPlotConfig] = useState(() => restoreSnapshot("nma.plotConfig", initialPlotConfig()));
+  const [plotSavePath, setPlotSavePath] = useState(() => readPersisted("nma.plotSavePath", ""));
   const [plotJob, setPlotJob] = useState(() => ({ ...DEFAULT_PLOT_JOB, ...readStorage(STORAGE_KEYS.plotJob, {}) }));
   const [currentPlotIndex, setCurrentPlotIndex] = useState(0);
   const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
@@ -4420,21 +4657,21 @@ export default function App() {
   const [segPanelResetKey, setSegPanelResetKey] = useState(0);
   const [regPanelResetKey, setRegPanelResetKey] = useState(0);
   const [fociPanelResetKey, setFociPanelResetKey] = useState(0);
-  const [plotData, setPlotData] = useState(initialPlotDataState);
+  const [plotData, setPlotData] = useState(() => restoreSnapshot("plotData", initialPlotDataState()));
   const [plotDataStatus, setPlotDataStatus] = useState({ level: "info", text: "" });
   const [plotDataLoading, setPlotDataLoading] = useState(false);
-  const [clustering, setClustering] = useState(initialClusteringState);
+  const [clustering, setClustering] = useState(() => restoreSnapshot("clustering", initialClusteringState()));
   const [clusteringStatus, setClusteringStatus] = useState({ level: "info", text: "" });
   const [clusteringLoading, setClusteringLoading] = useState(false);
   const [clusteringElbowLoading, setClusteringElbowLoading] = useState(false);
-  const [statsState, setStatsState] = useState(initialStatsState);
+  const [statsState, setStatsState] = useState(() => restoreSnapshot("stats", initialStatsState()));
   const [statsStatus, setStatsStatus] = useState({ level: "info", text: "" });
   const [statsLoading, setStatsLoading] = useState(false);
-  const [gatingState, setGatingState] = useState(initialGatingState);
+  const [gatingState, setGatingState] = useState(() => restoreSnapshot("gating", initialGatingState()));
   const [gatingStatus, setGatingStatus] = useState({ level: "info", text: "" });
   const [gatingLoading, setGatingLoading] = useState(false);
   const [gatingApplying, setGatingApplying] = useState(false);
-  const [trackingState, setTrackingState] = useState(initialTrackingState);
+  const [trackingState, setTrackingState] = useState(() => restoreSnapshot("tracking", initialTrackingState()));
   const [trackingStatus, setTrackingStatus] = useState({ level: "info", text: "" });
   const [trackingRunning, setTrackingRunning] = useState(false);
   const [trackingLoadingFrame, setTrackingLoadingFrame] = useState(false);
@@ -4502,18 +4739,49 @@ export default function App() {
   };
 
   const handleOpenTutorial = (moduleName) => {
-    const sectionId = MODULE_TUTORIAL_SECTION[moduleName];
-    setActiveModule("Home");
-    if (!sectionId) return;
-    setHomeSection(sectionId);
-    if (typeof window === "undefined") return;
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        const target = document.getElementById(`home-${sectionId}`);
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
+    if (MODULE_TUTORIAL_SECTION[moduleName]) setTutorialModule(moduleName);
   };
+  const closeTutorial = React.useCallback(() => setTutorialModule(null), []);
+
+  useEffect(() => {
+    writePersisted("plotData", omitKeys(plotData, ["figure", "message"]));
+  }, [plotData]);
+
+  useEffect(() => {
+    writePersisted("clustering", omitKeys(clustering, ["figure", "elbowFigure", "message"]));
+  }, [clustering]);
+
+  useEffect(() => {
+    writePersisted("stats", omitKeys(statsState, ["tables", "log", "message"]));
+  }, [statsState]);
+
+  useEffect(() => {
+    writePersisted("gating", omitKeys(gatingState, ["figure", "tables", "files", "message"]));
+  }, [gatingState]);
+
+  // Only Step 1 inputs: later tracking stages depend on server-side files that may no longer exist.
+  useEffect(() => {
+    writePersisted("tracking", pickKeys(trackingState, [
+      "path_to_table", "image_dir", "image_col", "columns",
+      "max_distance", "time_window", "max_split_distance", "max_gap_closing_distance",
+    ]));
+  }, [trackingState]);
+
+  useEffect(() => {
+    writePersisted("nma.rows", rows);
+  }, [rows]);
+
+  useEffect(() => {
+    writePersisted("nma.controlGateSd", controlGateSd);
+  }, [controlGateSd]);
+
+  useEffect(() => {
+    writePersisted("nma.plotConfig", plotConfig);
+  }, [plotConfig]);
+
+  useEffect(() => {
+    writePersisted("nma.plotSavePath", plotSavePath);
+  }, [plotSavePath]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -4541,9 +4809,28 @@ export default function App() {
     [rows]
   );
   const hasControl = datasets.some((d) => d.is_control);
+  const nmaNameIssues = useMemo(() => {
+    const filled = rows.filter((r) => String(r.path || "").trim());
+    const counts = {};
+    filled.forEach((r) => {
+      const key = String(r.name || "").trim().toLowerCase();
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+    const issues = {};
+    filled.forEach((r) => {
+      const name = String(r.name || "").trim();
+      if (!name) {
+        issues[r.id] = "Give this dataset a name. It is shown in plot legends and tables.";
+      } else if (counts[name.toLowerCase()] > 1) {
+        issues[r.id] = `Another dataset is also called "${name}". Use unique names so the groups can be told apart.`;
+      }
+    });
+    return issues;
+  }, [rows]);
+  const hasNmaNameIssues = Object.keys(nmaNameIssues).length > 0;
 
   const updateRow = (idx, patch) => {
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+    setRows((prev) => prev.map((r, i) => (i === idx ? applyDatasetPatch(r, patch, prev) : r)));
   };
 
   const addRow = () => setRows((prev) => [...prev, emptyRow()]);
@@ -4582,6 +4869,11 @@ export default function App() {
   };
 
   const requireNmaAxes = () => {
+    if (hasNmaNameIssues) {
+      setStatus("Some datasets have an empty or repeated name. Fix the highlighted names before continuing.");
+      setStatusLevel("error");
+      return false;
+    }
     const missing = datasets.filter((dataset) => !dataset.area_col || !dataset.nii_col);
     if (missing.length === 0) return true;
     const names = missing.map((dataset) => dataset.name || dataset.path.split("/").pop()).join(", ");
@@ -5361,6 +5653,7 @@ export default function App() {
     setLastSegPreviewPayload(null);
     setStatus("");
     setStatusLevel("info");
+    clearPersisted("seg.");
     setSegPanelResetKey((k) => k + 1);
   };
 
@@ -6949,6 +7242,7 @@ export default function App() {
     const ok = window.confirm("Reset Image Registration screen to a clean state?");
     if (!ok) return;
     setRegJob({ ...DEFAULT_REG_JOB });
+    clearPersisted("reg.");
     setRegPanelResetKey((k) => k + 1);
     setStatus("");
     setStatusLevel("info");
@@ -6959,6 +7253,7 @@ export default function App() {
     const ok = window.confirm("Reset Foci Overlay screen to a clean state?");
     if (!ok) return;
     setFociJob({ ...DEFAULT_FOCI_JOB });
+    clearPersisted("foci.");
     setFociPanelResetKey((k) => k + 1);
     setStatus("");
     setStatusLevel("info");
@@ -7155,7 +7450,16 @@ export default function App() {
     (activeModule === "Statistics" && statsLoading) ||
     (activeModule === "Tracking" && (trackingRunning || trackingLoadingFrame || trackingEditing));
 
+  const moduleActions = activeModule === "Home"
+    ? null
+    : {
+      onTutorial: () => handleOpenTutorial(activeModule),
+      onReset: handleResetActiveModule,
+      resetDisabled: resetActiveDisabled,
+    };
+
   return (
+    <ModuleActionsContext.Provider value={moduleActions}>
     <div className="app">
       <div className="top-shell">
         <nav className="module-menu" aria-label="forNMA stages">
@@ -7167,47 +7471,10 @@ export default function App() {
               <div className="logo">forNMA</div>
             </div>
           </div>
-          <div className="module-menu-list">
-            {FORNMA_STAGES.map((stage) => (
-              <Button
-                key={stage}
-                type="button"
-                className={`module-chip ${stage === activeModule ? "active" : ""}`}
-                data-state={stage === activeModule ? "active" : "inactive"}
-                onClick={() => {
-                  setActiveModule(stage);
-                }}
-              >
-                <span className="module-chip-label">{stage}</span>
-              </Button>
-            ))}
-          </div>
-          <div className="top-actions" aria-label="Current module actions">
-            {activeModule !== "Home" && (
-              <Button type="button" className="top-action" onClick={() => handleOpenTutorial(activeModule)}>
-                <span className="top-action-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <path d="M4 5.5c0-.83.67-1.5 1.5-1.5H10c1.1 0 2 .9 2 2v14c0-1.1-.9-2-2-2H5.5C4.67 18 4 17.33 4 16.5v-11Z" />
-                    <path d="M20 5.5c0-.83-.67-1.5-1.5-1.5H14c-1.1 0-2 .9-2 2v14c0-1.1.9-2 2-2h4.5c.83 0 1.5-.67 1.5-1.5v-11Z" />
-                  </svg>
-                </span>
-                <span>Tutorial</span>
-              </Button>
-            )}
-            {activeModule !== "Home" && (
-              <Button type="button" className="top-action" onClick={handleResetActiveModule} disabled={resetActiveDisabled}>
-                <span className="top-action-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-                    <path d="M20 4v5h-5" />
-                  </svg>
-                </span>
-                <span>Reset</span>
-              </Button>
-            )}
-          </div>
+          <ModuleTabs stages={FORNMA_STAGES} active={activeModule} onSelect={setActiveModule} />
         </nav>
       </div>
+      {tutorialModule && <TutorialDrawer moduleName={tutorialModule} onClose={closeTutorial} />}
 
       <div className="layout">
         {activeModule === "Home" ? (
@@ -8005,7 +8272,7 @@ export default function App() {
           <>
         <Card as="aside" className="panel nma-panel seg-panel" variant="panel">
           <div className="seg-header">
-            <h3>NMA Settings</h3>
+            <PanelTitle>NMA Settings</PanelTitle>
             <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
           </div>
           <div className="row row-right">
@@ -8032,11 +8299,13 @@ export default function App() {
                     <div style={{ flex: 1 }}>
                       <FieldTitle title="Dataset name" tip="Friendly name used to identify this dataset throughout the NMA workflow." className="field-head" />
                       <input
-                        className="input"
+                        className={`input ${nmaNameIssues[row.id] ? "input-invalid" : ""}`}
                         placeholder="Name"
                         value={row.name}
+                        aria-invalid={nmaNameIssues[row.id] ? "true" : undefined}
                         onChange={(e) => updateRow(idx, { name: e.target.value })}
                       />
+                      {nmaNameIssues[row.id] && <div className="field-error">{nmaNameIssues[row.id]}</div>}
                     </div>
                     <label className="checkbox">
                       <input
@@ -8434,7 +8703,14 @@ export default function App() {
                 Load settings
               </Button>
               {!controlGateReady && !step1Ready && (
-                <Button className="primary" onClick={handleControlGate} disabled={!hasControl}>Create Settings</Button>
+                <Button className="primary" onClick={handleControlGate} disabled={!hasControl || hasNmaNameIssues}>Create Settings</Button>
+              )}
+              {!controlGateReady && !step1Ready && (!hasControl || hasNmaNameIssues) && (
+                <div className="hint disabled-reason">
+                  {!hasControl
+                    ? "To create settings, add a CSV path to a dataset and tick Control."
+                    : "To create settings, fix the highlighted dataset names."}
+                </div>
               )}
             </div>
           )}
@@ -8779,5 +9055,6 @@ export default function App() {
         )}
       </div>
     </div>
+    </ModuleActionsContext.Provider>
   );
 }
