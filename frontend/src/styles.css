@@ -2461,3 +2461,23 @@ button:not(:disabled):hover {
   width: 100%;
   max-width: none;
 }
+
+.seg-subsection {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.seg-subsection > summary {
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.seg-subsection-count {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12.5px;
+}

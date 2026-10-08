@@ -1241,6 +1241,11 @@ function FeaturePicker({ options, selected, onChange }) {
   );
 }
 
+function FilterCount({ values }) {
+  const active = Object.values(values || {}).filter(Boolean).length;
+  return <span className="seg-subsection-count">· {active ? `${active} active` : "none active"}</span>;
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2113,7 +2118,8 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                     </label>
                   </>
                 )}
-                <h4 className="seg-subtitle">Advanced Filters</h4>
+                <details className="seg-subsection">
+                  <summary>Advanced filters <FilterCount values={advEnable} /></summary>
                 <label className="checkbox">
                   <input type="checkbox" checked={advEnable.shape} onChange={(e) => setAdvToggle("shape", e.target.checked)} />
                   Shape <Tip text="Filter nuclear masks by irregularity/shape metric." />
@@ -2144,6 +2150,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                   Max Radius <Tip text="Maximum nuclear mask radius." />
                 </label>
                 {advEnable.max_radius && <input className="input" type="number" step="1" value={advValues.max_radius} onChange={(e) => setAdvValue("max_radius", e.target.value)} />}
+                </details>
                 </div>
               </details>
             )}
@@ -2188,7 +2195,8 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                   <input type="checkbox" checked={cytoCellposeInvert} onChange={(e) => setCytoCellposeInvert(e.target.checked)} />
                   Invert Intensities <Tip text="Invert image values before segmentation when needed." />
                 </label>
-                <h4 className="seg-subtitle">Advanced Filters</h4>
+                <details className="seg-subsection">
+                  <summary>Advanced filters <FilterCount values={cytoAdvEnable} /></summary>
                 <label className="checkbox">
                   <input type="checkbox" checked={cytoAdvEnable.shape} onChange={(e) => setCytoAdvToggle("shape", e.target.checked)} />
                   Shape <Tip text="Filter cytoplasm masks by irregularity/shape metric." />
@@ -2219,14 +2227,15 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                   Max Radius <Tip text="Maximum cytoplasm mask radius." />
                 </label>
                 {cytoAdvEnable.max_radius && <input className="input" type="number" step="1" value={cytoAdvValues.max_radius} onChange={(e) => setCytoAdvValue("max_radius", e.target.value)} />}
+                </details>
                 </div>
               </details>
             )}
           </div>
         </details>
 
-        <details open className="seg-section">
-          <summary>Channel Settings</summary>
+        <details className="seg-section">
+          <summary>Channel Settings <span className="seg-subsection-count">· {plural(channels.length, "channel")}</span></summary>
           <div className="seg-body">
             {channels.length === 0 ? (
               <p className="hint">No channels loaded yet. Use Load images and save the table.</p>
