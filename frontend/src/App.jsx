@@ -4792,11 +4792,11 @@ function buildQuadrantAnnotations(graphLimits, thresholds, stats, sdArea, percen
     yanchor: "middle",
     showarrow: false,
     captureevents: false,
-    font: { size: 12, color: "#1F2D3D" },
-    bgcolor: "rgba(247, 249, 252, 0.94)",
-    bordercolor: "rgba(217, 226, 236, 0.95)",
+    font: { size: 11, color: "#1F2D3D" },
+    bgcolor: "rgba(255, 255, 255, 0.72)",
+    bordercolor: "rgba(217, 226, 236, 0.8)",
     borderwidth: 1,
-    borderpad: 4,
+    borderpad: 3,
   }));
 }
 
@@ -4888,6 +4888,9 @@ function buildStep2Figure(
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const y_top = graphLimits[1];
   const y_bottom = graphLimits[0];
+  // While editing, leave a small gap between stacked segments so each draggable line reads as its own piece.
+  const editableLines = verticalColor !== "black";
+  const gap = editableLines ? 0.008 * (y_top - y_bottom) : 0;
 
   const shapes = [
     {
@@ -4913,7 +4916,7 @@ function buildStep2Figure(
       x0: thresholds.v_down,
       x1: thresholds.v_down,
       y0: y_bottom,
-      y1: y_low,
+      y1: y_low - gap,
       line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
     },
@@ -4922,7 +4925,7 @@ function buildStep2Figure(
       x0: thresholds.v_down2,
       x1: thresholds.v_down2,
       y0: y_bottom,
-      y1: y_low,
+      y1: y_low - gap,
       line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
     },
@@ -4930,8 +4933,8 @@ function buildStep2Figure(
       type: "line",
       x0: thresholds.v_mid,
       x1: thresholds.v_mid,
-      y0: y_low,
-      y1: y_high,
+      y0: y_low + gap,
+      y1: y_high - gap,
       line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
     },
@@ -4939,7 +4942,7 @@ function buildStep2Figure(
       type: "line",
       x0: thresholds.v_up,
       x1: thresholds.v_up,
-      y0: y_high,
+      y0: y_high + gap,
       y1: y_top,
       line: { color: verticalColor, width: 3, dash: "solid" },
       editable: true,
@@ -4955,15 +4958,37 @@ function buildStep2Figure(
     xaxis: { title: "NII", range: [graphLimits[2], graphLimits[3]], fixedrange: true },
     yaxis: { title: "Area", range: [graphLimits[0], graphLimits[1]], fixedrange: true },
     shapes,
-    annotations: withLabels
-      ? buildQuadrantAnnotations(
-          graphLimits,
-          thresholds,
-          stats,
-          sdArea,
-          computeQuadrantPercentages(traces, thresholds, stats, sdArea)
-        )
-      : [],
+    annotations: [
+      ...(withLabels
+        ? buildQuadrantAnnotations(
+            graphLimits,
+            thresholds,
+            stats,
+            sdArea,
+            computeQuadrantPercentages(traces, thresholds, stats, sdArea)
+          )
+        : []),
+      ...(editableLines
+        ? [
+            { x: thresholds.v_down, y: (y_bottom + y_low) / 2, hint: "SR | S" },
+            { x: thresholds.v_down2, y: (y_bottom + y_low) / 2 - 0.08 * (y_low - y_bottom), hint: "S | SI" },
+            { x: thresholds.v_mid, y: (y_low + y_high) / 2, hint: "N | I" },
+            { x: thresholds.v_up, y: (y_high + y_top) / 2, hint: "LR | LI" },
+          ].map((h) => ({
+            text: "⇆",
+            hovertext: `Drag sideways: ${h.hint} cut-off`,
+            x: h.x,
+            y: h.y,
+            xref: "x",
+            yref: "y",
+            showarrow: false,
+            captureevents: false,
+            font: { size: 12, color: "#FFFFFF" },
+            bgcolor: verticalColor,
+            borderpad: 2,
+          }))
+        : []),
+    ],
   };
 
   return { data, layout };
@@ -7754,9 +7779,24 @@ export default function App() {
     return (
       <div className="workflow-bar">
         <div className="stepper">
-          <div className={`chip ${step === 0 ? "active" : ""}`}>Step 1</div>
-          <div className={`chip ${step === 1 ? "active" : ""}`}>Step 2</div>
-          <div className={`chip ${step === 2 ? "active" : ""}`}>Step 3</div>
+          {["Control gate", "Control ellipse", "Threshold lines"].map((label, i) => {
+            const current = step1Ready ? step : 0;
+            const canGoBack = i < current && (i !== 0 || controlGateReady);
+            const done = i < current;
+            return (
+              <button
+                key={label}
+                type="button"
+                className={`chip ${i === current ? "active" : ""} ${done ? "done" : ""}`}
+                aria-current={i === current ? "step" : undefined}
+                disabled={!canGoBack}
+                title={canGoBack ? `Go back to Step ${i + 1}` : undefined}
+                onClick={() => setStep(i)}
+              >
+                {done ? "✓ " : ""}Step {i + 1} · {label}
+              </button>
+            );
+          })}
         </div>
         <div className="wizard-actions">
           {step1Ready && (
@@ -9152,7 +9192,7 @@ export default function App() {
               <h2>Step 3 · Threshold lines</h2>
               {!showPlotConfig && (
                 <p className="hint">
-                  Drag and drop the purple vertical lines to set the NMA population thresholds. The horizontal lines are fixed, and the percentage boxes update automatically from the line positions.
+                  Drag the purple lines sideways to set the NMA population thresholds. There are four separate lines, each marked with ⇆: two in the small-nuclei band, one in the normal band and one in the large band. The horizontal lines are fixed, and the percentages update as you drag.
                 </p>
               )}
               {(showPlotConfig && showPlotProgress && !showNmaPreviewWhilePlotting) ? (

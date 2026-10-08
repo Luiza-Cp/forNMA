@@ -298,7 +298,8 @@ body {
 
 .stepper {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .chip {
@@ -315,6 +316,26 @@ body {
   background: rgba(58, 110, 165, 0.1);
   color: var(--accent);
   border-color: transparent;
+}
+
+button.chip {
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  cursor: default;
+}
+
+button.chip.done:not(:disabled) {
+  color: var(--success);
+  cursor: pointer;
+}
+
+button.chip.done:not(:disabled):hover {
+  border-color: var(--success);
+}
+
+button.chip:disabled {
+  opacity: 1;
 }
 
 .layout {
@@ -2134,7 +2155,7 @@ button:not(:disabled):hover {
 
 .percent-row {
   display: grid;
-  grid-template-columns: 90px repeat(auto-fit, minmax(80px, 1fr));
+  grid-template-columns: 170px repeat(auto-fill, 110px);
   gap: 6px;
 }
 
