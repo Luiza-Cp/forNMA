@@ -1009,6 +1009,19 @@ function ImageSelectionBadge({ summaryText, imagesData }) {
   );
 }
 
+function useEscapeToClose(open, onClose) {
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1322,6 +1335,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     rows: [{ condition: "Control", ch1: "" }],
   });
   const [modalOpen, setModalOpen] = useState(false);
+  useEscapeToClose(modalOpen, () => setModalOpen(false));
   const [modalError, setModalError] = useState("");
   const [summaryText, setSummaryText] = usePersistentState("seg.summaryText", "No images loaded yet.");
   const [nuclearChannel, setNuclearChannel] = usePersistentState("seg.nuclearChannel", "ch1");
@@ -2198,7 +2212,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     </Card>
     {modalOpen && (
       <div className="seg-modal-backdrop" onClick={() => setModalOpen(false)}>
-        <div className="seg-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="seg-modal" role="dialog" aria-modal="true" aria-label="Load images" onClick={(e) => e.stopPropagation()}>
           <div className="seg-modal-header">
             <h4>Load images — conditions × channels</h4>
           </div>
@@ -2292,6 +2306,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
     rows: [{ condition: "Control", ch1: "" }],
   });
   const [modalOpen, setModalOpen] = useState(false);
+  useEscapeToClose(modalOpen, () => setModalOpen(false));
   const [modalError, setModalError] = useState("");
   const [summaryText, setSummaryText] = usePersistentState("reg.summaryText", "No images loaded yet.");
   const [referenceChannel, setReferenceChannel] = usePersistentState("reg.referenceChannel", "");
@@ -2506,7 +2521,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 
       {modalOpen && (
         <div className="seg-modal-backdrop" onClick={() => setModalOpen(false)}>
-          <div className="seg-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="seg-modal" role="dialog" aria-modal="true" aria-label="Load images" onClick={(e) => e.stopPropagation()}>
             <div className="seg-modal-header"><h4>Load images — conditions × channels</h4></div>
             <div className="seg-modal-body">
               {modalError && <div className="seg-modal-error">{modalError}</div>}
