@@ -2982,6 +2982,15 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
         >
           {loading ? "Generating..." : "Plot"}
         </button>
+        {!loading && (
+          <MissingSetup
+            action="plot"
+            items={[
+              !hasUsableDataset(graphState.datasets) && "add a CSV path to at least one enabled dataset",
+              graphState.columnsWarning && "resolve the column warning above",
+            ]}
+          />
+        )}
       </div>
       <Status level={status.level} text={status.text} />
     </Card>
@@ -3179,6 +3188,14 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
         <button className="primary" title="Compute the embedding preview with the selected datasets, features, and coloring options." onClick={onPreview} disabled={!canRun}>
           {loading ? "Running..." : "Run"}
         </button>
+        {!loading && (
+          <MissingSetup
+            items={[
+              !hasUsableDataset(state.datasets) && "add a CSV path to at least one enabled dataset",
+              (state.columns || []).length === 0 && "select at least one numeric feature",
+            ]}
+          />
+        )}
       </div>
       <Status level={status.level} text={status.text} />
     </Card>
@@ -3461,6 +3478,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
         <button className="primary" onClick={onRun} disabled={!canRun}>
           {loading ? "Running..." : "Run"}
         </button>
+        {!loading && <MissingSetup items={[!hasUsableDataset(state.datasets) && "add a CSV path to at least one enabled dataset"]} />}
       </div>
       <Status level={status.level} text={status.text} />
     </Card>
@@ -3654,6 +3672,24 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
         <button className="primary" title="Apply the gate and save the filtered CSV files to the selected output folder." onClick={onApply} disabled={!canApply}>
           {applying ? "Applying..." : "Apply and save"}
         </button>
+        {!busy && (canPreview ? (
+          <MissingSetup
+            action="apply and save"
+            items={[
+              !String(state.output_dir || "").trim() && "choose a saving path",
+              hasMissingPkl && "choose the pkl folder for every dataset (needed to apply the gate to images)",
+            ]}
+          />
+        ) : (
+          <MissingSetup
+            action="preview the gate"
+            items={[
+              !hasDatasets && "add a CSV path to at least one enabled dataset",
+              !state.x_col && "choose the X column",
+              !state.y_col && "choose the Y column",
+            ]}
+          />
+        ))}
       </div>
       <Status level={status.level} text={status.text} />
     </Card>
@@ -3790,6 +3826,16 @@ function TrackingLeftPanel({
                 Next
               </button>
             </div>
+            {!busy && (
+              <MissingSetup
+                action="run tracking"
+                items={[
+                  !String(state.path_to_table || "").trim() && "choose the tracking table",
+                  !String(state.image_dir || "").trim() && "choose the image folder",
+                  !String(state.image_col || "").trim() && "choose the image name column",
+                ]}
+              />
+            )}
             <Status level={status.level} text={status.text} />
           </div>
           </details>
@@ -4172,11 +4218,14 @@ async function errorFromResponse(res, fallback = "Request failed.") {
   return friendlyApiError(text || res.statusText, fallback);
 }
 
-function MissingSetup({ items }) {
-  if (!items || items.length === 0) return null;
-  const list = items.length === 1 ? items[0] : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-  return <div className="hint disabled-reason">To run, {list}.</div>;
+function MissingSetup({ items, action = "run" }) {
+  const list = (items || []).filter(Boolean);
+  if (list.length === 0) return null;
+  const text = list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
+  return <div className="hint disabled-reason">To {action}, {text}.</div>;
 }
+
+const hasUsableDataset = (datasets) => (datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim());
 
 const JOB_ACTIVE_STATES = ["starting", "queued", "running", "canceling"];
 
@@ -8727,6 +8776,15 @@ export default function App() {
                 >
                   Plot all
                 </Button>
+                {!(plotJob.status === "running" || plotJob.status === "queued") && (
+                  <MissingSetup
+                    action="plot all"
+                    items={[
+                      !plotSavePath.trim() && "choose a saving path",
+                      datasets.length === 0 && "add at least one dataset with a CSV path",
+                    ]}
+                  />
+                )}
                 <div className="hint">
                   Generate plots with current settings and save them to the chosen folder.
                 </div>
