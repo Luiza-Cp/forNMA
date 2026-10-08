@@ -494,6 +494,7 @@ body {
 
 .sidebar-control-block {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -503,6 +504,8 @@ body {
 }
 
 .seg-summary pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-size: 11px;
   border: 1px solid var(--border);
   border-radius: 6px;

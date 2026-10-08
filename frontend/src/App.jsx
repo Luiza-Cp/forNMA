@@ -963,6 +963,35 @@ function TutorialDrawer({ moduleName, onClose }) {
   );
 }
 
+// Long paths: when the field is not focused, show the end of the path (the file or folder name) and
+// keep the full path in the hover title.
+function PathInput({ value, onFocus, onBlur, ...props }) {
+  const ref = React.useRef(null);
+  const showEnd = () => {
+    const el = ref.current;
+    if (el && document.activeElement !== el) el.scrollLeft = el.scrollWidth;
+  };
+  React.useLayoutEffect(showEnd, [value]);
+  useEffect(() => {
+    window.addEventListener("resize", showEnd);
+    return () => window.removeEventListener("resize", showEnd);
+  }, []);
+  return (
+    <input
+      ref={ref}
+      value={value}
+      title={value || undefined}
+      spellCheck={false}
+      onFocus={onFocus}
+      onBlur={(event) => {
+        onBlur?.(event);
+        window.requestAnimationFrame(showEnd);
+      }}
+      {...props}
+    />
+  );
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1622,7 +1651,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         </div>
         <div className="field-head">Saving path <Tip text="Where outputs (tables, images, logs) will be written." /></div>
         <div className="row path-row">
-          <input
+          <PathInput
             className="input"
             value={savePath}
             onChange={(e) => setSavePath(e.target.value)}
@@ -2194,7 +2223,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                       {channels.map((ch, cIdx) => (
                         <td key={`c-${rIdx}-${ch.id}`}>
                           <div className="row path-row">
-                            <input
+                            <PathInput
                               className="input"
                               value={row[ch.id] || ""}
                               onChange={(e) => updatePathCell(rIdx, ch.id, e.target.value)}
@@ -2375,7 +2404,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
           <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
           <div className="field-head">Saving path <Tip text="Directory where registered outputs will be saved." /></div>
           <div className="row path-row">
-            <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save results..." />
+            <PathInput className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save results..." />
             <button className="secondary" title="Choose where registration outputs should be written." onClick={async () => {
               const p = await onPickDirectory();
               if (p) setSavePath(p);
@@ -2474,7 +2503,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
                         {channels.map((ch) => (
                           <td key={`reg-c-${rIdx}-${ch.id}`}>
                             <div className="row path-row">
-                              <input className="input" value={row[ch.id] || ""} onChange={(e) => updatePathCell(rIdx, ch.id, e.target.value)} placeholder={`Path to ${ch.name}`} />
+                              <PathInput className="input" value={row[ch.id] || ""} onChange={(e) => updatePathCell(rIdx, ch.id, e.target.value)} placeholder={`Path to ${ch.name}`} />
                               <button className="secondary btn-small" onClick={() => browsePathCell(rIdx, ch.id)}><BrowseLabel>Browse</BrowseLabel></button>
                             </div>
                           </td>
@@ -2535,7 +2564,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
         <div className="sidebar-control-block">
         <div className="field-head">Pickle (.pkl) folder <Tip text="Folder containing the `.pkl` files used to generate the selected foci outputs." /></div>
         <div className="row path-row">
-          <input className="input" value={pklPath} onChange={(e) => setPklPath(e.target.value)} placeholder="Folder with .pkl result files..." />
+          <PathInput className="input" value={pklPath} onChange={(e) => setPklPath(e.target.value)} placeholder="Folder with .pkl result files..." />
           <button className="secondary" title="Choose the folder containing the `.pkl` files." onClick={async () => {
             const p = await onPickDirectory();
             if (p) {
@@ -2546,7 +2575,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
         </div>
         <div className="field-head">Saving path <Tip text="Directory where the overlay outputs and optional rendered images will be saved." /></div>
         <div className="row path-row">
-          <input className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save overlay outputs..." />
+          <PathInput className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save overlay outputs..." />
           <button className="secondary" title="Choose where the foci overlay outputs should be written." onClick={async () => {
             const p = await onPickDirectory();
             if (p) setSavePath(p);
@@ -2701,7 +2730,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                     <div className="row path-row">
                       <div style={{ flex: 1 }}>
                         <div className="field-head">CSV path <Tip text="Local CSV file containing the measurements to plot." /></div>
-                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                        <PathInput className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
                       </div>
                       <button
                         className="secondary"
@@ -2980,7 +3009,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                     <div className="row path-row">
                       <div style={{ flex: 1 }}>
                         <div className="field-head">CSV path <Tip text="Local CSV file used to compute the embedding." /></div>
-                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                        <PathInput className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
                       </div>
                       <button
                         className="secondary"
@@ -3186,7 +3215,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                     <div className="row path-row">
                       <div style={{ flex: 1 }}>
                         <div className="field-head">CSV path <Tip text="Local path to the CSV file containing your data." /></div>
-                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                        <PathInput className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
                       </div>
                       <button
                         className="secondary"
@@ -3468,7 +3497,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
                     <div className="row path-row">
                       <div style={{ flex: 1 }}>
                         <div className="field-head">CSV path <Tip text="Local CSV file that will be filtered by the gate." /></div>
-                        <input className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
+                        <PathInput className="input" value={d.path || ""} onChange={(e) => updateDataset(d.id, { path: e.target.value })} placeholder="/path/Results.csv" />
                       </div>
                       <button
                         className="secondary"
@@ -3489,7 +3518,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
                       <div className="row path-row">
                         <div style={{ flex: 1 }}>
                           <div className="field-head">PKL folder <Tip text="Folder containing the segmentation `.pkl` files for this dataset. Needed only if you want to redraw filtered images after gating." /></div>
-                          <input className="input" value={d.pkl_dir || ""} onChange={(e) => updateDataset(d.id, { pkl_dir: e.target.value })} placeholder="/path/pkl-data" />
+                          <PathInput className="input" value={d.pkl_dir || ""} onChange={(e) => updateDataset(d.id, { pkl_dir: e.target.value })} placeholder="/path/pkl-data" />
                         </div>
                         <button
                           className="secondary"
@@ -3559,7 +3588,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
             )}
             <div className="field-head">Saving path <Tip text="Directory where gated CSV files, logs, and optional redrawn image outputs will be written." /></div>
             <div className="row path-row">
-              <input className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save gating outputs" />
+              <PathInput className="input" value={state.output_dir || ""} onChange={(e) => setField("output_dir", e.target.value)} placeholder="Folder to save gating outputs" />
               <button
                 className="secondary"
                 title="Choose where gated CSV files should be saved."
@@ -3648,7 +3677,7 @@ function TrackingLeftPanel({
           <div className="seg-body">
             <div className="field-head">Tracking table</div>
             <div className="row path-row">
-              <input className="input" value={state.path_to_table || ""} onChange={(e) => setField("path_to_table", e.target.value)} placeholder="/path/Results.csv" />
+              <PathInput className="input" value={state.path_to_table || ""} onChange={(e) => setField("path_to_table", e.target.value)} placeholder="/path/Results.csv" />
               <button
                 className="secondary"
                 title="Open a file picker to choose the tracking Results.csv input table."
@@ -3666,7 +3695,7 @@ function TrackingLeftPanel({
             </div>
             <div className="field-head">Image folder</div>
             <div className="row path-row">
-              <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder (required)" />
+              <PathInput className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder (required)" />
               <button
                 className="secondary"
                 title="Choose the folder containing the source images used by the tracking viewer."
@@ -3737,7 +3766,7 @@ function TrackingLeftPanel({
             <div className="seg-body">
               <div className="field-head">1. Save results</div>
               <div className="row path-row">
-                <input className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save table and tracking images" />
+                <PathInput className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save table and tracking images" />
                 <button
                   className="secondary"
                   title="Choose where the final table and rendered tracking images should be exported."
@@ -3758,7 +3787,7 @@ function TrackingLeftPanel({
               </button>
               <div className="field-head" style={{ marginTop: 10 }}>2. Correct tracks (napari-TRACE)</div>
               <div className="row path-row">
-                <input className="input" value={state.pkl_dir || ""} onChange={(e) => setField("pkl_dir", e.target.value)} placeholder="Segmentation pkl-data folder (nuclear contours)" />
+                <PathInput className="input" value={state.pkl_dir || ""} onChange={(e) => setField("pkl_dir", e.target.value)} placeholder="Segmentation pkl-data folder (nuclear contours)" />
                 <button
                   className="secondary"
                   title="Choose the segmentation 'pkl-data' folder that holds the nuclear contours."
@@ -3811,7 +3840,7 @@ function TrackingLeftPanel({
                 <button className="ghost btn-small" title="Return to the step 2 menu without losing the current tracked table." onClick={onGoToCorrection} disabled={busy}>Back to options</button>
               </div>
               <div className="row path-row">
-                <input className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder for viewer" />
+                <PathInput className="input" value={state.image_dir || ""} onChange={(e) => setField("image_dir", e.target.value)} placeholder="Image folder for viewer" />
                 <button
                   className="secondary"
                   title="Choose the image folder used by the correction viewer."
@@ -3842,7 +3871,7 @@ function TrackingLeftPanel({
                 <>
                   <div className="field-head">Finish output folder</div>
                   <div className="row path-row">
-                    <input className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save final tracking outputs" />
+                    <PathInput className="input" value={state.save_results_dir || ""} onChange={(e) => setField("save_results_dir", e.target.value)} placeholder="Folder to save final tracking outputs" />
                     <button
                       className="secondary"
                       title="Choose the folder where the final tracking outputs will be exported."
@@ -8319,7 +8348,7 @@ export default function App() {
                   <div className="row path-row">
                     <div style={{ flex: 1 }}>
                       <FieldTitle title="CSV path" tip="Results table used as input for this NMA dataset." className="field-head" />
-                      <input
+                      <PathInput
                         className="input"
                         placeholder="/path/Results.csv"
                         value={row.path}
@@ -8634,7 +8663,7 @@ export default function App() {
                 )}
                 <FieldTitle title="Saving path" tip="Directory where NMA plots and outputs will be saved." className="field-head" />
                 <div className="row path-row">
-                  <input
+                  <PathInput
                     className="input"
                     placeholder="Folder to save NMA results"
                     value={plotSavePath}
