@@ -1246,6 +1246,69 @@ function FilterCount({ values }) {
   return <span className="seg-subsection-count">· {active ? `${active} active` : "none active"}</span>;
 }
 
+// Set to the published article URL to show a link in Home → Article.
+const ARTICLE_URL = "";
+
+const HOME_WORKFLOW = [
+  {
+    step: "1",
+    title: "Prepare images",
+    modules: [{ name: "Image Registration", note: "Optional. Correct drift or align channels before tracking." }],
+  },
+  {
+    step: "2",
+    title: "Find and measure cells",
+    modules: [{ name: "Segmentation", note: "Detect nuclei or cytoplasm and measure every cell." }],
+  },
+  {
+    step: "3",
+    title: "Clean up and follow",
+    modules: [
+      { name: "Gating", note: "Remove debris and segmentation errors." },
+      { name: "Tracking", note: "Follow cells over time in time-lapse data." },
+      { name: "Foci Overlay", note: "Check foci on the images." },
+    ],
+  },
+  {
+    step: "4",
+    title: "Analyze",
+    modules: [
+      { name: "NMA", note: "Classify nuclear morphology against a control." },
+      { name: "Plot Data", note: "Explore measurements in interactive plots." },
+      { name: "Clustering", note: "Embed cells with UMAP or PCA." },
+      { name: "Statistics", note: "Test differences between groups." },
+    ],
+  },
+];
+
+function HomeWorkflow({ onOpen }) {
+  return (
+    <div className="home-workflow" aria-label="Typical workflow">
+      <h4>Typical workflow</h4>
+      <p className="hint hint-muted">
+        Each module also works on its own: start wherever your data is. Results tables from Segmentation feed every
+        analysis module.
+      </p>
+      <ol className="home-workflow-steps">
+        {HOME_WORKFLOW.map((stage) => (
+          <li key={stage.step} className="home-workflow-step">
+            <div className="home-workflow-head">
+              <span className="home-workflow-num">{stage.step}</span>
+              <span>{stage.title}</span>
+            </div>
+            {stage.modules.map((m) => (
+              <button key={m.name} type="button" className="home-workflow-module" onClick={() => onOpen(m.name)}>
+                <strong>{m.name} →</strong>
+                <span>{m.note}</span>
+              </button>
+            ))}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -7934,6 +7997,7 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+                  <HomeWorkflow onOpen={setActiveModule} />
                   <div className="home-meta-grid">
                     <div className="home-info-card">
                       <h4>How to read the interface</h4>
@@ -7951,23 +8015,22 @@ export default function App() {
                         ))}
                       </ul>
                     </div>
-                    <div className="home-info-card">
-                      <h4>Practical recommendation</h4>
-                      <p className="hint hint-muted">
-                        Start with the module that matches your immediate goal. Segmentation and NMA are common entry
-                        points, while registration and tracking depend more directly on how the images were acquired.
-                      </p>
-                    </div>
                   </div>
                 </div>
 
                 <div id="home-article" className="section home-section-card">
                   <h3>Article</h3>
-                  <p className="hint hint-muted">
-                    The full scientific rationale for each module should be described in the article or thesis that
-                    accompanies the software. Use that material for methodological details, validation strategy, and
-                    citation guidance.
-                  </p>
+                  {ARTICLE_URL ? (
+                    <p className="hint hint-muted">
+                      The article describes the scientific rationale, validation and citation for each module.{" "}
+                      <a href={ARTICLE_URL} target="_blank" rel="noreferrer">Read the article ↗</a>
+                    </p>
+                  ) : (
+                    <p className="hint hint-muted">
+                      The article describing forNMA's methods, validation and how to cite it will be linked here once
+                      it is available.
+                    </p>
+                  )}
                 </div>
 
                 {HOME_MODULE_GUIDES.map((section) => (
