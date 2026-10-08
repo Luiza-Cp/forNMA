@@ -2342,3 +2342,36 @@ button:not(:disabled):hover {
   width: auto;
   line-height: 1.35;
 }
+
+.stats-summary ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-summary li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.stats-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stats-badge.sig {
+  background: rgba(47, 125, 104, 0.12);
+  color: var(--success);
+}
+
+.stats-badge.ns {
+  background: rgba(66, 81, 96, 0.1);
+  color: var(--muted);
+}

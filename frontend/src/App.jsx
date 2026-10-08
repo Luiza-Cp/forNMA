@@ -1090,6 +1090,7 @@ function formatCell(value, column) {
   const text = String(value).trim();
   if (text === "" || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(text)) return String(value);
   const n = Number(text);
+  if (n === 0 && P_VALUE_COLUMN.test(String(column || ""))) return "< 0.0001";
   if (!Number.isFinite(n) || Number.isInteger(n)) return text;
   const abs = Math.abs(n);
   const trim = (s) => (s.includes("e") ? s : s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, ""));
@@ -1098,6 +1099,96 @@ function formatCell(value, column) {
   if (abs >= 1) return trim(n.toFixed(3));
   if (abs >= 0.001) return trim(n.toPrecision(3));
   return n.toExponential(2);
+}
+
+// Columns with few distinct values are flagged as categorical by the API, which also catches
+// measurements such as foci counts or per-image minimum intensity; keep those out of suggestions.
+const MEASUREMENT_NAME = /(area|mean|median|min|max|total|foci|intens|perim|radius|ratio|fraction|aspect|extent|round|nii|ellipse|sum|std|count|^x$|^y$|^cell$|^unnamed)/i;
+const likelyGroupingColumns = (categoricalCols) => (categoricalCols || []).filter((c) => !MEASUREMENT_NAME.test(String(c)));
+
+function GroupingOptions({ cols, suggested }) {
+  const suggestedSet = new Set(suggested || []);
+  const others = (cols || []).filter((c) => !suggestedSet.has(c));
+  const first = (suggested || []).filter((c) => (cols || []).includes(c));
+  if (first.length === 0) return others.map((c) => <option key={c} value={c}>{c}</option>);
+  return (
+    <>
+      <optgroup label="Suggested grouping columns">
+        {first.map((c) => <option key={`s-${c}`} value={c}>{c}</option>)}
+      </optgroup>
+      <optgroup label="Other columns">
+        {others.map((c) => <option key={`o-${c}`} value={c}>{c}</option>)}
+      </optgroup>
+    </>
+  );
+}
+
+const P_COLUMN_PRIORITY = [/^p[_-]?adj/i, /^p[_-]?corr/i, /^(p[_-]?value|pvalue)$/i, /^pr\(>f\)$/i, /^p[_-]?unc$/i, /^p[_-]?chi2$/i, /^p$/i];
+
+function findPColumn(columns) {
+  for (const re of P_COLUMN_PRIORITY) {
+    const hit = (columns || []).find((c) => re.test(String(c)));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function statsRowLabel(row, columns, pCol) {
+  if (row.group1 != null && row.group2 != null) return `${row.group1} vs ${row.group2}`;
+  for (const c of columns) {
+    if (c === pCol || c === "test_used") continue;
+    const v = row[c];
+    if (typeof v === "string" && v.trim() && !Number.isFinite(Number(v))) return v;
+  }
+  return null;
+}
+
+const formatP = (p) => (p < 0.0001 ? "p < 0.0001" : `p = ${p < 0.01 ? p.toFixed(4) : p.toFixed(3)}`);
+
+// Plain-language reading of the main test (and post hoc count) at the chosen alpha.
+function StatsSummary({ tables, alpha }) {
+  const a = Number(alpha);
+  if (!Number.isFinite(a) || a <= 0) return null;
+  const main = (tables || []).find((t) => t.name === "main_result") || (tables || []).find((t) => t.name === "subgroup_results");
+  if (!main) return null;
+  const columns = main.columns || [];
+  const pCol = findPColumn(columns);
+  if (!pCol) return null;
+  const rows = (main.rows || [])
+    .map((row) => ({ row, p: Number(row[pCol]) }))
+    .filter(({ row, p }) => Number.isFinite(p) && !/^residual/i.test(String(statsRowLabel(row, columns, pCol) || "")))
+    .slice(0, 8);
+  if (rows.length === 0) return null;
+  const testName = rows[0].row.test_used;
+  const posthoc = (tables || []).find((t) => t.name === "posthoc");
+  const postP = posthoc ? findPColumn(posthoc.columns) : null;
+  const postValues = postP ? (posthoc.rows || []).map((r) => Number(r[postP])).filter(Number.isFinite) : [];
+  const postSignificant = postValues.filter((p) => p < a).length;
+  return (
+    <div className="section stats-summary">
+      <h3>Summary{testName ? ` · ${testName}` : ""}</h3>
+      <ul>
+        {rows.map(({ row, p }, i) => {
+          const significant = p < a;
+          const label = statsRowLabel(row, columns, pCol);
+          return (
+            <li key={`sum-${i}`}>
+              <span className={`stats-badge ${significant ? "sig" : "ns"}`}>{significant ? "Significant" : "Not significant"}</span>
+              <span>
+                {label ? <strong>{label}: </strong> : null}
+                {formatP(p)} ({significant ? "below" : "not below"} α = {a})
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {postValues.length > 0 && (
+        <p className="hint">
+          Post hoc: {postSignificant} of {postValues.length} pairwise comparison{postValues.length === 1 ? "" : "s"} significant at α = {a} (see the pairwise table below).
+        </p>
+      )}
+    </div>
+  );
 }
 
 function FolderIcon() {
@@ -3315,6 +3406,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
   const updateFilter = (id, patch) => setField("filters", (state.filters || []).map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const cols = state.columns || [];
   const categoricalCols = state.categoricalColumns || [];
+  const groupingCols = likelyGroupingColumns(categoricalCols);
   const method = state.method || "oneway";
   const canRun = (state.datasets || []).some((d) => d.enabled !== false && String(d.path || "").trim()) && !loading;
   const methodHelp = {
@@ -3421,7 +3513,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                   <div className="field-head">Group column <Tip text="Categorical column that defines the groups to compare." /></div>
                 <select className="input" value={state.group_col || ""} onChange={(e) => setField("group_col", e.target.value)}>
                   <option value="">Group column</option>
-                  {cols.map((c) => <option key={`sg-${c}`} value={c}>{c}</option>)}
+                  <GroupingOptions cols={cols} suggested={groupingCols} />
                 </select>
                 </div>
               </div>
@@ -3433,14 +3525,14 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                   <div className="field-head">Factor A <Tip text="First categorical factor in the two-way analysis." /></div>
                 <select className="input" value={state.group_col1 || ""} onChange={(e) => setField("group_col1", e.target.value)}>
                   <option value="">Factor A</option>
-                  {cols.map((c) => <option key={`sga-${c}`} value={c}>{c}</option>)}
+                  <GroupingOptions cols={cols} suggested={groupingCols} />
                 </select>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div className="field-head">Factor B <Tip text="Second categorical factor in the two-way analysis." /></div>
                 <select className="input" value={state.group_col2 || ""} onChange={(e) => setField("group_col2", e.target.value)}>
                   <option value="">Factor B</option>
-                  {cols.map((c) => <option key={`sgb-${c}`} value={c}>{c}</option>)}
+                  <GroupingOptions cols={cols} suggested={groupingCols} />
                 </select>
                 </div>
               </div>
@@ -3452,14 +3544,14 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                   <div className="field-head">Group column <Tip text="Row groups in the contingency table." /></div>
                 <select className="input" value={state.group_col || ""} onChange={(e) => setField("group_col", e.target.value)}>
                   <option value="">Group column</option>
-                  {cols.map((c) => <option key={`scg-${c}`} value={c}>{c}</option>)}
+                  <GroupingOptions cols={cols} suggested={groupingCols} />
                 </select>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div className="field-head">Category column <Tip text="Category levels represented as columns in the contingency table." /></div>
                 <select className="input" value={state.category_col || ""} onChange={(e) => setField("category_col", e.target.value)}>
                   <option value="">Category column</option>
-                  {cols.map((c) => <option key={`scc-${c}`} value={c}>{c}</option>)}
+                  <GroupingOptions cols={cols} suggested={groupingCols} />
                 </select>
                 </div>
               </div>
@@ -3471,14 +3563,14 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                   <div className="field-head">Subgroup column <Tip text="Base category used to split subgroup comparisons." /></div>
                 <select className="input" value={state.group_col || ""} onChange={(e) => setField("group_col", e.target.value)}>
                   <option value="">Group column</option>
-                  {cols.map((c) => <option key={`ssg-${c}`} value={c}>{c}</option>)}
+                  <GroupingOptions cols={cols} suggested={groupingCols} />
                 </select>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div className="field-head">Condition column <Tip text="Conditions that will be compared within each subgroup." /></div>
                 <select className="input" value={state.condition_col || ""} onChange={(e) => setField("condition_col", e.target.value)}>
                   <option value="">Condition column</option>
-                  {cols.map((c) => <option key={`ssc-${c}`} value={c}>{c}</option>)}
+                  <GroupingOptions cols={cols} suggested={groupingCols} />
                 </select>
                 </div>
               </div>
@@ -3569,8 +3661,8 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
               );
             })}
             <button className="secondary" onClick={addFilter}>Add filter</button>
-            {categoricalCols.length > 0 && (
-              <div className="hint">Suggested categorical columns: {categoricalCols.join(", ")}</div>
+            {groupingCols.length > 0 && (
+              <div className="hint">Suggested grouping columns: {groupingCols.join(", ")}</div>
             )}
           </div>
         </details>
@@ -8236,6 +8328,7 @@ export default function App() {
                 )}
                 {(statsState.tables || []).length ? (
                   <>
+                    <StatsSummary tables={statsState.tables} alpha={statsState.alpha} />
                     {(statsState.tables || []).map((t) => (
                       <StatsTableView key={`stats-${t.name}`} table={t} onDownload={downloadStatsTableCsv} />
                     ))}
