@@ -992,6 +992,23 @@ function PathInput({ value, onFocus, onBlur, ...props }) {
   );
 }
 
+const isImageSelectionSaved = (summaryText) => String(summaryText || "").startsWith("Image selection OK");
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function ImageSelectionBadge({ summaryText, imagesData }) {
+  if (!isImageSelectionSaved(summaryText)) {
+    return <div className="images-state images-state--empty">No images loaded yet. Use Load images to map each condition and channel to a folder.</div>;
+  }
+  const conditions = (imagesData?.rows || []).length;
+  const channels = (imagesData?.channels || []).length;
+  return (
+    <div className="images-state images-state--ok" role="status">
+      <span className="images-state-icon" aria-hidden="true">✓</span>
+      Images loaded: {plural(conditions, "condition")} · {plural(channels, "channel")}
+    </div>
+  );
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1646,9 +1663,10 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
       <div className="seg-scroll">
         <div className="sidebar-control-block">
         <div className="row">
-          <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
+          <button className="secondary" onClick={() => { setModalError(""); setModalOpen(true); }}>{isImageSelectionSaved(summaryText) ? "Edit images" : "Load images"}</button>
           <button className="ghost" onClick={resetSegForm} disabled={segRunning}>Reset settings</button>
         </div>
+        <ImageSelectionBadge summaryText={summaryText} imagesData={imagesData} />
         <div className="field-head">Saving path <Tip text="Where outputs (tables, images, logs) will be written." /></div>
         <div className="row path-row">
           <PathInput
@@ -2401,7 +2419,8 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 
         <div className="seg-scroll">
           <div className="sidebar-control-block">
-          <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>Load images</button>
+          <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>{isImageSelectionSaved(summaryText) ? "Edit images" : "Load images"}</button>
+          <ImageSelectionBadge summaryText={summaryText} imagesData={imagesData} />
           <div className="field-head">Saving path <Tip text="Directory where registered outputs will be saved." /></div>
           <div className="row path-row">
             <PathInput className="input" value={savePath} onChange={(e) => setSavePath(e.target.value)} placeholder="Folder to save results..." />
