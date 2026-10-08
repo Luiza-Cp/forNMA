@@ -2208,3 +2208,32 @@ button:not(:disabled):hover {
   max-height: 260px;
   overflow: auto;
 }
+
+/* Keep the settings panel in view: its body scrolls and the action footer stays visible. */
+@media (min-width: 1101px) {
+  .layout > .panel.seg-panel:not(.home-panel) {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    height: auto;
+    max-height: calc(100vh - 104px);
+  }
+
+  .layout > .panel.seg-panel .seg-scroll {
+    min-height: 0;
+  }
+}
+
+.seg-footer > .status {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+}
+
+.nma-footer {
+  display: block;
+  padding-bottom: 2px;
+}
+
+.nma-footer > .section {
+  margin-bottom: 0;
+}

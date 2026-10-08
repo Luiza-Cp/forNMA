@@ -2991,8 +2991,8 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
             ]}
           />
         )}
+        <Status level={status.level} text={status.text} />
       </div>
-      <Status level={status.level} text={status.text} />
     </Card>
   );
 }
@@ -3196,8 +3196,8 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
             ]}
           />
         )}
+        <Status level={status.level} text={status.text} />
       </div>
-      <Status level={status.level} text={status.text} />
     </Card>
   );
 }
@@ -3479,8 +3479,8 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
           {loading ? "Running..." : "Run"}
         </button>
         {!loading && <MissingSetup items={[!hasUsableDataset(state.datasets) && "add a CSV path to at least one enabled dataset"]} />}
+        <Status level={status.level} text={status.text} />
       </div>
-      <Status level={status.level} text={status.text} />
     </Card>
   );
 }
@@ -3690,8 +3690,8 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
             ]}
           />
         ))}
+        <Status level={status.level} text={status.text} />
       </div>
-      <Status level={status.level} text={status.text} />
     </Card>
   );
 }
@@ -8387,6 +8387,7 @@ export default function App() {
             <PanelTitle>NMA Settings</PanelTitle>
             <p className="hint">Add at least one control only if you want to create new settings. If loading existing settings, this is not required.</p>
           </div>
+          <div className="seg-scroll">
           <div className="row row-right">
             <Button className="ghost btn-small bulk-expander-button" onClick={() => setAllCollapsed(true)}>
               <span>Collapse all</span>
@@ -8804,6 +8805,8 @@ export default function App() {
             </div>
           )}
 
+          </div>
+          <div className="seg-footer nma-footer">
           {!showPlotConfig && (
             <div className="section">
               <input
@@ -8836,6 +8839,7 @@ export default function App() {
             </div>
           )}
           <Status level={statusLevel} text={status} />
+          </div>
         </Card>
 
         <main className="content">
