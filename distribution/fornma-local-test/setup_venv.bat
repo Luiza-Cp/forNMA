@@ -11,10 +11,10 @@ echo Using virtual environment:
 echo   %VENV_PYTHON%
 echo.
 
-"%VENV_PYTHON%" -m pip install --upgrade pip
+"%VENV_PYTHON%" -m pip install --index-url https://pypi.org/simple/ --upgrade pip
 if errorlevel 1 goto :error
 
-"%VENV_PYTHON%" -m pip install -r "%ROOT_DIR%requirements-local-ui.txt"
+"%VENV_PYTHON%" -m pip install --index-url https://pypi.org/simple/ -r "%ROOT_DIR%requirements-local-ui.txt"
 if errorlevel 1 goto :error
 
 "%VENV_PYTHON%" -c "import fastapi, uvicorn, plotly, multipart"

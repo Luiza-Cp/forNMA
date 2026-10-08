@@ -23,4 +23,9 @@ dependencies:
   - conda-forge::umap-learn
   - conda-forge::scikit-posthocs
   - conda-forge::pingouin
+  - pip
+  - pip:
+      # Bundled tracking curator (napari-TRACE, from PyPI): pulls napari[all] + Qt
+      # into this env so the curator launches from forNMA with no extra setup, no git.
+      - napari-TRACE>=0.6,<0.7
 prefix: /media/luiza/DATA/conda_envs/fornma2025

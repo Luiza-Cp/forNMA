@@ -120,6 +120,8 @@ from .schemas import (
     TrackingPreviewResponse,
     TrackingEditResponse,
     TrackingSaveResponse,
+    TrackingCurateLaunchRequest,
+    TrackingCurateLaunchResponse,
 )
 from fornma.shared.params_builder import build_interface_params
 
@@ -2804,6 +2806,93 @@ def tracking_edit_unlink(req: TrackingUnlinkRequest):
         force_redraw=True,
     )
     return TrackingEditResponse(**preview.dict(), edited_rows=edited)
+
+
+def _link_or_copy_dir(src: Path, dst: Path) -> None:
+    """Make dst point at src's contents cheaply: junction/symlink, else copy.
+
+    Keeps the staging folder tiny — the one real image copy happens later when
+    napari-TRACE builds its `_curated` working copy (it copytrees this folder).
+    """
+    if dst.exists():
+        return
+    try:
+        if os.name == "nt":
+            # ponytail: mklink /J (directory junction) needs no admin on Windows.
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(dst), str(src)], check=True, capture_output=True)
+        else:
+            os.symlink(str(src), str(dst), target_is_directory=True)
+    except Exception:
+        shutil.copytree(src, dst)
+
+
+@app.post("/tracking/curate/launch", response_model=TrackingCurateLaunchResponse)
+def tracking_curate_launch(req: TrackingCurateLaunchRequest):
+    from fornma.core.Tracking.mask_from_contours import build_label_mask
+
+    table = Path(req.table_path).expanduser().resolve()
+    if not table.exists() or not table.is_file():
+        raise HTTPException(status_code=400, detail=f"Tracked table not found: {req.table_path}")
+    pkl_dir = Path(req.pkl_dir).expanduser().resolve()
+    if not pkl_dir.exists() or not pkl_dir.is_dir():
+        raise HTTPException(status_code=400, detail="Select the segmentation 'pkl-data' folder (nuclear contours).")
+    image_dir = Path(req.image_dir).expanduser().resolve()
+    if not image_dir.exists() or not image_dir.is_dir():
+        raise HTTPException(status_code=400, detail="Select the raw image frames folder used for tracking.")
+
+    curator_dir = str(req.curator_dir or os.environ.get("FORNMA_CURATOR_DIR") or "").strip()
+    curator_python = str(req.curator_python or os.environ.get("FORNMA_CURATOR_PYTHON") or sys.executable).strip()
+    if curator_dir:
+        # Dev override: run napari-TRACE from a source checkout.
+        run_script = Path(curator_dir).expanduser().resolve() / "run_curator.py"
+        if not run_script.exists():
+            raise HTTPException(status_code=400, detail=f"run_curator.py not found in {curator_dir}.")
+        launch_cmd = [curator_python, str(run_script), None]  # staging filled in below
+    else:
+        # Default: napari-TRACE is pip-installed in this environment (shipped with forNMA).
+        # ponytail: find_spec checks the current env; only meaningful when curator_python == sys.executable.
+        import importlib.util
+        if importlib.util.find_spec("curator") is None:
+            raise HTTPException(
+                status_code=400,
+                detail="napari-TRACE is not installed in this environment. Re-run the forNMA setup, or set FORNMA_CURATOR_DIR to a napari-TRACE source folder.",
+            )
+        launch_cmd = [curator_python, "-m", "curator.app", None]  # staging filled in below
+
+    # One self-contained "Curation" folder next to the segmentation pkl-data.
+    # Seeding curator_meta.json marks it as an already-set-up working copy, so
+    # napari-TRACE opens it IN PLACE (no separate <name>_curated sibling) and
+    # writes its exports/ inside it. If it already exists (re-launch), we leave it
+    # untouched so prior curation resumes instead of being overwritten.
+    staging = pkl_dir.parent / "Curation"
+    meta_file = staging / "curator_meta.json"
+    mask_path = staging / "mask.tif"
+    if not meta_file.exists():
+        staging.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(table, staging / "Tracked Results.csv")  # name matches napari's CSV discovery
+        # ponytail: synchronous rasterization; wrap in a job thread if big movies feel slow.
+        build_label_mask(str(table), str(pkl_dir), str(image_dir), str(mask_path))
+        _link_or_copy_dir(image_dir, staging / "images")
+        meta_file.write_text(json.dumps({"source_folder": str(staging), "version": 6}), encoding="utf-8")
+
+    launch_cmd[-1] = str(staging)  # placeholder was None; the folder exists now
+    try:
+        subprocess.Popen(launch_cmd)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to launch napari-TRACE: {e}")
+
+    exports_dir = staging / "exports"
+    return TrackingCurateLaunchResponse(
+        status="launched",
+        mask_path=str(mask_path),
+        staging_dir=str(staging),
+        curated_dir=str(staging),  # opened in place: the working folder IS this folder
+        exports_dir=str(exports_dir),
+        message=(
+            "napari-TRACE is opening in a new window. Curate there, then SAVE ALL. "
+            f"Curated results and exports will be in: {exports_dir}"
+        ),
+    )
 
 
 def _prepare_clustering_input(req: UMAPPreviewRequest):

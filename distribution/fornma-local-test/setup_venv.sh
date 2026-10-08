@@ -13,8 +13,8 @@ else
 fi
 
 "$PYTHON_BIN" -m venv "$ROOT_DIR/.venv"
-"$ROOT_DIR/.venv/bin/python" -m pip install --upgrade pip
-"$ROOT_DIR/.venv/bin/python" -m pip install -r "$ROOT_DIR/requirements-local-ui.txt"
+"$ROOT_DIR/.venv/bin/python" -m pip install --index-url https://pypi.org/simple/ --upgrade pip
+"$ROOT_DIR/.venv/bin/python" -m pip install --index-url https://pypi.org/simple/ -r "$ROOT_DIR/requirements-local-ui.txt"
 "$ROOT_DIR/.venv/bin/python" -c "import fastapi, uvicorn, plotly, multipart"
 
 echo

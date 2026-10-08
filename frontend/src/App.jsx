@@ -713,6 +713,9 @@ const initialTrackingState = () => ({
   total_tracks: 0,
   workflow_stage: "step1",
   save_results_dir: "",
+  pkl_dir: "",
+  curator_dir: "",
+  exports_dir: "",
 });
 
 function readStorage(key, fallback) {
@@ -3365,6 +3368,7 @@ function TrackingLeftPanel({
   onRunAutomatic,
   onGoToCorrection,
   onOpenCorrection,
+  onLaunchCurator,
   onSaveResults,
   onRefreshFrame,
   onPrevFrame,
@@ -3518,10 +3522,48 @@ function TrackingLeftPanel({
               <button className="secondary" title="Export the current tracked table and the cached tracking images to the selected folder." onClick={onSaveResults} disabled={!canSaveResults}>
                 Save results
               </button>
-              <div className="field-head" style={{ marginTop: 10 }}>2. Correct tracks</div>
-              <button className="primary" title="Open the manual correction viewer to inspect and edit tracks." onClick={onOpenCorrection} disabled={!hasTracked || busy}>
-                Correct tracks
+              <div className="field-head" style={{ marginTop: 10 }}>2. Correct tracks (napari-TRACE)</div>
+              <div className="row path-row">
+                <input className="input" value={state.pkl_dir || ""} onChange={(e) => setField("pkl_dir", e.target.value)} placeholder="Segmentation pkl-data folder (nuclear contours)" />
+                <button
+                  className="secondary"
+                  title="Choose the segmentation 'pkl-data' folder that holds the nuclear contours."
+                  onClick={async () => {
+                    try {
+                      const p = await onPickDirectory();
+                      if (p) setField("pkl_dir", p);
+                    } catch {
+                      // no-op
+                    }
+                  }}
+                >
+                  <BrowseLabel>Browse</BrowseLabel>
+                </button>
+              </div>
+              <button
+                className="primary"
+                title="Build the label mask from the segmentation contours and open napari-TRACE in a new window to curate the tracks."
+                onClick={onLaunchCurator}
+                disabled={!hasTracked || !String(state.pkl_dir || "").trim() || !String(state.image_dir || "").trim() || busy}
+              >
+                {busy ? "Preparing..." : "Open curator"}
               </button>
+              <div className="hint">
+                {String(state.image_dir || "").trim()
+                  ? "Opens a separate napari window. Curate there, then SAVE ALL to write the curated exports."
+                  : "Set the image folder in step 1 first — napari-TRACE needs it."}
+              </div>
+              {state.exports_dir ? (
+                <div className="hint">
+                  Curated exports will appear in:<br />
+                  <code>{state.exports_dir}</code>
+                </div>
+              ) : null}
+              <div className="row row-right" style={{ marginTop: 8 }}>
+                <button className="ghost btn-small" title="Open the legacy in-browser correction viewer instead." onClick={onOpenCorrection} disabled={!hasTracked || busy}>
+                  Legacy in-browser corrector
+                </button>
+              </div>
               <Status level={status.level} text={status.text} />
             </div>
           </details>
@@ -6567,6 +6609,40 @@ export default function App() {
     setTrackingStatus({ level: "info", text: "Manual correction enabled." });
   };
 
+  const handleTrackingLaunchCurator = async () => {
+    const table = String(trackingState.table_path || "").trim();
+    const pklDir = String(trackingState.pkl_dir || "").trim();
+    const imageDir = String(trackingState.image_dir || "").trim();
+    if (!table) {
+      setTrackingStatus({ level: "error", text: "Run automatic tracking first. napari-TRACE needs a tracked table to curate." });
+      return;
+    }
+    if (!pklDir) {
+      setTrackingStatus({ level: "error", text: "Select the segmentation 'pkl-data' folder (nuclear contours) used to build the mask." });
+      return;
+    }
+    if (!imageDir) {
+      setTrackingStatus({ level: "error", text: "Set the image folder in step 1 — napari-TRACE needs the raw frames." });
+      return;
+    }
+    setTrackingEditing(true);
+    setTrackingStatus({ level: "info", text: "Building label mask and opening napari-TRACE..." });
+    try {
+      const res = await callApi("/tracking/curate/launch", {
+        table_path: table,
+        pkl_dir: pklDir,
+        image_dir: imageDir,
+        curator_dir: String(trackingState.curator_dir || "").trim() || null,
+      });
+      setTrackingState((prev) => ({ ...prev, exports_dir: res.exports_dir || "" }));
+      setTrackingStatus({ level: "success", text: res.message || "napari-TRACE launched." });
+    } catch (err) {
+      setTrackingStatus({ level: "error", text: errorMessageFromException(err, "Could not launch napari-TRACE. Check the pkl-data folder and the curator path.") });
+    } finally {
+      setTrackingEditing(false);
+    }
+  };
+
   const handleTrackingSaveResults = async (includeImages = true) => {
     if (!String(trackingState.table_path || "").trim()) {
       setTrackingStatus({ level: "error", text: "Run automatic tracking first. There is no tracked table to save yet." });
@@ -7489,6 +7565,7 @@ export default function App() {
               onRunAutomatic={handleTrackingRunAutomatic}
               onGoToCorrection={handleTrackingGoToCorrection}
               onOpenCorrection={handleTrackingOpenCorrection}
+              onLaunchCurator={handleTrackingLaunchCurator}
               onSaveResults={handleTrackingSaveResults}
               onRefreshFrame={handleTrackingRefreshFrame}
               onPrevFrame={() => handleTrackingStepFrame(-1)}
