@@ -7,30 +7,25 @@ const API_BASE = "http://127.0.0.1:8000";
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
 const makeRowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const csvCell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-const FORNMA_STAGES = [
-  "Home",
-  "Image Registration",
-  "Segmentation",
-  "Gating",
-  "Foci Overlay",
-  "NMA",
-  "Plot Data",
-  "Clustering",
-  "Statistics",
-  "Tracking",
+// Tabs grouped by what they work on: images first, then the measurement tables they produce.
+const FORNMA_STAGE_GROUPS = [
+  { label: null, stages: ["Home"] },
+  { label: "Images", stages: ["Image Registration", "Segmentation", "Tracking", "Foci Overlay"] },
+  { label: "Analysis", stages: ["Gating", "NMA", "Plot Data", "Clustering", "Statistics"] },
 ];
+const FORNMA_STAGES = FORNMA_STAGE_GROUPS.flatMap((g) => g.stages);
 const HOME_SECTIONS = [
   { id: "about", title: "About" },
   { id: "article", title: "Article" },
   { id: "tutorial-registration", title: "Image Registration" },
   { id: "tutorial-segmentation", title: "Segmentation" },
-  { id: "tutorial-gating", title: "Gating" },
+  { id: "tutorial-tracking", title: "Tracking" },
   { id: "tutorial-foci", title: "Foci Overlay" },
+  { id: "tutorial-gating", title: "Gating" },
   { id: "tutorial-nma", title: "NMA" },
   { id: "tutorial-plot", title: "Plot Data" },
   { id: "tutorial-clustering", title: "Clustering" },
   { id: "tutorial-statistics", title: "Statistics" },
-  { id: "tutorial-tracking", title: "Tracking" },
   { id: "resources", title: "Resources" },
 ];
 const HOME_INTERFACE_TIPS = [
@@ -866,7 +861,7 @@ function PanelTitle({ children }) {
   );
 }
 
-function ModuleTabs({ stages, active, onSelect }) {
+function ModuleTabs({ groups, active, onSelect }) {
   const listRef = React.useRef(null);
   const [overflow, setOverflow] = useState({ left: false, right: false });
 
@@ -903,17 +898,22 @@ function ModuleTabs({ stages, active, onSelect }) {
         <button type="button" className="module-tabs-arrow left" onClick={() => scrollBy(-1)} aria-label="Show previous modules">‹</button>
       )}
       <div className="module-menu-list" ref={listRef} onScroll={measure}>
-        {stages.map((stage) => (
-          <Button
-            key={stage}
-            type="button"
-            className={`module-chip ${stage === active ? "active" : ""}`}
-            data-state={stage === active ? "active" : "inactive"}
-            aria-current={stage === active ? "page" : undefined}
-            onClick={() => onSelect(stage)}
-          >
-            <span className="module-chip-label">{stage}</span>
-          </Button>
+        {groups.map((group) => (
+          <div key={group.label || "main"} className="module-group" role="group" aria-label={group.label || undefined}>
+            {group.label && <span className="module-group-label" aria-hidden="true">{group.label}</span>}
+            {group.stages.map((stage) => (
+              <Button
+                key={stage}
+                type="button"
+                className={`module-chip ${stage === active ? "active" : ""}`}
+                data-state={stage === active ? "active" : "inactive"}
+                aria-current={stage === active ? "page" : undefined}
+                onClick={() => onSelect(stage)}
+              >
+                <span className="module-chip-label">{stage}</span>
+              </Button>
+            ))}
+          </div>
         ))}
       </div>
       {overflow.right && (
@@ -8035,7 +8035,7 @@ export default function App() {
               <div className="logo">forNMA</div>
             </div>
           </div>
-          <ModuleTabs stages={FORNMA_STAGES} active={activeModule} onSelect={setActiveModule} />
+          <ModuleTabs groups={FORNMA_STAGE_GROUPS} active={activeModule} onSelect={setActiveModule} />
         </nav>
       </div>
       {tutorialModule && <TutorialDrawer moduleName={tutorialModule} onClose={closeTutorial} />}
@@ -8098,7 +8098,7 @@ export default function App() {
                   )}
                 </div>
 
-                {HOME_MODULE_GUIDES.map((section) => (
+                {HOME_SECTIONS.map((s) => HOME_MODULE_GUIDES.find((g) => g.id === s.id)).filter(Boolean).map((section) => (
                   <div key={section.id} id={`home-${section.id}`} className="section home-section-card">
                     <HomeTutorialSection {...section} />
                   </div>
