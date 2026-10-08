@@ -3357,7 +3357,13 @@ def stats_run(req: StatsRunRequest):
         except Exception:
             pass
 
-    return StatsRunResponse(method=method, message=f"{method} analysis complete.", log=log_text, tables=tables)
+    method_label = {
+        "oneway": "One-way comparison",
+        "twoway": "Two-way analysis",
+        "chi2": "Chi-square test",
+        "chi2-subgroups": "Chi-square subgroup comparison",
+    }.get(method, method)
+    return StatsRunResponse(method=method, message=f"{method_label} complete.", log=log_text, tables=tables)
 
 
 def _default_thresholds(mean_nii: float, std_nii: float, mean_area: float, std_area: float,

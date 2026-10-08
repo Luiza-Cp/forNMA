@@ -1022,6 +1022,58 @@ function useEscapeToClose(open, onClose) {
   }, [open]);
 }
 
+const NMA_QUADRANT_NAMES = {
+  LR: "Large regular",
+  LI: "Large irregular",
+  N: "Normal",
+  I: "Irregular",
+  SR: "Small regular",
+  S: "Small",
+  SI: "Small irregular",
+};
+
+const NMA_THRESHOLD_LABELS = {
+  v_up: "NII cut-off, large nuclei (LR | LI)",
+  v_mid: "NII cut-off, normal-size nuclei (N | I)",
+  v_down: "NII cut-off 1, small nuclei (SR | S)",
+  v_down2: "NII cut-off 2, small nuclei (S | SI)",
+  y_high: "Area upper limit (large nuclei above)",
+  y_low: "Area lower limit (small nuclei below)",
+};
+
+const TABLE_TITLES = {
+  main_result: "Test result",
+  posthoc: "Pairwise comparisons (post hoc)",
+  summary: "Descriptive statistics",
+  contingency: "Contingency table",
+  percentages: "Percentages",
+  expected: "Expected counts",
+  subgroup_results: "Subgroup comparisons",
+  proportions: "Proportions",
+  gating_summary: "Gating summary",
+};
+
+const COLUMN_LABELS = {
+  test_used: "Test",
+  group1: "Group 1",
+  group2: "Group 2",
+  statistic: "Statistic",
+  p_value: "p-value",
+  "p-value": "p-value",
+  p_adj: "Adjusted p",
+  p_adjusted: "Adjusted p",
+  std: "SD",
+  sem: "SEM",
+  q25: "Q1 (25%)",
+  q75: "Q3 (75%)",
+  kept_pct: "Kept (%)",
+  removed_pct: "Removed (%)",
+};
+
+const humanizeKey = (key) => String(key ?? "").replace(/_/g, " ").replace(/\s+/g, " ").trim();
+const tableTitle = (name) => TABLE_TITLES[name] || (name ? humanizeKey(name).replace(/^./, (c) => c.toUpperCase()) : "Table");
+const columnLabel = (col) => COLUMN_LABELS[col] ?? humanizeKey(col);
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -3648,7 +3700,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
                 <input className="input" type="number" min="0.51" max="1" step="0.01" value={state.q_high ?? 0.95} onChange={(e) => setField("q_high", Number(e.target.value || 0.95))} placeholder="High quantile" />
               </div>
             </div>
-            <div className="hint">If bounds are empty, they are estimated from quantiles (legacy filters behavior).</div>
+            <div className="hint">If the box limits are empty, they are estimated from the low and high quantiles.</div>
           </div>
         </details>
 
@@ -3927,8 +3979,8 @@ function TrackingLeftPanel({
                 </div>
               ) : null}
               <div className="row row-right" style={{ marginTop: 8 }}>
-                <button className="ghost btn-small" title="Open the legacy in-browser correction viewer instead." onClick={onOpenCorrection} disabled={!hasTracked || busy}>
-                  Legacy in-browser corrector
+                <button className="ghost btn-small" title="Use the simpler correction viewer built into this page instead of napari." onClick={onOpenCorrection} disabled={!hasTracked || busy}>
+                  Correct in this page instead
                 </button>
               </div>
               <Status level={status.level} text={status.text} />
@@ -4065,7 +4117,7 @@ function StatsTableView({ table, onDownload }) {
   return (
     <div className="section table-section">
       <div className="row row-between">
-        <h3>{table?.name || "Table"}</h3>
+        <h3>{tableTitle(table?.name)}</h3>
         <div className="row">
           <button className="ghost btn-small" onClick={handleCopy} disabled={!displayRows.length}>
             Copy table
@@ -4081,7 +4133,7 @@ function StatsTableView({ table, onDownload }) {
         <div className="table-wrap">
           <table className="results-table">
             <thead>
-              <tr>{displayCols.map((c) => <th key={`th-${table.name}-${c}`}>{c}</th>)}</tr>
+              <tr>{displayCols.map((c) => <th key={`th-${table.name}-${c}`} title={String(c)}>{columnLabel(c)}</th>)}</tr>
             </thead>
             <tbody>
               {displayRows.slice(0, 2000).map((r, i) => (
@@ -8527,7 +8579,7 @@ export default function App() {
                     <div className="hint">
                       Dot plot options <Tip text="These selectors use columns detected from your loaded dataset tables." />
                     </div>
-                    <FieldTitle title="Color by (column1)" tip="Choose which dataset column controls marker color." className="field-head" />
+                    <FieldTitle title="Color by" tip="Choose which dataset column controls marker color." className="field-head" />
                     <div className="row">
                       <select
                         className="input"
@@ -8536,14 +8588,14 @@ export default function App() {
                         disabled={allDetectedColumns.length === 0}
                       >
                         <option value="">
-                          {allDetectedColumns.length ? "Color by (column1)" : "Load columns first"}
+                          {allDetectedColumns.length ? "Choose a column" : "Load columns first"}
                         </option>
                         {allDetectedColumns.map((c) => (
                           <option key={`dot-c1-${c}`} value={c}>{c}</option>
                         ))}
                       </select>
                     </div>
-                    <FieldTitle title="Size by (column2)" tip="Choose which dataset column controls marker size." className="field-head" />
+                    <FieldTitle title="Size by" tip="Choose which dataset column controls marker size." className="field-head" />
                     <div className="row">
                       <select
                         className="input"
@@ -8552,7 +8604,7 @@ export default function App() {
                         disabled={allDetectedColumns.length === 0}
                       >
                         <option value="">
-                          {allDetectedColumns.length ? "Size by (column2)" : "Load columns first"}
+                          {allDetectedColumns.length ? "Choose a column" : "Load columns first"}
                         </option>
                         {allDetectedColumns.map((c) => (
                           <option key={`dot-c2-${c}`} value={c}>{c}</option>
@@ -8748,8 +8800,8 @@ export default function App() {
             <div className="section">
               <h4>Thresholds</h4>
               {Object.keys(thresholds).map((k) => (
-                <div className="row" key={k}>
-                  <label className="label">{k}</label>
+                <div className="row threshold-row" key={k}>
+                  <label className="label">{NMA_THRESHOLD_LABELS[k] || k}</label>
                   <div className="readonly">{Number(thresholds[k]).toFixed(3)}</div>
                 </div>
               ))}
@@ -9049,7 +9101,7 @@ export default function App() {
                             </div>
                             {["LR", "LI", "N", "I", "SR", "S", "SI"].map((q) => (
                               <div className="percent-row" key={`q-${q}`}>
-                                <div className="cell">{q}</div>
+                                <div className="cell"><strong>{q}</strong> · {NMA_QUADRANT_NAMES[q]}</div>
                                 {datasetNames.map((name) => (
                                   <div className="cell" key={`${q}-${name}`}>
                                     {step2Percentages[q]?.[name] != null ? step2Percentages[q][name].toFixed(1) : "-"}
