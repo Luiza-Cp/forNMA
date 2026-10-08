@@ -2668,3 +2668,34 @@ button:not(:disabled):hover {
     display: none;
   }
 }
+
+.module-select-wrap {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .module-tabs {
+    display: none;
+  }
+
+  .module-select-wrap {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding-bottom: 8px;
+  }
+
+  .module-select {
+    width: 100%;
+    font-weight: 600;
+    color: var(--accent-dark);
+  }
+
+  .module-menu {
+    padding: 8px 16px 0;
+  }
+
+  .layout > .home-panel {
+    display: none;
+  }
+}

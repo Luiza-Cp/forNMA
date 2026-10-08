@@ -893,6 +893,17 @@ function ModuleTabs({ groups, active, onSelect }) {
   };
 
   return (
+    <>
+    <label className="module-select-wrap">
+      <span className="sr-only">Module</span>
+      <select className="input module-select" value={active} onChange={(e) => onSelect(e.target.value)}>
+        {groups.map((group) => (group.label ? (
+          <optgroup key={group.label} label={group.label}>
+            {group.stages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+          </optgroup>
+        ) : group.stages.map((stage) => <option key={stage} value={stage}>{stage}</option>)))}
+      </select>
+    </label>
     <div className={`module-tabs ${overflow.left ? "fade-left" : ""} ${overflow.right ? "fade-right" : ""}`}>
       {overflow.left && (
         <button type="button" className="module-tabs-arrow left" onClick={() => scrollBy(-1)} aria-label="Show previous modules">‹</button>
@@ -920,6 +931,7 @@ function ModuleTabs({ groups, active, onSelect }) {
         <button type="button" className="module-tabs-arrow right" onClick={() => scrollBy(1)} aria-label="Show more modules">›</button>
       )}
     </div>
+    </>
   );
 }
 
