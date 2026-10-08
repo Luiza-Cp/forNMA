@@ -1074,6 +1074,32 @@ const humanizeKey = (key) => String(key ?? "").replace(/_/g, " ").replace(/\s+/g
 const tableTitle = (name) => TABLE_TITLES[name] || (name ? humanizeKey(name).replace(/^./, (c) => c.toUpperCase()) : "Table");
 const columnLabel = (col) => COLUMN_LABELS[col] ?? humanizeKey(col);
 
+// Gate limits are shown with 5 significant digits; the change is far below measurement precision.
+const boundText = (value) => {
+  if (value === "" || value == null) return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? String(Number(n.toPrecision(5))) : String(value);
+};
+
+const P_VALUE_COLUMN = /^(p|p[_-]?val(ue)?|p[_-]?adj(usted)?|p[_-]?unc|p[_-]?corr|pvalue|p-value|adj[_ ]?p)$/i;
+
+// Display-only rounding for result tables; copied and downloaded tables keep full precision.
+function formatCell(value, column) {
+  if (value == null) return "";
+  if (typeof value === "boolean") return String(value);
+  const text = String(value).trim();
+  if (text === "" || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(text)) return String(value);
+  const n = Number(text);
+  if (!Number.isFinite(n) || Number.isInteger(n)) return text;
+  const abs = Math.abs(n);
+  const trim = (s) => (s.includes("e") ? s : s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, ""));
+  if (P_VALUE_COLUMN.test(String(column || "")) && abs < 0.001) return n.toExponential(2);
+  if (abs >= 100) return trim(n.toFixed(2));
+  if (abs >= 1) return trim(n.toFixed(3));
+  if (abs >= 0.001) return trim(n.toPrecision(3));
+  return n.toExponential(2);
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -4141,7 +4167,7 @@ function StatsTableView({ table, onDownload }) {
                   {displayCols.map((c) => (
                     c === rowHeaderKey
                       ? <th key={`td-${table.name}-${i}-${c}`} scope="row" className="results-table-rowhead">{r[c] == null ? "" : String(r[c])}</th>
-                      : <td key={`td-${table.name}-${i}-${c}`}>{r[c] == null ? "" : String(r[c])}</td>
+                      : <td key={`td-${table.name}-${i}-${c}`} title={r[c] == null ? undefined : String(r[c])}>{formatCell(r[c], c)}</td>
                   ))}
                 </tr>
               ))}
@@ -5894,10 +5920,10 @@ export default function App() {
       setControlGateMeta(data.gate || null);
       if (data.gate?.bounds) {
         setControlGateBounds({
-          x_min: String(data.gate.bounds.x_min ?? ""),
-          x_max: String(data.gate.bounds.x_max ?? ""),
-          y_min: String(data.gate.bounds.y_min ?? ""),
-          y_max: String(data.gate.bounds.y_max ?? ""),
+          x_min: boundText(data.gate.bounds.x_min ?? ""),
+          x_max: boundText(data.gate.bounds.x_max ?? ""),
+          y_min: boundText(data.gate.bounds.y_min ?? ""),
+          y_max: boundText(data.gate.bounds.y_max ?? ""),
         });
       }
       setControlGateFigure(buildControlGateFigure(data.gate, data.stats, graphLimits));
@@ -5949,10 +5975,10 @@ export default function App() {
     if (![xMin, xMax, yMin, yMax].every((n) => Number.isFinite(n))) return;
 
     const nextBounds = {
-      x_min: String(xMin),
-      x_max: String(xMax),
-      y_min: String(yMin),
-      y_max: String(yMax),
+      x_min: boundText(xMin),
+      x_max: boundText(xMax),
+      y_min: boundText(yMin),
+      y_max: boundText(yMax),
     };
     setControlGateBounds(nextBounds);
     setControlGateReady(false);
@@ -6895,10 +6921,10 @@ export default function App() {
         figure: res.figure || null,
         tables: res.tables || [],
         message: res.message || "",
-        x_min: String(res.bounds?.x_min ?? prev.x_min ?? ""),
-        x_max: String(res.bounds?.x_max ?? prev.x_max ?? ""),
-        y_min: String(res.bounds?.y_min ?? prev.y_min ?? ""),
-        y_max: String(res.bounds?.y_max ?? prev.y_max ?? ""),
+        x_min: boundText(res.bounds?.x_min ?? prev.x_min ?? ""),
+        x_max: boundText(res.bounds?.x_max ?? prev.x_max ?? ""),
+        y_min: boundText(res.bounds?.y_min ?? prev.y_min ?? ""),
+        y_max: boundText(res.bounds?.y_max ?? prev.y_max ?? ""),
       }));
       setGatingStatus({ level: "success", text: res.message || "Preview ready." });
     } catch (err) {
@@ -6962,10 +6988,10 @@ export default function App() {
         files: res.files || [],
         message: res.message || "",
         output_dir: res.output_dir || prev.output_dir || "",
-        x_min: String(res.bounds?.x_min ?? prev.x_min ?? ""),
-        x_max: String(res.bounds?.x_max ?? prev.x_max ?? ""),
-        y_min: String(res.bounds?.y_min ?? prev.y_min ?? ""),
-        y_max: String(res.bounds?.y_max ?? prev.y_max ?? ""),
+        x_min: boundText(res.bounds?.x_min ?? prev.x_min ?? ""),
+        x_max: boundText(res.bounds?.x_max ?? prev.x_max ?? ""),
+        y_min: boundText(res.bounds?.y_min ?? prev.y_min ?? ""),
+        y_max: boundText(res.bounds?.y_max ?? prev.y_max ?? ""),
       }));
       setGatingStatus({ level: "success", text: res.message || "Gating complete." });
     } catch (err) {
@@ -7011,10 +7037,10 @@ export default function App() {
 
     setGatingState((prev) => ({
       ...prev,
-      x_min: String(xMin),
-      x_max: String(xMax),
-      y_min: String(yMin),
-      y_max: String(yMax),
+      x_min: boundText(xMin),
+      x_max: boundText(xMax),
+      y_min: boundText(yMin),
+      y_max: boundText(yMax),
     }));
     if (gatingRelayoutTimerRef.current) {
       clearTimeout(gatingRelayoutTimerRef.current);
