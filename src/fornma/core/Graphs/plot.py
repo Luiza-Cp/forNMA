@@ -42,15 +42,15 @@ def plot(path: Union[str, Sequence[str]],
         cond_cols = [c for c in df_i.columns if c.lower() == 'condition']
         if not cond_cols:
             raise ValueError(
-                    f"O arquivo '{p.name}' não possui a coluna 'condition'. "
-                    f"Para analisar mais de um arquivo, todos devem ter esta coluna preenchida."
+                    f"The file '{p.name}' has no 'condition' column. "
+                    f"To analyze more than one file, every file needs this column filled in."
                 )
 
         cond_col = cond_cols[0]
         if not df_i[cond_col].astype(bool).any():
             raise ValueError(
-                    f"O arquivo '{p.name}' possui a coluna 'condition', mas ela está vazia ou com valores inválidos. "
-                    f"Para analisar mais de um arquivo, esta coluna precisa estar preenchida."
+                    f"The file '{p.name}' has a 'condition' column, but it is empty or has invalid values. "
+                    f"To analyze more than one file, this column must be filled in."
             )
 
         dfs.append(df_i)
@@ -74,7 +74,7 @@ def plot(path: Union[str, Sequence[str]],
     if gate:
         x, y = kwargs.get('x'), kwargs.get('y')
         if x is None or y is None:
-            raise ValueError("Para aplicar gate, forneça 'x' e 'y' em kwargs.")
+            raise ValueError("To apply a gate, provide 'x' and 'y' in kwargs.")
         graphs.gate(x, y)
 
     # log no arquivo + logger
@@ -83,7 +83,7 @@ def plot(path: Union[str, Sequence[str]],
     with log_path.open("a", encoding="utf-8") as logs:
         logs.write(f"\n\n{dt} - {graph_type} plot")
 
-    logger.info("Gerando gráfico '%s' (ot=%s) | params=%s", graph_type, ot, {k: kwargs.get(k) for k in ('x','y','hue','size','n','frames','control','dot')})
+    logger.info("Generating plot '%s' (ot=%s) | params=%s", graph_type, ot, {k: kwargs.get(k) for k in ('x','y','hue','size','n','frames','control','dot')})
 
     # roteamento
     if graph_type == 'violin':
@@ -117,12 +117,12 @@ def plot(path: Union[str, Sequence[str]],
 
     elif graph_type == 'line':
         if not ot:
-            raise ValueError("Line plot requer dados temporais (coluna 'Overtime' com pelo menos um True).")
+            raise ValueError("Line plots need time-lapse data (an 'Overtime' column with at least one True value).")
         graphs.save_figs(graphs.lineplot(**kwargs), 'line-plot')
 
     elif graph_type == 'rolling-average':
         if not ot:
-            raise ValueError("Rolling Average requer dados temporais (coluna 'Overtime' com pelo menos um True).")
+            raise ValueError("Rolling average plots need time-lapse data (an 'Overtime' column with at least one True value).")
         ycol = kwargs.get('y'); n = kwargs.get('n')
         if ycol is None or n is None:
             raise ValueError("Rolling Average requer kwargs 'y' e 'n'.")
@@ -130,10 +130,10 @@ def plot(path: Union[str, Sequence[str]],
 
     elif graph_type == 'cpd':
         if not ot:
-            raise ValueError("CPD requer dados temporais (coluna 'Overtime' com pelo menos um True).")
+            raise ValueError("CPD plots need time-lapse data (an 'Overtime' column with at least one True value).")
         graphs.save_figs(graphs.cpd(kwargs.get('frames'), kwargs.get('control')), 'cumulative-population-doubling')
 
     else:
-        raise ValueError(f"graph_type inválido: {graph_type}")
+        raise ValueError(f"Invalid graph_type: {graph_type}")
 
     return f'Files were saved at {out_dir}'

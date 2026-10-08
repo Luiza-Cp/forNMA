@@ -57,7 +57,7 @@ def perform_clustering(
     else:
         missing = [c for c in columns if c not in df.columns]
         if missing:
-            raise KeyError(f"Colunas ausentes: {missing}")
+            raise KeyError(f"Missing columns: {missing}")
         feat_cols = list(columns)
 
     valid = ~df[feat_cols].isna().any(axis=1)

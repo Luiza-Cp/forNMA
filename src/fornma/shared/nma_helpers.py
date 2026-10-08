@@ -111,12 +111,12 @@ def load_controls_pool(params: dict, sample_per_ds: int = 2000) -> tuple[pd.Data
         try:
             raw = pd.read_csv(path, engine="python", sep=None)
         except Exception as e:
-            log.append(f"- {name}: erro lendo CSV '{path}': {e}")
+            log.append(f"- {name}: could not read CSV '{path}': {e}")
             continue
 
         a_name, n_name = _resolve_two_columns(raw, a_in, n_in)
         if not (a_name and n_name):
-            log.append(f"- {name}: colunas não encontradas (area='{a_in}', nii='{n_in}')")
+            log.append(f"- {name}: columns not found (area='{a_in}', nii='{n_in}')")
             continue
 
         df = raw[[a_name, n_name]].copy()
@@ -124,7 +124,7 @@ def load_controls_pool(params: dict, sample_per_ds: int = 2000) -> tuple[pd.Data
         df[a_name] = _to_num(df[a_name]); df[n_name] = _to_num(df[n_name])
         df = df.dropna()
         after = len(df)
-        log.append(f"  · válidas {after}/{before} linhas")
+        log.append(f"  · valid rows: {after}/{before}")
 
         if after == 0:
             continue
@@ -136,7 +136,7 @@ def load_controls_pool(params: dict, sample_per_ds: int = 2000) -> tuple[pd.Data
         dfs.append(df)
 
     if not dfs:
-        log.append("Nenhum controle válido encontrado.")
+        log.append("No valid control dataset found.")
         return None, None, None, "\n".join(log)
 
     pool = pd.concat(dfs, axis=0, ignore_index=True)
@@ -168,12 +168,12 @@ def load_all_datasets(params: dict, sample_per_ds: int = 4000) -> tuple[pd.DataF
         try:
             raw = pd.read_csv(path, engine="python", sep=None)
         except Exception as e:
-            log.append(f"- {name}: erro lendo CSV: {e}")
+            log.append(f"- {name}: could not read CSV: {e}")
             continue
 
         a_name, n_name = _resolve_two_columns(raw, a_in, n_in)
         if not (a_name and n_name):
-            log.append(f"- {name}: não achou colunas (area='{a_in}', nii='{n_in}')")
+            log.append(f"- {name}: columns not found (area='{a_in}', nii='{n_in}')")
             continue
 
         df = raw[[a_name, n_name]].copy()
@@ -181,7 +181,7 @@ def load_all_datasets(params: dict, sample_per_ds: int = 4000) -> tuple[pd.DataF
         df[a_name] = _to_num(df[a_name]); df[n_name] = _to_num(df[n_name])
         df = df.dropna()
         after = len(df)
-        log.append(f"- {name}: válidas {after}/{before} linhas")
+        log.append(f"- {name}: valid rows: {after}/{before}")
 
         if after == 0:
             continue
@@ -194,11 +194,11 @@ def load_all_datasets(params: dict, sample_per_ds: int = 4000) -> tuple[pd.DataF
         dfs.append(df)
 
     if not dfs:
-        log.append("step2: nenhum dataset válido encontrado.")
+        log.append("step2: no valid dataset found.")
         return None, None, None, "\n".join(log)
 
     pool = pd.concat(dfs, axis=0, ignore_index=True)
-    log.append(f"step2: POOL final {len(pool)} linhas.")
+    log.append(f"step2: pooled {len(pool)} rows.")
     return pool, "NII_TMP", "AREA_TMP", "\n".join(log)
 
 

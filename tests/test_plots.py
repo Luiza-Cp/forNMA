@@ -126,7 +126,7 @@ def test_plot_gate_requires_xy(path_input):
     out.mkdir(parents=True, exist_ok=True)
 
     # deve falhar sem x e y quando gate=True
-    with pytest.raises(ValueError, match="forneça 'x' e 'y'"):
+    with pytest.raises(ValueError, match="provide 'x' and 'y'"):
         plot(
             path=path_input,
             path_save=str(out),
@@ -235,7 +235,7 @@ def test_multiple_paths_require_condition_missing_raises(tmp_path):
     out.mkdir(parents=True, exist_ok=True)
 
     bad_csv = make_missing_condition(STATIC_CSV2, tmp_path)  # remove Condition
-    with pytest.raises(ValueError, match="não possui a coluna 'condition'"):
+    with pytest.raises(ValueError, match="has no 'condition' column"):
         plot(
             path=[str(STATIC_CSV1), str(bad_csv)],
             path_save=str(out),
@@ -254,7 +254,7 @@ def test_multiple_paths_require_condition_all_false_raises(tmp_path):
 
     bad_csv = make_condition_all_false(STATIC_CSV3, tmp_path)  # deixa Condition vazia
 
-    with pytest.raises(ValueError, match="está vazia ou com valores inválidos"):
+    with pytest.raises(ValueError, match="it is empty or has invalid values"):
         plot(
             path=[str(STATIC_CSV1), str(bad_csv)],
             path_save=str(out),

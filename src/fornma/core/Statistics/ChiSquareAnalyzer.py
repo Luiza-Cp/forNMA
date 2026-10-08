@@ -29,16 +29,16 @@ class MonteCarloChi2Simulator:
         observed = np.asarray(observed, dtype=int)
 
         if observed.ndim != 2 or observed.size == 0:
-            raise ValueError("`observed` deve ser uma matriz 2D não vazia.")
+            raise ValueError("`observed` must be a non-empty 2D matrix.")
 
         # margens não podem ter totais zero
         if np.any(observed.sum(axis=0) == 0) or np.any(observed.sum(axis=1) == 0):
-            raise ValueError("Tabela com linha ou coluna de total zero — não é possível simular.")
+            raise ValueError("The table has a row or column that sums to zero, so it cannot be simulated.")
 
         try:
             chi2_obs, *_ = chi2_contingency(observed, correction=False)
         except ValueError as e:
-            raise ValueError(f"Não foi possível calcular chi2 nos dados observados: {e}")
+            raise ValueError(f"Could not compute chi-square on the observed data: {e}")
 
         # constrói rótulos conforme margens
         row_labels = np.repeat(np.arange(observed.shape[0]), observed.sum(axis=1))

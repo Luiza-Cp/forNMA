@@ -215,7 +215,7 @@ def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point
     required = {'Frame','X','Y','track_id','family','family_name','previous_x','previous_y', img_col}
     missing = required - set(df.columns)
     if missing:
-        raise KeyError(f"Colunas faltando: {missing}")
+        raise KeyError(f"Missing columns: {missing}")
 
     os.makedirs(save, exist_ok=True)
 

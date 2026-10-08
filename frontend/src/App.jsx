@@ -4432,7 +4432,7 @@ function buildStep1Figure(sample, stats, graphLimits, sdNii, sdArea) {
     width: 640,
     height: 640,
     margin: { l: 60, r: 10, t: 50, b: 60 },
-    title: { text: "NMA · Elipse de controle", x: 0.5, xanchor: "center" },
+    title: { text: "NMA · Control ellipse", x: 0.5, xanchor: "center" },
     xaxis: { title: "NII", range: [graphLimits?.[2] ?? 0, graphLimits?.[3] ?? 1], fixedrange: true },
     yaxis: { title: "Area", range: [graphLimits?.[0] ?? 0, graphLimits?.[1] ?? 1], fixedrange: true },
   };
@@ -4488,7 +4488,7 @@ function buildControlGateFigure(gate, stats, graphLimits) {
     width: 640,
     height: 640,
     margin: { l: 60, r: 10, t: 50, b: 60 },
-    title: { text: "NMA · Gate do controle", x: 0.5, xanchor: "center" },
+    title: { text: "NMA · Control gate", x: 0.5, xanchor: "center" },
     xaxis: { title: "NII", range: [graphLimits?.[2] ?? x0, graphLimits?.[3] ?? x1], fixedrange: true },
     yaxis: { title: "Area", range: [graphLimits?.[0] ?? y0, graphLimits?.[1] ?? y1], fixedrange: true },
     shapes: [
