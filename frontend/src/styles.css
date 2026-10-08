@@ -86,7 +86,10 @@ body {
   z-index: 0;
   width: 100%;
   background: url("/scientific-molecule-frame.png") right top / auto 760px no-repeat;
-  opacity: 0.72;
+  opacity: 0.5;
+  /* Keep the artwork in the right-hand corner so it does not sit behind the tab labels. */
+  -webkit-mask-image: linear-gradient(to left, #000 0, #000 8%, transparent 30%);
+  mask-image: linear-gradient(to left, #000 0, #000 8%, transparent 30%);
   pointer-events: none;
 }
 
