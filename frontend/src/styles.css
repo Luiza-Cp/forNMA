@@ -2583,3 +2583,42 @@ button:not(:disabled):hover {
     display: none;
   }
 }
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 37, 64, 0.32);
+}
+
+.confirm-dialog {
+  width: min(420px, 100%);
+  padding: 20px 22px 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--ds-surface-strong);
+  box-shadow: 0 20px 50px rgba(31, 45, 61, 0.22);
+  animation: tutorial-drawer-in 160ms ease-out;
+}
+
+.confirm-dialog h4 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.confirm-dialog p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

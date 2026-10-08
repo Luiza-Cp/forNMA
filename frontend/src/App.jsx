@@ -1309,6 +1309,67 @@ function HomeWorkflow({ onOpen }) {
   );
 }
 
+// In-app replacement for window.confirm: resolves true/false; rendered by <ConfirmHost /> in App.
+let confirmListener = null;
+
+function confirmDialog(message, options = {}) {
+  if (!confirmListener) return Promise.resolve(window.confirm(message));
+  return new Promise((resolve) => confirmListener({ message, ...options, resolve }));
+}
+
+const confirmReset = (moduleName) => confirmDialog(
+  "This clears the settings and results shown in this module. Files already saved to disk are not affected.",
+  { title: `Reset ${moduleName}?`, confirmLabel: "Reset" }
+);
+
+function ConfirmHost() {
+  const [request, setRequest] = useState(null);
+  useEffect(() => {
+    confirmListener = (next) => setRequest(next);
+    return () => {
+      confirmListener = null;
+    };
+  }, []);
+  const close = (value) => {
+    request?.resolve(value);
+    setRequest(null);
+  };
+  const closeRef = React.useRef(close);
+  closeRef.current = close;
+  useEffect(() => {
+    if (!request) return undefined;
+    // Capture phase so Esc closes only this dialog, not a modal underneath it.
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      closeRef.current(false);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [request]);
+  if (!request) return null;
+  return createPortal(
+    <div className="confirm-backdrop" onMouseDown={() => close(false)}>
+      <div
+        className="confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        aria-describedby="confirm-message"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <h4 id="confirm-title">{request.title || "Are you sure?"}</h4>
+        <p id="confirm-message">{request.message}</p>
+        <div className="confirm-actions">
+          <button type="button" className="ghost" autoFocus onClick={() => close(false)}>Cancel</button>
+          <button type="button" className="danger" onClick={() => close(true)}>{request.confirmLabel || "Confirm"}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1355,8 +1416,11 @@ function hasFilledFields(item = {}) {
 }
 
 function confirmRemoveFilled(item, label = "this item") {
-  if (!hasFilledFields(item)) return true;
-  return window.confirm(`Remove ${label}? This item already has filled fields, and this action cannot be undone.`);
+  if (!hasFilledFields(item)) return Promise.resolve(true);
+  return confirmDialog(`${label} already has filled fields. Removing it cannot be undone.`, {
+    title: `Remove ${label}?`,
+    confirmLabel: "Remove",
+  });
 }
 
 function EmptyState({ title, text }) {
@@ -2816,12 +2880,12 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
                   <thead>
                     <tr>
                       <th>Condition</th>
-                      {channels.map((ch) => (
+                      {channels.map((ch, cIdx) => (
                         <th key={`h-reg-${ch.id}`}>
                           <div className="row row-between">
                             <input className="input" value={ch.name} onChange={(e) => updateChannelName(ch.id, e.target.value)} placeholder="Channel name" />
                             <button className="ghost btn-small" onClick={() => {
-                              if (confirmRemoveFilled(ch, `Channel ${cIdx + 1}`)) removeChannel(ch.id);
+                              confirmRemoveFilled(ch, `Channel ${cIdx + 1}`).then((ok) => { if (ok) removeChannel(ch.id); });
                             }} disabled={channels.length <= 1}>Remove</button>
                           </div>
                         </th>
@@ -2835,7 +2899,7 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
                           <div className="row row-between">
                             <input className="input" value={row.condition || ""} onChange={(e) => updateCondition(rIdx, e.target.value)} placeholder="Condition name" />
                             <button className="ghost btn-small" onClick={() => {
-                              if (confirmRemoveFilled(row, `Condition ${rIdx + 1}`)) removeCondition(rIdx);
+                              confirmRemoveFilled(row, `Condition ${rIdx + 1}`).then((ok) => { if (ok) removeCondition(rIdx); });
                             }} disabled={(imagesData.rows || []).length <= 1}>Remove</button>
                           </div>
                         </td>
@@ -3045,7 +3109,7 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(graphState.datasets || []).length > 1 && (
                     <button className="ghost btn-small" title="Remove this dataset from the plotting configuration." onClick={() => {
-                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                      confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
                     }}>Remove</button>
                   )}
                   <DatasetBadge>#{idx + 1}</DatasetBadge>
@@ -3333,7 +3397,7 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(state.datasets || []).length > 1 && (
                     <button className="ghost btn-small" title="Remove this dataset from the clustering configuration." onClick={() => {
-                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                      confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
                     }}>Remove</button>
                   )}
                   <DatasetBadge>#{idx + 1}</DatasetBadge>
@@ -3537,7 +3601,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(state.datasets || []).length > 1 && (
                     <button className="ghost btn-small" onClick={() => {
-                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                      confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
                     }}>Remove</button>
                   )}
                   <DatasetBadge>#{idx + 1}</DatasetBadge>
@@ -3738,7 +3802,7 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                     </div>
                     {(state.filters || []).length > 1 && (
                       <button className="ghost btn-small" onClick={() => {
-                        if (confirmRemoveFilled(filter, `Filter ${idx + 1}`)) removeFilter(filter.id);
+                        confirmRemoveFilled(filter, `Filter ${idx + 1}`).then((ok) => { if (ok) removeFilter(filter.id); });
                       }}>Remove</button>
                     )}
                   </div>
@@ -3829,7 +3893,7 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
                   {(state.datasets || []).length > 1 && (
                     <button className="ghost btn-small" title="Remove this dataset from the gating analysis." onClick={() => {
-                      if (confirmRemoveFilled(d, `Dataset ${idx + 1}`)) removeDataset(d.id);
+                      confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
                     }}>Remove</button>
                   )}
                   <DatasetBadge>#{idx + 1}</DatasetBadge>
@@ -7677,8 +7741,8 @@ export default function App() {
     }
   };
 
-  const handleResetNma = () => {
-    const ok = window.confirm("Reset NMA settings and return to initial state?");
+  const handleResetNma = async () => {
+    const ok = await confirmReset("NMA");
     if (!ok) return;
     setRows(initialNmaRows());
     setCollapsedById({});
@@ -7722,9 +7786,9 @@ export default function App() {
     attemptedColumnsRef.current = new Set();
   };
 
-  const handleResetRegistrationUi = () => {
+  const handleResetRegistrationUi = async () => {
     if (["starting", "queued", "running", "canceling"].includes(regJob.status || "idle")) return;
-    const ok = window.confirm("Reset Image Registration screen to a clean state?");
+    const ok = await confirmReset("Image Registration");
     if (!ok) return;
     setRegJob({ ...DEFAULT_REG_JOB });
     clearPersisted("reg.");
@@ -7733,9 +7797,9 @@ export default function App() {
     setStatusLevel("info");
   };
 
-  const handleResetFociUi = () => {
+  const handleResetFociUi = async () => {
     if (["starting", "queued", "running", "canceling"].includes(fociJob.status || "idle")) return;
-    const ok = window.confirm("Reset Foci Overlay screen to a clean state?");
+    const ok = await confirmReset("Foci Overlay");
     if (!ok) return;
     setFociJob({ ...DEFAULT_FOCI_JOB });
     clearPersisted("foci.");
@@ -7744,9 +7808,9 @@ export default function App() {
     setStatusLevel("info");
   };
 
-  const handleResetPlotDataUi = () => {
+  const handleResetPlotDataUi = async () => {
     if (plotDataLoading) return;
-    const ok = window.confirm("Reset Plot Data screen to a clean state?");
+    const ok = await confirmReset("Plot Data");
     if (!ok) return;
     setPlotData(initialPlotDataState());
     setPlotDataStatus({ level: "info", text: "" });
@@ -7754,9 +7818,9 @@ export default function App() {
     plotDataColsCacheRef.current = {};
   };
 
-  const handleResetClusteringUi = () => {
+  const handleResetClusteringUi = async () => {
     if (clusteringLoading || clusteringElbowLoading) return;
-    const ok = window.confirm("Reset Clustering screen to a clean state?");
+    const ok = await confirmReset("Clustering");
     if (!ok) return;
     setClustering(initialClusteringState());
     setClusteringStatus({ level: "info", text: "" });
@@ -7765,9 +7829,9 @@ export default function App() {
     clusteringColsCacheRef.current = {};
   };
 
-  const handleResetStatisticsUi = () => {
+  const handleResetStatisticsUi = async () => {
     if (statsLoading) return;
-    const ok = window.confirm("Reset Statistics screen to a clean state?");
+    const ok = await confirmReset("Statistics");
     if (!ok) return;
     setStatsState(initialStatsState());
     setStatsStatus({ level: "info", text: "" });
@@ -7776,9 +7840,9 @@ export default function App() {
     statsFilterValuesCacheRef.current = {};
   };
 
-  const handleResetGatingUi = () => {
+  const handleResetGatingUi = async () => {
     if (gatingLoading || gatingApplying) return;
-    const ok = window.confirm("Reset Gating screen to a clean state?");
+    const ok = await confirmReset("Gating");
     if (!ok) return;
     setGatingState(initialGatingState());
     setGatingStatus({ level: "info", text: "" });
@@ -7787,9 +7851,9 @@ export default function App() {
     gatingColsCacheRef.current = {};
   };
 
-  const handleResetTrackingUi = () => {
+  const handleResetTrackingUi = async () => {
     if (trackingRunning || trackingLoadingFrame || trackingEditing) return;
-    const ok = window.confirm("Reset Tracking screen to a clean state?");
+    const ok = await confirmReset("Tracking");
     if (!ok) return;
     setTrackingState(initialTrackingState());
     setTrackingStatus({ level: "info", text: "" });
@@ -7922,7 +7986,7 @@ export default function App() {
     } else if (activeModule === "Image Registration") {
       handleResetRegistrationUi();
     } else if (activeModule === "Segmentation") {
-      if (window.confirm("Reset Segmentation screen to a clean state?")) handleResetSegmentationUi();
+      confirmReset("Segmentation").then((ok) => { if (ok) handleResetSegmentationUi(); });
     } else if (activeModule === "Gating") {
       handleResetGatingUi();
     } else if (activeModule === "Foci Overlay") {
@@ -7975,6 +8039,7 @@ export default function App() {
         </nav>
       </div>
       {tutorialModule && <TutorialDrawer moduleName={tutorialModule} onClose={closeTutorial} />}
+      <ConfirmHost />
 
       <div className="layout">
         {activeModule === "Home" ? (
@@ -8760,7 +8825,7 @@ export default function App() {
                     </Button>
                     {rows.length > 1 && (
                       <Button className="ghost" onClick={() => {
-                        if (confirmRemoveFilled(row, `Dataset ${idx + 1}`)) removeRow(idx);
+                        confirmRemoveFilled(row, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeRow(idx); });
                       }}>Remove</Button>
                     )}
                   </div>
