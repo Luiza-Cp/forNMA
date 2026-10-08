@@ -2375,3 +2375,51 @@ button:not(:disabled):hover {
   background: rgba(66, 81, 96, 0.1);
   color: var(--muted);
 }
+
+.feature-picker-count {
+  margin: 2px 0 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.feature-picker-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px 0;
+  background: var(--ds-surface-strong);
+}
+
+.feature-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.feature-picker-item:hover {
+  background: rgba(58, 110, 165, 0.06);
+}
+
+.feature-picker-item span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.feature-picker-tag {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(66, 81, 96, 0.08);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.feature-picker-actions {
+  flex-wrap: wrap;
+  margin-top: 8px;
+}

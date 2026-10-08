@@ -1191,6 +1191,56 @@ function StatsSummary({ tables, alpha }) {
   );
 }
 
+// Identifiers, coordinates and per-image values describe where a cell is, not what it looks like,
+// so they are left out of the default embedding features.
+const NON_FEATURE_COLUMN = /^(frame|cell|x|y|index|id|label|parent|overtime|track(_?id)?)$|^unnamed|(_x|_y)$|^(min|max)_image|image_name/i;
+const isNonFeatureColumn = (c) => NON_FEATURE_COLUMN.test(String(c));
+const measurementFeatures = (cols) => (cols || []).filter((c) => !isNonFeatureColumn(c));
+
+function FeaturePicker({ options, selected, onChange }) {
+  const [query, setQuery] = useState("");
+  const selectedSet = new Set(selected);
+  const q = query.trim().toLowerCase();
+  const visible = (options || []).filter((c) => !q || String(c).toLowerCase().includes(q));
+  const toggle = (c) => {
+    const next = selectedSet.has(c) ? selected.filter((x) => x !== c) : [...selected, c];
+    onChange((options || []).filter((o) => next.includes(o)));
+  };
+  if (!options || options.length === 0) {
+    return <p className="hint">Add a CSV to list its numeric columns.</p>;
+  }
+  return (
+    <div className="feature-picker">
+      <div className="row">
+        <input
+          className="input"
+          type="search"
+          placeholder="Filter columns"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Filter numeric columns"
+        />
+      </div>
+      <div className="feature-picker-count">{selected.length} of {options.length} selected</div>
+      <div className="feature-picker-list" role="group" aria-label="Numeric features">
+        {visible.map((c) => (
+          <label key={`feat-${c}`} className="feature-picker-item">
+            <input type="checkbox" checked={selectedSet.has(c)} onChange={() => toggle(c)} />
+            <span>{c}</span>
+            {isNonFeatureColumn(c) && <span className="feature-picker-tag">ID / position</span>}
+          </label>
+        ))}
+        {visible.length === 0 && <div className="hint">No column matches “{query}”.</div>}
+      </div>
+      <div className="row row-right feature-picker-actions">
+        <button type="button" className="ghost btn-small" title="Select measurement columns only (no IDs, coordinates or per-image values)." onClick={() => onChange(measurementFeatures(options))}>Measurements only</button>
+        <button type="button" className="ghost btn-small" title="Select every numeric column." onClick={() => onChange(options.slice())}>Select all</button>
+        <button type="button" className="ghost btn-small" title="Clear the selected features." onClick={() => onChange([])}>Clear</button>
+      </div>
+    </div>
+  );
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -3273,22 +3323,11 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
           <summary>Features</summary>
           <div className="seg-body">
             <div className="field-head">Numeric features <Tip text="Numeric columns used as input features for UMAP or PCA." /></div>
-            <select
-              className="input"
-              multiple
-              size={Math.min(10, Math.max(4, numeric.length || 4))}
-              value={state.columns || []}
-              onChange={(e) => {
-                const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
-                setField("columns", vals);
-              }}
-            >
-              {numeric.map((c) => <option key={`umap-col-${c}`} value={c}>{c}</option>)}
-            </select>
-            <div className="row row-right">
-              <button className="ghost btn-small" title="Select all numeric columns as embedding features." onClick={() => setField("columns", numeric.slice())}>Select all</button>
-              <button className="ghost btn-small" title="Clear the selected embedding features." onClick={() => setField("columns", [])}>Clear</button>
-            </div>
+            <FeaturePicker
+              options={numeric}
+              selected={state.columns || []}
+              onChange={(cols) => setField("columns", cols)}
+            />
           </div>
         </details>
 
@@ -5455,7 +5494,7 @@ export default function App() {
           ...prev,
           columnsAll: firstCols,
           numericColumns: firstNumeric,
-          columns: keepNumeric.length ? keepNumeric : firstNumeric.slice(0, Math.min(8, firstNumeric.length)),
+          columns: keepNumeric.length ? keepNumeric : measurementFeatures(firstNumeric),
         };
       });
     })();
