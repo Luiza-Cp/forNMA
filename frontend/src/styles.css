@@ -1297,6 +1297,7 @@ select.input {
 }
 
 .tip-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1320,6 +1321,27 @@ select.input {
 .tip-wrap {
   display: inline-flex;
   align-items: center;
+}
+
+.tip-badge::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+
+.tip-badge:hover,
+.tip-badge[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: rgba(58, 110, 165, 0.08);
+}
+
+.tip-badge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tip-popover.below {
+  transform: translate(-50%, 0);
 }
 
 .tip-popover {

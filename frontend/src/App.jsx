@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Plotly from "plotly.js-dist-min";
-import { Button, Card, FieldTitle } from "./design-system/index.js";
+import { Button, Card, FieldTitle, Tip } from "./design-system/index.js";
 
 const API_BASE = "http://127.0.0.1:8000";
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
@@ -1079,63 +1079,6 @@ function ForNmaLogo({ className = "", decorative = false }) {
       alt={decorative ? "" : "forNMA"}
       aria-hidden={decorative ? "true" : undefined}
     />
-  );
-}
-
-function Tip({ text }) {
-  const [open, setOpen] = React.useState(false);
-  const [position, setPosition] = React.useState({ left: 0, top: 0 });
-  const buttonRef = React.useRef(null);
-  const closeTimerRef = React.useRef(null);
-
-  React.useEffect(() => () => {
-    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
-  }, []);
-
-  const toggleTip = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (closeTimerRef.current) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (rect && typeof window !== "undefined") {
-      setPosition({
-        left: Math.min(window.innerWidth - 150, Math.max(150, rect.left + rect.width / 2)),
-        top: Math.max(12, rect.top - 10),
-      });
-    }
-    setOpen((v) => !v);
-  };
-
-  return (
-    <span className="tip-wrap">
-      <button
-        ref={buttonRef}
-        type="button"
-        className="tip-badge"
-        aria-label={text}
-        aria-expanded={open}
-        onClick={toggleTip}
-        onBlur={() => {
-          closeTimerRef.current = window.setTimeout(() => setOpen(false), 160);
-        }}
-      >
-        i
-      </button>
-      {open && typeof document !== "undefined" && createPortal(
-        <span
-          className="tip-popover"
-          role="tooltip"
-          style={{ left: position.left, top: position.top }}
-          onMouseDown={(event) => event.preventDefault()}
-        >
-          {text}
-        </span>,
-        document.body
-      )}
-    </span>
   );
 }
 
