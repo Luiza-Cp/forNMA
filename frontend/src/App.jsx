@@ -1644,6 +1644,11 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
     await onStartSegmentation(payload);
   };
 
+  const segMissing = [
+    !isImageSelectionSaved(summaryText) && "load images",
+    !String(savePath || "").trim() && "choose a saving path",
+  ].filter(Boolean);
+
   const segRunning =
     segJob?.status === "starting" ||
     segJob?.status === "running" ||
@@ -2173,13 +2178,14 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
       </div>
 
       <div className="seg-footer">
-        <button className="secondary" onClick={() => startSeg(true)} disabled={segRunning}>Preview</button>
-        <button className="primary" onClick={() => startSeg(false)} disabled={segRunning}>Run</button>
+        <button className="secondary" onClick={() => startSeg(true)} disabled={segRunning || segMissing.length > 0}>Preview</button>
+        <button className="primary" onClick={() => startSeg(false)} disabled={segRunning || segMissing.length > 0}>Run</button>
         <button className="danger" onClick={() => onStopSegmentation()} disabled={!segRunning || segCanceling}>
           {segCanceling ? "Stopping..." : "Stop"}
         </button>
         {segCanceling && <span className="seg-stop-state" role="status">Finishing current image and stopping.</span>}
         {segCanceled && <span className="seg-stop-state stopped" role="status">Stopped. No further images will be processed.</span>}
+        <MissingSetup items={segMissing} />
       </div>
     </Card>
     {modalOpen && (
@@ -2287,6 +2293,10 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
   const channels = imagesData.channels || [];
   const channelIds = new Set(channels.map((c) => c.id));
   const regRunning = ["starting", "queued", "running", "canceling"].includes(regJob?.status || "idle");
+  const regMissing = [
+    !isImageSelectionSaved(summaryText) && "load images",
+    !String(savePath || "").trim() && "choose a saving path",
+  ].filter(Boolean);
 
   useEffect(() => {
     if (channels.length === 0) return;
@@ -2480,8 +2490,9 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
         </div>
 
         <div className="seg-footer">
-          <button className="primary" title="Run image registration with the current mapping and options." onClick={startRegistration} disabled={regRunning}>Run Registration</button>
+          <button className="primary" title="Run image registration with the current mapping and options." onClick={startRegistration} disabled={regRunning || regMissing.length > 0}>Run Registration</button>
           <button className="danger" title="Request cancellation of the current registration job." onClick={() => onStopRegistration()} disabled={!regRunning}>Stop</button>
+          <MissingSetup items={regMissing} />
         </div>
       </Card>
 
@@ -2555,6 +2566,10 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
   const [actions, setActions] = usePersistentState("foci.actions", ["overlay"]);
   const [saveImages, setSaveImages] = usePersistentState("foci.saveImages", true);
   const running = ["starting", "queued", "running", "canceling"].includes(fociJob?.status || "idle");
+  const fociMissing = [
+    !String(pklPath || "").trim() && "choose the pickle (.pkl) folder",
+    (actions || []).length === 0 && "select at least one action",
+  ].filter(Boolean);
 
   const loadChannels = async (path) => {
     if (!path?.trim()) {
@@ -2671,11 +2686,12 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
             actions,
             save_images: !!saveImages,
           })}
-          disabled={running}
+          disabled={running || fociMissing.length > 0}
         >
           Run Overlay
         </button>
         <button className="danger" title="Request cancellation of the current foci overlay job." onClick={() => onStopFoci()} disabled={!running}>Stop</button>
+        <MissingSetup items={fociMissing} />
       </div>
     </Card>
   );
@@ -4154,6 +4170,35 @@ function friendlyApiError(text, fallback = "Request failed.") {
 async function errorFromResponse(res, fallback = "Request failed.") {
   const text = await res.text();
   return friendlyApiError(text || res.statusText, fallback);
+}
+
+function MissingSetup({ items }) {
+  if (!items || items.length === 0) return null;
+  const list = items.length === 1 ? items[0] : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  return <div className="hint disabled-reason">To run, {list}.</div>;
+}
+
+const JOB_ACTIVE_STATES = ["starting", "queued", "running", "canceling"];
+
+// One progress bar plus a single status box; a failed job shows its reason in the same box.
+function JobProgress({ job }) {
+  const active = JOB_ACTIVE_STATES.includes(job.status);
+  const failed = job.status === "failed";
+  const level = job.status === "completed" ? "success" : failed ? "error" : "info";
+  const message = job.message || "Waiting to start.";
+  const text = failed && job.error ? `${message}\n${job.error}` : message;
+  return (
+    <>
+      <div className="progress-wrap">
+        <div
+          className={`progress-fill ${active ? "running" : ""} ${failed ? "failed" : ""}`}
+          style={{ width: `${Math.max(0, Math.min(100, job.progress || 0))}%` }}
+        />
+      </div>
+      <Status level={level} text={text} />
+      {!failed && job.error && <Status level="error" text={job.error} />}
+    </>
+  );
 }
 
 function Status({ level = "info", text }) {
@@ -7632,17 +7677,7 @@ export default function App() {
                 {hasSegSession ? (
                   <div className="section tracking-viewer-section">
                     <h3>Execution progress</h3>
-                    <div className="progress-wrap">
-                      <div
-                        className={`progress-fill ${segJob.status === "starting" || segJob.status === "running" || segJob.status === "queued" || segJob.status === "canceling" ? "running" : ""}`}
-                        style={{ width: `${Math.max(0, Math.min(100, segJob.progress || 0))}%` }}
-                      />
-                    </div>
-                    <Status
-                      level={segJob.status === "completed" ? "success" : segJob.status === "failed" ? "error" : "info"}
-                      text={segJob.message || "Waiting to start."}
-                    />
-                    {segJob.error && <Status level="error" text={segJob.error} />}
+                    <JobProgress job={segJob} />
                     <div className="section">
                       <h4>
                         Segmentation preview{Number.isInteger(segJob.preview_index) ? ` (image ${segJob.preview_index + 1})` : ""}
@@ -8075,17 +8110,7 @@ export default function App() {
                 {fociJob.job_id ? (
                   <div className="section">
                     <h3>Execution progress</h3>
-                    <div className="progress-wrap">
-                      <div
-                        className={`progress-fill ${["starting", "running", "queued", "canceling"].includes(fociJob.status) ? "running" : ""}`}
-                        style={{ width: `${Math.max(0, Math.min(100, fociJob.progress || 0))}%` }}
-                      />
-                    </div>
-                    <Status
-                      level={fociJob.status === "completed" ? "success" : fociJob.status === "failed" ? "error" : "info"}
-                      text={fociJob.message || "Waiting to start."}
-                    />
-                    {fociJob.error && <Status level="error" text={fociJob.error} />}
+                    <JobProgress job={fociJob} />
                     <div className="section">
                       <h4>Log</h4>
                       <pre className="seg-log">{fociJob.log || "No logs yet."}</pre>
@@ -8286,20 +8311,10 @@ export default function App() {
                       text="Registration can be slow and memory-intensive. Keep this window open and avoid running other heavy tasks. If needed, reduce the number of images/channels per run."
                     />
                     <h3>Execution progress</h3>
-                    <div className="progress-wrap">
-                      <div
-                        className={`progress-fill ${["starting", "running", "queued", "canceling"].includes(regJob.status) ? "running" : ""}`}
-                        style={{ width: `${Math.max(0, Math.min(100, regJob.progress || 0))}%` }}
-                      />
-                    </div>
-                    <Status
-                      level={regJob.status === "completed" ? "success" : regJob.status === "failed" ? "error" : "info"}
-                      text={regJob.message || "Waiting to start."}
-                    />
+                    <JobProgress job={regJob} />
                     {(regJob.total || 0) > 0 && (
                       <div className="hint">{regJob.done || 0} / {regJob.total || 0} conditions</div>
                     )}
-                    {regJob.error && <Status level="error" text={regJob.error} />}
                     <div className="section">
                       <h4>Log</h4>
                       <pre className="seg-log">{regJob.log || "No logs yet."}</pre>

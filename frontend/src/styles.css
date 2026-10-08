@@ -946,6 +946,7 @@ body {
   bottom: 0;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   background: rgba(255, 255, 255, 0.72);
   border-top: 1px solid var(--border);
@@ -1527,6 +1528,11 @@ button .btn-icon,
 
 .progress-fill.running {
   box-shadow: 0 0 8px rgba(58, 110, 165, 0.34);
+}
+
+.progress-fill.failed {
+  background: var(--danger);
+  opacity: 0.55;
 }
 
 .plot-thumbs {
