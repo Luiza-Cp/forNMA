@@ -1,0 +1,17 @@
+
+
+03/09/2026 08:47:37 - NMA plot
+Your current configuration was defined with table named Control with an area standard deviation of 2.1 and NII standard deviation of 1.8.
+03/09/2026 08:47:37 - Save  DOXO NMA plot  plot
+03/09/2026 08:47:37 - Save  PTC+DOXO NMA plot  plot
+03/09/2026 08:47:38 - Save  PTC NMA plot  plot
+03/09/2026 08:47:38 - Save  Control NMA plot  plot
+03/09/2026 08:47:38 - Save  DMSO NMA plot  plot
+
+03/09/2026 08:48:19 - NMA plot
+Your current configuration was defined with table named Control with an area standard deviation of 2.1 and NII standard deviation of 1.8.
+03/09/2026 08:48:19 - Save  DOXO NMA plot  plot
+03/09/2026 08:48:19 - Save  PTC+DOXO NMA plot  plot
+03/09/2026 08:48:19 - Save  PTC NMA plot  plot
+03/09/2026 08:48:20 - Save  Control NMA plot  plot
+03/09/2026 08:48:20 - Save  DMSO NMA plot  plot
