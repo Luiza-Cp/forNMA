@@ -2237,3 +2237,80 @@ button:not(:disabled):hover {
 .nma-footer > .section {
   margin-bottom: 0;
 }
+
+.seg-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.seg-preview-head h4 {
+  margin: 0;
+}
+
+.seg-preview-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.seg-preview-tab {
+  appearance: none;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--ds-surface-strong);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.seg-preview-tab.active {
+  border-color: var(--accent);
+  background: rgba(58, 110, 165, 0.1);
+  color: var(--accent-dark);
+}
+
+.zoomable-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.zoomable-open {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.zoomable-frame {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #000;
+  overflow: hidden;
+}
+
+.zoomable-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: zoom-in;
+}
+
+.zoomable-frame.zoomed {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.zoomable-frame.zoomed img {
+  width: auto;
+  max-width: none;
+  cursor: zoom-out;
+}

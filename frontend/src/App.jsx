@@ -1293,6 +1293,71 @@ function previewMeta(path) {
   return { channel, condition };
 }
 
+function ZoomableImage({ src, alt }) {
+  const [zoomed, setZoomed] = useState(false);
+  return (
+    <div className="zoomable">
+      <div className="zoomable-toolbar">
+        <button type="button" className="ghost btn-small" onClick={() => setZoomed((z) => !z)}>
+          {zoomed ? "Fit to panel" : "Zoom to 100%"}
+        </button>
+        <a className="zoomable-open" href={src} target="_blank" rel="noreferrer">Open full size ↗</a>
+      </div>
+      <div className={`zoomable-frame ${zoomed ? "zoomed" : ""}`}>
+        <img src={src} alt={alt} onClick={() => setZoomed((z) => !z)} />
+      </div>
+    </div>
+  );
+}
+
+function SegPreviewViewer({ paths, selected, onSelect, nonce, previewIndex, busy, onPreviewNext }) {
+  const index = Math.min(Math.max(0, selected || 0), Math.max(0, paths.length - 1));
+  const path = paths[index];
+  const label = (p) => {
+    const meta = previewMeta(p);
+    return [meta.condition, meta.channel].filter(Boolean).join(" · ") || `View ${paths.indexOf(p) + 1}`;
+  };
+  return (
+    <div className="section seg-preview">
+      <div className="seg-preview-head">
+        <h4>Segmentation preview{Number.isInteger(previewIndex) ? ` · image ${previewIndex + 1}` : ""}</h4>
+        {onPreviewNext && (
+          <button type="button" className="secondary btn-small" onClick={onPreviewNext} disabled={busy}>
+            Preview next image
+          </button>
+        )}
+      </div>
+      {paths.length > 1 && (
+        <div className="seg-preview-tabs" role="tablist" aria-label="Preview channel">
+          {paths.map((p, i) => (
+            <button
+              key={p}
+              type="button"
+              role="tab"
+              aria-selected={i === index}
+              className={`seg-preview-tab ${i === index ? "active" : ""}`}
+              onClick={() => onSelect(i)}
+            >
+              {label(p)}
+            </button>
+          ))}
+        </div>
+      )}
+      {path ? (
+        <>
+          {paths.length === 1 && <div className="hint">{label(path)}</div>}
+          <ZoomableImage
+            src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(path)}&v=${nonce}`}
+            alt={`Segmentation preview: ${label(path)}`}
+          />
+        </>
+      ) : (
+        <p className="hint">No preview image yet.</p>
+      )}
+    </div>
+  );
+}
+
 function defaultChannelName(index) {
   return `Channel ${index + 1}`;
 }
@@ -7727,96 +7792,24 @@ export default function App() {
                   <div className="section tracking-viewer-section">
                     <h3>Execution progress</h3>
                     <JobProgress job={segJob} />
-                    <div className="section">
-                      <h4>
-                        Segmentation preview{Number.isInteger(segJob.preview_index) ? ` (image ${segJob.preview_index + 1})` : ""}
-                      </h4>
-                      {lastSegPreviewPayload && Number.isInteger(segJob.preview_index) && (
-                        <div className="row row-right">
-                          <button
-                            className="secondary btn-small"
-                            onClick={() =>
-                              handleStartSegmentation({
-                                ...lastSegPreviewPayload,
-                                preview: true,
-                                preview_index: (Number(segJob.preview_index) || 0) + 1,
-                              })
-                            }
-                            disabled={["starting", "queued", "running", "canceling"].includes(segJob.status)}
-                          >
-                            Preview next image
-                          </button>
-                        </div>
-                      )}
-                      {(segJob.preview_paths || []).length > 0 ? (
-                        <>
-                          <div className="viewer-toolbar">
-                            <button
-                              className="ghost btn-small"
-                              onClick={() => setSegPreviewPage((p) => Math.max(0, p - 1))}
-                              disabled={segPreviewPage <= 0}
-                            >
-                              ◀
-                            </button>
-                            <span className="viewer-counter">
-                              {Math.min((segPreviewPage * 2) + 1, segJob.preview_paths.length)}-{Math.min((segPreviewPage * 2) + 2, segJob.preview_paths.length)} / {segJob.preview_paths.length}
-                            </span>
-                            <button
-                              className="ghost btn-small"
-                              onClick={() => setSegPreviewPage((p) => {
-                                const maxPage = Math.max(0, Math.ceil((segJob.preview_paths.length || 0) / 2) - 1);
-                                return Math.min(maxPage, p + 1);
-                              })}
-                              disabled={((segPreviewPage + 1) * 2) >= segJob.preview_paths.length}
-                            >
-                              ▶
-                            </button>
-                          </div>
-                          <div className="plot-thumbs plot-thumbs-right">
-                            {(segJob.preview_paths || []).slice(segPreviewPage * 2, segPreviewPage * 2 + 2).map((path) => (
-                              (() => {
-                                const meta = previewMeta(path);
-                                return (
-                                  <a
-                                    key={path}
-                                    href={`${API_BASE}/segmentation/file?path=${encodeURIComponent(path)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="thumb-card"
-                                  >
-                                    <span>
-                                      {meta.condition ? `Condition: ${meta.condition}` : ""}
-                                      {meta.condition && meta.channel ? " | " : ""}
-                                      {meta.channel ? `Channel: ${meta.channel}` : ""}
-                                    </span>
-                                    <img
-                                      src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(path)}&v=${segPreviewNonce}`}
-                                      alt={path.split("/").pop()}
-                                    />
-                                    <span>{path.split("/").pop()}</span>
-                                  </a>
-                                );
-                              })()
-                            ))}
-                          </div>
-                        </>
-                      ) : segJob.preview_path ? (
-                        <a
-                          href={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="thumb-card viewer-single"
-                        >
-                          <img
-                            src={`${API_BASE}/segmentation/file?path=${encodeURIComponent(segJob.preview_path)}&v=${segPreviewNonce}`}
-                            alt={segJob.preview_path.split("/").pop()}
-                          />
-                          <span>{segJob.preview_path.split("/").pop()}</span>
-                        </a>
-                      ) : (
-                        <p className="hint">No preview image yet.</p>
-                      )}
-                    </div>
+                    <SegPreviewViewer
+                      paths={(segJob.preview_paths || []).length > 0 ? segJob.preview_paths : (segJob.preview_path ? [segJob.preview_path] : [])}
+                      selected={segPreviewPage}
+                      onSelect={setSegPreviewPage}
+                      nonce={segPreviewNonce}
+                      previewIndex={segJob.preview_index}
+                      busy={JOB_ACTIVE_STATES.includes(segJob.status)}
+                      onPreviewNext={lastSegPreviewPayload && Number.isInteger(segJob.preview_index)
+                        ? () => {
+                          setSegPreviewPage(0);
+                          handleStartSegmentation({
+                            ...lastSegPreviewPayload,
+                            preview: true,
+                            preview_index: (Number(segJob.preview_index) || 0) + 1,
+                          });
+                        }
+                        : null}
+                    />
                     <div className="section">
                       <h4>Log</h4>
                       <pre className="seg-log">{segJob.log || "No logs yet."}</pre>

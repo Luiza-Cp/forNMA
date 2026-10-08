@@ -187,10 +187,39 @@ def draw_and_save(df: pd.DataFrame,
         prog = os.environ.get("FORNMA_PROGRESS_FILE")
         imwrite(os.path.join(saving_dir, name), img)
         preview_path = os.path.join(saving_dir, "_preview.png")
-        imwrite(preview_path, img)  # faz uma cópia em PNG só para a UI
+        # UI-only copy: contrast-stretched with thicker, brighter contours so they are visible on screen.
+        imwrite(preview_path, _render_preview(group, ch, cols_to_draw, fs))
         update_progress(prog, preview_path=preview_path, append_preview_path=preview_path)
 
     return None
+
+
+def _stretch_for_display(img: np.ndarray) -> np.ndarray:
+    """Map the 1st-99.8th intensity percentiles to 0-255 so dim images are readable."""
+    arr = np.asarray(img, dtype=np.float32)
+    if arr.ndim == 3:
+        arr = arr.mean(axis=2)
+    lo, hi = np.percentile(arr, (1, 99.8))
+    if hi <= lo:
+        hi = lo + 1.0
+    return (np.clip((arr - lo) / (hi - lo), 0.0, 1.0) * 255).astype(np.uint8)
+
+
+def _render_preview(group: pd.DataFrame, ch: str, cols_to_draw: List[str], fs: float) -> np.ndarray:
+    """Draw the UI preview for one image; colors are BGR because images are encoded with OpenCV."""
+    nucleus_color = (0, 230, 255)   # yellow
+    other_color = (255, 80, 255)    # magenta
+    label_color = (255, 255, 255)
+    preview = cv.cvtColor(_stretch_for_display(group['Image_' + ch].iloc[0]), cv.COLOR_GRAY2BGR)
+    preview = _draw_contours_if_any(preview, list(group['Nuc_cnt_' + ch]), nucleus_color, 2)
+    for col in cols_to_draw:
+        values = list(group['Foci_cnt_' + ch]) if 'Foci' in col else list(group[col])
+        preview = _draw_contours_if_any(preview, values, other_color, 2)
+    for i in range(len(group['Cell'])):
+        preview = cv.putText(preview, str(int(group['Cell'].iloc[i])),
+                             ((group['X'] + 5).iloc[i], group['Y_draw_' + ch].iloc[i]),
+                             2, fs, label_color, 1, cv.LINE_AA)
+    return preview
 
 
 def saving_images(df_draw: pd.DataFrame,

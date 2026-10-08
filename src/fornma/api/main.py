@@ -633,7 +633,12 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
             status="completed" if st == "done" else ("canceled" if st == "canceled" else st),
             progress=percent,
             message=(
-                f"Segmentation finished successfully. Outputs were saved to {params['global']['output_folder']}."
+                (
+                    "Preview ready. Only this image was processed with the current settings; "
+                    "click Run to segment all images."
+                    if preview
+                    else f"Segmentation finished successfully. Outputs were saved to {params['global']['output_folder']}."
+                )
                 if st == "done"
                 else ("Segmentation stopped." if st == "canceled" else (d.get("message") or st))
             ),
