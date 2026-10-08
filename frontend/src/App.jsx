@@ -5075,6 +5075,8 @@ export default function App() {
   const [trackingRunning, setTrackingRunning] = useState(false);
   const [trackingLoadingFrame, setTrackingLoadingFrame] = useState(false);
   const [trackingEditing, setTrackingEditing] = useState(false);
+  const [trackingPlaying, setTrackingPlaying] = useState(false);
+  const [trackingZoomed, setTrackingZoomed] = useState(false);
   const fileInputRef = React.useRef(null);
   const attemptedColumnsRef = React.useRef(new Set());
   const plotDataColsCacheRef = React.useRef({});
@@ -5141,6 +5143,21 @@ export default function App() {
     if (MODULE_TUTORIAL_SECTION[moduleName]) setTutorialModule(moduleName);
   };
   const closeTutorial = React.useCallback(() => setTutorialModule(null), []);
+
+  useEffect(() => {
+    if (!trackingPlaying) return undefined;
+    if (trackingRunning || trackingEditing) {
+      setTrackingPlaying(false);
+      return undefined;
+    }
+    if (trackingLoadingFrame) return undefined;
+    if (Number(trackingState.frame || 0) >= Number(trackingState.max_frame || 0)) {
+      setTrackingPlaying(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => handleTrackingStepFrame(1), 350);
+    return () => window.clearTimeout(timer);
+  }, [trackingPlaying, trackingState.frame, trackingState.max_frame, trackingLoadingFrame, trackingRunning, trackingEditing]);
 
   useEffect(() => {
     writePersisted("plotData", omitKeys(plotData, ["figure", "message"]));
@@ -7430,10 +7447,12 @@ export default function App() {
     }
   };
 
-  const handleTrackingStepFrame = async (delta) => {
+  const handleTrackingStepFrame = (delta) => handleTrackingGoToFrame(Number(trackingState.frame || 0) + delta);
+
+  const handleTrackingGoToFrame = async (requested) => {
     const current = Number(trackingState.frame || 0);
     const maxFrame = Number(trackingState.max_frame || 0);
-    const target = Math.max(0, Math.min(maxFrame, current + delta));
+    const target = Math.max(0, Math.min(maxFrame, Math.round(Number(requested) || 0)));
     if (target === current) return;
     const cacheDir = String(trackingState.preview_cache_dir || "").trim();
     if (cacheDir) {
@@ -8229,30 +8248,56 @@ export default function App() {
                         </button>
                       </div>
                     )}
-                    <div className="viewer-toolbar">
+                    <div className="viewer-toolbar tracking-toolbar">
                       <button
                         className="ghost btn-small"
                         title="Show the previous frame in the tracking viewer."
-                        onClick={() => handleTrackingStepFrame(-1)}
+                        aria-label="Previous frame"
+                        onClick={() => { setTrackingPlaying(false); handleTrackingStepFrame(-1); }}
                         disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) <= 0}
                       >
                         ◀
                       </button>
-                      <span className="viewer-counter">
-                        {(Number(trackingState.frame || 0) + 1)} / {(Number(trackingState.max_frame || 0) + 1)}
-                      </span>
+                      <button
+                        className="ghost btn-small tracking-play"
+                        title={trackingPlaying ? "Pause playback" : "Play through the frames"}
+                        onClick={() => {
+                          if (!trackingPlaying && Number(trackingState.frame || 0) >= Number(trackingState.max_frame || 0)) handleTrackingGoToFrame(0);
+                          setTrackingPlaying((v) => !v);
+                        }}
+                        disabled={trackingRunning || trackingEditing || Number(trackingState.max_frame || 0) <= 0}
+                      >
+                        {trackingPlaying ? "❚❚ Pause" : "▶ Play"}
+                      </button>
                       <button
                         className="ghost btn-small"
                         title="Show the next frame in the tracking viewer."
-                        onClick={() => handleTrackingStepFrame(1)}
+                        aria-label="Next frame"
+                        onClick={() => { setTrackingPlaying(false); handleTrackingStepFrame(1); }}
                         disabled={trackingLoadingFrame || trackingRunning || trackingEditing || Number(trackingState.frame || 0) >= Number(trackingState.max_frame || 0)}
                       >
                         ▶
                       </button>
+                      <input
+                        type="range"
+                        className="tracking-frame-slider"
+                        min={0}
+                        max={Number(trackingState.max_frame || 0)}
+                        value={Number(trackingState.frame || 0)}
+                        aria-label="Frame"
+                        onChange={(e) => { setTrackingPlaying(false); handleTrackingGoToFrame(e.target.value); }}
+                        disabled={trackingRunning || trackingEditing || Number(trackingState.max_frame || 0) <= 0}
+                      />
+                      <span className="viewer-counter">
+                        Frame {Number(trackingState.frame || 0)} of {Number(trackingState.max_frame || 0)}
+                      </span>
+                      <button className="ghost btn-small" onClick={() => setTrackingZoomed((z) => !z)} disabled={!trackingState.preview_image_path}>
+                        {trackingZoomed ? "Fit to panel" : "Zoom to 100%"}
+                      </button>
                     </div>
                     {trackingState.preview_image_path ? (
-                      <div className="thumb-card viewer-single" style={{ cursor: "crosshair" }}>
-                        <div style={{ position: "relative", width: "100%" }}>
+                      <div className={`thumb-card viewer-single tracking-frame ${trackingZoomed ? "zoomed" : ""}`} style={{ cursor: "crosshair" }}>
+                        <div style={{ position: "relative", width: trackingZoomed && trackingState.viewer_w ? `${trackingState.viewer_w}px` : "100%" }}>
                           {(trackingRunning || trackingLoadingFrame || trackingEditing) && (
                             <div className="viewer-overlay">
                               <div className="spinner" />
@@ -8295,7 +8340,6 @@ export default function App() {
                               );
                             })}
                         </div>
-                        <span>{trackingState.preview_image_path.split("/").pop()}</span>
                       </div>
                     ) : (
                       <p className="hint hint-muted">

@@ -2157,6 +2157,7 @@ def _tracking_draw_preview_image(
         cache_root.mkdir(parents=True, exist_ok=True)
         key_raw = "||".join(
             [
+                "render-v2",
                 str(Path(image_dir).expanduser().resolve()),
                 str(image_col),
                 str(max(1, int(trail_window))),

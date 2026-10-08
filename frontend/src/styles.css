@@ -2444,3 +2444,24 @@ button:not(:disabled):hover {
   flex-wrap: wrap;
   margin-top: 8px;
 }
+
+.tracking-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tracking-frame-slider {
+  flex: 1 1 160px;
+  min-width: 120px;
+  accent-color: var(--accent);
+}
+
+.tracking-frame.zoomed {
+  max-height: 72vh;
+  overflow: auto;
+}
+
+.tracking-frame.zoomed img {
+  width: 100%;
+  max-width: none;
+}

@@ -205,7 +205,22 @@ def _family_color_map(family):
     return (random.randint(0,255), random.randint(0,255), random.randint(0,255))  # BGR no OpenCV
 
 
-def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point_thickness=2, font_scale=0.7, text_thickness=1):
+def _to_display_bgr(img):
+    """Contrast-stretch an image of any bit depth to 8-bit BGR so dim microscopy frames are readable."""
+    arr = np.asarray(img, dtype=np.float32)
+    if arr.ndim == 2:
+        arr = arr[..., None]
+    lo, hi = np.percentile(arr, (1, 99.8))
+    if hi <= lo:
+        hi = lo + 1.0
+    out = (np.clip((arr - lo) / (hi - lo), 0.0, 1.0) * 255).astype(np.uint8)
+    if out.shape[2] == 1:
+        return cv.cvtColor(out, cv.COLOR_GRAY2BGR)
+    return out[..., :3]
+
+
+def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point_thickness=2, font_scale=0.7, text_thickness=1,
+               enhance_contrast=True):
 
 
     if not img_col:
@@ -227,10 +242,12 @@ def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point
         # Resolve caminho da imagem
         image_to_open = df_frame[img_col].iloc[0]
         img_path = image_to_open if os.path.isabs(image_to_open) else os.path.join(folder, image_to_open)
-        img = imread(img_path)
+        img = imread(img_path, cv.IMREAD_UNCHANGED if enhance_contrast else cv.IMREAD_COLOR)
         if img is None:
             # pula frames com problema de leitura de imagem
             continue
+        if enhance_contrast:
+            img = _to_display_bgr(img)
 
         # pontos do frame atual
         df_0 = df_frame  # já é o frame atual
@@ -241,7 +258,8 @@ def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point
         # desenha pontos e labels
         for (x, y), fam, color in zip(coordinates, family_name, colors_now):
             cv.circle(img, (x, y), point_radius, color, point_thickness)
-            cv.putText(img, fam, (x + 35, y), cv.FONT_HERSHEY_SIMPLEX, font_scale, color, text_thickness)
+            # Lineage names end with "." in the table ("8.", "8.1."); drop it on screen.
+            cv.putText(img, fam.rstrip('.'), (x + 35, y), cv.FONT_HERSHEY_SIMPLEX, font_scale, color, text_thickness, cv.LINE_AA)
 
         # desenha trilhas dos últimos N frames (inclui o atual)
         start = frame - trail_window
