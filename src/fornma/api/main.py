@@ -2104,7 +2104,8 @@ def _tracking_df_load(path: str) -> pd.DataFrame:
     if not p.exists() or not p.is_file():
         raise HTTPException(status_code=400, detail=f"Tracking table not found: {path}")
     try:
-        df = pd.read_csv(p)
+        # Lineage names like "41." would otherwise parse as 41.0 and render as "41.0".
+        df = pd.read_csv(p, dtype={"family_name": str})
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read tracking table: {e}")
     return _tracking_ensure_columns(df)
