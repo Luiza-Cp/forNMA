@@ -3190,6 +3190,10 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 <div className="row dataset-header-row">
                   <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
+                  <label className="dataset-include" title="Include this dataset in the analysis">
+                    <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
+                    Include
+                  </label>
                   {(graphState.datasets || []).length > 1 && (
                     <button className="ghost btn-small" title="Remove this dataset from the plotting configuration." onClick={() => {
                       confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
@@ -3200,14 +3204,6 @@ function PlotDataLeftPanel({ onPickCsv, onPreview, status, setStatusExternal, gr
                 {!collapsedDatasets[d.id] && (
                   <>
                     <div className="row">
-                      <label className="checkbox" style={{ minWidth: 62 }}>
-                        <input
-                          type="checkbox"
-                          checked={d.enabled !== false}
-                          onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
-                        />
-                        plot
-                      </label>
                       <div style={{ flex: 1 }}>
                         <div className="field-head">Dataset name <Tip text="Friendly label used in legends and plot summaries." /></div>
                         <input
@@ -3478,6 +3474,10 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                 <div className="row dataset-header-row">
                   <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
+                  <label className="dataset-include" title="Include this dataset in the analysis">
+                    <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
+                    Include
+                  </label>
                   {(state.datasets || []).length > 1 && (
                     <button className="ghost btn-small" title="Remove this dataset from the clustering configuration." onClick={() => {
                       confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
@@ -3488,14 +3488,6 @@ function ClusteringLeftPanel({ onPickCsv, onPreview, onElbow, status, loading, e
                 {!collapsedDatasets[d.id] && (
                   <>
                     <div className="row">
-                      <label className="checkbox" style={{ minWidth: 62 }}>
-                        <input
-                          type="checkbox"
-                          checked={d.enabled !== false}
-                          onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
-                        />
-                        use
-                      </label>
                       <div style={{ flex: 1 }}>
                         <div className="field-head">Dataset name <Tip text="Friendly label used to identify this dataset in the embedding preview." /></div>
                         <input
@@ -3682,6 +3674,10 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                 <div className="row dataset-header-row">
                   <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
+                  <label className="dataset-include" title="Include this dataset in the analysis">
+                    <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
+                    Include
+                  </label>
                   {(state.datasets || []).length > 1 && (
                     <button className="ghost btn-small" onClick={() => {
                       confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
@@ -3692,14 +3688,6 @@ function StatsLeftPanel({ onPickCsv, onRun, status, loading, state, setState }) 
                 {!collapsedDatasets[d.id] && (
                   <>
                     <div className="row">
-                      <label className="checkbox" style={{ minWidth: 62 }}>
-                        <input
-                          type="checkbox"
-                          checked={d.enabled !== false}
-                          onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })}
-                        />
-                        use
-                      </label>
                       <div style={{ flex: 1 }}>
                         <div className="field-head">Dataset name <Tip text="Friendly name used to identify this file in the analysis." /></div>
                         <input
@@ -3974,6 +3962,10 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
                 <div className="row dataset-header-row">
                   <DatasetCollapseButton collapsed={!!collapsedDatasets[d.id]} onClick={() => toggleDataset(d.id)} label={d.name || `Dataset ${idx + 1}`} />
                   <div className="dataset-title">{d.name?.trim() || `Dataset ${idx + 1}`}</div>
+                  <label className="dataset-include" title="Include this dataset in the analysis">
+                    <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
+                    Include
+                  </label>
                   {(state.datasets || []).length > 1 && (
                     <button className="ghost btn-small" title="Remove this dataset from the gating analysis." onClick={() => {
                       confirmRemoveFilled(d, `Dataset ${idx + 1}`).then((ok) => { if (ok) removeDataset(d.id); });
@@ -3984,10 +3976,6 @@ function GatingLeftPanel({ onPickCsv, onPickDirectory, onPreview, onApply, onAxe
                 {!collapsedDatasets[d.id] && (
                   <>
                     <div className="row">
-                      <label className="checkbox" style={{ minWidth: 62 }}>
-                        <input type="checkbox" checked={d.enabled !== false} onChange={(e) => updateDataset(d.id, { enabled: e.target.checked })} />
-                        use
-                      </label>
                       <div style={{ flex: 1 }}>
                         <div className="field-head">Dataset name <Tip text="Friendly label shown in the gating preview and saved outputs." /></div>
                         <input className="input" value={d.name || ""} onChange={(e) => updateDataset(d.id, { name: e.target.value })} placeholder={`Dataset ${idx + 1} name`} />
@@ -4476,6 +4464,11 @@ function StatsTableView({ table, onDownload }) {
     ? "group"
     : ((displayCols[0] === "" || String(displayCols[0] || "").toLowerCase() === "group") ? displayCols[0] : null);
 
+  const isNumericText = (v) => v == null || v === "" || (typeof v !== "boolean" && Number.isFinite(Number(v)));
+  const numericCols = new Set(
+    displayCols.filter((col) => col !== rowHeaderKey && displayRows.some((r) => r[col] != null && r[col] !== "") && displayRows.every((r) => isNumericText(r[col])))
+  );
+
   const handleCopy = async () => {
     if (!displayRows.length || !displayCols.length) return;
     const lines = [displayCols.map((c) => String(c ?? "")).join("\t")];
@@ -4504,7 +4497,7 @@ function StatsTableView({ table, onDownload }) {
         <div className="table-wrap">
           <table className="results-table">
             <thead>
-              <tr>{displayCols.map((c) => <th key={`th-${table.name}-${c}`} title={String(c)}>{columnLabel(c)}</th>)}</tr>
+              <tr>{displayCols.map((c) => <th key={`th-${table.name}-${c}`} title={String(c)} className={numericCols.has(c) ? "num" : undefined}>{columnLabel(c)}</th>)}</tr>
             </thead>
             <tbody>
               {displayRows.slice(0, 2000).map((r, i) => (
@@ -4512,7 +4505,7 @@ function StatsTableView({ table, onDownload }) {
                   {displayCols.map((c) => (
                     c === rowHeaderKey
                       ? <th key={`td-${table.name}-${i}-${c}`} scope="row" className="results-table-rowhead">{r[c] == null ? "" : String(r[c])}</th>
-                      : <td key={`td-${table.name}-${i}-${c}`} title={r[c] == null ? undefined : String(r[c])}>{formatCell(r[c], c)}</td>
+                      : <td key={`td-${table.name}-${i}-${c}`} title={r[c] == null ? undefined : String(r[c])} className={numericCols.has(c) ? "num" : undefined}>{formatCell(r[c], c)}</td>
                   ))}
                 </tr>
               ))}
@@ -4757,6 +4750,8 @@ function pickNmaMeasureColumn(columns, measure, current, serverCandidates = []) 
   return "";
 }
 
+const PLOT_FONT_FAMILY = '"Plus Jakarta Sans", "Inter", system-ui, sans-serif';
+
 function PlotPanel({ figure, config, onRelayout, onClick }) {
   const hostRef = React.useRef(null);
   const ref = React.useRef(null);
@@ -4788,8 +4783,12 @@ function PlotPanel({ figure, config, onRelayout, onClick }) {
 
   React.useEffect(() => {
     if (!ref.current || !figure) return;
+    const baseLayout = figure.layout || {};
     const layout = {
-      ...(figure.layout || {}),
+      ...baseLayout,
+      // Plot text uses the app font and ink color unless the figure sets its own.
+      font: { family: PLOT_FONT_FAMILY, color: "#3d4d5e", ...(baseLayout.font || {}) },
+      hoverlabel: { font: { family: PLOT_FONT_FAMILY }, ...(baseLayout.hoverlabel || {}) },
       autosize: false,
       width: plotWidth,
     };
