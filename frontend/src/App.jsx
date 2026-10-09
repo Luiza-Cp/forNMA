@@ -3024,6 +3024,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
   const [channels, setChannels] = usePersistentState("foci.channels", []);
   const [actions, setActions] = usePersistentState("foci.actions", ["overlay"]);
   const [saveImages, setSaveImages] = usePersistentState("foci.saveImages", true);
+  const [channelsError, setChannelsError] = useState("");
   const running = ["starting", "queued", "running", "canceling"].includes(fociJob?.status || "idle");
   const fociMissing = [
     !String(pklPath || "").trim() && "choose the pickle (.pkl) folder",
@@ -3031,6 +3032,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
   ].filter(Boolean);
 
   const loadChannels = async (path) => {
+    setChannelsError("");
     if (!path?.trim()) {
       setChannelsOptions([]);
       setChannels([]);
@@ -3039,12 +3041,23 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
     try {
       const opts = await onLoadFociChannels(path.trim());
       setChannelsOptions(opts);
-      setChannels(opts.map((o) => o.value));
-    } catch {
+      // Keep the user's ticks when the same folder is reloaded; default to all channels otherwise.
+      setChannels((prev) => {
+        const kept = (prev || []).filter((v) => opts.some((o) => o.value === v));
+        return kept.length ? kept : opts.map((o) => o.value);
+      });
+    } catch (err) {
       setChannelsOptions([]);
       setChannels([]);
+      setChannelsError(errorMessageFromException(err, "Could not read this folder."));
     }
   };
+
+  // Load channels for typed, pasted or restored paths too, not only Browse.
+  useEffect(() => {
+    const t = setTimeout(() => loadChannels(pklPath), 400);
+    return () => clearTimeout(t);
+  }, [pklPath]);
 
   return (
     <Card as="aside" className="panel seg-panel" variant="panel">
@@ -3060,10 +3073,7 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
           <PathInput className="input" value={pklPath} onChange={(e) => setPklPath(e.target.value)} placeholder="Folder with .pkl result files..." />
           <button className="secondary" title="Choose the folder containing the `.pkl` files." onClick={async () => {
             const p = await onPickDirectory();
-            if (p) {
-              setPklPath(p);
-              await loadChannels(p);
-            }
+            if (p) setPklPath(p);
           }}><BrowseLabel>Browse</BrowseLabel></button>
         </div>
         <div className="field-head">Saving path <Tip text="Directory where the overlay outputs and optional rendered images will be saved." /></div>
@@ -3079,7 +3089,13 @@ function FociOverlayLeftPanel({ onPickDirectory, onStartFoci, onStopFoci, onLoad
           <summary>Channels</summary>
           <div className="seg-body">
             {channelsOptions.length === 0 ? (
-              <p className="hint">Point to a .pkl folder to load channels automatically.</p>
+              <p className="hint">
+                {!String(pklPath || "").trim()
+                  ? "Point to a .pkl folder to load channels automatically."
+                  : channelsError
+                    ? channelsError
+                    : "No foci channels found in these .pkl files. Run Segmentation with Foci enabled for the channel you want to inspect."}
+              </p>
             ) : (
               <div className="multi-picker">
                 {channelsOptions.map((opt) => (
