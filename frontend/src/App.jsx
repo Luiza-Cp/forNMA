@@ -8739,10 +8739,12 @@ export default function App() {
               <section>
                 {regJob.job_id ? (
                   <div className="section">
-                    <Status
-                      level="warning"
-                      text="Registration can be slow and memory-intensive. Keep this window open and avoid running other heavy tasks. If needed, reduce the number of images/channels per run."
-                    />
+                    {JOB_ACTIVE_STATES.includes(regJob.status) && (
+                      <Status
+                        level="warning"
+                        text="Registration can be slow and memory-intensive. Keep this window open and avoid running other heavy tasks. If needed, reduce the number of images/channels per run."
+                      />
+                    )}
                     <h3>Execution progress</h3>
                     <JobProgress job={regJob} />
                     {(regJob.total || 0) > 0 && (
