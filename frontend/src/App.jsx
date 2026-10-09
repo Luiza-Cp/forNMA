@@ -451,29 +451,64 @@ const HOME_MODULE_GUIDES = [
     id: "tutorial-tracking",
     title: "Tracking Tutorial",
     intro:
-      "Tracking reconstructs cell trajectories over time and supports manual correction after automatic linking.",
+      "Tracking links each cell across the frames of a time-lapse and records divisions as lineages. It runs in two steps: an automatic tracking pass, then manual correction, normally in napari-TRACE.",
     whenToUse: [
       "Use it when you need trajectory-level information across frames, including migration paths and lineage events.",
+      "The input is the Results table from a time-lapse segmentation (Overtime enabled) and the folder with the same image frames.",
     ],
-    params: [
-      ["path_to_table", "Select the measurement table used as tracking input."],
-      ["image_dir", "Select the folder containing the corresponding images."],
-      ["image_col", "Choose the column that identifies the image name or frame source."],
-      ["max_distance", "Set the maximum allowed displacement between linked objects."],
-      ["time_window", "Set the temporal window used for association."],
-      ["max_split_distance", "Set the maximum distance allowed when assigning division events."],
-      ["max_gap_closing_distance", "Set the tolerance for reconnecting interrupted tracks."],
-      ["frame / max_frame / trail_window", "Viewer controls for navigating the time series and adjusting the trail display."],
-      ["show_complete_trail", "Shows the full trajectory instead of only the recent trail."],
-      ["save_results_dir", "Sets the output folder for corrected tracking results."],
+    paramGroups: [
+      {
+        title: "Step 1 · Automatic tracking",
+        items: [
+          ["Tracking table", "The segmentation Results.csv of the time-lapse."],
+          ["Image folder", "The folder with the raw frames used in segmentation. The viewer and napari-TRACE both need it."],
+          ["Image name column", "The table column whose values match the image file names in that folder."],
+          ["Max distance", "Largest movement, in pixels, allowed between consecutive frames for two detections to be linked."],
+          ["Time window", "How many frames a cell may be missing and still be reconnected to its track."],
+          ["Max split distance", "Largest distance between a mother cell and its daughters when a division is assigned."],
+          ["Gap closing distance", "Largest distance allowed when reconnecting a track across missing frames."],
+          ["Viewer", "After the run, browse frames with the arrows, the frame slider or Play, and use Zoom to inspect details."],
+        ],
+      },
+      {
+        title: "Step 2 · Correct tracks in napari-TRACE (recommended)",
+        items: [
+          ["What it is", "napari-TRACE is the track curation tool bundled with forNMA. It opens in a separate napari window."],
+          ["Segmentation pkl-data folder", "Select the pkl-data folder written by Segmentation. forNMA uses its nuclear contours to build the label mask napari-TRACE edits."],
+          ["Open curator", "Builds the mask, prepares a working folder and opens napari-TRACE. The first launch can take a while on long movies."],
+          ["Save in napari-TRACE", "Curate the tracks in the napari window, then use SAVE ALL there. Closing the window without saving loses the changes."],
+          ["Where files go", "A folder named Curation is created next to pkl-data, holding the tracked table, mask.tif, the frames and an exports folder with the curated results. The exports path is also shown under the Open curator button."],
+          ["Resuming", "Opening the curator again reuses the existing Curation folder, so earlier work continues instead of being overwritten. To start over from the automatic tracking, rename or delete that folder first."],
+        ],
+      },
+      {
+        title: "Step 2 · Alternatives",
+        items: [
+          ["Save results", "Export the automatic tracking as is: the tracked table and the rendered tracking images go to the chosen folder."],
+          ["Correct in this page instead", "A simpler editor inside forNMA. Click cells on the image to select them, then use Link selected, Cell division (mother plus two daughters), Unlink or Delete track. Undo reverts the last edit and Save progress keeps a checkpoint."],
+          ["Finish", "In the in-page editor, Finish exports the corrected table alone or together with the rendered tracking images."],
+        ],
+      },
     ],
     outputs: [
-      "Tracking result tables with linked trajectories.",
-      "Corrected outputs after manual editing, when applicable.",
-      "Saved tracking files in the selected results folder.",
+      {
+        title: "Automatic tracking",
+        items: [
+          "A tracked table with a track ID and a lineage name for every cell. Daughter cells extend the mother's name, for example 8 → 8.1 and 8.2.",
+          "Rendered tracking images, when exported with Save results.",
+        ],
+      },
+      {
+        title: "napari-TRACE curation",
+        items: [
+          "Curation/ next to pkl-data, with Tracked Results.csv, mask.tif and the frames used for curation.",
+          "Curation/exports/ with the curated results written by SAVE ALL.",
+        ],
+      },
     ],
     notes: [
-      "Manual correction is part of the workflow, so linking, unlinking, and marking cell divisions are expected editing steps.",
+      "napari-TRACE is installed with the forNMA environment. If Open curator reports that it is not installed, update the environment with the project's environment.yml (or run the forNMA setup again).",
+      "Automatic tracking is a starting point: always review divisions and track breaks before using lineage results.",
     ],
   },
 ];
