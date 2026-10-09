@@ -2886,7 +2886,9 @@ function RegistrationLeftPanel({ onPickDirectory, onStartRegistration, onStopReg
 
         <div className="seg-scroll">
           <div className="sidebar-control-block">
-          <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>{isImageSelectionSaved(summaryText) ? "Edit images" : "Load images"}</button>
+          <div className="row">
+            <button className="secondary" title="Open the condition-by-channel table used to define the registration inputs." onClick={() => { setModalError(""); setModalOpen(true); }}>{isImageSelectionSaved(summaryText) ? "Edit images" : "Load images"}</button>
+          </div>
           <ImageSelectionBadge summaryText={summaryText} imagesData={imagesData} />
           <div className="field-head">Saving path <Tip text="Directory where registered outputs will be saved." /></div>
           <div className="row path-row">
