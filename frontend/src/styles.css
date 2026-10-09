@@ -1270,6 +1270,7 @@ button.chip:disabled {
 
 .dataset-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   margin-bottom: 12px;
 }
