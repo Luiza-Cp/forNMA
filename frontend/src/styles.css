@@ -2325,12 +2325,6 @@ button:not(:disabled):hover {
   margin: 6px 0;
 }
 
-.zoomable-open {
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
 
 .zoomable-frame {
   border: 1px solid var(--border);
@@ -2339,10 +2333,18 @@ button:not(:disabled):hover {
   overflow: hidden;
 }
 
-.zoomable-frame img {
+/* Fit: the whole image is visible, scaled down to the panel width and the screen height. */
+.zoomable-frame.fit {
+  display: flex;
+  justify-content: center;
+}
+
+.zoomable-frame.fit img {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: auto;
+  max-height: 70vh;
   cursor: zoom-in;
 }
 
@@ -2352,7 +2354,66 @@ button:not(:disabled):hover {
 }
 
 .zoomable-frame.zoomed img {
+  display: block;
   width: auto;
+  max-width: none;
+  height: auto;
+  cursor: zoom-out;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  background: rgba(5, 12, 22, 0.92);
+}
+
+.lightbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+}
+
+.lightbox-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #e8eef6;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-toolbar .ghost {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.lightbox-stage {
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px 16px;
+}
+
+.lightbox-stage.fit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-stage.fit img {
+  max-width: 100%;
+  max-height: 100%;
+  cursor: zoom-in;
+}
+
+.lightbox-stage.actual {
+  overflow: auto;
+}
+
+.lightbox-stage.actual img {
   max-width: none;
   cursor: zoom-out;
 }

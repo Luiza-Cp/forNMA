@@ -1622,18 +1622,46 @@ function previewMeta(path) {
 
 function ZoomableImage({ src, alt }) {
   const [zoomed, setZoomed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   return (
     <div className="zoomable">
       <div className="zoomable-toolbar">
         <button type="button" className="ghost btn-small" onClick={() => setZoomed((z) => !z)}>
           {zoomed ? "Fit to panel" : "Zoom to 100%"}
         </button>
-        <a className="zoomable-open" href={src} target="_blank" rel="noreferrer">Open full size ↗</a>
+        <button type="button" className="ghost btn-small" onClick={() => setFullscreen(true)}>View full screen</button>
       </div>
-      <div className={`zoomable-frame ${zoomed ? "zoomed" : ""}`}>
+      <div className={`zoomable-frame ${zoomed ? "zoomed" : "fit"}`}>
         <img src={src} alt={alt} onClick={() => setZoomed((z) => !z)} />
       </div>
+      {fullscreen && <ImageLightbox src={src} alt={alt} onClose={() => setFullscreen(false)} />}
     </div>
+  );
+}
+
+// Full-screen image view inside the app: fits the screen by default, 100% scrolls.
+function ImageLightbox({ src, alt, onClose }) {
+  const [actualSize, setActualSize] = useState(false);
+  useEscapeToClose(true, onClose);
+  return createPortal(
+    <div className="lightbox" role="dialog" aria-modal="true" aria-label={alt} onMouseDown={onClose}>
+      <div className="lightbox-toolbar" onMouseDown={(event) => event.stopPropagation()}>
+        <span className="lightbox-title">{alt}</span>
+        <button type="button" className="ghost btn-small" onClick={() => setActualSize((v) => !v)}>
+          {actualSize ? "Fit to screen" : "Actual size (100%)"}
+        </button>
+        <button type="button" className="ghost btn-small" onClick={onClose} autoFocus>Close (Esc)</button>
+      </div>
+      <div className={`lightbox-stage ${actualSize ? "actual" : "fit"}`}>
+        <img
+          src={src}
+          alt={alt}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={() => setActualSize((v) => !v)}
+        />
+      </div>
+    </div>,
+    document.body
   );
 }
 
