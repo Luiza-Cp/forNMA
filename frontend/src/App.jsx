@@ -951,6 +951,7 @@ function ModuleTabs({ groups, active, onSelect }) {
               <Button
                 key={stage}
                 type="button"
+                variant="plain"
                 className={`module-chip ${stage === active ? "active" : ""}`}
                 data-state={stage === active ? "active" : "inactive"}
                 aria-current={stage === active ? "page" : undefined}
@@ -1538,7 +1539,7 @@ function HomeTutorialSection({ title, intro, whenToUse = [], params = [], paramG
         <details className="home-detail-block home-copy-block" open>
           <summary>
             <span>When to use</span>
-            <span className="home-detail-hint">Click to expand or collapse</span>
+            <span className="home-detail-hint" aria-hidden="true" />
           </summary>
           <ul className="home-bullet-list">
             {whenToUse.map((item) => (
@@ -1551,7 +1552,7 @@ function HomeTutorialSection({ title, intro, whenToUse = [], params = [], paramG
         <details className="home-detail-block home-copy-block">
           <summary>
             <span>Key interface parameters</span>
-            <span className="home-detail-hint">Click to expand or collapse</span>
+            <span className="home-detail-hint" aria-hidden="true" />
           </summary>
           {paramGroups.length > 0 ? (
             <div className="home-param-groups">
@@ -1583,7 +1584,7 @@ function HomeTutorialSection({ title, intro, whenToUse = [], params = [], paramG
         <details className="home-detail-block home-copy-block" open>
           <summary>
             <span>How to use Load images</span>
-            <span className="home-detail-hint">Click to expand or collapse</span>
+            <span className="home-detail-hint" aria-hidden="true" />
           </summary>
           <p className="hint hint-muted">
             The <strong>Load images</strong> window is often the least intuitive part of the interface for new users,
@@ -1606,7 +1607,7 @@ function HomeTutorialSection({ title, intro, whenToUse = [], params = [], paramG
         <details className="home-detail-block home-copy-block" open>
           <summary>
             <span>Outputs</span>
-            <span className="home-detail-hint">Click to expand or collapse</span>
+            <span className="home-detail-hint" aria-hidden="true" />
           </summary>
           {outputs.every((item) => typeof item === "object" && item !== null && Array.isArray(item.items)) ? (
             <div className="home-output-groups">
@@ -1635,7 +1636,7 @@ function HomeTutorialSection({ title, intro, whenToUse = [], params = [], paramG
         <details className="home-detail-block home-copy-block">
           <summary>
             <span>Notes</span>
-            <span className="home-detail-hint">Click to expand or collapse</span>
+            <span className="home-detail-hint" aria-hidden="true" />
           </summary>
           <ul className="home-bullet-list">
             {notes.map((item) => (

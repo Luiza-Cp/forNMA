@@ -670,13 +670,13 @@ button.chip:disabled {
 
 .home-section-card {
   margin-top: 0;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 24px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--ds-border-soft);
+  border-radius: var(--ds-radius-xl);
+  padding: var(--ds-space-6);
+  box-shadow: var(--ds-shadow-md);
   color: var(--ink);
+  font-size: 15px;
   line-height: 1.65;
 }
 
@@ -724,10 +724,10 @@ button.chip:disabled {
 }
 
 .home-info-card {
-  border-radius: 18px;
-  padding: 16px;
-  background: rgba(238, 242, 247, 0.72);
-  border: 1px solid var(--border);
+  border-radius: var(--ds-radius-lg);
+  padding: var(--ds-space-4);
+  background: var(--ds-background);
+  border: 1px solid var(--ds-border-soft);
   color: var(--ink);
 }
 
@@ -745,12 +745,11 @@ button.chip:disabled {
 }
 
 .home-section-card h3 {
-  font-size: 20px;
-  line-height: 1.2;
-  margin-bottom: 18px;
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: var(--ds-space-4);
   color: var(--accent-dark);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .home-section-card h3::after {
@@ -789,9 +788,9 @@ button.chip:disabled {
 }
 
 .home-detail-block {
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid var(--border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface-strong);
+  border: 1px solid var(--ds-border-soft);
   padding: 0;
   overflow: hidden;
 }
@@ -803,11 +802,11 @@ button.chip:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 16px;
-  background: rgba(238, 242, 247, 0.72);
-  color: var(--accent);
+  padding: 12px 16px;
+  background: var(--ds-background);
+  color: var(--accent-dark);
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 15px;
 }
 
 .home-detail-block > summary::-webkit-details-marker {
@@ -815,33 +814,28 @@ button.chip:disabled {
 }
 
 .home-detail-block > summary::after {
-  content: "+";
+  content: "";
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  display: inline-grid;
-  place-items: center;
-  background: rgba(58, 110, 165, 0.12);
-  color: var(--accent);
-  font-size: 1rem;
-  font-weight: 800;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.7;
+  transform: rotate(45deg);
+  transition: transform var(--ds-transition);
 }
 
 .home-detail-block[open] > summary::after {
-  content: "-";
+  transform: rotate(-135deg);
 }
 
 .home-detail-block > :not(summary) {
-  padding: 20px 22px;
+  padding: var(--ds-space-4) var(--ds-space-5);
 }
 
 .home-detail-hint {
   margin-left: auto;
-  padding-right: 8px;
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--muted);
 }
 
 .home-copy-block h4 {
@@ -2970,22 +2964,22 @@ details[open] > summary::before {
 }
 
 /* The first block in a results area has nothing above it to separate from. */
-.content > section > .section:first-child,
-.content > section > .preview-loading + .section,
-.content > section > div:first-child > .section:first-child {
+.content > section:not(.home-stack) > .section:first-child,
+.content > section:not(.home-stack) > .preview-loading + .section,
+.content > section:not(.home-stack) > div:first-child > .section:first-child {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
 }
 
-.content h2 {
+.content > section:not(.home-stack) h2 {
   margin: 0 0 var(--ds-space-2);
   font-size: var(--ds-text-2xl);
   font-weight: 700;
   color: var(--accent-dark);
 }
 
-.content h3 {
+.content > section:not(.home-stack) h3 {
   margin: 0 0 var(--ds-space-3);
   font-size: var(--ds-text-lg);
   font-weight: 700;
@@ -3109,4 +3103,16 @@ details[open] > summary::before {
 
 .nma-footer > .status {
   margin-top: var(--ds-space-2);
+}
+
+/* Buttons that hold descriptive text wrap like normal content. */
+.home-workflow-module,
+.home-index-item,
+.feature-picker-item {
+  white-space: normal;
+}
+
+.workflow-done-message .status-icon {
+  color: var(--ds-success);
+  --status-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1.6 14.6-4.2-4.2 1.4-1.4 2.8 2.8 6-6 1.4 1.4-7.4 7.4Z'/%3E%3C/svg%3E");
 }

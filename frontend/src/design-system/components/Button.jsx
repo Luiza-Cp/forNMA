@@ -1,5 +1,6 @@
 import React from "react";
 
+// Variants: primary (default), secondary, ghost, and plain (no button chrome; the caller styles it).
 function inferVariant(className = "", variant) {
   if (variant) return variant;
   if (className.includes("secondary")) return "secondary";
