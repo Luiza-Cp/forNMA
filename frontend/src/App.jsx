@@ -4675,7 +4675,7 @@ function JobProgress({ job }) {
   const failed = job.status === "failed";
   const level = job.status === "completed" ? "success" : failed ? "error" : "info";
   const message = job.message || "Waiting to start.";
-  const text = failed && job.error ? `${message}\n${job.error}` : message;
+  const text = failed && job.error && !message.includes(job.error) ? `${message}\n${job.error}` : message;
   return (
     <>
       <div className="progress-wrap">
