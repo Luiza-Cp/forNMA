@@ -2491,7 +2491,7 @@ def tracking_save_results(req: TrackingSaveRequest):
 
     saved_images = 0
     images_dir = None
-    if req.preview_cache_dir:
+    if req.include_images and req.preview_cache_dir:
         cache_dir = Path(req.preview_cache_dir).expanduser().resolve()
         if cache_dir.exists() and cache_dir.is_dir():
             files = sorted([p for p in cache_dir.iterdir() if p.is_file() and p.suffix.lower() in {".png", ".tif", ".tiff"}])
@@ -2506,7 +2506,7 @@ def tracking_save_results(req: TrackingSaveRequest):
     msg = f"Saved tracked table to '{dst_table}'."
     if saved_images:
         msg += f" Saved {saved_images} image(s) to '{images_dir}'."
-    else:
+    elif req.include_images:
         msg += " No cached tracking images were found to copy."
 
     return TrackingSaveResponse(
