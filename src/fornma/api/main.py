@@ -630,7 +630,7 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
         percent = int(d.get("percent", 100 if st == "done" else 0))
         _set_seg_job(
             job_id,
-            status="completed" if st == "done" else ("canceled" if st == "canceled" else st),
+            status={"done": "completed", "canceled": "canceled", "error": "failed"}.get(st, st),
             progress=percent,
             message=(
                 (
@@ -640,13 +640,13 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
                     else f"Segmentation finished successfully. Outputs were saved to {params['global']['output_folder']}."
                 )
                 if st == "done"
-                else ("Segmentation stopped." if st == "canceled" else (d.get("message") or st))
+                else ("Segmentation stopped." if st == "canceled" else (_progress_error_text(d) or st))
             ),
             log=d.get("log_history") or d.get("log", "") or "",
             preview_path=d.get("preview_path"),
             preview_paths=d.get("preview_paths", []),
             preview_index=d.get("preview_index", preview_index),
-            error=d.get("message") if st == "error" else None,
+            error=_progress_error_text(d) if st == "error" else None,
         )
     except Exception as e:
         try:
@@ -661,6 +661,11 @@ def _run_segmentation_job(job_id: str, images_data: dict, seg_data: dict, previe
     finally:
         with SEG_JOBS_LOCK:
             SEG_THREADS.pop(job_id, None)
+
+
+def _progress_error_text(d: dict) -> str:
+    """Failure text from a pipeline progress file (written to `message` or `log`)."""
+    return str(d.get("message") or d.get("log") or "")
 
 
 @app.post("/segmentation/start", response_model=SegmentationStartResponse)
@@ -712,16 +717,27 @@ def segmentation_status(job_id: str):
             "error": "failed",
             "canceled": "canceled",
         }.get(st, job.get("status", "running"))
+        # The pipeline reports each step in `log` ("Control — image 3/8") and
+        # failures in `message` or `log`; surface both while the job is live.
+        log = d.get("log_history") or d.get("log", "") or ""
+        if mapped == "running":
+            message = d.get("log") or d.get("message") or job.get("message", "")
+            if d.get("done") and d.get("log") and not log.endswith(d["log"]):
+                log = f"{log}\n{d['log']}".strip()
+        elif st == "error":
+            message = _progress_error_text(d) or job.get("message", "")
+        else:
+            message = job.get("message", "") or d.get("message", "")
         _set_seg_job(
             job_id,
             status=mapped,
             progress=int(d.get("percent", job.get("progress", 0))),
-            message=d.get("message", job.get("message", "")) or job.get("message", ""),
-            log=d.get("log_history") or d.get("log", "") or "",
+            message=message,
+            log=log,
             preview_path=d.get("preview_path", job.get("preview_path")),
             preview_paths=d.get("preview_paths", job.get("preview_paths", [])),
             preview_index=d.get("preview_index", job.get("preview_index")),
-            error=d.get("message") if st == "error" else job.get("error"),
+            error=_progress_error_text(d) if st == "error" else job.get("error"),
         )
         with SEG_JOBS_LOCK:
             job = SEG_JOBS.get(job_id)
