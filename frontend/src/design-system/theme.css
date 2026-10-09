@@ -1,4 +1,5 @@
 :root {
+  /* Brand palette (unchanged). */
   --ds-primary: #3a6ea5;
   --ds-primary-soft: #7db7d9;
   --ds-primary-dark: #0f4c81;
@@ -18,18 +19,70 @@
   --ds-white: #ffffff;
   --ds-gradient: linear-gradient(135deg, #3a6ea5 0%, #7db7d9 58%, #c8b6e2 100%);
   --ds-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78));
-  --ds-shadow-sm: 0 8px 24px rgba(31, 45, 61, 0.06);
-  --ds-shadow-md: 0 8px 24px rgba(31, 45, 61, 0.06);
-  --ds-shadow-lg: 0 8px 24px rgba(31, 45, 61, 0.06);
-  --ds-shadow-glow: 0 8px 24px rgba(31, 45, 61, 0.06);
+
+  /* Derived tints of the palette for hover, selection and subtle fills. */
+  --ds-primary-tint: rgba(58, 110, 165, 0.08);
+  --ds-primary-tint-strong: rgba(58, 110, 165, 0.14);
+  --ds-border-soft: #dfe7ef;
+  --ds-border-strong: #b7c6d6;
+
+  /* Status colors: the existing danger/success hues plus soft fills. */
+  --ds-success: #2f7d68;
+  --ds-success-soft: #eaf5f1;
+  --ds-success-border: #b9ddd1;
+  --ds-danger: #b84a43;
+  --ds-danger-soft: #fbefed;
+  --ds-danger-border: #ecc3bf;
+  --ds-warning: #8a5a00;
+  --ds-warning-soft: #fff6e0;
+  --ds-warning-border: #f0d595;
+  --ds-info: #285781;
+  --ds-info-soft: #eef4fb;
+  --ds-info-border: #c9d9ea;
+
+  /* Elevation: distinct levels (they were all the same value). */
+  --ds-shadow-xs: 0 1px 2px rgba(15, 37, 64, 0.06);
+  --ds-shadow-sm: 0 1px 3px rgba(15, 37, 64, 0.06), 0 2px 8px rgba(15, 37, 64, 0.04);
+  --ds-shadow-md: 0 2px 6px rgba(15, 37, 64, 0.05), 0 8px 24px rgba(15, 37, 64, 0.06);
+  --ds-shadow-lg: 0 12px 40px rgba(15, 37, 64, 0.16);
+  --ds-shadow-glow: 0 1px 2px rgba(15, 76, 129, 0.2), 0 4px 12px rgba(58, 110, 165, 0.22);
+  --ds-focus-ring: 0 0 0 3px rgba(125, 183, 217, 0.45);
+
+  /* Shape. */
+  --ds-radius-xs: 6px;
   --ds-radius-sm: 8px;
-  --ds-radius-md: 12px;
-  --ds-radius-lg: 18px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 14px;
   --ds-radius-xl: 18px;
   --ds-radius-pill: 999px;
+
+  /* Spacing scale (4 px grid). */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+
+  /* Type. */
   --ds-font-sans: "Plus Jakarta Sans", "Inter", "Montserrat", system-ui, sans-serif;
   --ds-font-serif: "Plus Jakarta Sans", "Inter", "Montserrat", system-ui, sans-serif;
+  --ds-font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  --ds-text-2xs: 11px;
+  --ds-text-xs: 12px;
+  --ds-text-sm: 13px;
+  --ds-text-md: 14px;
+  --ds-text-lg: 16px;
+  --ds-text-xl: 19px;
+  --ds-text-2xl: 24px;
 
+  /* Controls. */
+  --ds-control-h: 40px;
+  --ds-control-h-sm: 32px;
+  --ds-transition: 140ms ease;
+
+  /* Legacy aliases used across styles.css. */
   --bg: var(--ds-background);
   --panel: var(--ds-surface);
   --ink: var(--ds-text);
@@ -39,7 +92,7 @@
   --accent-2: var(--ds-secondary-blue);
   --accent-3: var(--ds-secondary-purple);
   --border: var(--ds-border);
-  --danger: #b84a43;
-  --success: #2f7d68;
+  --danger: var(--ds-danger);
+  --success: var(--ds-success);
   --shadow: var(--ds-shadow-md);
 }
