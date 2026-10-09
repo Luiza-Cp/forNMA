@@ -1382,6 +1382,14 @@ function ConfirmHost() {
   );
 }
 
+// Jobs are saved so a run in progress survives a page reload. A job that had already finished is
+// not restored: its previews could be months old and would look like the result of the current setup.
+function restoreActiveJob(storageKey, defaults) {
+  const saved = readStorage(storageKey, {});
+  const active = ["starting", "queued", "running", "canceling"].includes(saved?.status);
+  return active && saved?.job_id ? { ...defaults, ...saved } : { ...defaults };
+}
+
 function FolderIcon() {
   return (
     <svg className="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -5186,13 +5194,13 @@ export default function App() {
   const [highlightPlotConfig, setHighlightPlotConfig] = useState(false);
   const [plotConfig, setPlotConfig] = useState(() => restoreSnapshot("nma.plotConfig", initialPlotConfig()));
   const [plotSavePath, setPlotSavePath] = useState(() => readPersisted("nma.plotSavePath", ""));
-  const [plotJob, setPlotJob] = useState(() => ({ ...DEFAULT_PLOT_JOB, ...readStorage(STORAGE_KEYS.plotJob, {}) }));
+  const [plotJob, setPlotJob] = useState(() => restoreActiveJob(STORAGE_KEYS.plotJob, DEFAULT_PLOT_JOB));
   const [currentPlotIndex, setCurrentPlotIndex] = useState(0);
   const [showNmaPreviewWhilePlotting, setShowNmaPreviewWhilePlotting] = useState(false);
   const [showPlotProgress, setShowPlotProgress] = useState(false);
-  const [segJob, setSegJob] = useState(() => ({ ...DEFAULT_SEG_JOB, ...readStorage(STORAGE_KEYS.segJob, {}) }));
-  const [regJob, setRegJob] = useState(() => ({ ...DEFAULT_REG_JOB, ...readStorage(STORAGE_KEYS.regJob, {}) }));
-  const [fociJob, setFociJob] = useState(() => ({ ...DEFAULT_FOCI_JOB, ...readStorage(STORAGE_KEYS.fociJob, {}) }));
+  const [segJob, setSegJob] = useState(() => restoreActiveJob(STORAGE_KEYS.segJob, DEFAULT_SEG_JOB));
+  const [regJob, setRegJob] = useState(() => restoreActiveJob(STORAGE_KEYS.regJob, DEFAULT_REG_JOB));
+  const [fociJob, setFociJob] = useState(() => restoreActiveJob(STORAGE_KEYS.fociJob, DEFAULT_FOCI_JOB));
   const [segPreviewNonce, setSegPreviewNonce] = useState(0);
   const [segPreviewPage, setSegPreviewPage] = useState(0);
   const [lastSegPreviewPayload, setLastSegPreviewPayload] = useState(null);
