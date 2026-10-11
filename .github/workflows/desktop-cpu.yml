@@ -25,6 +25,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Historical analysis outputs include a directory named "file:",
+          # which Windows cannot check out. Only build inputs are needed.
+          sparse-checkout: |
+            src
+            frontend
+            packaging
+            .github
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'

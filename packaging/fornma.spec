@@ -5,6 +5,7 @@ from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_sub
 root = Path(SPECPATH).parent
 datas = [(str(root / "frontend" / "dist"), "frontend/dist"),
          (str(root / "build" / "desktop-models"), "models")]
+datas += collect_data_files("fornma", includes=["resources/*.toml", "core/Segmentation/parameters.toml"])
 binaries = []
 hiddenimports = [name for name in collect_submodules("fornma")
                  if name == "fornma" or name.split(".")[1] in
