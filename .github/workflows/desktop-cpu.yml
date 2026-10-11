@@ -11,6 +11,10 @@ on:
       - 'packaging/**'
       - 'pyproject.toml'
       - '.github/workflows/desktop-cpu.yml'
+      - '.gitignore'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
