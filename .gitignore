@@ -22,3 +22,6 @@ tests/results
 # Desktop installers and isolated build environments
 /release/
 /.venv-desktop/
+
+# Historical generated outputs with a name that Windows cannot check out
+/file:/
