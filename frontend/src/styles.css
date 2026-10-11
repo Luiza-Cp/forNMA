@@ -955,6 +955,32 @@ button.chip:disabled {
   transition: background-color var(--ds-transition);
 }
 
+.tracking-alternative > summary {
+  width: fit-content;
+  padding: 9px 14px;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-primary-tint);
+  color: var(--accent-dark);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--ds-shadow-xs);
+  transition: border-color var(--ds-transition), background-color var(--ds-transition);
+}
+
+.tracking-alternative > summary:hover {
+  border-color: var(--accent);
+}
+
+.tracking-alternative > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.tracking-alternative[open] > summary {
+  margin-bottom: 12px;
+}
+
 .seg-body {
   padding: var(--ds-space-3) 14px var(--ds-space-4);
   display: grid;

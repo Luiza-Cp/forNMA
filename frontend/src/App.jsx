@@ -451,7 +451,7 @@ const HOME_MODULE_GUIDES = [
     id: "tutorial-tracking",
     title: "Tracking Tutorial",
     intro:
-      "Tracking links each cell across the frames of a time-lapse and records divisions as lineages. It runs in two steps: an automatic tracking pass, then manual correction, normally in napari-TRACE.",
+      "Tracking links each cell across the frames of a time-lapse and records divisions as lineages. It runs in two steps: an automatic tracking pass, then manual correction in the native forNMA editor, with napari-TRACE available as an alternative.",
     whenToUse: [
       "Use it when you need trajectory-level information across frames, including migration paths and lineage events.",
       "The input is the Results table from a time-lapse segmentation (Overtime enabled) and the folder with the same image frames.",
@@ -471,7 +471,15 @@ const HOME_MODULE_GUIDES = [
         ],
       },
       {
-        title: "Step 2 · Correct tracks in napari-TRACE (recommended)",
+        title: "Step 2 · Native track correction (recommended)",
+        items: [
+          ["Save results", "Export the automatic tracking as is: the tracked table and the rendered tracking images go to the chosen folder."],
+          ["Correct tracks", "The native editor inside forNMA. Click cells on the image to select them, then use Link selected, Cell division (mother plus two daughters), Unlink or Delete track. Undo reverts the last edit and Save progress keeps a checkpoint."],
+          ["Finish", "In the in-page editor, Finish exports the corrected table alone or together with the rendered tracking images."],
+        ],
+      },
+      {
+        title: "Step 2 · Alternative: napari-TRACE",
         items: [
           ["What it is", "napari-TRACE is the track curation tool bundled with forNMA. It opens in a separate napari window."],
           ["Segmentation pkl-data folder", "Select the pkl-data folder written by Segmentation. forNMA uses its nuclear contours to build the label mask napari-TRACE edits."],
@@ -479,14 +487,6 @@ const HOME_MODULE_GUIDES = [
           ["Save in napari-TRACE", "Curate the tracks in the napari window, then use SAVE ALL there. Closing the window without saving loses the changes."],
           ["Where files go", "A folder named Curation is created next to pkl-data, holding the tracked table, mask.tif, the frames and an exports folder with the curated results. The exports path is also shown under the Open curator button."],
           ["Resuming", "Opening the curator again reuses the existing Curation folder, so earlier work continues instead of being overwritten. To start over from the automatic tracking, rename or delete that folder first."],
-        ],
-      },
-      {
-        title: "Step 2 · Alternatives",
-        items: [
-          ["Save results", "Export the automatic tracking as is: the tracked table and the rendered tracking images go to the chosen folder."],
-          ["Correct in this page instead", "A simpler editor inside forNMA. Click cells on the image to select them, then use Link selected, Cell division (mother plus two daughters), Unlink or Delete track. Undo reverts the last edit and Save progress keeps a checkpoint."],
-          ["Finish", "In the in-page editor, Finish exports the corrected table alone or together with the rendered tracking images."],
         ],
       },
     ],
@@ -4319,7 +4319,13 @@ function TrackingLeftPanel({
               <button className="secondary" title="Export the current tracked table and the cached tracking images to the selected folder." onClick={onSaveResults} disabled={!canSaveResults}>
                 Save results
               </button>
-              <div className="field-head" style={{ marginTop: 10 }}>2. Correct tracks (napari-TRACE)</div>
+              <div className="field-head" style={{ marginTop: 10 }}>2. Correct tracks</div>
+              <button className="primary" title="Open the native forNMA editor to correct tracks in this page." onClick={onOpenCorrection} disabled={!hasTracked || busy}>
+                Correct tracks
+              </button>
+              <div className="hint">Use the native editor to link cells, mark divisions, unlink or delete tracks, and save corrections.</div>
+              <details className="tracking-alternative" style={{ marginTop: 10 }}>
+                <summary>Alternative: correct in napari-TRACE</summary>
               <div className="row path-row">
                 <PathInput className="input" value={state.pkl_dir || ""} onChange={(e) => setField("pkl_dir", e.target.value)} placeholder="Segmentation pkl-data folder (nuclear contours)" />
                 <button
@@ -4356,11 +4362,7 @@ function TrackingLeftPanel({
                   <code>{state.exports_dir}</code>
                 </div>
               ) : null}
-              <div className="row row-right" style={{ marginTop: 8 }}>
-                <button className="ghost btn-small" title="Use the simpler correction viewer built into this page instead of napari." onClick={onOpenCorrection} disabled={!hasTracked || busy}>
-                  Correct in this page instead
-                </button>
-              </div>
+              </details>
               <Status level={status.level} text={status.text} />
             </div>
           </details>
