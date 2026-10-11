@@ -109,6 +109,9 @@ def self_test() -> int:
     import tkinter
     # Importing curator.app creates a QApplication. Keep it out of normal startup.
     import curator.app
+    import scikit_posthocs
+    from fornma.core.Statistics.OneWayAnalysis import OneWayAnalysis
+    from fornma.core.Statistics.TwoWayAnalysis import TwoWayAnalysis
     from fornma.core.Segmentation.segmentation.cellpose_integration import get_cellpose_model
     from fornma.core.Tracking.tracking import run_laptracker
     from fornma.core.UMAP import umap_tools
@@ -117,6 +120,8 @@ def self_test() -> int:
     if torch.version.cuda is not None:
         raise RuntimeError(f"This package includes CUDA: {torch.__version__}")
     assert tkinter.Tcl().eval("info library")
+    posthoc = scikit_posthocs.posthoc_dunn([[1, 2, 3], [8, 9, 10]])
+    assert posthoc.shape == (2, 2)
     model = get_cellpose_model("nuclei", use_gpu=True)
     if model.gpu:
         raise RuntimeError("Cellpose must use CPU even with a legacy GPU parameter")

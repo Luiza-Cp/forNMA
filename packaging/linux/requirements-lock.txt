@@ -156,7 +156,7 @@ sphinxcontrib-qthelp==2.0.0
 sphinxcontrib-serializinghtml==2.0.0
 stack-data==0.6.3
 starlette==1.7.0
-statsmodels==0.15.0
+statsmodels==0.14.6
 superqt==0.8.2
 sympy==1.13.1
 tabulate==0.10.0
