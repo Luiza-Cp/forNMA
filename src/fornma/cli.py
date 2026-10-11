@@ -409,7 +409,7 @@ def main():
             export_parameters_toml(args.dest)
         else:
             import toml
-            from fornma.Segmentation import run, check_user_inputs
+            from fornma.core.Segmentation import run, check_user_inputs
             dic = toml.load(args.parameters)
             if args.cellpose_model:
                 dic['segmentation']['cellpose']['model_type'] = args.cellpose_model

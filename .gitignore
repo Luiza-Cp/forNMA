@@ -18,3 +18,7 @@ control_parameters.pickle
 tests/data
 tests/results
 
+
+# Desktop installers and isolated build environments
+/release/
+/.venv-desktop/

@@ -63,7 +63,7 @@ model_type = 'nuclei'
 diameter = 25
 flow_threshold = 0.4
 mask_threshold = 0.0
-use_gpu = true
+use_gpu = false
 invert = true
 cellprob_threshold = -3
 

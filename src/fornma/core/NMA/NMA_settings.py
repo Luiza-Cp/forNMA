@@ -15,10 +15,11 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from matplotlib.widgets import Slider
 import matplotlib
-try:
-    matplotlib.use('TkAgg')
-except ImportError:
-    matplotlib.use('Agg')
+if not os.environ.get('MPLBACKEND'):
+    try:
+        matplotlib.use('TkAgg')
+    except ImportError:
+        matplotlib.use('Agg')
 # as infos disso estção anotadas no caderno, conferir ali
 from scipy import stats
 from .NMA_draggable_line import draggable_lines
@@ -386,7 +387,9 @@ def NMA_control(path: str,
                       'fig': nma.fig,
                       }
 
-    config_path = os.path.join(os.path.dirname(__file__), "control_parameters.pickle")
+    from fornma.runtime import nma_settings_path
+    config_path = nma_settings_path()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     with open(config_path, 'wb') as handle:
         pickle.dump(nma_parameters, handle, protocol=pickle.HIGHEST_PROTOCOL)
 

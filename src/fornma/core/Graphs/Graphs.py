@@ -17,10 +17,11 @@ from ..NMA.NMA_draggable_line import draggable_lines
 import matplotlib.patches as patches
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-try:
-    matplotlib.use('TkAgg')
-except ImportError:
-    matplotlib.use('Agg')
+if not os.environ.get('MPLBACKEND'):
+    try:
+        matplotlib.use('TkAgg')
+    except ImportError:
+        matplotlib.use('Agg')
 
 
 class Graphs:

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import Plotly from "plotly.js-dist-min";
 import { Button, Card, FieldTitle, Tip } from "./design-system/index.js";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000" : window.location.origin;
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
 const makeRowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const csvCell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -137,7 +137,7 @@ const HOME_MODULE_GUIDES = [
           ["Cellpose Diameter", "Expected nucleus diameter, in pixels, used by Cellpose."],
           ["Cellpose Flow Threshold", "Controls the allowed flow error in Cellpose. Objects with errors below the threshold are kept."],
           ["Cellprob Threshold", "Controls the minimum cell probability accepted by Cellpose."],
-          ["Use GPU", "Allows Cellpose to run on GPU when one is available."],
+          ["Processing", "Cellpose runs on CPU; no CUDA or GPU setup is required."],
           ["Invert Intensities", "Inverts the image intensity before Cellpose segmentation when needed."],
         ],
       },
@@ -1792,7 +1792,6 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
   const [cellposeDiameter, setCellposeDiameter] = usePersistentState("seg.cellposeDiameter", 25);
   const [cellposeFlow, setCellposeFlow] = usePersistentState("seg.cellposeFlow", 0.4);
   const [cellposeCellprob, setCellposeCellprob] = usePersistentState("seg.cellposeCellprob", -3);
-  const [cellposeUseGpu, setCellposeUseGpu] = usePersistentState("seg.cellposeUseGpu", true);
   const [cellposeInvert, setCellposeInvert] = usePersistentState("seg.cellposeInvert", true);
   const [cytoCellposeModel, setCytoCellposeModel] = usePersistentState("seg.cytoCellposeModel", "cyto3");
   const [cytoCellposeDiameter, setCytoCellposeDiameter] = usePersistentState("seg.cytoCellposeDiameter", 25);
@@ -2047,7 +2046,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
         diameter: showNumber(cellposeDiameter, 25),
         flow_threshold: showNumber(cellposeFlow, 0.4),
         cellprob_threshold: showNumber(cellposeCellprob, -3),
-        use_gpu: !!cellposeUseGpu,
+        use_gpu: false,
         invert: !!cellposeInvert,
       },
       cytoplasm_cellpose: {
@@ -2319,10 +2318,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                     <input className="input" type="number" value={cellposeFlow} onChange={(e) => setCellposeFlow(e.target.value)} step="0.05" />
                     <div className="field-head">Cellprob Threshold <Tip text="Cell probability threshold; lower values include more cells." /></div>
                     <input className="input" type="number" value={cellposeCellprob} onChange={(e) => setCellposeCellprob(e.target.value)} step="0.5" />
-                    <label className="checkbox">
-                      <input type="checkbox" checked={cellposeUseGpu} onChange={(e) => setCellposeUseGpu(e.target.checked)} />
-                      Use GPU <Tip text="Enable GPU acceleration if available." />
-                    </label>
+                    <div className="hint">Cellpose processing: CPU</div>
                     <label className="checkbox">
                       <input type="checkbox" checked={cellposeInvert} onChange={(e) => setCellposeInvert(e.target.checked)} />
                       Invert Intensities <Tip text="Invert image values before segmentation when needed." />
@@ -2398,10 +2394,7 @@ function SegmentationLeftPanel({ onPickDirectory, onStartSegmentation, onStopSeg
                 <input className="input" type="number" value={cytoCellposeFlow} onChange={(e) => setCytoCellposeFlow(e.target.value)} step="0.05" />
                 <div className="field-head">Cellprob Threshold <Tip text="Cell probability threshold; lower values include more cells. For visible-light or brightfield cells, try -3 or -4." /></div>
                 <input className="input" type="number" value={cytoCellposeCellprob} onChange={(e) => setCytoCellposeCellprob(e.target.value)} step="0.5" />
-                <label className="checkbox">
-                  <input type="checkbox" checked={cellposeUseGpu} onChange={(e) => setCellposeUseGpu(e.target.checked)} />
-                  Use GPU <Tip text="Enable GPU acceleration if available." />
-                </label>
+                    <div className="hint">Cellpose processing: CPU</div>
                 <label className="checkbox">
                   <input type="checkbox" checked={cytoCellposeInvert} onChange={(e) => setCytoCellposeInvert(e.target.checked)} />
                   Invert Intensities <Tip text="Invert image values before segmentation when needed." />
@@ -5504,7 +5497,7 @@ export default function App() {
       });
     } catch (err) {
       if (err instanceof TypeError) {
-        throw new Error("Failed to fetch API. Check if backend is running at http://127.0.0.1:8000.");
+        throw new Error(`Cannot reach forNMA at ${API_BASE}. Check that the application is still running.`);
       }
       throw err;
     }

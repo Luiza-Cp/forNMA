@@ -134,7 +134,7 @@ def test_run_cellpose_passes_selected_model_to_cellpose(monkeypatch):
     )
 
     assert contours == []
-    assert created == {"pretrained_model": "cyto2", "gpu": True}
+    assert created == {"pretrained_model": "cyto2", "gpu": False}
     assert eval_kwargs["diameter"] == 50
     assert eval_kwargs["flow_threshold"] == 0.55
     assert eval_kwargs["cellprob_threshold"] == -2
@@ -154,7 +154,8 @@ def test_get_cellpose_model_reuses_cached_model(monkeypatch):
     monkeypatch.setattr(cellpose_integration.models, "CellposeModel", FakeCellposeModel)
 
     first = cellpose_integration.get_cellpose_model("nuclei", False)
-    second = cellpose_integration.get_cellpose_model("nuclei", False)
+    # Legacy GPU settings must share the same CPU model.
+    second = cellpose_integration.get_cellpose_model("nuclei", True)
     third = cellpose_integration.get_cellpose_model("cyto3", False)
 
     assert first is second

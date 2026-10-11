@@ -14,12 +14,14 @@ from pathlib import Path
 warnings.filterwarnings('ignore')
 import matplotlib
 
-try:
-    matplotlib.use('TkAgg')
-except ImportError:
-    matplotlib.use('Agg')
+if not os.environ.get('MPLBACKEND'):
+    try:
+        matplotlib.use('TkAgg')
+    except ImportError:
+        matplotlib.use('Agg')
 
-CONFIG_PATH = Path(__file__).parent / "control_parameters.pickle"
+from fornma.runtime import nma_settings_path
+CONFIG_PATH = nma_settings_path()
 
 class NMA:
     """ Class for NMA graph plotting"""

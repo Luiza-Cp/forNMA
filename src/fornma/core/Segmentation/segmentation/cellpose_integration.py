@@ -8,7 +8,6 @@ Created on Fri Feb 11 15:35:41 2022
 
 import numpy as np
 import cv2 as cv
-import warnings
 from cellpose import models, utils
 from typing import Optional, List
 from .find_contours import load_image
@@ -25,7 +24,9 @@ def get_cellpose_model(model_type: str = "nuclei", use_gpu: bool = False):
             f"Unknown Cellpose model '{model_type}'. Choose one of: {', '.join(CELLPOSE_MODEL_TYPES)}."
         )
 
-    cache_key = (model_type, bool(use_gpu))
+    # Keep the legacy argument so existing parameter files remain compatible.
+    use_gpu = False
+    cache_key = (model_type, False)
     if cache_key not in _MODEL_CACHE:
         _MODEL_CACHE[cache_key] = models.CellposeModel(
             pretrained_model=model_type,
@@ -99,12 +100,6 @@ def run_cellpose(image_path: str,
     """
     Runs Cellpose in a specified image and returns a list of filtered contours.
     """
-    warnings.warn(
-                "⚠️ Even if you selected GPU, Cellpose may still be running on CPU. "
-        "This can be very slow. For better performance, make sure CUDA is installed "
-        "and that you are using a GPU-enabled version of PyTorch.",
-        UserWarning
-    )
     image = load_image(
         image_path,
         rescale_intensity=rescale_intensity,

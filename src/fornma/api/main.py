@@ -15,7 +15,6 @@ import shutil
 from datetime import datetime
 import subprocess
 import sys
-import textwrap
 
 import numpy as np
 import pandas as pd
@@ -126,8 +125,10 @@ from .schemas import (
 from fornma.shared.params_builder import build_interface_params
 
 
+from fornma.runtime import helper_command, nma_settings_path
+
 APP_ROOT = Path(__file__).resolve().parent
-NMA_SETTINGS_PATH = (APP_ROOT.parent / "core" / "NMA" / "control_parameters.pickle").resolve()
+NMA_SETTINGS_PATH = nma_settings_path()
 
 app = FastAPI(title="forNMA API")
 PLOT_JOBS: Dict[str, Dict] = {}
@@ -249,24 +250,9 @@ def dataset_column_values(req: DatasetColumnValuesRequest):
 
 @app.post("/system/pick-csv")
 def system_pick_csv():
-    script = textwrap.dedent(
-        """
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        path = filedialog.askopenfilename(
-            title="Select dataset CSV",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
-        )
-        root.destroy()
-        print(path or "", end="")
-        """
-    )
     try:
         res = subprocess.run(
-            [sys.executable, "-c", script],
+            helper_command("pick-csv"),
             check=True,
             capture_output=True,
             text=True,
@@ -282,21 +268,9 @@ def system_pick_csv():
 
 @app.post("/system/pick-directory")
 def system_pick_directory():
-    script = textwrap.dedent(
-        """
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        path = filedialog.askdirectory(title="Select output folder")
-        root.destroy()
-        print(path or "", end="")
-        """
-    )
     try:
         res = subprocess.run(
-            [sys.executable, "-c", script],
+            helper_command("pick-directory"),
             check=True,
             capture_output=True,
             text=True,
@@ -2880,7 +2854,8 @@ def tracking_curate_launch(req: TrackingCurateLaunchRequest):
                 status_code=400,
                 detail="napari-TRACE is not installed in this environment. Re-run the forNMA setup, or set FORNMA_CURATOR_DIR to a napari-TRACE source folder.",
             )
-        launch_cmd = [curator_python, "-m", "curator.app", None]  # staging filled in below
+        launch_cmd = (helper_command("curator", None) if curator_python == sys.executable
+                      else [curator_python, "-m", "curator.app", None])  # staging filled in below
 
     # One self-contained "Curation" folder next to the segmentation pkl-data.
     # Seeding curator_meta.json marks it as an already-set-up working copy, so

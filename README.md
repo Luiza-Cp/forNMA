@@ -17,6 +17,12 @@ Tools for single-cell image analysis and phenotype integration, including regist
 
 ## Installation
 
+For the desktop CPU installers (Windows and Linux), see
+[packaging/README.md](packaging/README.md). These packages bundle Python,
+the web interface, CPU analysis dependencies, Cellpose models and napari-TRACE.
+The older `distribution/fornma-local-test` folder is a source-based test bundle;
+new desktop installers are built directly from the current source tree.
+
 ```bash
 # Editable install during development
 pip install -e .

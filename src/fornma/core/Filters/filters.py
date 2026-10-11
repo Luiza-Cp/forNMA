@@ -17,14 +17,15 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 
 #from src.Graphs.Graph_class import check_column_names
-from fornma.NMA.NMA_draggable_line import draggable_lines
-from fornma.Segmentation.analyze import saving_images
+from fornma.core.NMA.NMA_draggable_line import draggable_lines
+from fornma.core.Segmentation.analyze import saving_images
 from rich.progress import track
 
-try:
-    matplotlib.use('TkAgg')
-except ImportError:
-    matplotlib.use('Agg')
+if not os.environ.get('MPLBACKEND'):
+    try:
+        matplotlib.use('TkAgg')
+    except ImportError:
+        matplotlib.use('Agg')
 
 
 def filter_table(path_to_table: str,

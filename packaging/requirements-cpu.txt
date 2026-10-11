@@ -1,0 +1,6 @@
+# Install torch from its CPU index FIRST; then install this file and the project.
+torch==2.5.1+cpu
+numpy==1.26.4
+cellpose==3.1.1.2
+napari-TRACE==0.6.1
+pyinstaller==6.22.3

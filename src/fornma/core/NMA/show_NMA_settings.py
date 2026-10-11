@@ -3,13 +3,15 @@ import pickle
 import os
 import matplotlib
 from pathlib import Path
-try:
-    matplotlib.use('TkAgg')
-except ImportError:
-    matplotlib.use('Agg')
+if not os.environ.get('MPLBACKEND'):
+    try:
+        matplotlib.use('TkAgg')
+    except ImportError:
+        matplotlib.use('Agg')
 
 HERE = Path(__file__).resolve().parent
-PICKLE_PATH = HERE / "control_parameters.pickle"   # 2) caminho estável
+from fornma.runtime import nma_settings_path
+PICKLE_PATH = nma_settings_path()
 
 
 def show_nma_settings():

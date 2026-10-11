@@ -53,6 +53,7 @@ version_scheme = "no-guess-dev"
 local_scheme = "no-local-version"
 
 [project.scripts]
+fornma-desktop = "fornma.desktop:main"
 fornma = "fornma.cli:main"            # já existe, manter
 
 [tool.setuptools.package-data]
