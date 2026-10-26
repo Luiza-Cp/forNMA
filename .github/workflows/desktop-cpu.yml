@@ -1,6 +1,12 @@
 name: Desktop CPU installers
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: Platforms to build
+        type: choice
+        default: all
+        options: [all, macos]
   push:
     branches: [build/desktop-cpu]
     paths:
@@ -18,19 +24,28 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  prepare-release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Create draft for tested installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          gh release create "desktop-cpu-${{ github.run_id }}"
+          --draft --target "${{ github.sha }}"
+          --title "Desktop CPU installers (build ${{ github.run_id }})"
+          --notes "Test installers. Download the file matching your OS and processor. macOS and Windows packages have no developer signing certificate."
   package:
+    needs: prepare-release
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-22.04
-            arch: x64
-          - os: windows-2022
-            arch: x64
-          - os: macos-15
-            arch: arm64
-          - os: macos-15-intel
-            arch: x64
+        include: ${{ fromJSON(inputs.platforms == 'macos' && '[{"os":"macos-15","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"}]' || '[{"os":"ubuntu-22.04","arch":"x64"},{"os":"windows-2022","arch":"x64"},{"os":"macos-15","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -60,9 +75,9 @@ jobs:
         run: choco install innosetup --no-progress -y
       - name: Build and test CPU installer
         run: python packaging/build_desktop.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: forNMA-cpu-${{ runner.os }}-${{ matrix.arch }}
-          path: release/
-          if-no-files-found: error
-          retention-days: 14
+      - name: Upload tested installers to draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "desktop-cpu-${{ github.run_id }}" release/*
