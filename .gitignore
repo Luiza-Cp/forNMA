@@ -25,3 +25,31 @@ tests/results
 
 # Historical generated outputs with a name that Windows cannot check out
 /file:/
+
+# Static forNMA page prepared for the laboratory website
+/site-fornma/
+
+# Frontend dependencies, build outputs and caches
+node_modules/
+/frontend/dist/
+/frontend/.vite/
+
+# Legacy generated source distribution (kept locally)
+/distribution/
+/build_distribution.py
+
+# Python environments and development caches
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.py[cod]
+
+# Local editor and assistant configuration
+/.codex
+/.claude/
+/.agents/
+/.aws/
+.vscode/
+.DS_Store
+Thumbs.db

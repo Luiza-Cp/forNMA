@@ -1,31 +1,10 @@
-name: /media/luiza/DATA/conda_envs/fornma2025
+# Run from the repository root: conda env create -f environment.yml
+name: fornma
 channels:
-  - defaults
+  - conda-forge
 dependencies:
   - python=3.11
-  - numpy
-  - scipy
-  - scikit-learn
-  - matplotlib
-  - seaborn
-  - pandas
-  - scikit-image
-  - shapely
-  - progress
-  - networkx
-  - pystackreg
-  - rich
-  - toml
-  - opencv
-  - cellpose[version='<4']
-  - pytest
-  - expat
-  - conda-forge::umap-learn
-  - conda-forge::scikit-posthocs
-  - conda-forge::pingouin
   - pip
   - pip:
-      # Bundled tracking curator (napari-TRACE, from PyPI): pulls napari[all] + Qt
-      # into this env so the curator launches from forNMA with no extra setup, no git.
+      - -e .[test]
       - napari-TRACE>=0.6,<0.7
-prefix: /media/luiza/DATA/conda_envs/fornma2025

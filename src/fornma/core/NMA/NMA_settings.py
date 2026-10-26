@@ -394,6 +394,3 @@ def NMA_control(path: str,
         pickle.dump(nma_parameters, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     return print("NMA control setting complete")
-
-
-#NMA_control('/media/luiza/DATA/Doutorado/Dani/results/24h/lap_lnc_tras1 Results.csv')

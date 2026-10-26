@@ -175,7 +175,7 @@ class OneWayAnalysis:
 
 if __name__ == '__main__':
     dados_geminina = pd.read_csv(
-        '/media/luiza/DATA/Doutorado/forNMA/experimentos/Nicolas/Dado Tiago 2023/2 53BP1-NB/Results/Results C/Results complete.csv',
+        'data/example.csv',
         index_col=0)
     helper = AnalysisHelper(alpha=0.05, log_file="logs.txt")
 

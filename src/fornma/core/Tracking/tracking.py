@@ -277,9 +277,3 @@ def draw_track(df, folder, save, img_col, trail_window=15, point_radius=2, point
         # salva com zero-padding no frame (opcional)
         out_path = os.path.join(save, f"{int(frame):05d}.tiff")
         imwrite(out_path, img)
-
-
-#path_to_table = '/media/luiza/DATA/Doutorado/forNMA/experimentos/exp_kaka/populacional 1/exp kaka populacional 1/results/dados para tracking/results/GREEN_D9_2 Registered/Results_NMA_para_tracking.csv'
-#df = tracking(path_to_table,30, 5, 10,  10 )
-
-#df.to_csv('/media/luiza/DATA/Doutorado/forNMA/experimentos/exp_kaka/populacional 1/exp kaka populacional 1/results/dados para tracking/results/GREEN_D9_2 Registered/tracked.csv')

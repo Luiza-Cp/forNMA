@@ -28,7 +28,8 @@ PyTorch 2.2.2, the last release with Intel Mac wheels; Apple Silicon uses 2.5.1.
 Both run Cellpose on CPU. Each platform must build and test its own installer.
 
 The manual GitHub Actions workflow `Desktop CPU installers` performs these
-steps independently on Linux, Windows, macOS Apple Silicon and macOS Intel and uploads the generated installers to a draft GitHub release. Draft release
+steps independently on Linux, Windows, macOS Apple Silicon and macOS Intel,
+and uploads the generated installers to a draft GitHub release. Draft release
 assets avoid the Actions artifact storage quota. Select `platforms: macos` in
 Run workflow to build only the two Mac variants.
 Windows installers are unsigned until a code-signing certificate is configured.

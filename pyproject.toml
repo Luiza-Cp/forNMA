@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fornma"
 description = "A tool for single cell image analysis and phenotype integration"
+authors = [{name = "Luiza Cherobini Pereira", email = "luiza.cp1998@gmail.com"}]
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10,<3.13"
 license = {text = "BSD-3-Clause"}
@@ -54,7 +55,7 @@ local_scheme = "no-local-version"
 
 [project.scripts]
 fornma-desktop = "fornma.desktop:main"
-fornma = "fornma.cli:main"            # já existe, manter
+fornma = "fornma.cli:main"
 
 [tool.setuptools.package-data]
-fornma = ["resources/*.toml"]
+fornma = ["resources/*.toml", "core/Segmentation/parameters.toml"]

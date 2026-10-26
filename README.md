@@ -20,8 +20,8 @@ Tools for single-cell image analysis and phenotype integration, including regist
 For the desktop CPU installers (Windows, Linux and macOS), see
 [packaging/README.md](packaging/README.md). These packages bundle Python,
 the web interface, CPU analysis dependencies, Cellpose models and napari-TRACE.
-The older `distribution/fornma-local-test` folder is a source-based test bundle;
-new desktop installers are built directly from the current source tree.
+Desktop installers are built directly from the current source tree; generated
+packages and dependency folders are not stored with the source code.
 
 ```bash
 # Editable install during development
@@ -31,7 +31,9 @@ pip install -e .
 # pip install --index-url https://test.pypi.org/simple fornma
 ```
 
-Python ≥ 3.10 is recommended.
+Python 3.10–3.12 is supported; desktop CPU installers are built with Python 3.11.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and validation.
+The project uses the [BSD 3-Clause license](LICENSE).
 
 ## Command-line interface
 
@@ -58,7 +60,7 @@ fornma segmentation <parameters.toml> [--preview]
 - Runs segmentation and feature extraction from a TOML configuration.
 
 ```bash
-fornma fornma segmentation init-config <destination>
+fornma segmentation init-config <destination>
 ```
 - Copies the default parameters.toml into <destination> (file or folder). Used to configure segmentation
 
@@ -131,7 +133,7 @@ fornma umap run <csv...> <out_dir> [--columns COL1 COL2 ...] [--n_neighbors INT]
 **Example**
 
 ```bash
-fornma umap run   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   /media/luiza/DATA/Doutorado/teste-apagar-depois   --columns Area
+fornma umap run   ./data/example.csv   ./results   --columns Area
 ```
 
 ### 2) Elbow plot
@@ -179,7 +181,7 @@ fornma stats oneway <csv...> <numeric_col> <group_col>   --save_dir <out_dir> [-
 **Example**
 
 ```bash
-fornma stats oneway   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   Area Condition   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+fornma stats oneway   ./data/example.csv   Area Condition   --save_dir ./results
 ```
 
 ### 2) Two-way analysis
@@ -197,7 +199,7 @@ fornma stats twoway <csv...> <numeric_col> <group_col1> <group_col2>   --save_di
 **Example**
 
 ```bash
-fornma stats twoway   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   Area Condition NMA_category   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+fornma stats twoway   ./data/example.csv   Area Condition NMA_category   --save_dir ./results
 ```
 
 ### 3) Chi-square (global + post-hoc)
@@ -217,7 +219,7 @@ fornma stats chi2 <csv...> <group_col> <category_col>   --save_dir <out_dir> [--
 **Example**
 
 ```bash
-fornma stats chi2   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   Condition NMA_category   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+fornma stats chi2   ./data/example.csv   Condition NMA_category   --save_dir ./results
 ```
 
 ### 4) Chi-square subgroup comparisons
@@ -235,7 +237,7 @@ fornma stats chi2-subgroups <csv...> <group_col> <condition_col>   --save_dir <o
 **Example**
 
 ```bash
-fornma stats chi2-subgroups   /media/luiza/DATA/Doutorado/53BP1/tests/data/statistics/dados_fig_2.csv   NMA_category Condition   --save_dir /media/luiza/DATA/Doutorado/teste-apagar-depois
+fornma stats chi2-subgroups   ./data/example.csv   NMA_category Condition   --save_dir ./results
 ```
 
 ---
