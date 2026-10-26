@@ -22,7 +22,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2022]
+        include:
+          - os: ubuntu-22.04
+            arch: x64
+          - os: windows-2022
+            arch: x64
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -54,7 +62,7 @@ jobs:
         run: python packaging/build_desktop.py
       - uses: actions/upload-artifact@v4
         with:
-          name: forNMA-cpu-${{ runner.os }}-x64
+          name: forNMA-cpu-${{ runner.os }}-${{ matrix.arch }}
           path: release/
           if-no-files-found: error
           retention-days: 14

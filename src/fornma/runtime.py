@@ -12,6 +12,8 @@ def data_dir() -> Path:
         return Path(override).expanduser().resolve()
     if sys.platform == "win32":
         return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "forNMA"
+    if sys.platform == "darwin":
+        return Path.home() / "Library/Application Support/forNMA"
     return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "forNMA"
 
 

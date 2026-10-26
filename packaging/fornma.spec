@@ -1,4 +1,5 @@
 """Build on the target OS in the isolated CPU environment."""
+import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
@@ -32,3 +33,8 @@ pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="forNMA", debug=False,
           strip=False, upx=False, console=True)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="forNMA")
+
+if sys.platform == "darwin":
+    app = BUNDLE(coll, name="forNMA.app", bundle_identifier="org.fornma.desktop",
+                 info_plist={"CFBundleShortVersionString": "0.1.0",
+                             "NSHighResolutionCapable": True})

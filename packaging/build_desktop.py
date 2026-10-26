@@ -12,6 +12,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--skip-install", action="store_true", help="Use the current Python environment")
 parser.add_argument("--skip-frontend", action="store_true")
 args = parser.parse_args()
+if sys.platform not in {"linux", "win32", "darwin"}:
+    raise SystemExit("Desktop installer targets are Windows, Linux and macOS")
 python = Path(sys.executable)
 if not args.skip_install:
     environment = root / ".venv-desktop"
@@ -25,7 +27,8 @@ def run(command, **kwargs):
 
 if not args.skip_install:
     run([python, "-m", "pip", "install", "--upgrade", "pip"])
-    run([python, "-m", "pip", "install", "torch==2.5.1+cpu", "--index-url", "https://download.pytorch.org/whl/cpu"])
+    if sys.platform != "darwin":
+        run([python, "-m", "pip", "install", "torch==2.5.1+cpu", "--index-url", "https://download.pytorch.org/whl/cpu"])
     if sys.platform == "linux":
         run([python, "-m", "pip", "install", "-r", "packaging/linux/requirements-lock.txt"])
     run([python, "-m", "pip", "install", "-r", "packaging/requirements-cpu.txt", "."])
@@ -47,6 +50,8 @@ run([python, "packaging/prepare_models.py"], env=environment)
 run([python, "-m", "PyInstaller", "--noconfirm", "--distpath", "build/desktop-dist",
      "--workpath", "build/desktop-work", "packaging/fornma.spec"], env=environment)
 binary = root / "build/desktop-dist/forNMA" / ("forNMA.exe" if sys.platform == "win32" else "forNMA")
+if sys.platform == "darwin":
+    binary = root / "build/desktop-dist/forNMA.app/Contents/MacOS/forNMA"
 run([python, "packaging/smoke_test.py", binary], env=environment)
 release = root / "release"
 release.mkdir(exist_ok=True)
@@ -57,5 +62,5 @@ if sys.platform == "linux":
 elif sys.platform == "win32":
     compiler = Path(os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)")) / "Inno Setup 6/ISCC.exe"
     run([compiler, "packaging/windows/fornma.iss"])
-else:
-    raise SystemExit("Desktop installer targets are Windows x64 and Linux amd64")
+elif sys.platform == "darwin":
+    run([python, "packaging/macos/package_dmg.py"])

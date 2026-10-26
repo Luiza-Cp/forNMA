@@ -1,5 +1,8 @@
-# Install torch from its CPU index FIRST; then install this file and the project.
-torch==2.5.1+cpu
+# Linux/Windows install torch from its CPU index FIRST.
+# macOS wheels use PyPI; 2.2.2 is the last release with Intel Mac wheels.
+torch==2.5.1+cpu; sys_platform != "darwin"
+torch==2.5.1; sys_platform == "darwin" and platform_machine == "arm64"
+torch==2.2.2; sys_platform == "darwin" and platform_machine == "x86_64"
 numpy==1.26.4
 cellpose==3.1.1.2
 statsmodels==0.14.6

@@ -15,17 +15,24 @@ python packaging/build_desktop.py
 The build creates an isolated `.venv-desktop`, downloads CPU dependencies and
 model weights, builds the frontend, freezes Python, runs a packaged smoke test,
 and writes installers to `release/`. Linux builds use the dependency lock in
-`packaging/linux/requirements-lock.txt`. Windows builds resolve compatible
+`packaging/linux/requirements-lock.txt`. Windows and macOS builds resolve compatible
 platform-specific wheels and save the exact dependency list in `release/`.
 
 On Linux, build on Ubuntu 22.04 amd64 with `dpkg-deb` available. The `.deb` is
 intended for Ubuntu 22.04+ and compatible Debian systems with glibc >= 2.35;
 other distributions require separate validation. On Windows, install Inno Setup
-6 before building. Each platform must build and test its own installer.
+6 before building. On macOS, use macOS 15 with a native Python 3.11
+(arm64 for Apple Silicon, x86_64 for Intel). The build creates a native
+`forNMA.app` and a compressed `.dmg`, then verifies the disk image. Intel uses
+PyTorch 2.2.2, the last release with Intel Mac wheels; Apple Silicon uses 2.5.1.
+Both run Cellpose on CPU. Each platform must build and test its own installer.
 
 The manual GitHub Actions workflow `Desktop CPU installers` performs these
-steps independently on Linux and Windows and uploads the generated artifacts.
+steps independently on Linux, Windows, macOS Apple Silicon and macOS Intel and uploads the generated artifacts.
 Windows installers are unsigned until a code-signing certificate is configured.
+macOS test builds have no Developer ID signature or notarization. macOS may
+block them; only for a trusted build, use System Settings > Privacy & Security >
+Open Anyway after attempting to open the app.
 
 ## Install and run
 
@@ -38,13 +45,23 @@ fornma-desktop
 
 Windows: run `forNMA-Setup-0.1.0-cpu-windows-x64.exe` and open the new shortcut.
 
+macOS: open `forNMA-0.1.0-cpu-macos-arm64.dmg` (M1 or later) or
+`forNMA-0.1.0-cpu-macos-x64.dmg` (Intel), drag `forNMA.app` to Applications,
+and open it. These builds target macOS 15+. To stop a Finder-launched instance,
+quit the forNMA process in Activity Monitor. To run with a terminal instead:
+
+```sh
+/Applications/forNMA.app/Contents/MacOS/forNMA
+```
+
 The launcher opens the default browser after the local server is ready. Keep
 the terminal window open while working; Ctrl+C stops the server. Closing a
 browser tab does not stop running analyses. API and frontend use the same local
 address. Port 8000 is preferred; an occupied port gets a reserved fallback.
 
 Settings, logs and model copies are written under `%LOCALAPPDATA%/forNMA` on
-Windows and `$XDG_DATA_HOME/forNMA` (normally `~/.local/share/forNMA`) on Linux.
+Windows and `$XDG_DATA_HOME/forNMA` (normally `~/.local/share/forNMA`) on Linux,
+and `~/Library/Application Support/forNMA` on macOS.
 `FORNMA_DATA_DIR` can override the location. Analysis outputs remain in the
 folders chosen by the user. Previous source-tree NMA settings can be imported
 with the existing settings upload control.
