@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import os
+import platform
 import subprocess
 import sys
 import venv
@@ -55,7 +56,8 @@ if sys.platform == "darwin":
 run([python, "packaging/smoke_test.py", binary], env=environment)
 release = root / "release"
 release.mkdir(exist_ok=True)
-with (release / f"dependencies-{sys.platform}-cpu.txt").open("w") as handle:
+dependency_platform = f"darwin-{platform.machine()}" if sys.platform == "darwin" else sys.platform
+with (release / f"dependencies-{dependency_platform}-cpu.txt").open("w") as handle:
     subprocess.run([str(python), "-m", "pip", "freeze"], stdout=handle, check=True)
 if sys.platform == "linux":
     run([python, "packaging/linux/package_deb.py"])
