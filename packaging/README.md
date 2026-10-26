@@ -27,7 +27,8 @@ other distributions require separate validation. On Windows, install Inno Setup
 PyTorch 2.2.2, the last release with Intel Mac wheels; Apple Silicon uses 2.5.1.
 Both run Cellpose on CPU. Each platform must build and test its own installer.
 
-The manual GitHub Actions workflow `Desktop CPU installers` performs these
+The GitHub Actions workflow `Desktop CPU installers` runs manually or when
+build inputs change on `main`. It performs these
 steps independently on Linux, Windows, macOS Apple Silicon and macOS Intel,
 and uploads the generated installers to a draft GitHub release. Draft release
 assets avoid the Actions artifact storage quota. Select `platforms: macos` in

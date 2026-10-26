@@ -8,7 +8,7 @@ on:
         default: all
         options: [all, macos]
   push:
-    branches: [build/desktop-cpu]
+    branches: [main]
     paths:
       - 'src/**'
       - 'frontend/src/**'
