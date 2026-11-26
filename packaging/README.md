@@ -84,3 +84,19 @@ renders its preview and exports the table. `--self-test` additionally verifies
 the CPU Torch build, native dialog imports, napari imports and Cellpose inference.
 This is technical packaging validation, not a replacement for reviewing real
 scientific datasets or testing the installer on clean target machines.
+
+
+### Release validation records
+
+After building the installer, `test_installer.py` repeats the executable smoke test
+against the extracted `.deb` payload (read-only installation files), the silently
+installed Windows application, or the application on a read-only mounted `.dmg`.
+A failure prevents that platform from uploading its files. The build writes
+`validation-*-cpu.json` with the source commit, architecture, installer size and
+SHA-256, alongside `SHA256SUMS-*` and exact dependency manifests. GitHub runners
+start with clean build directories. Release v0.1.0 sets the setuptools-scm build
+version explicitly to match the installer version.
+
+These checks exercise HTTP frontend assets, backend startup and CPU inference.
+They do not claim visual browser interaction, Finder/Start menu acceptance,
+Gatekeeper/SmartScreen approval, or testing on clean end-user machines.

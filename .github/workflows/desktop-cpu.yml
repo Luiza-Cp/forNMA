@@ -47,7 +47,9 @@ jobs:
       matrix:
         include: ${{ fromJSON(inputs.platforms == 'macos' && '[{"os":"macos-15","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"}]' || '[{"os":"ubuntu-22.04","arch":"x64"},{"os":"windows-2022","arch":"x64"},{"os":"macos-15","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"}]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: "0.1.0"
     steps:
       - uses: actions/checkout@v4
         with:

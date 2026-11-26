@@ -10,7 +10,24 @@ forNMA is a modular Python toolkit for integrating morphological, functional and
 
 The software can be used through a local graphical interface, a command-line interface (CLI), or Python functions. The graphical interface uses React and FastAPI; analyses run locally on the user's computer.
 
-**Quick links:** [Installation](#installation) · [Features](#features) · [Command-line interface](#command-line-interface) · [Python API](#python-api-optional) · [Citation](#citation) · [Contributing](CONTRIBUTING.md)
+## Download forNMA
+
+The CPU desktop installers include Python, the React interface, FastAPI, all four Cellpose models and napari-TRACE. You do not need to install Python, Conda, Node.js or CUDA. Analyses run locally; a GPU is not required.
+
+| System | Download v0.1.0 | Installation |
+| --- | --- | --- |
+| Windows x64 | [Windows installer (.exe)](https://github.com/Luiza-Cp/forNMA/releases/download/v0.1.0/forNMA-Setup-0.1.0-cpu-windows-x64.exe) | Run the installer and open the forNMA shortcut. |
+| Ubuntu 22.04+ / compatible Debian, x64 | [Linux installer (.deb)](https://github.com/Luiza-Cp/forNMA/releases/download/v0.1.0/fornma_0.1.0%2Bcpu_amd64.deb) | In the download folder, run `sudo apt install ./fornma_0.1.0+cpu_amd64.deb`, then launch `fornma-desktop`. |
+| macOS 15+, Apple Silicon (M1 or later) | [Apple Silicon installer (.dmg)](https://github.com/Luiza-Cp/forNMA/releases/download/v0.1.0/forNMA-0.1.0-cpu-macos-arm64.dmg) | Open the disk image and drag forNMA.app to Applications. |
+| macOS 15+, Intel | [Intel installer (.dmg)](https://github.com/Luiza-Cp/forNMA/releases/download/v0.1.0/forNMA-0.1.0-cpu-macos-x64.dmg) | Open the disk image and drag forNMA.app to Applications. |
+
+The launcher opens the interface in your default browser. Keep the server running while working; closing the browser tab does not stop it. Use Ctrl+C in its terminal, or Activity Monitor on macOS, to stop forNMA. Linux packages require the system libraries installed by `apt`; napari needs working OpenGL.
+
+**Unsigned installers:** Windows SmartScreen may warn about an unknown publisher. macOS builds are not Developer ID signed or notarized and may be blocked by Gatekeeper. Only for a trusted download from this repository, use the available “More info” / “Run anyway” option on Windows or System Settings → Privacy & Security → “Open Anyway” on macOS. Do not disable system security globally. Institutional policies may prevent opening unsigned software.
+
+See the [release notes, checksums and platform validation records](https://github.com/Luiza-Cp/forNMA/releases/tag/v0.1.0) and the [desktop guide](packaging/README.md). Automated smoke tests cover the packaged backend, frontend assets and CPU inference; manual desktop interaction and acceptance testing on clean end-user machines remain separate checks.
+
+**Quick links:** [Download](#download-fornma) · [Installation](#installation) · [Features](#features) · [Command-line interface](#command-line-interface) · [Python API](#python-api-optional) · [Citation](#citation) · [Contributing](CONTRIBUTING.md)
 
 ## Features
 
@@ -34,7 +51,7 @@ The software can be used through a local graphical interface, a command-line int
 
 The desktop CPU application bundles Python, the graphical interface, analysis dependencies, Cellpose models and napari-TRACE. It does not require a separate Python, Node.js, Conda or CUDA installation.
 
-Visit [GitHub Releases](https://github.com/Luiza-Cp/forNMA/releases) for published installers, when available. Draft releases are not publicly downloadable. See the [desktop installation and build guide](packaging/README.md) for platform requirements, instructions and limitations, including unsigned Windows and macOS test builds.
+Use the [downloads above](#download-fornma) for the desktop application. See the [desktop installation and build guide](packaging/README.md) for platform requirements, instructions and limitations, including unsigned Windows and macOS test builds.
 
 ### Install from source
 

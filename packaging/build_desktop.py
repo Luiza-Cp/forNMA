@@ -1,5 +1,6 @@
 """Repeatable CPU build using a dedicated virtual environment on the target OS."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import os
@@ -47,6 +48,7 @@ environment["XDG_CACHE_HOME"] = str(root / "build" / "cache")
 environment["MPLCONFIGDIR"] = str(root / "build" / "matplotlib")
 environment["NUMBA_CACHE_DIR"] = str(root / "build" / "numba")
 environment["QT_QPA_PLATFORM"] = "offscreen"
+environment["CUDA_VISIBLE_DEVICES"] = ""
 run([python, "packaging/prepare_models.py"], env=environment)
 run([python, "-m", "PyInstaller", "--noconfirm", "--distpath", "build/desktop-dist",
      "--workpath", "build/desktop-work", "packaging/fornma.spec"], env=environment)
@@ -66,3 +68,31 @@ elif sys.platform == "win32":
     run([compiler, "packaging/windows/fornma.iss"])
 elif sys.platform == "darwin":
     run([python, "packaging/macos/package_dmg.py"])
+
+# Gate uploads on testing the final installer, not just the pre-install bundle.
+if sys.platform == "linux":
+    installer = release / "fornma_0.1.0+cpu_amd64.deb"
+elif sys.platform == "win32":
+    installer = release / "forNMA-Setup-0.1.0-cpu-windows-x64.exe"
+else:
+    arch = "arm64" if platform.machine() == "arm64" else "x64"
+    installer = release / f"forNMA-0.1.0-cpu-macos-{arch}.dmg"
+run([python, "packaging/test_installer.py", installer], env=environment)
+with installer.open("rb") as handle:
+    digest = hashlib.file_digest(handle, "sha256").hexdigest()
+source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+manifest = {
+    "version": "0.1.0", "source_commit": source,
+    "platform": sys.platform, "architecture": platform.machine(),
+    "installer": installer.name, "bytes": installer.stat().st_size, "sha256": digest,
+    "validation": ["frozen executable smoke test", "final installer payload smoke test",
+                   "frontend assets and FastAPI", "CSV and tracking preview/export",
+                   "CPU Cellpose inference", "napari-TRACE and Tcl imports",
+                   "unrelated working directory and isolated user data"],
+    "limitations": ["No manual desktop interaction or clean-machine acceptance test",
+                    "Windows unsigned; macOS not Developer ID signed or notarized"],
+}
+(release / f"validation-{dependency_platform}-cpu.json").write_text(
+    json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+(release / f"SHA256SUMS-{dependency_platform}").write_text(
+    f"{digest}  {installer.name}\n", encoding="utf-8")
