@@ -1,10 +1,23 @@
 # forNMA
 
-Tools for single-cell image analysis and phenotype integration, including registration, segmentation, tracking, plotting, UMAP, and statistical analyses (one-way, two-way, chi-square).
+**Integrated single-cell image analysis and phenotyping**
+
+![forNMA logo](frontend/public/fornma-logo-AP.png)
+
+[![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-3.10–3.12-blue.svg)](pyproject.toml)
+
+forNMA is a modular Python toolkit for integrating morphological, functional and temporal measurements at the single-cell level. It combines image processing, nuclear and cytoplasmic measurements, nuclear morphometric analysis (NMA), cell tracking, visualization, dimensionality reduction and statistical analysis.
+
+The software can be used through a local graphical interface, a command-line interface (CLI), or Python functions. The graphical interface uses React and FastAPI; analyses run locally on the user's computer.
+
+**Quick links:** [Installation](#installation) · [Features](#features) · [Command-line interface](#command-line-interface) · [Python API](#python-api-optional) · [Citation](#citation) · [Contributing](CONTRIBUTING.md)
 
 ## Features
 
-- Image pipeline: registration → segmentation (+feature extraction) → tracking → drawing overlays.
+- Image registration and nuclear/cytoplasmic segmentation, including Cellpose integration.
+- Single-cell morphological and intensity measurements, foci detection and overlays, and nuclear/cytoplasmic intensity ratios.
+- Cell tracking, lineage visualization and tracking curation.
+- Interactive gating and exploration of measurement tables.
 - NMA plots (dot/heatmap/joint) with reusable settings.
 - General plotting module (box/violin/dot/bar/scatter/line/rolling-average/CPD).
 - UMAP utilities: compute embeddings, elbow plot, and color by column or KMeans.
@@ -17,23 +30,61 @@ Tools for single-cell image analysis and phenotype integration, including regist
 
 ## Installation
 
-For the desktop CPU installers (Windows, Linux and macOS), see
-[packaging/README.md](packaging/README.md). These packages bundle Python,
-the web interface, CPU analysis dependencies, Cellpose models and napari-TRACE.
-Desktop installers are built directly from the current source tree; generated
-packages and dependency folders are not stored with the source code.
+### Desktop application
+
+The desktop CPU application bundles Python, the graphical interface, analysis dependencies, Cellpose models and napari-TRACE. It does not require a separate Python, Node.js, Conda or CUDA installation.
+
+Visit [GitHub Releases](https://github.com/Luiza-Cp/forNMA/releases) for published installers, when available. Draft releases are not publicly downloadable. See the [desktop installation and build guide](packaging/README.md) for platform requirements, instructions and limitations, including unsigned Windows and macOS test builds.
+
+### Install from source
+
+Python 3.10–3.12 is supported. Python 3.11 is recommended for desktop builds.
 
 ```bash
-# Editable install during development
-pip install -e .
-
-# (Optional) From TestPyPI once published:
-# pip install --index-url https://test.pypi.org/simple fornma
+git clone https://github.com/Luiza-Cp/forNMA.git
+cd forNMA
+python -m pip install -e .
 ```
 
-Python 3.10–3.12 is supported; desktop CPU installers are built with Python 3.11.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and validation.
-The project uses the [BSD 3-Clause license](LICENSE).
+Alternatively, create the Conda development environment from the repository root:
+
+```bash
+conda env create -f environment.yml
+conda activate fornma
+```
+
+### Launch the graphical interface from source
+
+With Node.js 20 or later installed, build the React frontend:
+
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+fornma-desktop
+```
+
+The launcher starts a local server and opens the interface in your default browser. Keep the server running while performing analyses.
+
+For frontend development with Vite and a separate FastAPI server, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+**Security:** the API is intended for local use, not as an internet-facing service. Only open trusted input files, especially Python pickle files.
+
+### Project structure
+
+```text
+src/fornma/
+  core/       Scientific analysis modules
+  api/        FastAPI backend
+  shared/     Shared utilities
+  cli.py      Command-line interface
+  desktop.py  Local desktop launcher
+frontend/     React graphical interface
+packaging/    Desktop installer build scripts
+tests/        Automated tests
+docs/         Additional documentation
+```
 
 ## Command-line interface
 
@@ -248,8 +299,8 @@ You can also call functions/classes directly:
 
 ```python
 import pandas as pd
-from fornma.Statistics.Helpers import AnalysisHelper
-from fornma.Statistics.OneWay import OneWayAnalysis
+from fornma.core.Statistics.Helpers import AnalysisHelper
+from fornma.core.Statistics.OneWayAnalysis import OneWayAnalysis
 
 helper = AnalysisHelper(alpha=0.05, log_file="logs-fornma.txt")
 df = helper.load_and_concat("/path/to/data.csv")
@@ -260,7 +311,7 @@ print(res["main_result"])
 UMAP:
 
 ```python
-from fornma.UMAP import perform_clustering
+from fornma.core.UMAP import perform_clustering
 perform_clustering(path="/path/to/data.csv", saving_path="out", columns=["Area"])
 ```
 
@@ -275,20 +326,16 @@ perform_clustering(path="/path/to/data.csv", saving_path="out", columns=["Area"]
 
 ## Requirements
 
-Core: `numpy`, `pandas`, `scipy`, `matplotlib`, `scikit-learn`, `umap-learn`.Stats: `statsmodels`, `scikit-posthocs`.Imaging: `scikit-image`, `opencv-python`, `pillow`, (`cellpose<4` if you use segmentation).Plots: `seaborn` (optional).
+Runtime dependencies and supported versions are defined in [pyproject.toml](pyproject.toml). The [environment.yml](environment.yml) file provides a Conda development environment, and [packaging/](packaging/) contains the desktop CPU build requirements.
 
-Your `pyproject.toml` / `environment.yml` should pin compatible versions (example):
-
-- numpy~=1.26, pandas~=2.3, scipy~=1.16, matplotlib~=3.10, seaborn~=0.13  
-- scikit-image~=0.25, scikit-learn~=1.7, pillow~=11.1, opencv-python~=4.10  
-- umap-learn~=0.5.9, statsmodels, scikit-posthocs
+The main scientific dependencies include NumPy, pandas, SciPy, scikit-image, scikit-learn, OpenCV, Cellpose, Matplotlib, seaborn, UMAP and statsmodels.
 
 ---
 
 ## Troubleshooting
 
 - **Command not found (`fornma`)**: reinstall in editable mode and ensure `[project.scripts] fornma = "fornma.cli:main"` is present.
-- **Import errors (`src.fornma` vs `fornma`)**: use absolute package imports `fornma.*`.
+- **Import errors:** install the package from the repository root and use the current package paths, such as `fornma.core.Statistics`.
 - **Argparse errors**: run `fornma -h` or `fornma stats oneway -h` to confirm arguments.
 - **Slow runs**: large datasets + normality/homoscedasticity tests + post-hoc can take time; try a subset first.
 
@@ -310,10 +357,14 @@ BSD 3-Clause License.
 
 ## Citation
 
-If you use **forNMA** in academic work, please cite the software and link to the repository/TestPyPI page.
+If you use **forNMA** in academic work, please cite the software repository and identify the release or commit used for your analysis:
+
+Pereira, L. C., and contributors. *forNMA: integrated single-cell image analysis and phenotyping*. GitHub. https://github.com/Luiza-Cp/forNMA
+
+Use the published article citation when available.
 
 ---
 
 ## Changelog
 
-See `CHANGELOG.md` (or Git tags) for version history once published.
+See [GitHub Releases](https://github.com/Luiza-Cp/forNMA/releases) and the [commit history](https://github.com/Luiza-Cp/forNMA/commits/main/) for version history.
